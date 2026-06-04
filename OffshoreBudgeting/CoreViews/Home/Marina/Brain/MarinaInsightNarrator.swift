@@ -62,6 +62,7 @@ struct MarinaInsightContext: Equatable, Sendable {
     let meaning: String?
     let signals: [MarinaInsightSignal]
     let followUps: [MarinaFollowUpSuggestion]
+    let recommendedFollowUp: MarinaFollowUpSuggestion?
     let rows: [Row]
 
     init(
@@ -83,6 +84,7 @@ struct MarinaInsightContext: Equatable, Sendable {
         self.meaning = insightBundle?.meaning
         self.signals = insightBundle?.signals ?? []
         self.followUps = insightBundle?.followUps ?? []
+        self.recommendedFollowUp = MarinaRecommendedFollowUp.suggestion(from: self.followUps)
         let rows = result.rows.prefix(Self.maxRows).map {
             Row(
                 title: $0.title,
@@ -202,12 +204,20 @@ struct MarinaAnswerFactsDigest: Equatable {
             }
         }
 
+        if let recommendedFollowUp = context.recommendedFollowUp {
+            lines.append("Recommended follow-up:")
+            lines.append("Question: \(MarinaRecommendedFollowUp.confirmationQuestion(for: recommendedFollowUp))")
+            lines.append(Self.followUpLine(recommendedFollowUp))
+        } else {
+            lines.append("Recommended follow-up: none supplied")
+        }
+
         if context.followUps.isEmpty {
             lines.append("Deterministic follow-ups: none supplied")
         } else {
             lines.append("Deterministic follow-ups:")
             for followUp in context.followUps {
-                lines.append("- \(followUp.title): \(followUp.prompt) [\(followUp.reason.rawValue), \(followUp.executionMode.rawValue)]")
+                lines.append("- \(Self.followUpLine(followUp))")
             }
         }
 
@@ -221,6 +231,10 @@ struct MarinaAnswerFactsDigest: Equatable {
         }
 
         return lines.joined(separator: "\n")
+    }
+
+    private static func followUpLine(_ followUp: MarinaFollowUpSuggestion) -> String {
+        "\(followUp.title): \(followUp.prompt) [\(followUp.reason.rawValue), \(followUp.executionMode.rawValue)]"
     }
 }
 
@@ -372,20 +386,44 @@ enum MarinaVoiceSanitizer {
     }
 }
 
+enum MarinaNarrationFinalizer {
+    static func finalized(_ value: String?, context: MarinaInsightContext) -> String? {
+        guard let sanitized = MarinaVoiceSanitizer.sanitizedFinal(value, context: context) else {
+            return nil
+        }
+        guard let followUp = context.recommendedFollowUp else {
+            return sanitized
+        }
+        let question = MarinaRecommendedFollowUp.confirmationQuestion(for: followUp)
+        guard question.isEmpty == false,
+              containsFollowUpQuestion(sanitized, question: question) == false else {
+            return sanitized
+        }
+
+        return "\(sanitized.trimmingCharacters(in: .whitespacesAndNewlines))\n\n\(question)"
+    }
+
+    private static func containsFollowUpQuestion(_ value: String, question: String) -> Bool {
+        value.range(of: question, options: [.caseInsensitive, .diacriticInsensitive]) != nil
+    }
+}
+
 struct MarinaDeterministicInsightNarrator: MarinaInsightNarrating {
     func narration(for context: MarinaInsightContext) async throws -> String? {
         guard context.isNarratable else { return nil }
 
+        let narration: String?
         switch context.answerKind {
         case .metric:
-            return metricNarration(for: context)
+            narration = metricNarration(for: context)
         case .list:
-            return listNarration(for: context)
+            narration = listNarration(for: context)
         case .comparison:
-            return comparisonNarration(for: context)
+            narration = comparisonNarration(for: context)
         case .message:
             return nil
         }
+        return MarinaNarrationFinalizer.finalized(narration, context: context)
     }
 
     private func metricNarration(for context: MarinaInsightContext) -> String? {
@@ -470,14 +508,21 @@ struct MarinaInsightNarrator: MarinaInsightNarrating {
 
                 if let modelStream = modelStream(for: context) {
                     do {
+                        var latest: String?
                         for try await partial in modelStream {
                             guard Task.isCancelled == false else {
                                 continuation.finish()
                                 return
                             }
                             if let sanitized = MarinaVoiceSanitizer.sanitizedStreaming(partial, context: context) {
+                                latest = sanitized
                                 continuation.yield(sanitized)
                             }
+                        }
+                        if let finalized = MarinaNarrationFinalizer.finalized(latest, context: context),
+                           finalized != latest,
+                           Task.isCancelled == false {
+                            continuation.yield(finalized)
                         }
                         continuation.finish()
                         return
@@ -520,7 +565,7 @@ struct MarinaInsightNarrator: MarinaInsightNarrating {
     ) async {
         do {
             if let fallback = try await fallbackNarrator.narration(for: context),
-               let sanitized = MarinaVoiceSanitizer.sanitizedFinal(fallback, context: context),
+               let sanitized = MarinaNarrationFinalizer.finalized(fallback, context: context),
                Task.isCancelled == false {
                 continuation.yield(sanitized)
             }

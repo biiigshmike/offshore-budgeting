@@ -59,6 +59,9 @@ struct MarinaQueryPlanner {
             )
             return currentRange.map(previousEquivalentRange)
         case .currentMonth:
+            if let ambientDateRange {
+                return ambientDateRange
+            }
             let range = BudgetingPeriod.monthly.defaultRange(containing: now, calendar: calendar)
             return HomeQueryDateRange(startDate: range.start, endDate: range.end)
         case .previousMonth:
@@ -92,12 +95,7 @@ struct MarinaQueryPlanner {
         case .currentPeriod:
             return primaryRange.map(previousEquivalentRange)
         case .currentMonth:
-            return dateRange(
-                for: .previousMonth,
-                ambientDateRange: nil,
-                defaultBudgetingPeriod: defaultBudgetingPeriod,
-                now: now
-            )
+            return primaryRange.map(previousEquivalentRange)
         case .nextSevenDays, .allTime:
             return primaryRange.map(previousEquivalentRange)
         }

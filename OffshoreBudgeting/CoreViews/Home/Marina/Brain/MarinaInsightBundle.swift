@@ -63,6 +63,7 @@ struct MarinaFollowUpSuggestion: Codable, Equatable, Sendable, Identifiable {
         case forecast
         case nextDue
         case safeDailySpend
+        case showMore
     }
 
     let id: UUID

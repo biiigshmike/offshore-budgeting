@@ -79,6 +79,19 @@ struct MarinaPanelView: View {
     private let createService = MarinaCreateService()
     private let brain = MarinaBrain()
 
+    static func hasAssistantCardContent(_ answer: HomeAnswer) -> Bool {
+        if answer.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false {
+            return true
+        }
+        if (answer.subtitle ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false {
+            return true
+        }
+        if (answer.primaryValue ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false {
+            return true
+        }
+        return answer.rows.isEmpty == false || answer.attachment != nil
+    }
+
     init(
         workspace: Workspace,
         onDismiss: @escaping () -> Void,
@@ -383,65 +396,67 @@ struct MarinaPanelView: View {
 
     private func assistantMessageBubble(for answer: HomeAnswer, index: Int) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            VStack(alignment: .leading, spacing: 10) {
-                Text(answer.title)
-                    .font(.headline)
-                    .foregroundStyle(.primary)
+            if Self.hasAssistantCardContent(answer) {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text(answer.title)
+                        .font(.headline)
+                        .foregroundStyle(.primary)
 
-                if let subtitle = answer.subtitle, subtitle.isEmpty == false {
-                    Text(subtitle)
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
-
-                if let primaryValue = answer.primaryValue, primaryValue.isEmpty == false {
-                    Text(primaryValue)
-                        .font(.title3.weight(.semibold))
-                        .foregroundStyle(Color("AccentColor"))
-                }
-
-                ForEach(answer.rows) { row in
-                    HStack(alignment: .firstTextBaseline) {
-                        Text(row.title)
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(.primary)
-                        Spacer(minLength: 12)
-                        Text(row.value)
+                    if let subtitle = answer.subtitle, subtitle.isEmpty == false {
+                        Text(subtitle)
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
-                            .multilineTextAlignment(.trailing)
+                    }
+
+                    if let primaryValue = answer.primaryValue, primaryValue.isEmpty == false {
+                        Text(primaryValue)
+                            .font(.title3.weight(.semibold))
+                            .foregroundStyle(Color("AccentColor"))
+                    }
+
+                    ForEach(answer.rows) { row in
+                        HStack(alignment: .firstTextBaseline) {
+                            Text(row.title)
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(.primary)
+                            Spacer(minLength: 12)
+                            Text(row.value)
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                                .multilineTextAlignment(.trailing)
+                        }
+                    }
+
+                    if let formBinding = inlineCreateFormBinding(for: answer.id) {
+                        MarinaInlineCreateFormCard(
+                            form: formBinding,
+                            cards: cards,
+                            categories: categories,
+                            presets: activePresets,
+                            onSubmit: {
+                                submitInlineCreateForm(answerID: answer.id)
+                            },
+                            onCancel: {
+                                cancelInlineCreateForm(answerID: answer.id)
+                            }
+                        )
+                    }
+
+                    if let choices = clarificationChoices(for: answer) {
+                        clarificationChoicesView(choices, answerID: answer.id)
                     }
                 }
-
-                if let formBinding = inlineCreateFormBinding(for: answer.id) {
-                    MarinaInlineCreateFormCard(
-                        form: formBinding,
-                        cards: cards,
-                        categories: categories,
-                        presets: activePresets,
-                        onSubmit: {
-                            submitInlineCreateForm(answerID: answer.id)
-                        },
-                        onCancel: {
-                            cancelInlineCreateForm(answerID: answer.id)
-                        }
-                    )
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+                .background(assistantBubbleBackground, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .stroke(assistantBubbleStroke, lineWidth: 1)
                 }
-
-                if let choices = clarificationChoices(for: answer) {
-                    clarificationChoicesView(choices, answerID: answer.id)
-                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .accessibilityElement(children: .combine)
+                .accessibilityIdentifier("marina.answer.\(index)")
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 10)
-            .background(assistantBubbleBackground, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .stroke(assistantBubbleStroke, lineWidth: 1)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .accessibilityElement(children: .combine)
-            .accessibilityIdentifier("marina.answer.\(index)")
 
             if let explanation = answer.explanation?.trimmingCharacters(in: .whitespacesAndNewlines),
                explanation.isEmpty == false {
@@ -971,6 +986,12 @@ struct MarinaPanelView: View {
 
     private func handleAnswerSeed(_ seed: MarinaAnswerSeed) async {
         appendAnswer(seed.answer)
+        if let scriptedNarration = seed.scriptedNarration,
+           seed.insightContext == nil {
+            await streamScriptedNarration(scriptedNarration, for: seed)
+            return
+        }
+
         guard let insightContext = seed.insightContext else { return }
 
         var latestNarration: String?
@@ -997,6 +1018,45 @@ struct MarinaPanelView: View {
             guard Task.isCancelled == false else { return }
             replaceAnswer(seed.answer, shouldSave: true)
         }
+    }
+
+    private func streamScriptedNarration(_ narration: String, for seed: MarinaAnswerSeed) async {
+        var latestNarration: String?
+        for partial in scriptedNarrationPartials(for: narration) {
+            guard Task.isCancelled == false else { return }
+            latestNarration = partial
+            replaceAnswerExplanation(
+                answerID: seed.answer.id,
+                baseExplanation: seed.answer.explanation,
+                insight: partial,
+                suffix: nil,
+                shouldSave: false
+            )
+            try? await Task.sleep(nanoseconds: 18_000_000)
+        }
+
+        guard Task.isCancelled == false else { return }
+        let finalAnswer = brain.completedAnswer(
+            from: seed,
+            streamingNarration: latestNarration
+        )
+        replaceAnswer(finalAnswer, shouldSave: true)
+    }
+
+    private func scriptedNarrationPartials(for narration: String) -> [String] {
+        let words = narration.split(separator: " ", omittingEmptySubsequences: false)
+        guard words.isEmpty == false else { return [narration] }
+
+        var partials: [String] = []
+        var current = ""
+        for word in words {
+            current = current.isEmpty ? String(word) : "\(current) \(word)"
+            partials.append(current)
+        }
+        if partials.last != narration {
+            partials.append(narration)
+        }
+        return partials
     }
 
     private func replaceAnswerExplanation(

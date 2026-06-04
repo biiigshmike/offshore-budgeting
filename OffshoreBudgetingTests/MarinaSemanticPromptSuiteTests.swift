@@ -83,6 +83,7 @@ struct MarinaSemanticPromptSuiteTests {
             .init(prompt: "Does my income cover planned expenses?", entity: .income, operation: .share, measure: .coverageRatio, shape: .metric),
             .init(prompt: "What is my recurring burden?", entity: .preset, operation: .sum, measure: .recurringBurden, shape: .metric),
             .init(prompt: "What is eating my budget?", entity: .category, operation: .share, measure: .concentration, shape: .metric),
+            .init(prompt: "See the expenses driving my spend trends.", entity: .variableExpense, operation: .list, measure: .budgetImpact, shape: .list),
             .init(prompt: "Compare this budget period to last period.", entity: .budget, operation: .compare, measure: .budgetImpact, shape: .comparison),
             .init(prompt: "If I spend $50 at Target, what happens to my safe spend?", entity: .budget, operation: .whatIf, measure: .remainingRoom, shape: .comparison),
             .init(prompt: "If I spend $200 on Groceries, what happens to projected savings?", entity: .budget, operation: .whatIf, measure: .savingsTotal, shape: .comparison),
@@ -116,6 +117,50 @@ struct MarinaSemanticPromptSuiteTests {
             #expect(plan.entity == testCase.entity, "Plan entity mismatch for \(testCase.prompt)")
             #expect(plan.operation == testCase.operation, "Plan operation mismatch for \(testCase.prompt)")
         }
+    }
+
+    @Test func queryPlanner_currentMonthUsesAmbientRangeForComparisonsAndFormulas() throws {
+        let planner = MarinaQueryPlanner()
+        let ambientRange = HomeQueryDateRange(
+            startDate: date(2026, 6, 1),
+            endDate: date(2026, 6, 30)
+        )
+        let now = date(2026, 4, 20)
+
+        let comparisonPlan = planner.plan(
+            request: MarinaSemanticRequest(
+                entity: .income,
+                operation: .compare,
+                measure: .incomeAmount,
+                dateRangeToken: .currentMonth,
+                expectedAnswerShape: .comparison
+            ),
+            ambientDateRange: ambientRange,
+            defaultBudgetingPeriod: .monthly,
+            now: now
+        )
+
+        #expect(comparisonPlan.dateRange?.startDate == date(2026, 6, 1))
+        #expect(comparisonPlan.dateRange?.endDate == date(2026, 6, 30))
+        #expect(comparisonPlan.comparisonDateRange?.startDate == date(2026, 5, 2))
+        #expect(comparisonPlan.comparisonDateRange?.endDate == date(2026, 5, 31))
+
+        let formulaPlan = planner.plan(
+            request: MarinaSemanticRequest(
+                entity: .budget,
+                operation: .forecast,
+                measure: .safeDailySpend,
+                dateRangeToken: .currentMonth,
+                expectedAnswerShape: .metric
+            ),
+            ambientDateRange: ambientRange,
+            defaultBudgetingPeriod: .monthly,
+            now: now
+        )
+
+        #expect(formulaPlan.dateRange?.startDate == date(2026, 6, 1))
+        #expect(formulaPlan.dateRange?.endDate == date(2026, 6, 30))
+        #expect(formulaPlan.comparisonDateRange == nil)
     }
 
     @Test func promptSuite_executesEveryInAppQuestionPhrase() async throws {
@@ -152,6 +197,7 @@ struct MarinaSemanticPromptSuiteTests {
             .init(prompt: "Does my income cover planned expenses?", kind: .metric),
             .init(prompt: "What is my recurring burden?", kind: .metric),
             .init(prompt: "What is eating my budget?", kind: .metric),
+            .init(prompt: "See the expenses driving my spend trends.", kind: .list),
             .init(prompt: "Compare this budget period to last period.", kind: .comparison),
             .init(prompt: "If I spend $50 at Target, what happens to my safe spend?", kind: .comparison),
             .init(prompt: "If I spend $200 on Groceries, what happens to projected savings?", kind: .comparison),
@@ -1114,6 +1160,215 @@ struct MarinaSemanticPromptSuiteTests {
         #expect(comparison.semanticRequest?.incomeState == .all)
     }
 
+    @Test func followUpBuilder_suppressesPreviousPeriodWhenAnswerAlreadyCompares() throws {
+        let context = MarinaAnswerSemanticContext(
+            request: MarinaSemanticRequest(
+                entity: .income,
+                operation: .compare,
+                measure: .incomeAmount,
+                dateRangeToken: .currentPeriod,
+                expectedAnswerShape: .comparison
+            ),
+            dateRange: HomeQueryDateRange(startDate: date(2026, 4, 1), endDate: date(2026, 4, 30)),
+            comparisonDateRange: HomeQueryDateRange(startDate: date(2026, 3, 2), endDate: date(2026, 3, 31)),
+            answerKind: .comparison,
+            answerTitle: "Income Comparison",
+            answerSubtitle: nil,
+            primaryValue: "Down $100.00",
+            rowReferences: []
+        )
+
+        let followUps = MarinaFollowUpBuilder().followUps(for: context)
+
+        #expect(followUps.contains { $0.reason == .comparePreviousPeriod } == false)
+        #expect(MarinaRecommendedFollowUp.suggestion(from: followUps)?.reason != .comparePreviousPeriod)
+    }
+
+    @Test func followUpBuilder_listSuppressesPreviousPeriodWhenAlreadyPreviousOrComparison() throws {
+        let previousContext = MarinaAnswerSemanticContext(
+            request: MarinaSemanticRequest(
+                entity: .variableExpense,
+                operation: .list,
+                measure: .budgetImpact,
+                dateRangeToken: .previousPeriod,
+                expectedAnswerShape: .list
+            ),
+            dateRange: HomeQueryDateRange(startDate: date(2026, 3, 2), endDate: date(2026, 3, 31)),
+            comparisonDateRange: nil,
+            answerKind: .list,
+            answerTitle: "Expenses",
+            answerSubtitle: nil,
+            primaryValue: nil,
+            rowReferences: [
+                MarinaAnswerSemanticRowReference(row: HomeAnswerRow(title: "Coffee", value: "$5.00", amount: 5))
+            ]
+        )
+        let comparisonContext = MarinaAnswerSemanticContext(
+            request: MarinaSemanticRequest(
+                entity: .variableExpense,
+                operation: .list,
+                measure: .budgetImpact,
+                dateRangeToken: .currentPeriod,
+                expectedAnswerShape: .list
+            ),
+            dateRange: HomeQueryDateRange(startDate: date(2026, 4, 1), endDate: date(2026, 4, 30)),
+            comparisonDateRange: HomeQueryDateRange(startDate: date(2026, 3, 2), endDate: date(2026, 3, 31)),
+            answerKind: .list,
+            answerTitle: "Expenses",
+            answerSubtitle: nil,
+            primaryValue: nil,
+            rowReferences: [
+                MarinaAnswerSemanticRowReference(row: HomeAnswerRow(title: "Coffee", value: "$5.00", amount: 5))
+            ]
+        )
+
+        let previousFollowUps = MarinaFollowUpBuilder().followUps(for: previousContext)
+        let comparisonFollowUps = MarinaFollowUpBuilder().followUps(for: comparisonContext)
+
+        #expect(previousFollowUps.contains { $0.reason == .comparePreviousPeriod } == false)
+        #expect(comparisonFollowUps.contains { $0.reason == .comparePreviousPeriod } == false)
+        #expect(previousFollowUps.contains { $0.title == "Show more" })
+        #expect(comparisonFollowUps.contains { $0.title == "Show more" })
+    }
+
+    @Test func followUpBuilder_groupedSpendListsSeparateShowMoreFromExpenseDrillDown() throws {
+        let context = MarinaAnswerSemanticContext(
+            request: MarinaSemanticRequest(
+                entity: .category,
+                operation: .group,
+                measure: .budgetImpact,
+                dimensions: [.category, .date],
+                dateRangeToken: .currentPeriod,
+                resultLimit: 3,
+                sort: .amountDescending,
+                expenseScope: .unified,
+                expectedAnswerShape: .list
+            ),
+            dateRange: HomeQueryDateRange(startDate: date(2026, 4, 1), endDate: date(2026, 4, 30)),
+            comparisonDateRange: nil,
+            answerKind: .list,
+            answerTitle: "Spend Trends",
+            answerSubtitle: "April 2026",
+            primaryValue: "$2,435.40",
+            rowReferences: [
+                MarinaAnswerSemanticRowReference(row: HomeAnswerRow(title: "Bills & Utilities", value: "$2,200.94 (90.4%)", amount: 2_200.94)),
+                MarinaAnswerSemanticRowReference(row: HomeAnswerRow(title: "Shopping", value: "$148.57 (6.1%)", amount: 148.57))
+            ]
+        )
+
+        let followUps = MarinaFollowUpBuilder().followUps(for: context)
+        let showMore = try #require(followUps.first { $0.reason == .showMore })
+        let inspectRows = try #require(followUps.first { $0.reason == .inspectRows })
+
+        #expect(showMore.semanticRequest?.entity == .category)
+        #expect(showMore.semanticRequest?.operation == .group)
+        #expect(showMore.semanticRequest?.resultLimit == 10)
+        #expect(inspectRows.semanticRequest?.entity == .variableExpense)
+        #expect(inspectRows.semanticRequest?.operation == .list)
+        #expect(inspectRows.semanticRequest?.measure == .budgetImpact)
+        #expect(inspectRows.semanticRequest?.sort == .amountDescending)
+        #expect(inspectRows.semanticRequest?.expenseScope == .unified)
+        #expect(inspectRows.semanticRequest?.dimensions.contains(.date) == false)
+        #expect(inspectRows.semanticRequest?.dimensions.contains(.category) == false)
+    }
+
+    @Test func followUpBuilder_concreteExpenseListsDoNotRecommendInspectRowsAgain() throws {
+        let context = MarinaAnswerSemanticContext(
+            request: MarinaSemanticRequest(
+                entity: .variableExpense,
+                operation: .list,
+                measure: .budgetImpact,
+                dateRangeToken: .currentPeriod,
+                resultLimit: 5,
+                sort: .amountDescending,
+                expenseScope: .unified,
+                expectedAnswerShape: .list
+            ),
+            dateRange: HomeQueryDateRange(startDate: date(2026, 4, 1), endDate: date(2026, 4, 30)),
+            comparisonDateRange: nil,
+            answerKind: .list,
+            answerTitle: "Recent Expenses",
+            answerSubtitle: "April 2026",
+            primaryValue: nil,
+            rowReferences: [
+                MarinaAnswerSemanticRowReference(row: HomeAnswerRow(title: "Rent", value: "$1,200.00", sourceID: UUID(), objectType: .plannedExpense, amount: 1_200))
+            ]
+        )
+
+        let followUps = MarinaFollowUpBuilder().followUps(for: context)
+
+        #expect(followUps.contains { $0.reason == .inspectRows } == false)
+        #expect(followUps.contains { $0.reason == .showMore })
+    }
+
+    @Test func followUpBuilder_allInspectRowsSuggestionsExecuteRowListRequests() throws {
+        let categoryContext = MarinaAnswerSemanticContext(
+            request: MarinaSemanticRequest(
+                entity: .category,
+                operation: .sum,
+                measure: .budgetImpact,
+                dimensions: [.category],
+                dateRangeToken: .currentPeriod,
+                targetName: "Groceries",
+                expectedAnswerShape: .metric
+            ),
+            dateRange: HomeQueryDateRange(startDate: date(2026, 4, 1), endDate: date(2026, 4, 30)),
+            comparisonDateRange: nil,
+            answerKind: .metric,
+            answerTitle: "Groceries Spend",
+            answerSubtitle: nil,
+            primaryValue: "$120.00",
+            rowReferences: []
+        )
+        let cardContext = MarinaAnswerSemanticContext(
+            request: MarinaSemanticRequest(
+                entity: .card,
+                operation: .sum,
+                measure: .budgetImpact,
+                dimensions: [.card],
+                dateRangeToken: .currentPeriod,
+                targetName: "Apple Card",
+                expectedAnswerShape: .metric
+            ),
+            dateRange: HomeQueryDateRange(startDate: date(2026, 4, 1), endDate: date(2026, 4, 30)),
+            comparisonDateRange: nil,
+            answerKind: .metric,
+            answerTitle: "Apple Card Spend",
+            answerSubtitle: nil,
+            primaryValue: "$100.00",
+            rowReferences: []
+        )
+        let trendContext = MarinaAnswerSemanticContext(
+            request: MarinaSemanticRequest(
+                entity: .category,
+                operation: .group,
+                measure: .budgetImpact,
+                dimensions: [.category, .date],
+                dateRangeToken: .currentPeriod,
+                resultLimit: 3,
+                sort: .amountDescending,
+                expenseScope: .unified,
+                expectedAnswerShape: .list
+            ),
+            dateRange: HomeQueryDateRange(startDate: date(2026, 4, 1), endDate: date(2026, 4, 30)),
+            comparisonDateRange: nil,
+            answerKind: .list,
+            answerTitle: "Spend Trends",
+            answerSubtitle: nil,
+            primaryValue: "$100.00",
+            rowReferences: []
+        )
+
+        let followUps = [categoryContext, cardContext, trendContext]
+            .flatMap { MarinaFollowUpBuilder().followUps(for: $0) }
+            .filter { $0.reason == .inspectRows }
+
+        #expect(followUps.isEmpty == false)
+        #expect(followUps.allSatisfy { $0.semanticRequest?.entity == .variableExpense })
+        #expect(followUps.allSatisfy { $0.semanticRequest?.operation == .list })
+        #expect(followUps.allSatisfy { $0.semanticRequest?.expectedAnswerShape == .list })
+    }
+
     @Test func followUpBuilder_marksExecutableAndClarificationDrivenSuggestionsExplicitly() throws {
         let builder = MarinaFollowUpBuilder()
         let contexts = [
@@ -1232,6 +1487,39 @@ struct MarinaSemanticPromptSuiteTests {
         #expect(decodedExecutable.semanticRequest != nil)
         #expect(decodedClarification.executionMode == .clarificationRequired)
         #expect(decodedClarification.semanticRequest == nil)
+    }
+
+    @Test func insightContext_recommendedFollowUpSelectionIsDeterministic() throws {
+        let safeDaily = followUp(
+            title: "What can I spend per day?",
+            prompt: "What can I spend per day?",
+            reason: .safeDailySpend,
+            mode: .executable
+        )
+        let whatIf = followUp(
+            title: "What if I spend $50?",
+            prompt: "What if I spend $50?",
+            reason: .whatIf,
+            mode: .executable
+        )
+        let clarification = followUp(
+            title: "Compare this card to another card",
+            prompt: "Compare Apple Card to another card.",
+            reason: .comparePreviousPeriod,
+            mode: .clarificationRequired
+        )
+
+        let prefersWhatIf = insightContext(followUps: [safeDaily, whatIf, clarification])
+        #expect(prefersWhatIf.recommendedFollowUp?.title == "What if I spend $50?")
+
+        let prefersExecutable = insightContext(followUps: [clarification, safeDaily])
+        #expect(prefersExecutable.recommendedFollowUp?.title == "What can I spend per day?")
+
+        let fallsBackToClarification = insightContext(followUps: [clarification])
+        #expect(fallsBackToClarification.recommendedFollowUp?.title == "Compare this card to another card")
+
+        let noFollowUp = insightContext(followUps: [])
+        #expect(noFollowUp.recommendedFollowUp == nil)
     }
 
     @Test func insightAnalyzer_emitsDomainSignalsForFormulaAnswers() throws {
@@ -1405,6 +1693,10 @@ struct MarinaSemanticPromptSuiteTests {
         #expect(digest.contains("Deterministic headline fact: Groceries Spend: $120.00"))
         #expect(digest.contains("Deterministic signals:"))
         #expect(digest.contains("caution: Daily room is tight - The remaining room is spread thin across the days left in this period."))
+        #expect(digest.contains("Recommended follow-up:"))
+        #expect(digest.contains("Question: Want to see the biggest expenses behind this?"))
+        #expect(digest.contains("Show biggest expenses in this category: Show biggest expenses in Groceries. [inspectRows, executable]"))
+        #expect(digest.contains("Deterministic follow-ups:"))
         #expect(digest.contains("Show biggest expenses in this category: Show biggest expenses in Groceries. [inspectRows, executable]"))
         #expect(digest.contains("Which categories still have room?") == false)
     }
@@ -1443,6 +1735,17 @@ struct MarinaSemanticPromptSuiteTests {
         #expect(output.contains("Variable"))
         #expect(output.contains("SwiftData") == false)
     }
+
+    @Test func foundationModelsInsightInstructionsRequireRecommendedFollowUpOnly() throws {
+        guard #available(iOS 26.0, *) else { return }
+
+        let instructions = MarinaFoundationModelsInsightRuntime.baseInstructions
+
+        #expect(instructions.contains("If a Recommended follow-up question is supplied, write the answer, then a blank line, then that exact Recommended follow-up question."))
+        #expect(instructions.contains("Do not invent, rewrite, or substitute follow-ups"))
+        #expect(instructions.contains("Do not show raw follow-up prompts as visible questions unless they exactly match the Recommended follow-up question."))
+        #expect(instructions.contains("If no Recommended follow-up question is supplied, do not add a next-step question."))
+    }
     #endif
 
     @Test func deterministicInsightNarrator_producesWarmFallback() async throws {
@@ -1474,6 +1777,148 @@ struct MarinaSemanticPromptSuiteTests {
         #expect(narration?.contains("$42.00") == true)
         #expect(narration?.contains("Period room") == true)
         #expect(narration?.hasPrefix("Marina:") == false)
+    }
+
+    @Test func narrationFinalizer_appendsRecommendedFollowUpWhenMissing() throws {
+        let context = insightContext(followUps: [
+            followUp(
+                title: "What if I spend $50?",
+                prompt: "What if I spend $50?",
+                reason: .whatIf,
+                mode: .executable
+            )
+        ])
+
+        let finalized = MarinaNarrationFinalizer.finalized("Your safe daily room is tight for the rest of this period.", context: context)
+
+        #expect(finalized == "Your safe daily room is tight for the rest of this period.\n\nWant to see what happens if you spend $50?")
+    }
+
+    @Test func recommendedFollowUpFormatterCreatesNaturalConfirmationQuestions() throws {
+        let incomeComparison = MarinaFollowUpSuggestion(
+            title: "Compare income to last period",
+            prompt: "Compare income to last period.",
+            reason: .comparePreviousPeriod,
+            executionMode: .executable,
+            semanticRequest: MarinaSemanticRequest(
+                entity: .income,
+                operation: .compare,
+                measure: .incomeAmount,
+                dateRangeToken: .currentPeriod,
+                incomeState: .all,
+                expectedAnswerShape: .comparison
+            )
+        )
+        #expect(MarinaRecommendedFollowUp.confirmationQuestion(for: incomeComparison) == "Want to compare your income to last period?")
+
+        let safeDaily = MarinaNarrationFinalizer.finalized("Your room is ready.", context: insightContext(followUps: [
+            followUp(
+                title: "What can I spend per day?",
+                prompt: "What can I spend per day?",
+                reason: .safeDailySpend,
+                mode: .executable
+            )
+        ]))
+        #expect(safeDaily == "Your room is ready.\n\nWant to check what you can spend per day?")
+
+        let breakdown = MarinaNarrationFinalizer.finalized("Groceries is the main category.", context: insightContext(followUps: [
+            followUp(
+                title: "Show category share",
+                prompt: "Show category share",
+                reason: .breakdown,
+                mode: .executable
+            )
+        ]))
+        #expect(breakdown == "Groceries is the main category.\n\nWant to see the category breakdown?")
+
+        let clarification = MarinaNarrationFinalizer.finalized("Pick another card to compare.", context: insightContext(followUps: [
+            followUp(
+                title: "Compare this card to another card",
+                prompt: "Compare Apple Card to another card.",
+                reason: .comparePreviousPeriod,
+                mode: .clarificationRequired
+            )
+        ]))
+        #expect(clarification == "Pick another card to compare.\n\nWant to narrow that down?")
+
+        let showMore = MarinaFollowUpSuggestion(
+            title: "Show more",
+            prompt: "Show more.",
+            reason: .showMore,
+            executionMode: .executable,
+            semanticRequest: MarinaSemanticRequest(
+                entity: .category,
+                operation: .group,
+                measure: .budgetImpact,
+                dimensions: [.category, .date],
+                resultLimit: 10,
+                expectedAnswerShape: .list
+            )
+        )
+        #expect(MarinaRecommendedFollowUp.confirmationQuestion(for: showMore) == "Want to see more rows?")
+    }
+
+    @Test func factsDigestIncludesShowMoreFollowUpReason() throws {
+        let context = insightContext(followUps: [
+            MarinaFollowUpSuggestion(
+                title: "Show more",
+                prompt: "Show more.",
+                reason: .showMore,
+                executionMode: .executable,
+                semanticRequest: MarinaSemanticRequest(
+                    entity: .category,
+                    operation: .group,
+                    measure: .budgetImpact,
+                    dimensions: [.category, .date],
+                    resultLimit: 10,
+                    expectedAnswerShape: .list
+                )
+            )
+        ])
+        let digest = MarinaAnswerFactsDigest(context: context).text()
+
+        #expect(digest.contains("Question: Want to see more rows?"))
+        #expect(digest.contains("Show more: Show more. [showMore, executable]"))
+    }
+
+    @Test func narrationFinalizer_doesNotDuplicateRecommendedFollowUp() throws {
+        let context = insightContext(followUps: [
+            followUp(
+                title: "What if I spend $50?",
+                prompt: "What if I spend $50?",
+                reason: .whatIf,
+                mode: .executable
+            )
+        ])
+        let alreadyIncluded = "Your safe daily room is tight.\n\nWant to see what happens if you spend $50?"
+
+        let finalized = MarinaNarrationFinalizer.finalized(alreadyIncluded, context: context)
+
+        #expect(finalized == alreadyIncluded)
+    }
+
+    @Test func narrationFinalizer_skipsWhenNoRecommendedFollowUpExists() throws {
+        let context = insightContext(followUps: [])
+
+        let finalized = MarinaNarrationFinalizer.finalized("Your safe spend is ready.", context: context)
+
+        #expect(finalized == "Your safe spend is ready.")
+    }
+
+    @Test func deterministicInsightNarrator_appendsRecommendedFollowUp() async throws {
+        let context = insightContext(followUps: [
+            followUp(
+                title: "What if I spend $50?",
+                prompt: "What if I spend $50?",
+                reason: .whatIf,
+                mode: .executable
+            )
+        ])
+
+        let narration = try await MarinaDeterministicInsightNarrator().narration(for: context)
+
+        #expect(narration?.contains("\n\nWant to see what happens if you spend $50?") == true)
+        #expect(narration?.contains("?”?") == false)
     }
 
     @Test func deterministicInsightNarrator_usesReconciliationPerspectiveSentence() async throws {
@@ -1528,6 +1973,30 @@ struct MarinaSemanticPromptSuiteTests {
 
         #expect(values.count == 1)
         #expect(values.first?.contains("Safe Spend Today") == true)
+    }
+
+    @Test func insightNarrator_modelStreamYieldsFinalRecommendedFollowUpWhenOmitted() async throws {
+        let context = insightContext(followUps: [
+            followUp(
+                title: "What if I spend $50?",
+                prompt: "What if I spend $50?",
+                reason: .whatIf,
+                mode: .executable
+            )
+        ])
+        let narrator = MarinaInsightNarrator(modelStreamProvider: { _ in
+            AsyncThrowingStream { continuation in
+                continuation.yield("Your safe daily room is tight.")
+                continuation.finish()
+            }
+        })
+
+        let values = try await collect(narrator.narrationStream(for: context))
+
+        #expect(values == [
+            "Your safe daily room is tight.",
+            "Your safe daily room is tight.\n\nWant to see what happens if you spend $50?"
+        ])
     }
 
     @Test func voiceSanitizer_removesLeadingNameLabelsAndPreservesLaterMentions() throws {
@@ -1941,6 +2410,184 @@ struct MarinaSemanticPromptSuiteTests {
         #expect(MarinaConversationContext(recentAnswers: [loaded]).lastSemanticContext == streamed.semanticContext)
     }
 
+    @Test func recommendedFollowUpConfirmation_yesExecutesStoredRequestAndKeepsVisiblePrompt() async throws {
+        let fixture = try makeFixture()
+        let brain = MarinaBrain(interpreter: MarinaRuleBasedInterpreter())
+        let summary = await answer("How is income progress?", using: brain, fixture: fixture)
+        let context = MarinaConversationContext(recentAnswers: [summary])
+
+        let recommendation = try #require(context.lastRecommendedFollowUp)
+        #expect(MarinaRecommendedFollowUp.confirmationQuestion(for: recommendation) == "Want to compare your income to last period?")
+
+        let yes = await answer("Yes", using: brain, fixture: fixture, conversationContext: context)
+
+        #expect(yes.userPrompt == "Yes")
+        #expect(yes.kind == .comparison)
+        #expect(yes.title == "Income Comparison")
+        #expect(yes.semanticContext?.request.entity == .income)
+        #expect(yes.semanticContext?.request.operation == .compare)
+        #expect(yes.insightBundle?.followUps.contains { $0.reason == .comparePreviousPeriod } == false)
+        #expect(MarinaConversationContext(recentAnswers: [yes]).lastRecommendedFollowUp?.reason != .comparePreviousPeriod)
+    }
+
+    @Test func recommendedFollowUpConfirmation_noReturnsCasualMessageWithoutQuery() async throws {
+        let fixture = try makeFixture()
+        let brain = MarinaBrain(interpreter: MarinaRuleBasedInterpreter())
+        let summary = await answer("How is income progress?", using: brain, fixture: fixture)
+
+        let no = await answer(
+            "No",
+            using: brain,
+            fixture: fixture,
+            conversationContext: MarinaConversationContext(recentAnswers: [summary])
+        )
+
+        #expect(no.userPrompt == "No")
+        #expect(no.kind == .message)
+        #expect(no.title == "")
+        #expect(no.subtitle == nil)
+        #expect(no.rows.isEmpty)
+        #expect(no.attachment == nil)
+        #expect(no.explanation == "No problem. I’m here whenever you want to dig into something else.")
+        #expect(no.semanticContext == nil)
+        #expect(no.insightBundle == nil)
+        #expect(MarinaPanelView.hasAssistantCardContent(no) == false)
+
+        let messages = MarinaConversationDisplayAdapter.messages(from: [no])
+        #expect(messages.count == 2)
+        #expect(messages[0].role == .user)
+        #expect(messages[0].prompt == "No")
+        #expect(messages[1].role == .assistant)
+        #expect(messages[1].answer?.explanation == "No problem. I’m here whenever you want to dig into something else.")
+    }
+
+    @Test func marinaPanel_assistantCardContentPredicateTreatsNormalAnswersAsVisible() throws {
+        let metric = HomeAnswer(
+            queryID: UUID(),
+            kind: .metric,
+            title: "Safe Spend Today",
+            primaryValue: "$42.00"
+        )
+        let message = HomeAnswer(
+            queryID: UUID(),
+            kind: .message,
+            title: "Can you clarify?",
+            subtitle: "I found a few matches."
+        )
+
+        #expect(MarinaPanelView.hasAssistantCardContent(metric))
+        #expect(MarinaPanelView.hasAssistantCardContent(message))
+    }
+
+    @Test func spendTrendsRecommendedFollowUpsDrillIntoExpenseRowsAfterComparison() async throws {
+        let fixture = try makeFixture()
+        let brain = MarinaBrain(interpreter: MarinaRuleBasedInterpreter())
+        let trends = await answer("Show my spend trends.", using: brain, fixture: fixture)
+        let trendsContext = MarinaConversationContext(recentAnswers: [trends])
+
+        #expect(trends.title == "Spend Trends")
+        #expect(trendsContext.lastRecommendedFollowUp?.reason == .comparePreviousPeriod)
+
+        let previous = await answer("Yes please", using: brain, fixture: fixture, conversationContext: trendsContext)
+        let previousContext = MarinaConversationContext(recentAnswers: [previous])
+
+        #expect(previous.title == "Spend Trends")
+        #expect(previous.semanticContext?.request.operation == .group)
+        #expect(previous.semanticContext?.request.dateRangeToken == .previousPeriod)
+        #expect(previousContext.lastRecommendedFollowUp?.reason == .inspectRows)
+
+        let drillDown = await answer("Sure", using: brain, fixture: fixture, conversationContext: previousContext)
+
+        #expect(drillDown.title == "Recent Expenses")
+        #expect(drillDown.kind == .list)
+        #expect(drillDown.semanticContext?.request.entity == .variableExpense)
+        #expect(drillDown.semanticContext?.request.operation == .list)
+        #expect(drillDown.semanticContext?.request.sort == .amountDescending)
+        #expect(drillDown.semanticContext?.request.dimensions.contains(.date) == false)
+        #expect(drillDown.rows.isEmpty == false)
+        #expect(drillDown.rows.allSatisfy { $0.objectType == .plannedExpense || $0.objectType == .variableExpense })
+        #expect(drillDown.insightBundle?.followUps.contains { $0.reason == .inspectRows } == false)
+    }
+
+    @Test func spendTrendsExpenseDriverPromptRoutesToExpenseRows() async throws {
+        let fixture = try makeFixture()
+        let brain = MarinaBrain(interpreter: MarinaRuleBasedInterpreter())
+
+        let answer = await answer("See the expenses driving my spend trends.", using: brain, fixture: fixture)
+
+        #expect(answer.title == "Recent Expenses")
+        #expect(answer.kind == .list)
+        #expect(answer.semanticContext?.request.entity == .variableExpense)
+        #expect(answer.semanticContext?.request.operation == .list)
+        #expect(answer.semanticContext?.request.sort == .amountDescending)
+        #expect(answer.rows.isEmpty == false)
+    }
+
+    @Test func comparisonDriverPromptsKeepCategoryDriversUnlessExpensesAreExplicit() async throws {
+        let fixture = try makeFixture()
+        let brain = MarinaBrain(interpreter: MarinaRuleBasedInterpreter())
+        let comparison = await answer("Compare this budget period to last period.", using: brain, fixture: fixture)
+        let context = MarinaConversationContext(recentAnswers: [comparison])
+
+        let categoryDrivers = await answer("what drove the increase?", using: brain, fixture: fixture, conversationContext: context)
+        #expect(categoryDrivers.kind == .list)
+        #expect(categoryDrivers.semanticContext?.request.entity == .category)
+        #expect(categoryDrivers.semanticContext?.request.operation == .group)
+
+        let expenseDrivers = await answer("which expenses drove the increase?", using: brain, fixture: fixture, conversationContext: context)
+        #expect(expenseDrivers.kind == .list)
+        #expect(expenseDrivers.title == "Recent Expenses")
+        #expect(expenseDrivers.semanticContext?.request.entity == .variableExpense)
+        #expect(expenseDrivers.semanticContext?.request.operation == .list)
+        #expect(expenseDrivers.rows.allSatisfy { $0.objectType == .plannedExpense || $0.objectType == .variableExpense })
+    }
+
+    @Test func recommendedFollowUpConfirmation_yesWithoutRecommendationDoesNotResolveHiddenRequest() throws {
+        let answer = HomeAnswer(
+            queryID: UUID(),
+            kind: .message,
+            title: "Plain Answer"
+        )
+        let context = MarinaConversationContext(recentAnswers: [answer])
+
+        #expect(MarinaFollowUpResolver().resolve(prompt: "Yes", conversationContext: context) == nil)
+    }
+
+    @Test func recommendedFollowUpConfirmation_aliasesRecognizeCommonYesAndNoReplies() throws {
+        let yesReplies = [
+            "yes",
+            "sure",
+            "okay",
+            "go for it!",
+            "let’s do it",
+            "sounds good",
+            "yup",
+            "please do",
+            "works for me"
+        ]
+        let noReplies = [
+            "no",
+            "nah",
+            "no thanks",
+            "no, thanks.",
+            "no thank you",
+            "not right now",
+            "maybe later",
+            "pass",
+            "don’t do it"
+        ]
+
+        for reply in yesReplies {
+            #expect(MarinaRecommendedFollowUp.isAffirmative(reply), "\(reply) should confirm the recommended follow-up.")
+            #expect(MarinaRecommendedFollowUp.isNegative(reply) == false, "\(reply) should not decline the recommended follow-up.")
+        }
+
+        for reply in noReplies {
+            #expect(MarinaRecommendedFollowUp.isNegative(reply), "\(reply) should decline the recommended follow-up.")
+            #expect(MarinaRecommendedFollowUp.isAffirmative(reply) == false, "\(reply) should not confirm the recommended follow-up.")
+        }
+    }
+
     @Test func followUpResolver_drillsDownAndCorrectsCardAnswers() async throws {
         let fixture = try makeFixture()
         let brain = MarinaBrain(interpreter: MarinaRuleBasedInterpreter())
@@ -2340,6 +2987,42 @@ struct MarinaSemanticPromptSuiteTests {
                 rows: rows
             ),
             plan: plan
+        )
+    }
+
+    private func insightContext(followUps: [MarinaFollowUpSuggestion]) -> MarinaInsightContext {
+        MarinaInsightContext(
+            prompt: "What is my safe spend today?",
+            result: MarinaExecutionResult(
+                kind: .metric,
+                title: "Safe Spend Today",
+                primaryValue: "$42.00",
+                rows: [HomeAnswerRow(title: "Period room", value: "$420.00", amount: 420)]
+            ),
+            plan: formulaPlan(entity: .budget, operation: .forecast, measure: .remainingRoom),
+            insightBundle: MarinaInsightBundle(followUps: followUps)
+        )
+    }
+
+    private func followUp(
+        title: String,
+        prompt: String,
+        reason: MarinaFollowUpSuggestion.Reason,
+        mode: MarinaFollowUpExecutionMode
+    ) -> MarinaFollowUpSuggestion {
+        MarinaFollowUpSuggestion(
+            title: title,
+            prompt: prompt,
+            reason: reason,
+            executionMode: mode,
+            semanticRequest: mode == .executable
+                ? MarinaSemanticRequest(
+                    entity: .budget,
+                    operation: reason == .whatIf ? .whatIf : .forecast,
+                    measure: reason == .safeDailySpend ? .safeDailySpend : .remainingRoom,
+                    expectedAnswerShape: reason == .whatIf ? .comparison : .metric
+                )
+                : nil
         )
     }
 

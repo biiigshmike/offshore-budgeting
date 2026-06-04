@@ -138,7 +138,34 @@ struct MarinaRuleBasedInterpreter: MarinaModelInterpreting {
             )
         }
 
+        if asksForExpenseRows(normalized),
+           containsAny(normalized, ["drove", "driving", "behind", "made up", "what caused"]) {
+            return MarinaSemanticRequest(
+                entity: .variableExpense,
+                operation: .list,
+                measure: .budgetImpact,
+                dateRangeToken: dateToken(for: normalized),
+                resultLimit: firstInteger(in: normalized) ?? 5,
+                sort: .amountDescending,
+                expenseScope: .unified,
+                expectedAnswerShape: .list
+            )
+        }
+
         if normalized.contains("spend trends") || normalized.contains("spending trends") {
+            if asksForExpenseRows(normalized) {
+                return MarinaSemanticRequest(
+                    entity: .variableExpense,
+                    operation: .list,
+                    measure: .budgetImpact,
+                    dateRangeToken: dateToken(for: normalized),
+                    resultLimit: firstInteger(in: normalized) ?? 5,
+                    sort: .amountDescending,
+                    expenseScope: .unified,
+                    expectedAnswerShape: .list
+                )
+            }
+
             return MarinaSemanticRequest(
                 entity: .category,
                 operation: .group,
@@ -597,6 +624,22 @@ struct MarinaRuleBasedInterpreter: MarinaModelInterpreting {
 
     private func containsAny(_ value: String, _ needles: [String]) -> Bool {
         needles.contains { value.contains($0) }
+    }
+
+    private func asksForExpenseRows(_ normalized: String) -> Bool {
+        containsAny(normalized, [
+            "expense",
+            "expenses",
+            "transaction",
+            "transactions",
+            "charge",
+            "charges",
+            "purchase",
+            "purchases",
+            "behind this",
+            "behind it",
+            "driving"
+        ])
     }
 
     private func categoryAvailabilityRequest(for normalized: String) -> MarinaSemanticRequest? {

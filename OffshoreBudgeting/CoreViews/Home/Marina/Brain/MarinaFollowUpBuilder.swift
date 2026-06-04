@@ -190,7 +190,7 @@ struct MarinaFollowUpBuilder {
             expectedAnswerShape: .metric
         )
 
-        return [
+        var suggestions = [
             suggestion(
                 title: MarinaL10n.string("marina.followUp.income.expected.title", defaultValue: "What income is still expected?", comment: "Follow-up title for expected income."),
                 prompt: MarinaL10n.string("marina.followUp.income.expected.prompt", defaultValue: "What income is still expected?", comment: "Follow-up prompt for expected income."),
@@ -204,15 +204,20 @@ struct MarinaFollowUpBuilder {
                 reason: .forecast,
                 executionMode: .executable,
                 request: coverageRequest
-            ),
-            suggestion(
+            )
+        ]
+
+        if shouldOfferPreviousPeriodComparison(for: context) {
+            suggestions.append(suggestion(
                 title: MarinaL10n.string("marina.followUp.income.previous.title", defaultValue: "Compare income to last period", comment: "Follow-up title for income previous-period comparison."),
                 prompt: MarinaL10n.string("marina.followUp.income.previous.prompt", defaultValue: "Compare income to last period.", comment: "Follow-up prompt for income previous-period comparison."),
                 reason: .comparePreviousPeriod,
                 executionMode: .executable,
                 request: comparisonRequest
-            )
-        ]
+            ))
+        }
+
+        return suggestions
     }
 
     private func cardFollowUps(for context: MarinaAnswerSemanticContext) -> [MarinaFollowUpSuggestion] {
@@ -257,24 +262,38 @@ struct MarinaFollowUpBuilder {
             suggestion(
                 title: MarinaL10n.string("marina.followUp.list.more.title", defaultValue: "Show more", comment: "Follow-up title for showing more rows."),
                 prompt: MarinaL10n.string("marina.followUp.list.more.prompt", defaultValue: "Show more.", comment: "Follow-up prompt for showing more rows."),
-                reason: .inspectRows,
+                reason: .showMore,
                 executionMode: .executable,
                 request: moreRequest
             )
         )
 
-        var previousRequest = context.request
-        previousRequest.dateRangeToken = .previousPeriod
-        previousRequest.expectedAnswerShape = context.request.expectedAnswerShape
-        suggestions.append(
-            suggestion(
-                title: MarinaL10n.string("marina.followUp.list.previous.title", defaultValue: "Compare to last period", comment: "Follow-up title for previous-period list follow-up."),
-                prompt: MarinaL10n.string("marina.followUp.list.previous.prompt", defaultValue: "Show last period.", comment: "Follow-up prompt for previous-period list follow-up."),
-                reason: .comparePreviousPeriod,
-                executionMode: .executable,
-                request: previousRequest
+        if shouldOfferPreviousPeriodComparison(for: context) {
+            var previousRequest = context.request
+            previousRequest.dateRangeToken = .previousPeriod
+            previousRequest.expectedAnswerShape = context.request.expectedAnswerShape
+            suggestions.append(
+                suggestion(
+                    title: MarinaL10n.string("marina.followUp.list.previous.title", defaultValue: "Compare to last period", comment: "Follow-up title for previous-period list follow-up."),
+                    prompt: MarinaL10n.string("marina.followUp.list.previous.prompt", defaultValue: "Show last period.", comment: "Follow-up prompt for previous-period list follow-up."),
+                    reason: .comparePreviousPeriod,
+                    executionMode: .executable,
+                    request: previousRequest
+                )
             )
-        )
+        }
+
+        if let inspectRowsRequest = inspectRowsRequest(for: context) {
+            suggestions.append(
+                suggestion(
+                    title: MarinaL10n.string("marina.followUp.list.inspectRows.title", defaultValue: "Show biggest expenses behind this", comment: "Follow-up title for showing expense rows behind an aggregate list."),
+                    prompt: MarinaL10n.string("marina.followUp.list.inspectRows.prompt", defaultValue: "Show biggest expenses behind this.", comment: "Follow-up prompt for showing expense rows behind an aggregate list."),
+                    reason: .inspectRows,
+                    executionMode: .executable,
+                    request: inspectRowsRequest
+                )
+            )
+        }
 
         if supportsCategoryBreakdown(context) {
             let breakdownRequest = MarinaSemanticRequest(
@@ -337,6 +356,75 @@ struct MarinaFollowUpBuilder {
             return context.request.operation != .group
         case .workspace, .budget, .reconciliationAccount, .savingsAccount, .income, .preset:
             return false
+        }
+    }
+
+    private func inspectRowsRequest(for context: MarinaAnswerSemanticContext) -> MarinaSemanticRequest? {
+        guard isAggregateSpendList(context),
+              context.rowReferences.contains(where: { $0.objectType == .plannedExpense || $0.objectType == .variableExpense }) == false else {
+            return nil
+        }
+
+        return MarinaSemanticRequest(
+            entity: .variableExpense,
+            operation: .list,
+            measure: .budgetImpact,
+            dimensions: expenseRowDimensions(from: context.request),
+            dateRangeToken: context.request.dateRangeToken,
+            targetName: context.request.targetName,
+            textQuery: context.request.textQuery,
+            targetDisplayName: context.request.targetDisplayName,
+            resultLimit: 5,
+            sort: .amountDescending,
+            expenseScope: context.request.expenseScope ?? .unified,
+            expectedAnswerShape: .list
+        )
+    }
+
+    private func isAggregateSpendList(_ context: MarinaAnswerSemanticContext) -> Bool {
+        guard context.request.measure == .budgetImpact,
+              context.request.operation == .group else {
+            return false
+        }
+
+        switch context.request.entity {
+        case .category, .variableExpense, .plannedExpense, .budget, .card:
+            return true
+        case .workspace, .reconciliationAccount, .savingsAccount, .income, .preset:
+            return false
+        }
+    }
+
+    private func expenseRowDimensions(from request: MarinaSemanticRequest) -> [MarinaSemanticDimension] {
+        var dimensions: [MarinaSemanticDimension] = []
+
+        if request.dimensions.contains(.merchantText), trimmed(request.textQuery) != nil {
+            dimensions.append(.merchantText)
+        }
+        if request.dimensions.contains(.card), trimmed(request.targetName) != nil {
+            dimensions.append(.card)
+        }
+        if request.dimensions.contains(.category), trimmed(request.targetName) != nil {
+            dimensions.append(.category)
+        }
+        if request.dimensions.contains(.reconciliationAccount), trimmed(request.targetName) != nil {
+            dimensions.append(.reconciliationAccount)
+        }
+
+        return dimensions
+    }
+
+    private func shouldOfferPreviousPeriodComparison(for context: MarinaAnswerSemanticContext) -> Bool {
+        guard context.request.operation != .compare,
+              context.comparisonDateRange == nil else {
+            return false
+        }
+
+        switch context.request.dateRangeToken {
+        case .previousPeriod, .previousMonth:
+            return false
+        case .currentPeriod, .currentMonth, .nextSevenDays, .allTime:
+            return true
         }
     }
 

@@ -350,6 +350,7 @@ struct MarinaConversationTurn: Equatable, Sendable {
     let primaryValue: String?
     let rowTitles: [String]
     let semanticContext: MarinaAnswerSemanticContext?
+    let recommendedFollowUp: MarinaFollowUpSuggestion?
 }
 
 struct MarinaConversationContext: Equatable, Sendable {
@@ -371,7 +372,8 @@ struct MarinaConversationContext: Equatable, Sendable {
                     subtitle: answer.subtitle,
                     primaryValue: answer.primaryValue,
                     rowTitles: answer.rows.map(\.title),
-                    semanticContext: answer.semanticContext
+                    semanticContext: answer.semanticContext,
+                    recommendedFollowUp: MarinaRecommendedFollowUp.suggestion(from: answer.insightBundle?.followUps ?? [])
                 )
             }
         )
@@ -383,6 +385,10 @@ struct MarinaConversationContext: Equatable, Sendable {
 
     var lastSemanticContext: MarinaAnswerSemanticContext? {
         recentTurns.reversed().compactMap(\.semanticContext).first
+    }
+
+    var lastRecommendedFollowUp: MarinaFollowUpSuggestion? {
+        lastTurn?.recommendedFollowUp
     }
 }
 

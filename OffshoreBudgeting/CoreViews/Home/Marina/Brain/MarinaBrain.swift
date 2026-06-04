@@ -82,16 +82,40 @@ struct MarinaBrain {
 
         do {
             let interpreted: MarinaInterpretedSemanticRequest
-            if let followUpRequest = followUpResolver.resolve(
+            if let followUpResolution = followUpResolver.resolve(
                 prompt: trimmedPrompt,
                 conversationContext: conversationContext
             ) {
-                interpreted = MarinaInterpretedSemanticRequest(
-                    request: followUpRequest,
-                    confidence: .high,
-                    source: .ruleBased,
-                    diagnosticNotes: ["Resolved from recent Marina conversation context."]
-                )
+                switch followUpResolution {
+                case .request(let followUpRequest, let diagnosticNote):
+                    interpreted = MarinaInterpretedSemanticRequest(
+                        request: followUpRequest,
+                        confidence: .high,
+                        source: .ruleBased,
+                        diagnosticNotes: [diagnosticNote]
+                    )
+                case .prompt(let followUpPrompt, let diagnosticNote):
+                    var promptInterpreted = try await interpreter.interpretedSemanticRequest(for: followUpPrompt, context: context)
+                    promptInterpreted.diagnosticNotes.append(diagnosticNote)
+                    interpreted = promptInterpreted
+                case .declined:
+                    let narration = MarinaL10n.string(
+                        "marina.followUp.decline.narration",
+                        defaultValue: "No problem. I’m here whenever you want to dig into something else.",
+                        comment: "Marina narration when the user declines a recommended follow-up."
+                    )
+                    let result = MarinaExecutionResult(
+                        kind: .message,
+                        title: ""
+                    )
+                    let answer = presenter.present(result: result, prompt: trimmedPrompt, queryID: UUID())
+                    return MarinaAnswerSeed(
+                        answer: answer,
+                        insightContext: nil,
+                        finalExplanationSuffix: nil,
+                        scriptedNarration: narration
+                    )
+                }
             } else {
                 interpreted = try await interpreter.interpretedSemanticRequest(for: trimmedPrompt, context: context)
             }
@@ -217,6 +241,17 @@ struct MarinaBrain {
     }
 
     private func completedAnswer(from seed: MarinaAnswerSeed) async -> HomeAnswer {
+        if let scriptedNarration = seed.scriptedNarration {
+            return answer(
+                seed.answer,
+                replacingExplanationWith: combinedExplanation(
+                    base: seed.answer.explanation,
+                    insight: scriptedNarration,
+                    suffix: seed.finalExplanationSuffix
+                )
+            )
+        }
+
         guard let context = seed.insightContext else {
             return seed.answer
         }
@@ -264,7 +299,7 @@ struct MarinaBrain {
             seed.answer,
             replacingExplanationWith: combinedExplanation(
                 base: seed.answer.explanation,
-                insight: narration,
+                insight: narration ?? seed.scriptedNarration,
                 suffix: seed.finalExplanationSuffix
             )
         )
@@ -300,20 +335,54 @@ struct MarinaBrain {
     }
 }
 
+enum MarinaFollowUpResolution: Equatable, Sendable {
+    case request(MarinaSemanticRequest, diagnosticNote: String)
+    case prompt(String, diagnosticNote: String)
+    case declined
+}
+
 struct MarinaFollowUpResolver {
     func resolve(
         prompt: String,
         conversationContext: MarinaConversationContext
-    ) -> MarinaSemanticRequest? {
+    ) -> MarinaFollowUpResolution? {
         let normalized = normalize(prompt)
         guard normalized.isEmpty == false else { return nil }
 
+        if let confirmation = recommendedFollowUpConfirmation(normalized: normalized, conversationContext: conversationContext) {
+            return confirmation
+        }
+
         if let semanticContext = conversationContext.lastSemanticContext,
            let request = request(from: prompt, normalized: normalized, context: semanticContext) {
-            return request
+            return .request(request, diagnosticNote: "Resolved from recent Marina conversation context.")
         }
 
         return legacyCategoryAvailabilityRequest(normalized: normalized, conversationContext: conversationContext)
+            .map { .request($0, diagnosticNote: "Resolved from recent Marina conversation context.") }
+    }
+
+    private func recommendedFollowUpConfirmation(
+        normalized: String,
+        conversationContext: MarinaConversationContext
+    ) -> MarinaFollowUpResolution? {
+        guard MarinaRecommendedFollowUp.isAffirmative(normalized) || MarinaRecommendedFollowUp.isNegative(normalized),
+              let followUp = conversationContext.lastRecommendedFollowUp else {
+            return nil
+        }
+
+        if MarinaRecommendedFollowUp.isNegative(normalized) {
+            return .declined
+        }
+
+        if let request = followUp.semanticRequest {
+            return .request(request, diagnosticNote: "Resolved from recommended Marina follow-up confirmation.")
+        }
+
+        guard followUp.executionMode == .clarificationRequired else {
+            return nil
+        }
+        return .prompt(followUp.prompt, diagnosticNote: "Resolved from recommended Marina follow-up confirmation.")
     }
 
     private func request(
@@ -328,6 +397,10 @@ struct MarinaFollowUpResolver {
         guard context.request.expectedAnswerShape != .unsupported,
               context.request.unsupportedReason == nil else {
             return nil
+        }
+
+        if let expenseDrivers = expenseDriverRequest(normalized: normalized, context: context) {
+            return expenseDrivers
         }
 
         if let comparisonDriver = comparisonDriverRequest(normalized: normalized, context: context) {
@@ -351,6 +424,22 @@ struct MarinaFollowUpResolver {
         }
 
         return nil
+    }
+
+    private func expenseDriverRequest(
+        normalized: String,
+        context: MarinaAnswerSemanticContext
+    ) -> MarinaSemanticRequest? {
+        guard asksForExpenseRows(normalized),
+              containsAny(normalized, ["drove", "driving", "behind", "made up", "what made", "what caused", "caused"]) else {
+            return nil
+        }
+
+        var request = expenseListRequest(from: context.request)
+        applyRefinements(from: normalized, to: &request)
+        request.resultLimit = firstInteger(in: normalized) ?? request.resultLimit ?? 5
+        request.sort = sort(in: normalized) ?? request.sort ?? .amountDescending
+        return request
     }
 
     private func legacyCategoryAvailabilityRequest(
@@ -448,6 +537,7 @@ struct MarinaFollowUpResolver {
         context: MarinaAnswerSemanticContext
     ) -> MarinaSemanticRequest? {
         guard context.answerKind == .comparison,
+              asksForExpenseRows(normalized) == false,
               containsAny(normalized, ["what drove", "why did", "caused", "cause", "driving", "behind the increase", "behind the decrease", "changed"]) else {
             return nil
         }
@@ -548,6 +638,7 @@ struct MarinaFollowUpResolver {
         request.entity = base.entity == .plannedExpense ? .plannedExpense : .variableExpense
         request.operation = .list
         request.measure = .budgetImpact
+        request.dimensions = expenseRowDimensions(from: base)
         request.resultLimit = base.resultLimit
         request.sort = base.sort
         request.expenseScope = base.expenseScope ?? .unified
@@ -557,15 +648,12 @@ struct MarinaFollowUpResolver {
         switch base.entity {
         case .card:
             request.entity = .variableExpense
-            request.dimensions = [.card]
             request.expenseScope = .unified
         case .category:
             request.entity = .variableExpense
-            request.dimensions = base.measure == .categoryAvailability ? [] : [.category]
             request.expenseScope = .unified
         case .reconciliationAccount:
             request.entity = .variableExpense
-            request.dimensions = [.reconciliationAccount]
             request.expenseScope = .unified
         case .budget, .savingsAccount, .workspace:
             request.entity = .variableExpense
@@ -583,6 +671,30 @@ struct MarinaFollowUpResolver {
         }
 
         return request
+    }
+
+    private func expenseRowDimensions(from request: MarinaSemanticRequest) -> [MarinaSemanticDimension] {
+        var dimensions: [MarinaSemanticDimension] = []
+
+        if request.dimensions.contains(.merchantText),
+           trimmed(request.textQuery) != nil {
+            dimensions.append(.merchantText)
+        }
+        if request.dimensions.contains(.card),
+           trimmed(request.targetName) != nil {
+            dimensions.append(.card)
+        }
+        if request.dimensions.contains(.category),
+           trimmed(request.targetName) != nil,
+           request.measure != .categoryAvailability {
+            dimensions.append(.category)
+        }
+        if request.dimensions.contains(.reconciliationAccount),
+           trimmed(request.targetName) != nil {
+            dimensions.append(.reconciliationAccount)
+        }
+
+        return dimensions
     }
 
     private func requestByApplying(
@@ -742,16 +854,39 @@ struct MarinaFollowUpResolver {
             "drill down",
             "transactions",
             "expenses",
+            "expense rows",
+            "expense row",
             "which ones",
             "which one",
             "what caused",
             "what made up",
+            "what made this up",
+            "driving",
+            "behind this",
+            "behind it",
             "largest",
             "biggest",
             "highest",
             "top ",
             "recent",
             "latest"
+        ])
+    }
+
+    private func asksForExpenseRows(_ normalized: String) -> Bool {
+        containsAny(normalized, [
+            "expense",
+            "expenses",
+            "transaction",
+            "transactions",
+            "charge",
+            "charges",
+            "purchase",
+            "purchases",
+            "expense row",
+            "expense rows",
+            "behind this",
+            "behind it"
         ])
     }
 
@@ -1068,6 +1203,11 @@ struct MarinaFollowUpResolver {
 
     private func containsAny(_ value: String, _ needles: [String]) -> Bool {
         needles.contains { value.contains($0) }
+    }
+
+    private func trimmed(_ value: String?) -> String? {
+        let trimmed = (value ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
     }
 
     private func unique(_ dimensions: [MarinaSemanticDimension]) -> [MarinaSemanticDimension] {
