@@ -72,6 +72,7 @@ struct MarinaPanelView: View {
     @State private var isShowingChatHistory = false
     @State private var isShowingClearConversationAlert = false
     @State private var isShowingRenameChatAlert = false
+    @State private var shouldUseRenameChatPopover = false
     @State private var renameChatText = ""
     @State private var renamingSessionID: UUID?
     @State private var pendingDeleteSession: PendingDeleteSession?
@@ -185,10 +186,7 @@ struct MarinaPanelView: View {
                 }
 
                 ToolbarItem(placement: .principal) {
-                    Text(activeSessionTitle)
-                        .font(.headline)
-                        .lineLimit(1)
-                        .accessibilityIdentifier("marina.activeChatTitle")
+                    activeChatTitleView
                 }
 
                 ToolbarItem(placement: .topBarTrailing) {
@@ -224,16 +222,16 @@ struct MarinaPanelView: View {
         }
         .alert(
             String(localized: "marina.chat.rename.title", defaultValue: "Rename Chat", comment: "Alert title for renaming a Marina chat."),
-            isPresented: $isShowingRenameChatAlert
+            isPresented: renameChatAlertBinding
         ) {
             TextField(String(localized: "common.name", defaultValue: "Name", comment: "Common label for a name field."), text: $renameChatText)
             Button(String(localized: "common.cancel", defaultValue: "Cancel", comment: "Cancel action label."), role: .cancel) {
-                renamingSessionID = nil
-                renameChatText = ""
+                cancelRenameChat()
             }
             Button(String(localized: "common.rename", defaultValue: "Rename", comment: "Common action label for renaming.")) {
                 renamePendingChat()
             }
+            .disabled(canSubmitRenameChat == false)
         } message: {
             Text(String(localized: "marina.chat.rename.message", defaultValue: "Give this Marina chat a name.", comment: "Alert message for renaming a Marina chat."))
         }
@@ -260,6 +258,25 @@ struct MarinaPanelView: View {
         } else {
             content
         }
+    }
+
+    private var activeChatTitleView: some View {
+        Text(activeSessionTitle)
+            .font(.headline)
+            .lineLimit(1)
+            .accessibilityIdentifier("marina.activeChatTitle")
+            .popover(
+                isPresented: renameChatPopoverBinding,
+                attachmentAnchor: .rect(.bounds),
+                arrowEdge: .top
+            ) {
+                RenameChatPopoverContent(
+                    chatTitle: $renameChatText,
+                    canRename: canSubmitRenameChat,
+                    onCancel: cancelRenameChat,
+                    onRename: renamePendingChat
+                )
+            }
     }
 
     @ViewBuilder
@@ -624,6 +641,40 @@ struct MarinaPanelView: View {
                 }
             }
         )
+    }
+
+    private var renameChatAlertBinding: Binding<Bool> {
+        Binding(
+            get: { isShowingRenameChatAlert && shouldUseRenameChatPopover == false },
+            set: { isPresented in
+                if isPresented == false {
+                    cancelRenameChat()
+                }
+            }
+        )
+    }
+
+    private var renameChatPopoverBinding: Binding<Bool> {
+        Binding(
+            get: { isShowingRenameChatAlert && shouldUseRenameChatPopover },
+            set: { isPresented in
+                if isPresented == false {
+                    cancelRenameChat()
+                }
+            }
+        )
+    }
+
+    private var canOfferRenameChatPopover: Bool {
+        #if targetEnvironment(macCatalyst)
+        horizontalSizeClass != .compact
+        #else
+        false
+        #endif
+    }
+
+    private var canSubmitRenameChat: Bool {
+        renameChatText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
     }
 
     private var deleteChatMessage: String {
@@ -1327,6 +1378,7 @@ struct MarinaPanelView: View {
     private func beginRenameChat(_ session: MarinaChatSession) {
         renamingSessionID = session.id
         renameChatText = session.title
+        shouldUseRenameChatPopover = canOfferRenameChatPopover && session.id == activeSessionID && isShowingChatHistory == false
         isShowingRenameChatAlert = true
     }
 
@@ -1346,7 +1398,16 @@ struct MarinaPanelView: View {
             return
         }
 
+        isShowingRenameChatAlert = false
+        shouldUseRenameChatPopover = false
         self.renamingSessionID = nil
+        renameChatText = ""
+    }
+
+    private func cancelRenameChat() {
+        isShowingRenameChatAlert = false
+        shouldUseRenameChatPopover = false
+        renamingSessionID = nil
         renameChatText = ""
     }
 
@@ -1620,6 +1681,60 @@ private struct MarinaClarificationChoiceButton: View {
         }
         .opacity(isEnabled ? 1 : 0.62)
         .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+}
+
+private struct RenameChatPopoverContent: View {
+    @Binding var chatTitle: String
+
+    let canRename: Bool
+    let onCancel: () -> Void
+    let onRename: () -> Void
+
+    @FocusState private var isTitleFieldFocused: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(String(localized: "marina.chat.rename.title", defaultValue: "Rename Chat", comment: "Alert title for renaming a Marina chat."))
+                    .font(.headline)
+
+                Text(String(localized: "marina.chat.rename.message", defaultValue: "Give this Marina chat a name.", comment: "Alert message for renaming a Marina chat."))
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            TextField(String(localized: "common.name", defaultValue: "Name", comment: "Common label for a name field."), text: $chatTitle)
+                .textFieldStyle(.roundedBorder)
+                .focused($isTitleFieldFocused)
+                .submitLabel(.done)
+                .onSubmit {
+                    if canRename {
+                        onRename()
+                    }
+                }
+
+            HStack(spacing: 10) {
+                Spacer(minLength: 0)
+
+                Button(String(localized: "common.cancel", defaultValue: "Cancel", comment: "Cancel action label."), role: .cancel) {
+                    onCancel()
+                }
+                .keyboardShortcut(.cancelAction)
+
+                Button(String(localized: "common.rename", defaultValue: "Rename", comment: "Common action label for renaming.")) {
+                    onRename()
+                }
+                .keyboardShortcut(.defaultAction)
+                .disabled(canRename == false)
+            }
+        }
+        .padding(18)
+        .frame(width: 320)
+        .onAppear {
+            isTitleFieldFocused = true
+        }
     }
 }
 
