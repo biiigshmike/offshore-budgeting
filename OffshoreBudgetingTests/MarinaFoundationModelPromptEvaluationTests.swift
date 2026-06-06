@@ -102,6 +102,7 @@ struct MarinaFoundationModelPromptEvaluationTests {
             SavingsLedgerEntry.self,
             ImportMerchantRule.self,
             AssistantAliasRule.self,
+            MarinaChatSession.self,
             IncomeSeries.self,
             Income.self
         ])

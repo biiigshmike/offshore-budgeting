@@ -224,6 +224,7 @@ struct OffshoreBudgetingApp: App {
                 SavingsLedgerEntry.self,
                 ImportMerchantRule.self,
                 AssistantAliasRule.self,
+                MarinaChatSession.self,
                 IncomeSeries.self,
                 Income.self
             ])
@@ -311,6 +312,7 @@ struct OffshoreBudgetingApp: App {
                 SavingsLedgerEntry.self,
                 ImportMerchantRule.self,
                 AssistantAliasRule.self,
+                MarinaChatSession.self,
                 IncomeSeries.self,
                 Income.self
             ])

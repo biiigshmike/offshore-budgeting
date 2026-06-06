@@ -113,6 +113,7 @@ enum UITestSupport {
         deleteAll(AllocationAccount.self, context: context)
         deleteAll(ImportMerchantRule.self, context: context)
         deleteAll(AssistantAliasRule.self, context: context)
+        deleteAll(MarinaChatSession.self, context: context)
         deleteAll(Workspace.self, context: context)
     }
 

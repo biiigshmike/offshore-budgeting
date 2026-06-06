@@ -32,6 +32,7 @@ struct SavingsAccountServiceTests {
             AllocationSettlement.self,
             IncomeSeries.self,
             ImportMerchantRule.self,
+            MarinaChatSession.self,
             Income.self,
             SavingsAccount.self,
             SavingsLedgerEntry.self

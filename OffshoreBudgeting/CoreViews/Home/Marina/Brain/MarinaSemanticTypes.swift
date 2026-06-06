@@ -343,7 +343,7 @@ struct MarinaAnswerSemanticContext: Codable, Equatable, Sendable {
     }
 }
 
-struct MarinaConversationTurn: Equatable, Sendable {
+struct MarinaConversationTurn: Codable, Equatable, Sendable {
     let title: String
     let kind: HomeAnswerKind
     let subtitle: String?
@@ -353,7 +353,7 @@ struct MarinaConversationTurn: Equatable, Sendable {
     let recommendedFollowUp: MarinaFollowUpSuggestion?
 }
 
-struct MarinaConversationContext: Equatable, Sendable {
+struct MarinaConversationContext: Codable, Equatable, Sendable {
     nonisolated static let empty = MarinaConversationContext()
     nonisolated static let maxTurns = 5
 

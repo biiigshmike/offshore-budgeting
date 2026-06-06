@@ -362,6 +362,7 @@ enum DebugSeeder {
 
         deleteAll(ImportMerchantRule.self, context: context)
         deleteAll(AssistantAliasRule.self, context: context)
+        deleteAll(MarinaChatSession.self, context: context)
         deleteAll(Workspace.self, context: context)
     }
 
@@ -659,7 +660,7 @@ enum DebugSeeder {
         )
 
         seedScreenshotSavingsLedger(context: context, workspace: workspace, now: now)
-        seedMarinaConversation(workspace: workspace, now: now)
+        seedMarinaConversation(workspace: workspace, modelContext: context, now: now)
         seedExcursionModeActive(now: now)
     }
 
@@ -1435,14 +1436,13 @@ enum DebugSeeder {
                 return
             }
 
-            seedMarinaConversation(workspace: workspace, now: now)
+            seedMarinaConversation(workspace: workspace, modelContext: context, now: now)
         } catch {
             assertionFailure("DebugSeeder failed to refresh Marina conversation: \(error)")
         }
     }
 
-    private static func seedMarinaConversation(workspace: Workspace, now: Date) {
-        let store = MarinaConversationStore()
+    private static func seedMarinaConversation(workspace: Workspace, modelContext: ModelContext, now: Date) {
         let engine = HomeQueryEngine()
         let monthRange = HomeQueryDateRange(
             startDate: startOfMonth(containing: now, calendar: .current),
@@ -1502,7 +1502,41 @@ enum DebugSeeder {
             )
         }
 
-        store.saveAnswers(answers, workspaceID: workspace.id)
+        do {
+            let encoder = JSONEncoder()
+            let existingSession = try existingMarinaChatSession(workspaceID: workspace.id, modelContext: modelContext)
+            let session = existingSession
+                ?? MarinaChatSession(
+                    title: answers.first?.userPrompt ?? MarinaChatSessionStore.defaultTitle,
+                    workspace: workspace,
+                    createdAt: now,
+                    updatedAt: now,
+                    lastOpenedAt: now
+                )
+
+            if existingSession == nil {
+                modelContext.insert(session)
+            }
+
+            session.title = answers.first?.userPrompt ?? MarinaChatSessionStore.defaultTitle
+            session.hasCustomTitle = false
+            session.visibleAnswersData = try encoder.encode(answers)
+            session.followUpContextData = try encoder.encode(MarinaConversationContext(recentAnswers: answers))
+            session.updatedAt = now
+            session.lastOpenedAt = now
+            try modelContext.save()
+        } catch {
+            assertionFailure("DebugSeeder failed to seed Marina chat session: \(error)")
+        }
+    }
+
+    private static func existingMarinaChatSession(workspaceID: UUID, modelContext: ModelContext) throws -> MarinaChatSession? {
+        var descriptor = FetchDescriptor<MarinaChatSession>(
+            predicate: #Predicate<MarinaChatSession> { $0.workspace?.id == workspaceID },
+            sortBy: [SortDescriptor(\MarinaChatSession.lastOpenedAt, order: .reverse)]
+        )
+        descriptor.fetchLimit = 1
+        return try modelContext.fetch(descriptor).first
     }
 
     // MARK: - Excursion

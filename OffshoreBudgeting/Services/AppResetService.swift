@@ -24,6 +24,7 @@ enum AppResetService {
         try deleteAll(Budget.self, modelContext: modelContext)
         try deleteAll(Card.self, modelContext: modelContext)
         try deleteAll(Category.self, modelContext: modelContext)
+        try deleteAll(MarinaChatSession.self, modelContext: modelContext)
         try deleteAll(Workspace.self, modelContext: modelContext)
 
         try modelContext.save()

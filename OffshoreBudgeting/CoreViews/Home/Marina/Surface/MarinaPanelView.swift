@@ -48,20 +48,33 @@ struct MarinaPanelView: View {
         let choices: MarinaClarificationChoices
     }
 
+    private struct PendingDeleteSession: Identifiable {
+        let id: UUID
+        let title: String
+    }
+
     let workspace: Workspace
     let onDismiss: () -> Void
     let shouldUseLargeMinimumSize: Bool
     let homeContext: MarinaPanelHomeContext?
 
+    @Query private var chatSessions: [MarinaChatSession]
     @Query private var cards: [Card]
     @Query private var categories: [Category]
     @Query private var presets: [Preset]
 
     @State private var answers: [HomeAnswer] = []
+    @State private var followUpContext = MarinaConversationContext.empty
+    @State private var activeSessionID: UUID?
     @State private var promptText = ""
     @State private var hasLoadedConversation = false
     @State private var isResponding = false
+    @State private var isShowingChatHistory = false
     @State private var isShowingClearConversationAlert = false
+    @State private var isShowingRenameChatAlert = false
+    @State private var renameChatText = ""
+    @State private var renamingSessionID: UUID?
+    @State private var pendingDeleteSession: PendingDeleteSession?
     @State private var pendingClarification: PendingClarification?
     @State private var responseTask: Task<Void, Never>?
     @State private var answerUpdateTick = 0
@@ -75,7 +88,7 @@ struct MarinaPanelView: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
-    private let conversationStore = MarinaConversationStore()
+    private let chatSessionStore = MarinaChatSessionStore()
     private let createService = MarinaCreateService()
     private let brain = MarinaBrain()
 
@@ -104,6 +117,13 @@ struct MarinaPanelView: View {
         self.homeContext = homeContext
 
         let workspaceID = workspace.id
+        _chatSessions = Query(
+            filter: #Predicate<MarinaChatSession> { $0.workspace?.id == workspaceID },
+            sort: [
+                SortDescriptor(\MarinaChatSession.lastOpenedAt, order: .reverse),
+                SortDescriptor(\MarinaChatSession.updatedAt, order: .reverse)
+            ]
+        )
         _cards = Query(
             filter: #Predicate<Card> { $0.workspace?.id == workspaceID },
             sort: [SortDescriptor(\Card.name, order: .forward)]
@@ -164,8 +184,15 @@ struct MarinaPanelView: View {
                     .accessibilityLabel(String(localized: "assistant.close", defaultValue: "Close Assistant", comment: "Accessibility label for closing assistant."))
                 }
 
+                ToolbarItem(placement: .principal) {
+                    Text(activeSessionTitle)
+                        .font(.headline)
+                        .lineLimit(1)
+                        .accessibilityIdentifier("marina.activeChatTitle")
+                }
+
                 ToolbarItem(placement: .topBarTrailing) {
-                    clearConversationButton
+                    chatActionsMenu
                 }
             }
         }
@@ -175,6 +202,17 @@ struct MarinaPanelView: View {
         }
         .tint(Color("AccentColor"))
         .toolbarBackground(.visible, for: .navigationBar)
+        .sheet(isPresented: $isShowingChatHistory) {
+            MarinaChatHistoryView(
+                sessions: chatSessions,
+                activeSessionID: activeSessionID,
+                onSelect: selectChatSession,
+                onNewChat: startNewChat,
+                onRename: beginRenameChat,
+                onDelete: beginDeleteChat,
+                onDismiss: { isShowingChatHistory = false }
+            )
+        }
         .alert(
             String(localized: "assistant.clearHistory.confirmation", defaultValue: "Are you sure you want to clear your chat history?", comment: "Confirmation prompt before clearing assistant chat history."),
             isPresented: $isShowingClearConversationAlert
@@ -183,6 +221,34 @@ struct MarinaPanelView: View {
             Button(String(localized: "common.clear", defaultValue: "Clear", comment: "Action to clear a selection."), role: .destructive) {
                 clearConversation()
             }
+        }
+        .alert(
+            String(localized: "marina.chat.rename.title", defaultValue: "Rename Chat", comment: "Alert title for renaming a Marina chat."),
+            isPresented: $isShowingRenameChatAlert
+        ) {
+            TextField(String(localized: "common.name", defaultValue: "Name", comment: "Common label for a name field."), text: $renameChatText)
+            Button(String(localized: "common.cancel", defaultValue: "Cancel", comment: "Cancel action label."), role: .cancel) {
+                renamingSessionID = nil
+                renameChatText = ""
+            }
+            Button(String(localized: "common.rename", defaultValue: "Rename", comment: "Common action label for renaming.")) {
+                renamePendingChat()
+            }
+        } message: {
+            Text(String(localized: "marina.chat.rename.message", defaultValue: "Give this Marina chat a name.", comment: "Alert message for renaming a Marina chat."))
+        }
+        .alert(
+            String(localized: "marina.chat.delete.title", defaultValue: "Delete Chat?", comment: "Alert title for deleting a Marina chat."),
+            isPresented: deleteChatAlertBinding
+        ) {
+            Button(String(localized: "common.cancel", defaultValue: "Cancel", comment: "Cancel action label."), role: .cancel) {
+                pendingDeleteSession = nil
+            }
+            Button(String(localized: "common.delete", defaultValue: "Delete", comment: "Delete action label."), role: .destructive) {
+                deletePendingChat()
+            }
+        } message: {
+            Text(deleteChatMessage)
         }
         .onDisappear {
             cancelResponseTask()
@@ -306,16 +372,50 @@ struct MarinaPanelView: View {
             }
     }
 
-    private var clearConversationButton: some View {
-        Button {
-            isShowingClearConversationAlert = true
+    private var chatActionsMenu: some View {
+        Menu {
+            Button {
+                startNewChat()
+            } label: {
+                Label(String(localized: "marina.chat.new", defaultValue: "New Chat", comment: "Menu action to start a new Marina chat."), systemImage: "square.and.pencil")
+            }
+
+            Button {
+                isShowingChatHistory = true
+            } label: {
+                Label(String(localized: "marina.chat.history", defaultValue: "Chat History", comment: "Menu action to open Marina chat history."), systemImage: "clock")
+            }
+
+            Divider()
+
+            Button {
+                beginRenameActiveChat()
+            } label: {
+                Label(String(localized: "marina.chat.rename", defaultValue: "Rename Chat", comment: "Menu action to rename a Marina chat."), systemImage: "pencil")
+            }
+            .disabled(activeSessionID == nil)
+
+            Button {
+                isShowingClearConversationAlert = true
+            } label: {
+                Label(String(localized: "marina.chat.clearCurrent", defaultValue: "Clear Current Chat", comment: "Menu action to clear the active Marina chat."), systemImage: "eraser")
+            }
+            .disabled(activeSessionID == nil || answers.isEmpty)
+
+            Button(role: .destructive) {
+                beginDeleteActiveChat()
+            } label: {
+                Label(String(localized: "marina.chat.delete", defaultValue: "Delete Chat", comment: "Menu action to delete a Marina chat."), systemImage: "trash")
+            }
+            .disabled(activeSessionID == nil)
         } label: {
-            Text(String(localized: "common.clear", defaultValue: "Clear", comment: "Action to clear a selection."))
-                .frame(height: 33)
+            Label(String(localized: "marina.chat.actions", defaultValue: "Chat Actions", comment: "Accessibility label for Marina chat actions menu."), systemImage: "ellipsis.circle")
+                .labelStyle(.iconOnly)
+                .font(.body.weight(.semibold))
+                .frame(width: 33, height: 33)
         }
-        .modifier(AssistantPanelActionButtonModifier())
-        .disabled(answers.isEmpty)
-        .accessibilityLabel(String(localized: "assistant.clearChat", defaultValue: "Clear Chat", comment: "Accessibility label for clearing assistant chat."))
+        .modifier(AssistantPanelIconButtonModifier())
+        .accessibilityIdentifier("marina.chatActionsMenu")
     }
 
     private var marinaEmptyState: some View {
@@ -505,6 +605,39 @@ struct MarinaPanelView: View {
         presets.filter { $0.isArchived == false }
     }
 
+    private var activeSession: MarinaChatSession? {
+        guard let activeSessionID else { return nil }
+        return chatSessions.first { $0.id == activeSessionID }
+    }
+
+    private var activeSessionTitle: String {
+        let title = activeSession?.title.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return title.isEmpty ? MarinaChatSessionStore.defaultTitle : title
+    }
+
+    private var deleteChatAlertBinding: Binding<Bool> {
+        Binding(
+            get: { pendingDeleteSession != nil },
+            set: { isPresented in
+                if isPresented == false {
+                    pendingDeleteSession = nil
+                }
+            }
+        )
+    }
+
+    private var deleteChatMessage: String {
+        guard let pendingDeleteSession else {
+            return String(localized: "marina.chat.delete.message", defaultValue: "This removes the chat transcript and follow-up context.", comment: "Alert message for deleting a Marina chat.")
+        }
+        return MarinaL10n.format(
+            "marina.chat.delete.messageFormat",
+            defaultValue: "Delete \"%@\"? This removes the chat transcript and follow-up context.",
+            comment: "Alert message for deleting a named Marina chat.",
+            pendingDeleteSession.title
+        )
+    }
+
     private var shouldStackClarificationChoices: Bool {
         horizontalSizeClass == .compact || dynamicTypeSize.isAccessibilitySize
     }
@@ -547,7 +680,7 @@ struct MarinaPanelView: View {
 
         cancelResponseTask()
         isResponding = true
-        let conversationContext = MarinaConversationContext(recentAnswers: answers)
+        let conversationContext = followUpContext
         responseTask = Task {
             let seed = await brain.answerSeed(
                 prompt: submittedPrompt,
@@ -661,7 +794,7 @@ struct MarinaPanelView: View {
             insightBundle: answer.insightBundle,
             generatedAt: answer.generatedAt
         )
-        conversationStore.saveAnswers(answers, workspaceID: workspace.id)
+        saveCurrentSession()
     }
 
     private func handleCreateMenuSelection(_ kind: MarinaCreateEntityKind) {
@@ -731,7 +864,7 @@ struct MarinaPanelView: View {
             insightBundle: answer.insightBundle,
             generatedAt: answer.generatedAt
         )
-        conversationStore.saveAnswers(answers, workspaceID: workspace.id)
+        saveCurrentSession()
     }
 
     private func finalizeInlineCreateForm(answerID: UUID, subtitle: String, rows: [HomeAnswerRow]) {
@@ -752,7 +885,7 @@ struct MarinaPanelView: View {
             insightBundle: answer.insightBundle,
             generatedAt: answer.generatedAt
         )
-        conversationStore.saveAnswers(answers, workspaceID: workspace.id)
+        saveCurrentSession()
     }
 
     private func cancelInlineCreateForm(answerID: UUID) {
@@ -981,7 +1114,7 @@ struct MarinaPanelView: View {
     private func appendAnswer(_ answer: HomeAnswer) {
         answers.append(answer)
         updatePendingClarification(afterAppending: answer)
-        conversationStore.saveAnswers(answers, workspaceID: workspace.id)
+        saveCurrentSession()
     }
 
     private func handleAnswerSeed(_ seed: MarinaAnswerSeed) async {
@@ -1090,7 +1223,7 @@ struct MarinaPanelView: View {
         )
         answerUpdateTick += 1
         if shouldSave {
-            conversationStore.saveAnswers(answers, workspaceID: workspace.id)
+            saveCurrentSession()
         }
     }
 
@@ -1100,7 +1233,7 @@ struct MarinaPanelView: View {
         updatePendingClarification(afterAppending: answer)
         answerUpdateTick += 1
         if shouldSave {
-            conversationStore.saveAnswers(answers, workspaceID: workspace.id)
+            saveCurrentSession()
         }
     }
 
@@ -1111,23 +1244,163 @@ struct MarinaPanelView: View {
         return pieces.isEmpty ? nil : pieces.joined(separator: "\n\n")
     }
 
+    private func saveCurrentSession() {
+        guard let activeSessionID else {
+            followUpContext = MarinaConversationContext(recentAnswers: answers)
+            return
+        }
+
+        do {
+            followUpContext = try chatSessionStore.saveTranscript(
+                answers,
+                sessionID: activeSessionID,
+                workspaceID: workspace.id,
+                modelContext: modelContext
+            )
+        } catch {
+            followUpContext = MarinaConversationContext(recentAnswers: answers)
+        }
+    }
+
     private func loadConversationIfNeeded() {
         guard hasLoadedConversation == false else { return }
-        answers = conversationStore.loadAnswers(workspaceID: workspace.id)
-        pendingClarification = pendingClarification(from: answers.last)
-        if answers.isEmpty {
+        do {
+            let session = try chatSessionStore.ensureActiveSession(
+                for: workspace,
+                modelContext: modelContext
+            )
+            loadSession(session)
+        } catch {
+            activeSessionID = nil
+            answers = []
+            followUpContext = .empty
+            pendingClarification = nil
             resetStarterPrompts()
         }
         hasLoadedConversation = true
     }
 
+    private func loadSession(_ session: MarinaChatSession) {
+        activeSessionID = session.id
+        answers = chatSessionStore.visibleAnswers(for: session)
+        followUpContext = chatSessionStore.followUpContext(for: session)
+        pendingClarification = pendingClarification(from: answers.last)
+        if answers.isEmpty {
+            resetStarterPrompts()
+        }
+    }
+
+    private func startNewChat() {
+        cancelResponseTask()
+        isResponding = false
+
+        do {
+            let session = try chatSessionStore.createSession(
+                workspace: workspace,
+                modelContext: modelContext
+            )
+            loadSession(session)
+            isShowingChatHistory = false
+        } catch {
+            return
+        }
+    }
+
+    private func selectChatSession(_ session: MarinaChatSession) {
+        cancelResponseTask()
+        isResponding = false
+
+        do {
+            try chatSessionStore.selectSession(session, modelContext: modelContext)
+            loadSession(session)
+            isShowingChatHistory = false
+        } catch {
+            return
+        }
+    }
+
+    private func beginRenameActiveChat() {
+        guard let activeSession else { return }
+        beginRenameChat(activeSession)
+    }
+
+    private func beginRenameChat(_ session: MarinaChatSession) {
+        renamingSessionID = session.id
+        renameChatText = session.title
+        isShowingRenameChatAlert = true
+    }
+
+    private func renamePendingChat() {
+        guard let renamingSessionID else { return }
+        let trimmedTitle = renameChatText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmedTitle.isEmpty == false else { return }
+
+        do {
+            _ = try chatSessionStore.renameSession(
+                id: renamingSessionID,
+                title: trimmedTitle,
+                workspaceID: workspace.id,
+                modelContext: modelContext
+            )
+        } catch {
+            return
+        }
+
+        self.renamingSessionID = nil
+        renameChatText = ""
+    }
+
+    private func beginDeleteActiveChat() {
+        guard let activeSession else { return }
+        beginDeleteChat(activeSession)
+    }
+
+    private func beginDeleteChat(_ session: MarinaChatSession) {
+        let title = session.title.trimmingCharacters(in: .whitespacesAndNewlines)
+        pendingDeleteSession = PendingDeleteSession(
+            id: session.id,
+            title: title.isEmpty ? MarinaChatSessionStore.defaultTitle : title
+        )
+    }
+
+    private func deletePendingChat() {
+        guard let pendingDeleteSession else { return }
+        let deletingActiveSession = pendingDeleteSession.id == activeSessionID
+
+        do {
+            let fallback = try chatSessionStore.deleteSession(
+                id: pendingDeleteSession.id,
+                workspace: workspace,
+                modelContext: modelContext
+            )
+            if deletingActiveSession || activeSessionID == nil {
+                loadSession(fallback)
+            }
+        } catch {
+            return
+        }
+
+        self.pendingDeleteSession = nil
+    }
+
     private func clearConversation() {
         cancelResponseTask()
         answers = []
+        followUpContext = .empty
         pendingClarification = nil
         isResponding = false
         resetStarterPrompts()
-        conversationStore.saveAnswers([], workspaceID: workspace.id)
+
+        guard let activeSessionID else { return }
+        do {
+            _ = try chatSessionStore.clearSession(
+                id: activeSessionID,
+                workspaceID: workspace.id,
+                modelContext: modelContext
+            )
+        } catch {
+            return
+        }
     }
 
     private func cancelResponseTask() {
@@ -1173,6 +1446,132 @@ struct MarinaPanelView: View {
 
     private func timestampText(for date: Date) -> String {
         date.formatted(.dateTime.hour().minute())
+    }
+}
+
+private struct MarinaChatHistoryView: View {
+    let sessions: [MarinaChatSession]
+    let activeSessionID: UUID?
+    let onSelect: (MarinaChatSession) -> Void
+    let onNewChat: () -> Void
+    let onRename: (MarinaChatSession) -> Void
+    let onDelete: (MarinaChatSession) -> Void
+    let onDismiss: () -> Void
+
+    var body: some View {
+        NavigationStack {
+            Group {
+                if sessions.isEmpty {
+                    VStack(spacing: 12) {
+                        Image(systemName: "bubble.left.and.bubble.right")
+                            .font(.system(size: 42, weight: .regular))
+                            .foregroundStyle(.secondary)
+                            .accessibilityHidden(true)
+
+                        Text(String(localized: "marina.chat.history.emptyTitle", defaultValue: "No Chats Yet", comment: "Empty state title for Marina chat history."))
+                            .font(.headline)
+
+                        Text(String(localized: "marina.chat.history.emptyMessage", defaultValue: "Start a new Marina chat to keep the conversation separate.", comment: "Empty state message for Marina chat history."))
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .frame(maxWidth: 320)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .padding()
+                } else {
+                    List {
+                        ForEach(sessions) { session in
+                            Button {
+                                onSelect(session)
+                                onDismiss()
+                            } label: {
+                                sessionRow(session)
+                            }
+                            .buttonStyle(.plain)
+                            .contextMenu {
+                                Button {
+                                    onDismiss()
+                                    onRename(session)
+                                } label: {
+                                    Label(String(localized: "common.rename", defaultValue: "Rename", comment: "Common action label for renaming."), systemImage: "pencil")
+                                }
+
+                                Button(role: .destructive) {
+                                    onDismiss()
+                                    onDelete(session)
+                                } label: {
+                                    Label(String(localized: "common.delete", defaultValue: "Delete", comment: "Delete action label."), systemImage: "trash")
+                                }
+                            }
+                            .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                                Button(role: .destructive) {
+                                    onDismiss()
+                                    onDelete(session)
+                                } label: {
+                                    Label(String(localized: "common.delete", defaultValue: "Delete", comment: "Delete action label."), systemImage: "trash")
+                                }
+
+                                Button {
+                                    onDismiss()
+                                    onRename(session)
+                                } label: {
+                                    Label(String(localized: "common.rename", defaultValue: "Rename", comment: "Common action label for renaming."), systemImage: "pencil")
+                                }
+                                .tint(Color("AccentColor"))
+                            }
+                        }
+                    }
+                }
+            }
+            .navigationTitle(String(localized: "marina.chat.history.title", defaultValue: "Chat History", comment: "Navigation title for Marina chat history."))
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button(String(localized: "common.done", defaultValue: "Done", comment: "Button title to close a sheet."), action: onDismiss)
+                }
+
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        onNewChat()
+                        onDismiss()
+                    } label: {
+                        Label(String(localized: "marina.chat.new", defaultValue: "New Chat", comment: "Menu action to start a new Marina chat."), systemImage: "square.and.pencil")
+                    }
+                }
+            }
+        }
+    }
+
+    private func sessionRow(_ session: MarinaChatSession) -> some View {
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(sessionTitle(session))
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+
+                Text(session.lastOpenedAt.formatted(.dateTime.month().day().hour().minute()))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer(minLength: 12)
+
+            if session.id == activeSessionID {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(Color("AccentColor"))
+                    .accessibilityLabel(String(localized: "marina.chat.current", defaultValue: "Current chat", comment: "Accessibility label for the active Marina chat."))
+            }
+        }
+        .contentShape(Rectangle())
+        .accessibilityElement(children: .combine)
+    }
+
+    private func sessionTitle(_ session: MarinaChatSession) -> String {
+        let title = session.title.trimmingCharacters(in: .whitespacesAndNewlines)
+        return title.isEmpty ? MarinaChatSessionStore.defaultTitle : title
     }
 }
 

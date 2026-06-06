@@ -2610,6 +2610,27 @@ struct MarinaSemanticPromptSuiteTests {
         #expect(appleStore.primaryValue == CurrencyFormatter.string(from: 300))
     }
 
+    @Test func followUpResolver_completeStandaloneExpenseListDoesNotInheritRecentCardContext() async throws {
+        let fixture = try makeFixture()
+        let brain = MarinaBrain(interpreter: MarinaRuleBasedInterpreter())
+        let summary = await answer("Summarize my Apple Card.", using: brain, fixture: fixture)
+        let context = MarinaConversationContext(recentAnswers: [summary])
+
+        let standalone = await answer(
+            "List my most recent 5 expenses on Chase",
+            using: brain,
+            fixture: fixture,
+            conversationContext: context
+        )
+
+        #expect(standalone.kind == .list)
+        #expect(standalone.title == "Chase Expenses")
+        #expect(standalone.semanticContext?.request.entity == .variableExpense)
+        #expect(standalone.semanticContext?.request.operation == .list)
+        #expect(standalone.semanticContext?.request.targetName == "Chase")
+        #expect(standalone.semanticContext?.request.targetName != "Apple Card")
+    }
+
     @Test func followUpResolver_drillsFromCategoryAvailabilityIntoCategoryTransactions() async throws {
         let fixture = try makeFixture()
         let brain = MarinaBrain(interpreter: MarinaRuleBasedInterpreter())
@@ -3433,6 +3454,7 @@ struct MarinaSemanticPromptSuiteTests {
             SavingsLedgerEntry.self,
             ImportMerchantRule.self,
             AssistantAliasRule.self,
+            MarinaChatSession.self,
             IncomeSeries.self,
             Income.self
         ])

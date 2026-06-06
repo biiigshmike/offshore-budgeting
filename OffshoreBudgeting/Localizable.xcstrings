@@ -5655,7 +5655,7 @@
     },
     "assistant.clearChat" : {
       "comment" : "Accessibility label for clearing assistant chat.",
-      "extractionState" : "extracted_with_value",
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -13366,7 +13366,7 @@
       }
     },
     "common.done" : {
-      "comment" : "Generic action label to finish and close a sheet.\nGeneric action label to finish editing.",
+      "comment" : "Button title to close a sheet.\nGeneric action label to finish and close a sheet.\nGeneric action label to finish editing.",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -34843,6 +34843,174 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "工作区颜色"
+          }
+        }
+      }
+    },
+    "marina.chat.actions" : {
+      "comment" : "Accessibility label for Marina chat actions menu.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Chat Actions"
+          }
+        }
+      }
+    },
+    "marina.chat.clearCurrent" : {
+      "comment" : "Menu action to clear the active Marina chat.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Clear Current Chat"
+          }
+        }
+      }
+    },
+    "marina.chat.current" : {
+      "comment" : "Accessibility label for the active Marina chat.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Current chat"
+          }
+        }
+      }
+    },
+    "marina.chat.delete" : {
+      "comment" : "Menu action to delete a Marina chat.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Delete Chat"
+          }
+        }
+      }
+    },
+    "marina.chat.delete.message" : {
+      "comment" : "Alert message for deleting a Marina chat.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "This removes the chat transcript and follow-up context."
+          }
+        }
+      }
+    },
+    "marina.chat.delete.title" : {
+      "comment" : "Alert title for deleting a Marina chat.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Delete Chat?"
+          }
+        }
+      }
+    },
+    "marina.chat.history" : {
+      "comment" : "Menu action to open Marina chat history.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Chat History"
+          }
+        }
+      }
+    },
+    "marina.chat.history.emptyMessage" : {
+      "comment" : "Empty state message for Marina chat history.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Start a new Marina chat to keep the conversation separate."
+          }
+        }
+      }
+    },
+    "marina.chat.history.emptyTitle" : {
+      "comment" : "Empty state title for Marina chat history.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "No Chats Yet"
+          }
+        }
+      }
+    },
+    "marina.chat.history.title" : {
+      "comment" : "Navigation title for Marina chat history.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Chat History"
+          }
+        }
+      }
+    },
+    "marina.chat.new" : {
+      "comment" : "Menu action to start a new Marina chat.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "New Chat"
+          }
+        }
+      }
+    },
+    "marina.chat.rename" : {
+      "comment" : "Menu action to rename a Marina chat.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Rename Chat"
+          }
+        }
+      }
+    },
+    "marina.chat.rename.message" : {
+      "comment" : "Alert message for renaming a Marina chat.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Give this Marina chat a name."
+          }
+        }
+      }
+    },
+    "marina.chat.rename.title" : {
+      "comment" : "Alert title for renaming a Marina chat.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Rename Chat"
           }
         }
       }

@@ -33,6 +33,7 @@ struct SwiftDataCRUDTests {
             AllocationSettlement.self,
             IncomeSeries.self,
             ImportMerchantRule.self,
+            MarinaChatSession.self,
             Income.self
         ])
 

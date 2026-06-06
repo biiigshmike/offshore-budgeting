@@ -33,6 +33,7 @@ struct SwiftDataDeletionRulesTests {
             AllocationSettlement.self,
             IncomeSeries.self,
             ImportMerchantRule.self,
+            MarinaChatSession.self,
             Income.self
         ])
 
@@ -65,6 +66,7 @@ struct SwiftDataDeletionRulesTests {
         let variable = VariableExpense(descriptionText: "Var", amount: 5, transactionDate: date, workspace: ws, card: card, category: category)
 
         let merchantRule = ImportMerchantRule(merchantKey: "AMAZON", preferredName: "Amazon", preferredCategory: category, workspace: ws)
+        let chatSession = MarinaChatSession(title: "Marina", workspace: ws)
 
         context.insert(ws)
         context.insert(card)
@@ -75,6 +77,7 @@ struct SwiftDataDeletionRulesTests {
         context.insert(planned)
         context.insert(variable)
         context.insert(merchantRule)
+        context.insert(chatSession)
 
         try context.save()
 
@@ -87,6 +90,7 @@ struct SwiftDataDeletionRulesTests {
         #expect(try count(PlannedExpense.self, in: context) == 1)
         #expect(try count(VariableExpense.self, in: context) == 1)
         #expect(try count(ImportMerchantRule.self, in: context) == 1)
+        #expect(try count(MarinaChatSession.self, in: context) == 1)
 
         context.delete(ws)
         try context.save()
@@ -100,6 +104,7 @@ struct SwiftDataDeletionRulesTests {
         #expect(try count(PlannedExpense.self, in: context) == 0)
         #expect(try count(VariableExpense.self, in: context) == 0)
         #expect(try count(ImportMerchantRule.self, in: context) == 0)
+        #expect(try count(MarinaChatSession.self, in: context) == 0)
     }
 
     // MARK: - Card deletion removes links (unassign behavior)

@@ -353,6 +353,10 @@ struct MarinaFollowUpResolver {
             return confirmation
         }
 
+        guard shouldResolveFromConversation(prompt: normalized) else {
+            return nil
+        }
+
         if let semanticContext = conversationContext.lastSemanticContext,
            let request = request(from: prompt, normalized: normalized, context: semanticContext) {
             return .request(request, diagnosticNote: "Resolved from recent Marina conversation context.")
@@ -360,6 +364,100 @@ struct MarinaFollowUpResolver {
 
         return legacyCategoryAvailabilityRequest(normalized: normalized, conversationContext: conversationContext)
             .map { .request($0, diagnosticNote: "Resolved from recent Marina conversation context.") }
+    }
+
+    private func shouldResolveFromConversation(prompt normalized: String) -> Bool {
+        if isCompleteStandalonePrompt(normalized) {
+            return false
+        }
+
+        return isShortContinuationPrompt(normalized)
+            || isCorrectionPrompt(normalized)
+            || isFollowUpCue(normalized)
+            || hasExplicitRefinement(normalized)
+            || containsAny(normalized, ["drove", "driving", "behind", "made up", "what caused", "caused", "changed"])
+    }
+
+    private func isCompleteStandalonePrompt(_ normalized: String) -> Bool {
+        guard containsContextualReference(normalized) == false,
+              isCorrectionPrompt(normalized) == false else {
+            return false
+        }
+
+        if containsAny(normalized, [
+            "category availability",
+            "spend trends",
+            "safe spend",
+            "savings outlook",
+            "income progress",
+            "next planned expense"
+        ]) {
+            return true
+        }
+
+        if categoryAvailabilityFilter(in: normalized) != nil,
+           containsAny(normalized, ["category", "categories"]) {
+            return true
+        }
+
+        let hasStandaloneAction = containsAny(normalized, [
+            "show",
+            "list",
+            "summarize",
+            "compare",
+            "how much",
+            "what is",
+            "what are",
+            "which",
+            "where",
+            "does"
+        ])
+        let hasStandaloneDomain = containsAny(normalized, [
+            "expense",
+            "expenses",
+            "income",
+            "card",
+            "budget",
+            "category",
+            "categories",
+            "merchant",
+            "savings",
+            "preset",
+            "planned expense",
+            "variable expense"
+        ])
+        guard hasStandaloneAction, hasStandaloneDomain else {
+            return false
+        }
+
+        let hasPersonalReference = containsAny(normalized, ["my ", " i ", " me "])
+            || normalized.hasPrefix("my ")
+            || normalized.hasPrefix("i ")
+        let hasExplicitTargetPhrase = containsAny(normalized, [" on ", " for ", " from ", " tied to ", " assigned to ", " linked to "])
+        return hasPersonalReference || hasExplicitTargetPhrase || wordCount(in: normalized) >= 6
+    }
+
+    private func containsContextualReference(_ normalized: String) -> Bool {
+        let contextualPronouns: Set<String> = ["this", "that", "these", "those", "it", "ones", "one"]
+        if normalized
+            .split(whereSeparator: { $0.isWhitespace })
+            .contains(where: { contextualPronouns.contains(String($0)) }) {
+            return true
+        }
+
+        return containsAny(normalized, [
+            "increase",
+            "decrease",
+            "behind",
+            "drove",
+            "driving",
+            "caused",
+            "made up"
+        ])
+    }
+
+    private func isShortContinuationPrompt(_ normalized: String) -> Bool {
+        wordCount(in: normalized) <= 5
     }
 
     private func recommendedFollowUpConfirmation(
@@ -1203,6 +1301,12 @@ struct MarinaFollowUpResolver {
 
     private func containsAny(_ value: String, _ needles: [String]) -> Bool {
         needles.contains { value.contains($0) }
+    }
+
+    private func wordCount(in value: String) -> Int {
+        value
+            .split(whereSeparator: { $0.isWhitespace })
+            .count
     }
 
     private func trimmed(_ value: String?) -> String? {

@@ -348,6 +348,9 @@ final class Workspace {
     @Relationship(deleteRule: .cascade)
     var assistantAliasRules: [AssistantAliasRule]? = nil
 
+    @Relationship(deleteRule: .cascade)
+    var marinaChatSessions: [MarinaChatSession]? = nil
+
     init(id: UUID = UUID(), name: String, hexColor: String) {
         self.id = id
         self.name = name
@@ -1233,6 +1236,47 @@ final class AssistantAliasRule {
         self.workspace = workspace
         self.createdAt = createdAt
         self.updatedAt = updatedAt
+    }
+}
+
+// MARK: - Marina Chat Session
+
+@Model
+final class MarinaChatSession {
+
+    var id: UUID = UUID()
+    var title: String = ""
+    var hasCustomTitle: Bool = false
+    var visibleAnswersData: Data = Data()
+    var followUpContextData: Data = Data()
+
+    @Relationship(inverse: \Workspace.marinaChatSessions)
+    var workspace: Workspace? = nil
+
+    var createdAt: Date = Date.now
+    var updatedAt: Date = Date.now
+    var lastOpenedAt: Date = Date.now
+
+    init(
+        id: UUID = UUID(),
+        title: String = "",
+        hasCustomTitle: Bool = false,
+        visibleAnswersData: Data = Data(),
+        followUpContextData: Data = Data(),
+        workspace: Workspace? = nil,
+        createdAt: Date = Date.now,
+        updatedAt: Date = Date.now,
+        lastOpenedAt: Date = Date.now
+    ) {
+        self.id = id
+        self.title = title
+        self.hasCustomTitle = hasCustomTitle
+        self.visibleAnswersData = visibleAnswersData
+        self.followUpContextData = followUpContextData
+        self.workspace = workspace
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+        self.lastOpenedAt = lastOpenedAt
     }
 }
 

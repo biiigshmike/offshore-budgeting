@@ -25,6 +25,7 @@ enum PreviewSeed {
                 VariableExpense.self,
                 SavingsAccount.self,
                 SavingsLedgerEntry.self,
+                MarinaChatSession.self,
                 Income.self
             ])
             let config = ModelConfiguration(isStoredInMemoryOnly: true)
