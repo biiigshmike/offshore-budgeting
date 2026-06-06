@@ -1706,9 +1706,19 @@ private struct RenameChatPopoverContent: View {
             }
 
             TextField(String(localized: "common.name", defaultValue: "Name", comment: "Common label for a name field."), text: $chatTitle)
-                .textFieldStyle(.roundedBorder)
+                .textFieldStyle(.plain)
                 .focused($isTitleFieldFocused)
                 .submitLabel(.done)
+                .padding(.horizontal, 10)
+                .frame(minHeight: 34)
+                .background(
+                    Capsule()
+                        .fill(Color.primary.opacity(0.04))
+                )
+                .overlay {
+                    Capsule()
+                        .stroke(isTitleFieldFocused ? Color("AccentColor").opacity(0.55) : .clear, lineWidth: 2)
+                }
                 .onSubmit {
                     if canRename {
                         onRename()
