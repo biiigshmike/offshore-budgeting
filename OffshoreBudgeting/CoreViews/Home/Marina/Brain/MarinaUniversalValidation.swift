@@ -1,7 +1,7 @@
 import Foundation
 
 struct MarinaUniversalValidationRequest: Equatable, Sendable {
-    let entity: MarinaSemanticEntity
+    let surface: MarinaUniversalEntitySurface
     let operation: MarinaSemanticOperation
     let measure: MarinaSemanticMeasure?
     let searchFields: Set<MarinaFieldKey>
@@ -13,6 +13,10 @@ struct MarinaUniversalValidationRequest: Equatable, Sendable {
     let sortRelationships: Set<MarinaRelationshipKey>
     let requiresDateField: Bool
     let requiresAmountField: Bool
+
+    var entity: MarinaSemanticEntity {
+        surface.semanticEntity ?? .variableExpense
+    }
 
     init(
         entity: MarinaSemanticEntity,
@@ -28,7 +32,37 @@ struct MarinaUniversalValidationRequest: Equatable, Sendable {
         requiresDateField: Bool = false,
         requiresAmountField: Bool = false
     ) {
-        self.entity = entity
+        self.init(
+            surface: .semantic(entity),
+            operation: operation,
+            measure: measure,
+            searchFields: searchFields,
+            filterFields: filterFields,
+            groupFields: groupFields,
+            sortFields: sortFields,
+            filterRelationships: filterRelationships,
+            groupRelationships: groupRelationships,
+            sortRelationships: sortRelationships,
+            requiresDateField: requiresDateField,
+            requiresAmountField: requiresAmountField
+        )
+    }
+
+    init(
+        surface: MarinaUniversalEntitySurface,
+        operation: MarinaSemanticOperation,
+        measure: MarinaSemanticMeasure? = nil,
+        searchFields: Set<MarinaFieldKey> = [],
+        filterFields: Set<MarinaFieldKey> = [],
+        groupFields: Set<MarinaFieldKey> = [],
+        sortFields: Set<MarinaFieldKey> = [],
+        filterRelationships: Set<MarinaRelationshipKey> = [],
+        groupRelationships: Set<MarinaRelationshipKey> = [],
+        sortRelationships: Set<MarinaRelationshipKey> = [],
+        requiresDateField: Bool = false,
+        requiresAmountField: Bool = false
+    ) {
+        self.surface = surface
         self.operation = operation
         self.measure = measure
         self.searchFields = searchFields
@@ -51,7 +85,7 @@ struct MarinaUniversalCatalogValidator: Sendable {
     }
 
     func validate(_ request: MarinaUniversalValidationRequest) -> MarinaCapabilityResult {
-        guard let descriptor = catalog.descriptor(for: request.entity) else {
+        guard let descriptor = catalog.descriptor(for: request.surface) else {
             return .unsupported(.missingEntityDescriptor)
         }
 
@@ -64,7 +98,7 @@ struct MarinaUniversalCatalogValidator: Sendable {
         }
 
         if let measure = request.measure,
-           supports(entity: request.entity, measure: measure) == false {
+           supports(surface: request.surface, measure: measure, descriptor: descriptor) == false {
             return .unsupported(.measureNotAvailable)
         }
 
@@ -98,21 +132,30 @@ struct MarinaUniversalCatalogValidator: Sendable {
         return .supported
     }
 
-    private func supports(entity: MarinaSemanticEntity, measure: MarinaSemanticMeasure) -> Bool {
-        catalog.supports(entity: entity, measure: measure) == .supported
+    private func supports(
+        surface: MarinaUniversalEntitySurface,
+        measure: MarinaSemanticMeasure,
+        descriptor: MarinaUniversalSurfaceDescriptor
+    ) -> Bool {
+        switch surface {
+        case let .semantic(entity):
+            return catalog.supports(entity: entity, measure: measure) == .supported
+        case .unifiedExpenses:
+            return descriptor.supportedMeasures.contains(measure)
+        }
     }
 
-    private func field(_ key: MarinaFieldKey, in descriptor: MarinaEntityDescriptor) -> MarinaFieldDescriptor? {
+    private func field(_ key: MarinaFieldKey, in descriptor: MarinaUniversalSurfaceDescriptor) -> MarinaFieldDescriptor? {
         descriptor.fields.first { $0.key == key }
     }
 
-    private func relationship(_ key: MarinaRelationshipKey, in descriptor: MarinaEntityDescriptor) -> MarinaRelationshipDescriptor? {
+    private func relationship(_ key: MarinaRelationshipKey, in descriptor: MarinaUniversalSurfaceDescriptor) -> MarinaRelationshipDescriptor? {
         descriptor.relationships.first { $0.key == key }
     }
 
     private func amountRequirementIsSatisfied(
         for request: MarinaUniversalValidationRequest,
-        descriptor: MarinaEntityDescriptor
+        descriptor: MarinaUniversalSurfaceDescriptor
     ) -> Bool {
         if descriptor.defaultAmountField != nil {
             return true
@@ -120,7 +163,7 @@ struct MarinaUniversalCatalogValidator: Sendable {
 
         guard let measure = request.measure,
               let measureDescriptor = catalog.measureDescriptor(for: measure),
-              supports(entity: request.entity, measure: measure) else {
+              supports(surface: request.surface, measure: measure, descriptor: descriptor) else {
             return false
         }
 

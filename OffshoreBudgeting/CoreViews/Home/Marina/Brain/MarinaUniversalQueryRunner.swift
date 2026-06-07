@@ -33,15 +33,14 @@ struct MarinaUniversalQueryRunner {
             return .unsupported(.unsupportedCombination)
         }
 
-        guard let descriptor = catalog.descriptor(for: plan.entity) else {
+        guard let descriptor = catalog.descriptor(for: plan.surface) else {
             return .unsupported(.missingEntityDescriptor)
         }
 
-        guard let adapter = adapterRegistry.adapter(for: plan.entity) else {
+        guard var rows = adapterRegistry.rows(for: plan.surface, from: snapshot) else {
             return .unsupported(.unsupportedCombination)
         }
 
-        var rows = adapter.rows(from: snapshot)
         if let search = plan.search {
             rows = rowEngine.search(rows, clause: search, catalog: catalog)
         }
@@ -77,7 +76,7 @@ struct MarinaUniversalQueryRunner {
 
     private func sumResult(
         plan: MarinaUniversalQueryPlan,
-        descriptor: MarinaEntityDescriptor,
+        descriptor: MarinaUniversalSurfaceDescriptor,
         rows: [MarinaQueryableRow]
     ) -> MarinaUniversalQueryResult {
         switch resolveNumericField(plan: plan, descriptor: descriptor, rows: rows) {
@@ -95,7 +94,7 @@ struct MarinaUniversalQueryRunner {
 
     private func averageResult(
         plan: MarinaUniversalQueryPlan,
-        descriptor: MarinaEntityDescriptor,
+        descriptor: MarinaUniversalSurfaceDescriptor,
         rows: [MarinaQueryableRow]
     ) -> MarinaUniversalQueryResult {
         switch resolveNumericField(plan: plan, descriptor: descriptor, rows: rows) {
@@ -114,7 +113,7 @@ struct MarinaUniversalQueryRunner {
 
     private func groupResult(
         plan: MarinaUniversalQueryPlan,
-        descriptor: MarinaEntityDescriptor,
+        descriptor: MarinaUniversalSurfaceDescriptor,
         rows: [MarinaQueryableRow]
     ) -> MarinaUniversalQueryResult {
         guard let groupBy = plan.groupBy else {
@@ -144,11 +143,11 @@ struct MarinaUniversalQueryRunner {
     private func makeValidationRequest(for plan: MarinaUniversalQueryPlan) -> MarinaUniversalValidationRequest {
         let effectiveSorts = effectiveSorts(
             for: plan,
-            descriptor: catalog.descriptor(for: plan.entity)
+            descriptor: catalog.descriptor(for: plan.surface)
         )
 
         return MarinaUniversalValidationRequest(
-            entity: plan.entity,
+            surface: plan.surface,
             operation: plan.operation,
             measure: plan.measure,
             searchFields: plan.search?.fields ?? [],
@@ -180,7 +179,7 @@ struct MarinaUniversalQueryRunner {
 
     private func effectiveSorts(
         for plan: MarinaUniversalQueryPlan,
-        descriptor: MarinaEntityDescriptor?
+        descriptor: MarinaUniversalSurfaceDescriptor?
     ) -> [MarinaRowSort] {
         guard plan.sorts.isEmpty,
               let descriptor,
@@ -200,12 +199,12 @@ struct MarinaUniversalQueryRunner {
 
     private func resolveNumericField(
         plan: MarinaUniversalQueryPlan,
-        descriptor: MarinaEntityDescriptor,
+        descriptor: MarinaUniversalSurfaceDescriptor,
         rows: [MarinaQueryableRow]
     ) -> ResolvedNumericFieldResult {
         let resolvedField: MarinaFieldKey
         if let measure = plan.measure {
-            guard let mappedField = field(for: measure, entity: plan.entity) else {
+            guard let mappedField = field(for: measure, surface: plan.surface) else {
                 return .failure(.measureNotAvailable)
             }
             resolvedField = mappedField
@@ -221,6 +220,37 @@ struct MarinaUniversalQueryRunner {
         }
 
         return .success(ResolvedNumericField(field: resolvedField, kind: kind))
+    }
+
+    private func field(for measure: MarinaSemanticMeasure, surface: MarinaUniversalEntitySurface) -> MarinaFieldKey? {
+        switch surface {
+        case let .semantic(entity):
+            return field(for: measure, entity: entity)
+        case .unifiedExpenses:
+            switch measure {
+            case .budgetImpact:
+                return .budgetImpact
+            case .amount,
+                 .plannedAmount,
+                 .actualAmount,
+                 .effectiveAmount,
+                 .incomeAmount,
+                 .name,
+                 .color,
+                 .savingsTotal,
+                 .reconciliationBalance,
+                 .categoryAvailability,
+                 .remainingRoom,
+                 .burnRate,
+                 .projectedSpend,
+                 .safeDailySpend,
+                 .paceDifference,
+                 .coverageRatio,
+                 .recurringBurden,
+                 .concentration:
+                return nil
+            }
+        }
     }
 
     private func field(for measure: MarinaSemanticMeasure, entity: MarinaSemanticEntity) -> MarinaFieldKey? {
@@ -259,7 +289,7 @@ struct MarinaUniversalQueryRunner {
     private func fieldIsExposed(
         _ field: MarinaFieldKey,
         in rows: [MarinaQueryableRow],
-        descriptor: MarinaEntityDescriptor
+        descriptor: MarinaUniversalSurfaceDescriptor
     ) -> Bool {
         if rows.isEmpty {
             return descriptor.fields.contains { $0.key == field }
@@ -273,7 +303,7 @@ struct MarinaUniversalQueryRunner {
     private func numericKind(
         for field: MarinaFieldKey,
         in rows: [MarinaQueryableRow],
-        descriptor: MarinaEntityDescriptor
+        descriptor: MarinaUniversalSurfaceDescriptor
     ) -> MetricNumericKind? {
         for row in rows {
             switch row.fields[field] {

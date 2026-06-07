@@ -43,6 +43,23 @@ struct MarinaEntityAdapterRegistry {
         adapters[entity]
     }
 
+    func rows(for surface: MarinaUniversalEntitySurface, from snapshot: MarinaWorkspaceSnapshot) -> [MarinaQueryableRow]? {
+        switch surface {
+        case let .semantic(entity):
+            return adapter(for: entity)?.rows(from: snapshot)
+        case .unifiedExpenses:
+            guard let variableAdapter = adapter(for: .variableExpense),
+                  let plannedAdapter = adapter(for: .plannedExpense) else {
+                return nil
+            }
+            return MarinaUnifiedExpenseAdapter(
+                variableAdapter: variableAdapter,
+                plannedAdapter: plannedAdapter
+            )
+            .rows(from: snapshot)
+        }
+    }
+
     static let defaultAdapters: [any MarinaEntityAdapter] = [
         MarinaVariableExpenseAdapter(),
         MarinaPlannedExpenseAdapter(),

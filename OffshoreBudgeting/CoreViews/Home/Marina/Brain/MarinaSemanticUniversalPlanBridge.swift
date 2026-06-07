@@ -28,9 +28,9 @@ struct MarinaSemanticUniversalPlanBridge {
             return .unsupported(.unsupportedCombination)
         }
 
-        switch resolvedEntity(for: request) {
-        case let .success(entity):
-            return makePlan(for: request, entity: entity, planningContext: planningContext)
+        switch resolvedSurface(for: request) {
+        case let .success(surface):
+            return makePlan(for: request, surface: surface, planningContext: planningContext)
         case let .failure(reason):
             return .unsupported(reason)
         }
@@ -38,10 +38,10 @@ struct MarinaSemanticUniversalPlanBridge {
 
     private func makePlan(
         for request: MarinaSemanticRequest,
-        entity: MarinaSemanticEntity,
+        surface: MarinaUniversalEntitySurface,
         planningContext: MarinaUniversalPlanningContext?
     ) -> MarinaSemanticUniversalPlanBridgeResult {
-        guard supportedEntities.contains(entity) else {
+        guard supportedSurface(surface) else {
             return .unsupported(.unsupportedCombination)
         }
 
@@ -49,7 +49,7 @@ struct MarinaSemanticUniversalPlanBridge {
             return .unsupported(.unsupportedCombination)
         }
 
-        guard let descriptor = catalog.descriptor(for: entity) else {
+        guard let descriptor = catalog.descriptor(for: surface) else {
             return .unsupported(.missingEntityDescriptor)
         }
 
@@ -58,22 +58,22 @@ struct MarinaSemanticUniversalPlanBridge {
                 return .unsupported(.measureNotAvailable)
             }
 
-            guard catalog.supports(entity: entity, measure: measure) == .supported else {
+            guard supports(surface: surface, measure: measure, descriptor: descriptor) else {
                 return .unsupported(.measureNotAvailable)
             }
         }
 
-        guard catalog.supports(entity: entity, operation: request.operation) == .supported else {
+        guard descriptor.supportedOperations.contains(request.operation) else {
             return .unsupported(.operationNotSupported)
         }
 
-        guard let search = searchClause(for: request, entity: entity, descriptor: descriptor) else {
+        guard let search = searchClause(for: request, surface: surface, descriptor: descriptor) else {
             if trimmed(request.textQuery).isEmpty == false {
                 return .unsupported(.fieldNotSearchable)
             }
             return planWithoutSearch(
                 for: request,
-                entity: entity,
+                surface: surface,
                 descriptor: descriptor,
                 planningContext: planningContext
             )
@@ -81,7 +81,7 @@ struct MarinaSemanticUniversalPlanBridge {
 
         return planWithoutSearch(
             for: request,
-            entity: entity,
+            surface: surface,
             descriptor: descriptor,
             planningContext: planningContext,
             search: search
@@ -90,8 +90,8 @@ struct MarinaSemanticUniversalPlanBridge {
 
     private func planWithoutSearch(
         for request: MarinaSemanticRequest,
-        entity: MarinaSemanticEntity,
-        descriptor: MarinaEntityDescriptor,
+        surface: MarinaUniversalEntitySurface,
+        descriptor: MarinaUniversalSurfaceDescriptor,
         planningContext: MarinaUniversalPlanningContext?,
         search: MarinaRowSearchClause? = nil
     ) -> MarinaSemanticUniversalPlanBridgeResult {
@@ -105,7 +105,7 @@ struct MarinaSemanticUniversalPlanBridge {
 
         let dateFiltersResult = dateFilters(
             for: request,
-            entity: entity,
+            surface: surface,
             descriptor: descriptor,
             planningContext: planningContext
         )
@@ -124,7 +124,7 @@ struct MarinaSemanticUniversalPlanBridge {
             return .unsupported(.unsupportedCombination)
         }
 
-        let sortResult = sorts(for: request, entity: entity, descriptor: descriptor)
+        let sortResult = sorts(for: request, surface: surface, descriptor: descriptor)
         guard case let .success(sorts) = sortResult else {
             if case let .failure(reason) = sortResult {
                 return .unsupported(reason)
@@ -134,7 +134,7 @@ struct MarinaSemanticUniversalPlanBridge {
 
         return .plan(
             MarinaUniversalQueryPlan(
-                entity: entity,
+                surface: surface,
                 operation: request.operation,
                 measure: request.measure,
                 search: search,
@@ -144,7 +144,7 @@ struct MarinaSemanticUniversalPlanBridge {
                 limit: clampedLimit(request.resultLimit),
                 requiresDateField: requiresDateField(
                     for: request,
-                    entity: entity,
+                    surface: surface,
                     descriptor: descriptor,
                     planningContext: planningContext
                 ),
@@ -169,27 +169,54 @@ struct MarinaSemanticUniversalPlanBridge {
         [.variableExpense, .plannedExpense, .income]
     }
 
-    private func resolvedEntity(
+    private func supportedSurface(_ surface: MarinaUniversalEntitySurface) -> Bool {
+        switch surface {
+        case let .semantic(entity):
+            return supportedEntities.contains(entity)
+        case .unifiedExpenses:
+            return true
+        }
+    }
+
+    private func supports(
+        surface: MarinaUniversalEntitySurface,
+        measure: MarinaSemanticMeasure,
+        descriptor: MarinaUniversalSurfaceDescriptor
+    ) -> Bool {
+        switch surface {
+        case let .semantic(entity):
+            return catalog.supports(entity: entity, measure: measure) == .supported
+        case .unifiedExpenses:
+            return descriptor.supportedMeasures.contains(measure)
+        }
+    }
+
+    private func resolvedSurface(
         for request: MarinaSemanticRequest
-    ) -> BridgeValueResult<MarinaSemanticEntity> {
+    ) -> BridgeValueResult<MarinaUniversalEntitySurface> {
         guard let scope = request.expenseScope else {
-            return .success(request.entity)
+            return .success(.semantic(request.entity))
         }
 
         switch scope {
         case .variable:
-            return .success(.variableExpense)
+            return .success(.semantic(.variableExpense))
         case .planned:
-            return .success(.plannedExpense)
+            return .success(.semantic(.plannedExpense))
         case .unified:
-            return .failure(.unsupportedCombination)
+            switch request.entity {
+            case .variableExpense, .plannedExpense:
+                return .success(.unifiedExpenses)
+            case .workspace, .budget, .card, .reconciliationAccount, .savingsAccount, .income, .category, .preset:
+                return .failure(.unsupportedCombination)
+            }
         }
     }
 
     private func searchClause(
         for request: MarinaSemanticRequest,
-        entity: MarinaSemanticEntity,
-        descriptor: MarinaEntityDescriptor
+        surface: MarinaUniversalEntitySurface,
+        descriptor: MarinaUniversalSurfaceDescriptor
     ) -> MarinaRowSearchClause? {
         let query = trimmed(request.textQuery)
         guard query.isEmpty == false else {
@@ -197,14 +224,19 @@ struct MarinaSemanticUniversalPlanBridge {
         }
 
         let preferredFields: [MarinaFieldKey]
-        switch entity {
-        case .variableExpense:
-            preferredFields = [.merchantText, .descriptionText]
-        case .plannedExpense:
-            preferredFields = [.merchantText, .title]
-        case .income:
-            preferredFields = [.source]
-        case .workspace, .budget, .card, .reconciliationAccount, .savingsAccount, .category, .preset:
+        switch surface {
+        case let .semantic(entity):
+            switch entity {
+            case .variableExpense:
+                preferredFields = [.merchantText, .descriptionText]
+            case .plannedExpense:
+                preferredFields = [.merchantText, .title]
+            case .income:
+                preferredFields = [.source]
+            case .workspace, .budget, .card, .reconciliationAccount, .savingsAccount, .category, .preset:
+                preferredFields = descriptor.defaultSearchFields
+            }
+        case .unifiedExpenses:
             preferredFields = descriptor.defaultSearchFields
         }
 
@@ -224,7 +256,7 @@ struct MarinaSemanticUniversalPlanBridge {
 
     private func filters(
         for request: MarinaSemanticRequest,
-        descriptor: MarinaEntityDescriptor
+        descriptor: MarinaUniversalSurfaceDescriptor
     ) -> BridgeValueResult<[MarinaRowFilter]> {
         let target = trimmed(request.targetName)
         guard target.isEmpty == false else {
@@ -253,13 +285,13 @@ struct MarinaSemanticUniversalPlanBridge {
 
     private func dateFilters(
         for request: MarinaSemanticRequest,
-        entity: MarinaSemanticEntity,
-        descriptor: MarinaEntityDescriptor,
+        surface: MarinaUniversalEntitySurface,
+        descriptor: MarinaUniversalSurfaceDescriptor,
         planningContext: MarinaUniversalPlanningContext?
     ) -> BridgeValueResult<[MarinaRowFilter]> {
         guard let planningContext,
               request.dateRangeToken != .allTime,
-              dateFilteredEntities.contains(entity) else {
+              dateFilteredSurface(surface) else {
             return .success([])
         }
 
@@ -299,7 +331,7 @@ struct MarinaSemanticUniversalPlanBridge {
 
     private func groupTarget(
         for request: MarinaSemanticRequest,
-        descriptor: MarinaEntityDescriptor
+        descriptor: MarinaUniversalSurfaceDescriptor
     ) -> BridgeValueResult<MarinaRowGroupTarget?> {
         guard request.operation == .group else {
             return .success(nil)
@@ -333,8 +365,8 @@ struct MarinaSemanticUniversalPlanBridge {
 
     private func sorts(
         for request: MarinaSemanticRequest,
-        entity: MarinaSemanticEntity,
-        descriptor: MarinaEntityDescriptor
+        surface: MarinaUniversalEntitySurface,
+        descriptor: MarinaUniversalSurfaceDescriptor
     ) -> BridgeValueResult<[MarinaRowSort]> {
         let sort: MarinaRowSort?
 
@@ -365,17 +397,17 @@ struct MarinaSemanticUniversalPlanBridge {
             }
             sort = MarinaRowSort(target: .field(dateField), direction: .descending)
         case .some(.amountAscending):
-            guard let amountField = amountSortField(for: request, descriptor: descriptor) else {
+            guard let amountField = amountSortField(for: request, surface: surface, descriptor: descriptor) else {
                 return .failure(.missingAmountField)
             }
             sort = MarinaRowSort(target: .field(amountField), direction: .ascending)
         case .some(.amountDescending):
-            guard let amountField = amountSortField(for: request, descriptor: descriptor) else {
+            guard let amountField = amountSortField(for: request, surface: surface, descriptor: descriptor) else {
                 return .failure(.missingAmountField)
             }
             sort = MarinaRowSort(target: .field(amountField), direction: .descending)
         case .some(.nameAscending):
-            sort = MarinaRowSort(target: .field(nameSortField(for: entity)), direction: .ascending)
+            sort = MarinaRowSort(target: .field(nameSortField(for: surface)), direction: .ascending)
         }
 
         guard let sort else {
@@ -391,35 +423,75 @@ struct MarinaSemanticUniversalPlanBridge {
 
     private func amountSortField(
         for request: MarinaSemanticRequest,
-        descriptor: MarinaEntityDescriptor
+        surface: MarinaUniversalEntitySurface,
+        descriptor: MarinaUniversalSurfaceDescriptor
     ) -> MarinaFieldKey? {
         if let measure = request.measure {
-            return field(for: measure, entity: descriptor.entity)
+            return field(for: measure, surface: surface)
         }
         return descriptor.defaultAmountField
     }
 
-    private func nameSortField(for entity: MarinaSemanticEntity) -> MarinaFieldKey {
-        switch entity {
-        case .plannedExpense, .preset:
-            return .title
-        case .variableExpense:
-            return .descriptionText
-        case .income:
-            return .source
-        case .workspace, .budget, .card, .reconciliationAccount, .savingsAccount, .category:
-            return .name
+    private func nameSortField(for surface: MarinaUniversalEntitySurface) -> MarinaFieldKey {
+        switch surface {
+        case let .semantic(entity):
+            switch entity {
+            case .plannedExpense, .preset:
+                return .title
+            case .variableExpense:
+                return .descriptionText
+            case .income:
+                return .source
+            case .workspace, .budget, .card, .reconciliationAccount, .savingsAccount, .category:
+                return .name
+            }
+        case .unifiedExpenses:
+            return .merchantText
         }
     }
 
     private func sortFieldIsSortable(
         _ sort: MarinaRowSort,
-        descriptor: MarinaEntityDescriptor
+        descriptor: MarinaUniversalSurfaceDescriptor
     ) -> Bool {
         guard case let .field(field) = sort.target else {
             return false
         }
         return descriptor.fields.contains { $0.key == field && $0.isSortable }
+    }
+
+    private func field(
+        for measure: MarinaSemanticMeasure,
+        surface: MarinaUniversalEntitySurface
+    ) -> MarinaFieldKey? {
+        switch surface {
+        case let .semantic(entity):
+            return field(for: measure, entity: entity)
+        case .unifiedExpenses:
+            switch measure {
+            case .budgetImpact:
+                return .budgetImpact
+            case .amount,
+                 .plannedAmount,
+                 .actualAmount,
+                 .effectiveAmount,
+                 .incomeAmount,
+                 .name,
+                 .color,
+                 .savingsTotal,
+                 .reconciliationBalance,
+                 .categoryAvailability,
+                 .remainingRoom,
+                 .burnRate,
+                 .projectedSpend,
+                 .safeDailySpend,
+                 .paceDifference,
+                 .coverageRatio,
+                 .recurringBurden,
+                 .concentration:
+                return nil
+            }
+        }
     }
 
     private func field(
@@ -498,14 +570,23 @@ struct MarinaSemanticUniversalPlanBridge {
 
     private func requiresDateField(
         for request: MarinaSemanticRequest,
-        entity: MarinaSemanticEntity,
-        descriptor: MarinaEntityDescriptor,
+        surface: MarinaUniversalEntitySurface,
+        descriptor: MarinaUniversalSurfaceDescriptor,
         planningContext: MarinaUniversalPlanningContext?
     ) -> Bool {
         if planningContext != nil {
-            return request.dateRangeToken != .allTime && dateFilteredEntities.contains(entity)
+            return request.dateRangeToken != .allTime && dateFilteredSurface(surface)
         }
         return request.dateRangeToken != .allTime && descriptor.defaultDateField != nil
+    }
+
+    private func dateFilteredSurface(_ surface: MarinaUniversalEntitySurface) -> Bool {
+        switch surface {
+        case let .semantic(entity):
+            return dateFilteredEntities.contains(entity)
+        case .unifiedExpenses:
+            return true
+        }
     }
 
     private func requiresAmountField(_ request: MarinaSemanticRequest) -> Bool {

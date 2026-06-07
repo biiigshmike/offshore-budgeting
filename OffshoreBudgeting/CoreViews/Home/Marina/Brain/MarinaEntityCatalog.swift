@@ -115,6 +115,66 @@ struct MarinaEntityDescriptor: Equatable, Sendable {
     let isInternalOnly: Bool
 }
 
+struct MarinaUniversalSurfaceDescriptor: Equatable, Sendable {
+    let surface: MarinaUniversalEntitySurface
+    let displayName: String
+    let aliases: [String]
+    let fields: [MarinaFieldDescriptor]
+    let relationships: [MarinaRelationshipDescriptor]
+    let supportedOperations: Set<MarinaSemanticOperation>
+    let supportedMeasures: Set<MarinaSemanticMeasure>
+    let defaultDateField: MarinaFieldKey?
+    let defaultAmountField: MarinaFieldKey?
+    let defaultSearchFields: [MarinaFieldKey]
+    let workspaceScoped: Bool
+    let isInternalOnly: Bool
+
+    init(
+        surface: MarinaUniversalEntitySurface,
+        displayName: String,
+        aliases: [String],
+        fields: [MarinaFieldDescriptor],
+        relationships: [MarinaRelationshipDescriptor],
+        supportedOperations: Set<MarinaSemanticOperation>,
+        supportedMeasures: Set<MarinaSemanticMeasure>,
+        defaultDateField: MarinaFieldKey?,
+        defaultAmountField: MarinaFieldKey?,
+        defaultSearchFields: [MarinaFieldKey],
+        workspaceScoped: Bool,
+        isInternalOnly: Bool
+    ) {
+        self.surface = surface
+        self.displayName = displayName
+        self.aliases = aliases
+        self.fields = fields
+        self.relationships = relationships
+        self.supportedOperations = supportedOperations
+        self.supportedMeasures = supportedMeasures
+        self.defaultDateField = defaultDateField
+        self.defaultAmountField = defaultAmountField
+        self.defaultSearchFields = defaultSearchFields
+        self.workspaceScoped = workspaceScoped
+        self.isInternalOnly = isInternalOnly
+    }
+
+    init(surface: MarinaUniversalEntitySurface, entityDescriptor descriptor: MarinaEntityDescriptor) {
+        self.init(
+            surface: surface,
+            displayName: descriptor.displayName,
+            aliases: descriptor.aliases,
+            fields: descriptor.fields,
+            relationships: descriptor.relationships,
+            supportedOperations: descriptor.supportedOperations,
+            supportedMeasures: descriptor.supportedMeasures,
+            defaultDateField: descriptor.defaultDateField,
+            defaultAmountField: descriptor.defaultAmountField,
+            defaultSearchFields: descriptor.defaultSearchFields,
+            workspaceScoped: descriptor.workspaceScoped,
+            isInternalOnly: descriptor.isInternalOnly
+        )
+    }
+}
+
 enum MarinaCapabilityFailureReason: String, Codable, Equatable, Sendable {
     case missingEntityDescriptor
     case internalOnly
@@ -151,6 +211,17 @@ struct MarinaEntityCatalog: Sendable {
 
     func descriptor(for entity: MarinaSemanticEntity) -> MarinaEntityDescriptor? {
         entities[entity]
+    }
+
+    func descriptor(for surface: MarinaUniversalEntitySurface) -> MarinaUniversalSurfaceDescriptor? {
+        switch surface {
+        case let .semantic(entity):
+            return descriptor(for: entity).map {
+                MarinaUniversalSurfaceDescriptor(surface: surface, entityDescriptor: $0)
+            }
+        case .unifiedExpenses:
+            return Self.unifiedExpensesDescriptor
+        }
     }
 
     func measureDescriptor(for measure: MarinaSemanticMeasure) -> MarinaMeasureDescriptor? {
@@ -194,6 +265,32 @@ extension MarinaEntityCatalog {
     static let defaultMeasures: [MarinaSemanticMeasure: MarinaMeasureDescriptor] = {
         Dictionary(uniqueKeysWithValues: defaultMeasureDescriptors.map { ($0.measure, $0) })
     }()
+
+    static let unifiedExpensesDescriptor = MarinaUniversalSurfaceDescriptor(
+        surface: .unifiedExpenses,
+        displayName: "Unified Expenses",
+        aliases: ["expenses", "spending", "planned and variable expenses"],
+        fields: [
+            field(.id, "ID", valueType: .text),
+            field(.merchantText, "Merchant text", aliases: ["merchant", "store", "vendor", "description"], valueType: .text, searchable: true, filterable: true, sortable: true),
+            field(.budgetImpact, "Budget impact", aliases: ["spend", "owned spend"], valueType: .money, filterable: true, sortable: true, aggregatable: true),
+            field(.date, "Date", valueType: .date, filterable: true, sortable: true)
+        ],
+        relationships: [
+            relationship(.workspace, "Workspace", targetEntity: .workspace, optional: true, groupable: false),
+            relationship(.card, "Card", targetEntity: .card, optional: true),
+            relationship(.category, "Category", targetEntity: .category, optional: true),
+            relationship(.preset, "Source preset", aliases: ["preset"], targetEntity: .preset, optional: true),
+            relationship(.budget, "Source budget", aliases: ["budget"], targetEntity: .budget, optional: true)
+        ],
+        supportedOperations: [.list, .count, .sum, .average, .last, .next, .group],
+        supportedMeasures: [.budgetImpact],
+        defaultDateField: .date,
+        defaultAmountField: .budgetImpact,
+        defaultSearchFields: [.merchantText],
+        workspaceScoped: true,
+        isInternalOnly: false
+    )
 
     private static let defaultEntityDescriptors: [MarinaEntityDescriptor] = [
         MarinaEntityDescriptor(
@@ -465,6 +562,7 @@ extension MarinaEntityCatalog {
             field(.id, "ID", valueType: .text),
             field(titleField, titleName, valueType: .text, searchable: true, filterable: true, sortable: true),
             field(.merchantText, "Merchant text", aliases: ["merchant", "store", "vendor", "description"], valueType: .text, searchable: true, filterable: true, groupable: true, sortable: true),
+            field(.date, "Date", valueType: .date, filterable: true, sortable: true),
             field(dateField, dateName, valueType: .date, filterable: true, groupable: true, sortable: true),
             field(.budgetImpact, "Budget impact", aliases: ["spend", "owned spend"], valueType: .money, filterable: true, sortable: true, aggregatable: true)
         ]

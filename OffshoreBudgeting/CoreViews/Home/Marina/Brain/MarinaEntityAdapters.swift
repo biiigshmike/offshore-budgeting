@@ -15,6 +15,7 @@ struct MarinaVariableExpenseAdapter: MarinaEntityAdapter {
                     .merchantText: .text(expense.descriptionText),
                     .amount: .money(expense.amount),
                     .budgetImpact: .money(SavingsMathService.variableBudgetImpactAmount(for: expense)),
+                    .date: .date(expense.transactionDate),
                     .transactionDate: .date(expense.transactionDate)
                 ],
                 relationships: expenseRelationships(
@@ -64,11 +65,29 @@ struct MarinaPlannedExpenseAdapter: MarinaEntityAdapter {
                     .actualAmount: .money(expense.actualAmount),
                     .effectiveAmount: .money(expense.effectiveAmount()),
                     .budgetImpact: .money(SavingsMathService.plannedBudgetImpactAmount(for: expense)),
+                    .date: .date(expense.expenseDate),
                     .expenseDate: .date(expense.expenseDate)
                 ],
                 relationships: relationships
             )
         }
+    }
+}
+
+struct MarinaUnifiedExpenseAdapter {
+    let variableAdapter: any MarinaEntityAdapter
+    let plannedAdapter: any MarinaEntityAdapter
+
+    init(
+        variableAdapter: any MarinaEntityAdapter = MarinaVariableExpenseAdapter(),
+        plannedAdapter: any MarinaEntityAdapter = MarinaPlannedExpenseAdapter()
+    ) {
+        self.variableAdapter = variableAdapter
+        self.plannedAdapter = plannedAdapter
+    }
+
+    func rows(from snapshot: MarinaWorkspaceSnapshot) -> [MarinaQueryableRow] {
+        variableAdapter.rows(from: snapshot) + plannedAdapter.rows(from: snapshot)
     }
 }
 
