@@ -1,0 +1,494 @@
+import Foundation
+
+struct MarinaUniversalPresentationContext: Equatable, Sendable {
+    let dateRange: HomeQueryDateRange?
+    let comparisonDateRange: HomeQueryDateRange?
+    let now: Date
+    let calendar: Calendar
+
+    init(
+        dateRange: HomeQueryDateRange? = nil,
+        comparisonDateRange: HomeQueryDateRange? = nil,
+        now: Date = Date(),
+        calendar: Calendar = .current
+    ) {
+        self.dateRange = dateRange
+        self.comparisonDateRange = comparisonDateRange
+        self.now = now
+        self.calendar = calendar
+    }
+}
+
+struct MarinaUniversalPresentationResult: Equatable {
+    let executionResult: MarinaExecutionResult
+    let unsupportedReason: MarinaCapabilityFailureReason?
+
+    init(
+        executionResult: MarinaExecutionResult,
+        unsupportedReason: MarinaCapabilityFailureReason? = nil
+    ) {
+        self.executionResult = executionResult
+        self.unsupportedReason = unsupportedReason
+    }
+}
+
+struct MarinaUniversalResultPresenter {
+    func presentationResult(
+        for universalResult: MarinaUniversalQueryResult,
+        plan: MarinaUniversalQueryPlan,
+        context: MarinaUniversalPresentationContext
+    ) -> MarinaExecutionResult {
+        presentedResult(
+            for: universalResult,
+            plan: plan,
+            context: context
+        )
+        .executionResult
+    }
+
+    func presentedResult(
+        for universalResult: MarinaUniversalQueryResult,
+        plan: MarinaUniversalQueryPlan,
+        context: MarinaUniversalPresentationContext
+    ) -> MarinaUniversalPresentationResult {
+        switch universalResult {
+        case let .metric(metric):
+            return .init(executionResult: metricResult(metric, plan: plan, context: context))
+        case let .rows(rows):
+            return .init(executionResult: rowsResult(rows, plan: plan, context: context))
+        case let .groups(groups):
+            return .init(executionResult: groupsResult(groups, plan: plan, context: context))
+        case let .unsupported(reason):
+            return unsupportedResult(reason)
+        }
+    }
+
+    func presentationResult(
+        for formulaResult: MarinaFormulaResult,
+        plan: MarinaUniversalQueryPlan,
+        context: MarinaUniversalPresentationContext
+    ) -> MarinaExecutionResult {
+        presentedResult(
+            for: formulaResult,
+            plan: plan,
+            context: context
+        )
+        .executionResult
+    }
+
+    func presentedResult(
+        for formulaResult: MarinaFormulaResult,
+        plan: MarinaUniversalQueryPlan,
+        context: MarinaUniversalPresentationContext
+    ) -> MarinaUniversalPresentationResult {
+        switch formulaResult {
+        case let .metric(metric):
+            return .init(
+                executionResult: metricResult(
+                    MarinaUniversalMetricResult(value: metric.value, evidenceRows: metric.evidenceRows),
+                    plan: plan,
+                    context: context
+                )
+            )
+        case let .rows(rows):
+            return .init(executionResult: rowsResult(rows, plan: plan, context: context))
+        case let .groups(groups):
+            return .init(executionResult: formulaGroupsResult(groups, plan: plan, context: context))
+        case let .unsupported(reason):
+            return unsupportedResult(reason)
+        }
+    }
+
+    private func metricResult(
+        _ metric: MarinaUniversalMetricResult,
+        plan: MarinaUniversalQueryPlan,
+        context: MarinaUniversalPresentationContext
+    ) -> MarinaExecutionResult {
+        let value = formattedValue(metric.value)
+        let rows = [
+            HomeAnswerRow(
+                title: "Value",
+                value: value,
+                amount: numericValue(metric.value)
+            )
+        ] + metric.evidenceRows.map { row in
+            homeAnswerRow(from: row, plan: plan, role: .evidence)
+        }
+
+        return MarinaExecutionResult(
+            kind: .metric,
+            title: title(for: plan),
+            subtitle: subtitle(for: context),
+            primaryValue: value,
+            rows: rows
+        )
+    }
+
+    private func rowsResult(
+        _ rows: [MarinaQueryableRow],
+        plan: MarinaUniversalQueryPlan,
+        context: MarinaUniversalPresentationContext
+    ) -> MarinaExecutionResult {
+        guard rows.isEmpty == false else {
+            return emptyResult(title: title(for: plan), context: context)
+        }
+
+        return MarinaExecutionResult(
+            kind: .list,
+            title: title(for: plan),
+            subtitle: subtitle(for: context),
+            rows: rows.map { homeAnswerRow(from: $0, plan: plan, role: .result) }
+        )
+    }
+
+    private func groupsResult(
+        _ groups: [MarinaUniversalGroupResult],
+        plan: MarinaUniversalQueryPlan,
+        context: MarinaUniversalPresentationContext
+    ) -> MarinaExecutionResult {
+        guard groups.isEmpty == false else {
+            return emptyResult(title: title(for: plan), context: context)
+        }
+
+        return MarinaExecutionResult(
+            kind: .list,
+            title: title(for: plan),
+            subtitle: subtitle(for: context),
+            rows: groups.map { group in
+                groupRow(
+                    displayName: group.group.displayName,
+                    aggregate: group.aggregate,
+                    count: group.group.rows.count
+                )
+            }
+        )
+    }
+
+    private func formulaGroupsResult(
+        _ groups: [MarinaFormulaGroup],
+        plan: MarinaUniversalQueryPlan,
+        context: MarinaUniversalPresentationContext
+    ) -> MarinaExecutionResult {
+        guard groups.isEmpty == false else {
+            return emptyResult(title: title(for: plan), context: context)
+        }
+
+        return MarinaExecutionResult(
+            kind: .list,
+            title: title(for: plan),
+            subtitle: subtitle(for: context),
+            rows: groups.map { group in
+                groupRow(
+                    displayName: group.displayName,
+                    aggregate: group.value,
+                    count: group.evidenceRows.count
+                )
+            }
+        )
+    }
+
+    private func unsupportedResult(
+        _ reason: MarinaCapabilityFailureReason
+    ) -> MarinaUniversalPresentationResult {
+        MarinaUniversalPresentationResult(
+            executionResult: MarinaExecutionResult(
+                kind: .message,
+                title: "I can't answer that yet",
+                subtitle: "That universal result is not supported for presentation yet."
+            ),
+            unsupportedReason: reason
+        )
+    }
+
+    private func emptyResult(
+        title: String,
+        context: MarinaUniversalPresentationContext
+    ) -> MarinaExecutionResult {
+        MarinaExecutionResult(
+            kind: .message,
+            title: title,
+            subtitle: subtitle(for: context) ?? "No results found."
+        )
+    }
+
+    private func homeAnswerRow(
+        from row: MarinaQueryableRow,
+        plan: MarinaUniversalQueryPlan,
+        role: HomeAnswerRowRole
+    ) -> HomeAnswerRow {
+        let selectedValue = preferredDisplayValue(for: row, plan: plan)
+        return HomeAnswerRow(
+            title: row.displayName,
+            value: formattedValue(selectedValue),
+            sourceID: row.id,
+            objectType: objectType(for: row.entity),
+            amount: amount(for: row, plan: plan),
+            date: date(for: row),
+            role: role
+        )
+    }
+
+    private func groupRow(
+        displayName: String,
+        aggregate: MarinaValue?,
+        count: Int
+    ) -> HomeAnswerRow {
+        guard let aggregate else {
+            return HomeAnswerRow(title: displayName, value: "\(count)")
+        }
+
+        return HomeAnswerRow(
+            title: displayName,
+            value: formattedValue(aggregate),
+            amount: numericValue(aggregate)
+        )
+    }
+
+    private func title(for plan: MarinaUniversalQueryPlan) -> String {
+        if let groupBy = plan.groupBy {
+            switch groupBy {
+            case .relationship(.category):
+                return "Spending by Category"
+            case .relationship(.card):
+                return "Spending by Card"
+            case .relationship(.incomeSource):
+                return "Income by Source"
+            case .field, .relationship:
+                break
+            }
+        }
+
+        switch plan.measure {
+        case .savingsTotal:
+            return "Savings Total"
+        case .reconciliationBalance:
+            return "Reconciliation Balance"
+        case .remainingRoom:
+            return "Remaining Room"
+        case .safeDailySpend:
+            return "Safe Daily Spend"
+        case .incomeAmount:
+            return "Income"
+        case .budgetImpact:
+            switch plan.operation {
+            case .average:
+                return "Average Spending"
+            case .sum:
+                return "Spending"
+            case .list, .last, .next:
+                return "Results"
+            case .count:
+                return "Count"
+            case .group, .compare, .share, .forecast, .whatIf:
+                break
+            }
+        case .amount,
+             .plannedAmount,
+             .actualAmount,
+             .effectiveAmount,
+             .categoryAvailability,
+             .burnRate,
+             .projectedSpend,
+             .paceDifference,
+             .coverageRatio,
+             .recurringBurden,
+             .concentration,
+             .color,
+             .name,
+             nil:
+            break
+        }
+
+        switch plan.operation {
+        case .count:
+            return "Count"
+        case .average:
+            return "Average"
+        case .list, .last, .next:
+            return "Results"
+        case .group:
+            return "Grouped Results"
+        case .sum:
+            return "Total"
+        case .compare, .share, .forecast, .whatIf:
+            return "Results"
+        }
+    }
+
+    private func subtitle(for context: MarinaUniversalPresentationContext) -> String? {
+        guard let dateRange = context.dateRange else {
+            return nil
+        }
+        return "\(shortDate(dateRange.startDate)) - \(shortDate(dateRange.endDate))"
+    }
+
+    private func preferredDisplayValue(
+        for row: MarinaQueryableRow,
+        plan: MarinaUniversalQueryPlan
+    ) -> MarinaValue {
+        let fields = preferredFields(for: row.entity, measure: plan.measure)
+        for field in fields {
+            if let value = row.fields[field] {
+                return value
+            }
+        }
+        return .text(row.displayName)
+    }
+
+    private func preferredFields(
+        for entity: MarinaSemanticEntity,
+        measure: MarinaSemanticMeasure?
+    ) -> [MarinaFieldKey] {
+        var fields: [MarinaFieldKey] = []
+        if let measureField = field(for: measure) {
+            fields.append(measureField)
+        }
+
+        switch entity {
+        case .variableExpense, .plannedExpense:
+            fields.append(contentsOf: [.budgetImpact, .amount, .effectiveAmount, .plannedAmount, .actualAmount])
+        case .income:
+            fields.append(contentsOf: [.incomeAmount, .amount, .date, .source])
+        case .workspace, .budget, .card, .reconciliationAccount, .savingsAccount, .category:
+            fields.append(contentsOf: [.name, .title, .color, .date, .startDate])
+        case .preset:
+            fields.append(contentsOf: [.title, .name, .plannedAmount, .date])
+        }
+
+        return fields.uniqued()
+    }
+
+    private func field(for measure: MarinaSemanticMeasure?) -> MarinaFieldKey? {
+        switch measure {
+        case .amount:
+            return .amount
+        case .plannedAmount:
+            return .plannedAmount
+        case .actualAmount:
+            return .actualAmount
+        case .effectiveAmount:
+            return .effectiveAmount
+        case .budgetImpact:
+            return .budgetImpact
+        case .incomeAmount:
+            return .incomeAmount
+        case .name:
+            return .name
+        case .color:
+            return .color
+        case .savingsTotal,
+             .reconciliationBalance,
+             .categoryAvailability,
+             .remainingRoom,
+             .burnRate,
+             .projectedSpend,
+             .safeDailySpend,
+             .paceDifference,
+             .coverageRatio,
+             .recurringBurden,
+             .concentration,
+             nil:
+            return nil
+        }
+    }
+
+    private func amount(
+        for row: MarinaQueryableRow,
+        plan: MarinaUniversalQueryPlan
+    ) -> Double? {
+        for field in preferredFields(for: row.entity, measure: plan.measure) {
+            if let value = numericValue(row.fields[field]),
+               amountFields.contains(field) {
+                return value
+            }
+        }
+        return nil
+    }
+
+    private var amountFields: Set<MarinaFieldKey> {
+        [.amount, .plannedAmount, .actualAmount, .effectiveAmount, .budgetImpact, .incomeAmount]
+    }
+
+    private func date(for row: MarinaQueryableRow) -> Date? {
+        for field in [MarinaFieldKey.date, .transactionDate, .expenseDate, .createdAt, .startDate] {
+            if case let .date(date)? = row.fields[field] {
+                return date
+            }
+        }
+        return nil
+    }
+
+    private func objectType(for entity: MarinaSemanticEntity) -> MarinaLookupObjectType {
+        switch entity {
+        case .workspace:
+            return .workspace
+        case .budget:
+            return .budget
+        case .card:
+            return .card
+        case .plannedExpense:
+            return .plannedExpense
+        case .variableExpense:
+            return .variableExpense
+        case .reconciliationAccount:
+            return .reconciliationAccount
+        case .savingsAccount:
+            return .savingsAccount
+        case .income:
+            return .income
+        case .category:
+            return .category
+        case .preset:
+            return .preset
+        }
+    }
+
+    private func formattedValue(_ value: MarinaValue) -> String {
+        switch value {
+        case let .text(value):
+            return value
+        case let .money(value):
+            return CurrencyFormatter.string(from: value)
+        case let .number(value):
+            return decimal(value)
+        case let .integer(value):
+            return "\(value)"
+        case let .date(value):
+            return shortDate(value)
+        case let .boolean(value):
+            return value ? "Yes" : "No"
+        case let .colorHex(value):
+            return value
+        case .empty:
+            return "No value"
+        }
+    }
+
+    private func numericValue(_ value: MarinaValue?) -> Double? {
+        switch value {
+        case let .money(value)?:
+            return value
+        case let .number(value)?:
+            return value
+        case let .integer(value)?:
+            return Double(value)
+        case .text, .date, .boolean, .colorHex, .empty, nil:
+            return nil
+        }
+    }
+
+    private func shortDate(_ date: Date) -> String {
+        date.formatted(.dateTime.month(.abbreviated).day().year())
+    }
+
+    private func decimal(_ value: Double) -> String {
+        value.formatted(.number.precision(.fractionLength(0...2)))
+    }
+}
+
+private extension Array where Element: Hashable {
+    func uniqued() -> [Element] {
+        var seen: Set<Element> = []
+        return filter { seen.insert($0).inserted }
+    }
+}
