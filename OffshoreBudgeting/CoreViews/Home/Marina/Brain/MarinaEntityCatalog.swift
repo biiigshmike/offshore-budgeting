@@ -231,7 +231,7 @@ extension MarinaEntityCatalog {
                 relationship(.category, "Category limit", aliases: ["category"], targetEntity: .category, optional: true),
                 relationship(.preset, "Linked preset", aliases: ["preset"], targetEntity: .preset, optional: true)
             ],
-            supportedOperations: [.sum, .average, .compare, .forecast, .whatIf],
+            supportedOperations: [.list, .sum, .average, .compare, .forecast, .whatIf],
             supportedMeasures: [.budgetImpact, .remainingRoom, .burnRate, .projectedSpend, .safeDailySpend, .paceDifference, .coverageRatio],
             defaultDateField: .startDate,
             defaultAmountField: .budgetImpact,
@@ -373,7 +373,7 @@ extension MarinaEntityCatalog {
                 relationship(.incomeSource, "Income source", aliases: ["source"], targetEntity: nil, optional: false),
                 relationship(.card, "Card", targetEntity: .card, optional: true)
             ],
-            supportedOperations: [.list, .count, .sum, .average, .compare, .share, .forecast],
+            supportedOperations: [.list, .count, .sum, .average, .compare, .group, .share, .forecast],
             supportedMeasures: [.amount, .incomeAmount, .coverageRatio],
             defaultDateField: .date,
             defaultAmountField: .incomeAmount,
