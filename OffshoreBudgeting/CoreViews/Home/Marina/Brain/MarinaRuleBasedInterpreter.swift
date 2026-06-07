@@ -932,6 +932,10 @@ struct MarinaRuleBasedInterpreter: MarinaModelInterpreting {
 
     private func expenseTextTarget(in normalized: String) -> String? {
         targetAfterAnyMarker(in: normalized, markers: [
+            "spend at ",
+            "spent at ",
+            "expenses at ",
+            "expense at ",
             "merchant named ",
             "merchant ",
             "store named ",

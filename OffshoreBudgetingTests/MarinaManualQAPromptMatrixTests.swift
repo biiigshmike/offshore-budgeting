@@ -148,6 +148,42 @@ struct MarinaManualQAPromptMatrixTests {
                 )
             ),
             MarinaManualQACase(
+                id: "expense.appleMerchant.currentPeriod",
+                prompt: "How much did I spend at Apple this period?",
+                category: .expenses,
+                expectedRouting: .universal,
+                expectedScenario: .merchantVariableSpend,
+                expectedLayer: .universalRouting,
+                notes: "Current-period merchant spend should keep the same universal-owned shape.",
+                request: semanticRequest(
+                    entity: .variableExpense,
+                    operation: .sum,
+                    measure: .budgetImpact,
+                    dimensions: [.merchantText],
+                    dateRangeToken: .currentPeriod,
+                    textQuery: "Apple",
+                    expenseScope: .variable
+                )
+            ),
+            MarinaManualQACase(
+                id: "expense.appleMerchant.previousMonth",
+                prompt: "How much did I spend at Apple last month?",
+                category: .expenses,
+                expectedRouting: .universal,
+                expectedScenario: .merchantVariableSpend,
+                expectedLayer: .universalRouting,
+                notes: "Previous-month merchant spend is already covered by the merchant scenario policy.",
+                request: semanticRequest(
+                    entity: .variableExpense,
+                    operation: .sum,
+                    measure: .budgetImpact,
+                    dimensions: [.merchantText],
+                    dateRangeToken: .previousMonth,
+                    textQuery: "Apple",
+                    expenseScope: .variable
+                )
+            ),
+            MarinaManualQACase(
                 id: "expense.groceriesCategory.currentMonth",
                 prompt: "How much did I spend on groceries this month?",
                 category: .expenses,
@@ -165,6 +201,42 @@ struct MarinaManualQAPromptMatrixTests {
                 )
             ),
             MarinaManualQACase(
+                id: "expense.groceriesCategory.currentPeriod",
+                prompt: "How much did I spend on groceries this period?",
+                category: .expenses,
+                expectedRouting: .universal,
+                expectedScenario: .categoryVariableSpend,
+                expectedLayer: .universalRouting,
+                notes: "Current-period category spend should keep the same universal-owned shape.",
+                request: semanticRequest(
+                    entity: .variableExpense,
+                    operation: .sum,
+                    measure: .budgetImpact,
+                    dimensions: [.category],
+                    dateRangeToken: .currentPeriod,
+                    targetName: "Groceries",
+                    expenseScope: .variable
+                )
+            ),
+            MarinaManualQACase(
+                id: "expense.groceriesCategory.previousMonth",
+                prompt: "How much did I spend on groceries last month?",
+                category: .expenses,
+                expectedRouting: .universal,
+                expectedScenario: .categoryVariableSpend,
+                expectedLayer: .universalRouting,
+                notes: "Previous-month category spend is already covered by the category scenario policy.",
+                request: semanticRequest(
+                    entity: .variableExpense,
+                    operation: .sum,
+                    measure: .budgetImpact,
+                    dimensions: [.category],
+                    dateRangeToken: .previousMonth,
+                    targetName: "Groceries",
+                    expenseScope: .variable
+                )
+            ),
+            MarinaManualQACase(
                 id: "expense.appleCard.currentMonth",
                 prompt: "How much did I spend on Apple Card this month?",
                 category: .cards,
@@ -177,6 +249,24 @@ struct MarinaManualQAPromptMatrixTests {
                     operation: .sum,
                     measure: .budgetImpact,
                     dimensions: [.card],
+                    targetName: "Apple Card",
+                    expenseScope: .variable
+                )
+            ),
+            MarinaManualQACase(
+                id: "expense.appleCard.currentPeriod",
+                prompt: "How much did I spend on Apple Card this period?",
+                category: .cards,
+                expectedRouting: .universal,
+                expectedScenario: .cardVariableSpend,
+                expectedLayer: .universalRouting,
+                notes: "Current-period card spend should keep the same universal-owned shape.",
+                request: semanticRequest(
+                    entity: .variableExpense,
+                    operation: .sum,
+                    measure: .budgetImpact,
+                    dimensions: [.card],
+                    dateRangeToken: .currentPeriod,
                     targetName: "Apple Card",
                     expenseScope: .variable
                 )
@@ -263,6 +353,24 @@ struct MarinaManualQAPromptMatrixTests {
                 )
             ),
             MarinaManualQACase(
+                id: "expense.unifiedByCategory.currentPeriod",
+                prompt: "Show spending by category this period.",
+                category: .categories,
+                expectedRouting: .universal,
+                expectedScenario: .unifiedExpenseCategoryGroups,
+                expectedLayer: .universalRouting,
+                notes: "Current-period unified category groups are already allowlisted.",
+                request: semanticRequest(
+                    entity: .variableExpense,
+                    operation: .group,
+                    measure: .budgetImpact,
+                    dimensions: [.category],
+                    dateRangeToken: .currentPeriod,
+                    expenseScope: .unified,
+                    expectedAnswerShape: .list
+                )
+            ),
+            MarinaManualQACase(
                 id: "expense.unifiedByCard.currentMonth",
                 prompt: "Show spending by card this month.",
                 category: .cards,
@@ -275,6 +383,24 @@ struct MarinaManualQAPromptMatrixTests {
                     operation: .group,
                     measure: .budgetImpact,
                     dimensions: [.card],
+                    expenseScope: .unified,
+                    expectedAnswerShape: .list
+                )
+            ),
+            MarinaManualQACase(
+                id: "expense.unifiedByCard.currentPeriod",
+                prompt: "Show spending by card this period.",
+                category: .cards,
+                expectedRouting: .universal,
+                expectedScenario: .unifiedExpenseCardGroups,
+                expectedLayer: .universalRouting,
+                notes: "Current-period unified card groups are already allowlisted.",
+                request: semanticRequest(
+                    entity: .variableExpense,
+                    operation: .group,
+                    measure: .budgetImpact,
+                    dimensions: [.card],
+                    dateRangeToken: .currentPeriod,
                     expenseScope: .unified,
                     expectedAnswerShape: .list
                 )
@@ -295,6 +421,22 @@ struct MarinaManualQAPromptMatrixTests {
                 )
             ),
             MarinaManualQACase(
+                id: "income.total.currentPeriod",
+                prompt: "How much income came in this period?",
+                category: .income,
+                expectedRouting: .universal,
+                expectedScenario: .incomeTotal,
+                expectedLayer: .universalRouting,
+                notes: "Current-period income total is already allowlisted.",
+                request: semanticRequest(
+                    entity: .income,
+                    operation: .sum,
+                    measure: .incomeAmount,
+                    dateRangeToken: .currentPeriod,
+                    incomeState: .all
+                )
+            ),
+            MarinaManualQACase(
                 id: "income.bySource.currentMonth",
                 prompt: "Show income by source this month.",
                 category: .income,
@@ -307,6 +449,24 @@ struct MarinaManualQAPromptMatrixTests {
                     operation: .group,
                     measure: .incomeAmount,
                     dimensions: [.incomeSource],
+                    incomeState: .all,
+                    expectedAnswerShape: .list
+                )
+            ),
+            MarinaManualQACase(
+                id: "income.bySource.currentPeriod",
+                prompt: "Show income by source this period.",
+                category: .income,
+                expectedRouting: .universal,
+                expectedScenario: .incomeBySource,
+                expectedLayer: .universalRouting,
+                notes: "Current-period income source groups are already allowlisted.",
+                request: semanticRequest(
+                    entity: .income,
+                    operation: .group,
+                    measure: .incomeAmount,
+                    dimensions: [.incomeSource],
+                    dateRangeToken: .currentPeriod,
                     incomeState: .all,
                     expectedAnswerShape: .list
                 )
@@ -487,6 +647,22 @@ struct MarinaManualQAPromptMatrixTests {
                 )
             ),
             MarinaManualQACase(
+                id: "deferred.whatIfForecastSavings.currentMonth",
+                prompt: "Forecast my savings if I spend $50.",
+                category: .deferredFormula,
+                expectedRouting: .legacyFallback,
+                expectedScenario: nil,
+                expectedLayer: .deferred,
+                notes: "What-if savings formulas remain legacy-owned and must not route universal.",
+                request: semanticRequest(
+                    entity: .savingsAccount,
+                    operation: .whatIf,
+                    measure: .savingsTotal,
+                    whatIfAmount: 50,
+                    expectedAnswerShape: .comparison
+                )
+            ),
+            MarinaManualQACase(
                 id: "deferred.categoryAvailability.overList",
                 prompt: "Which categories are over limit?",
                 category: .categories,
@@ -529,6 +705,83 @@ struct MarinaManualQAPromptMatrixTests {
                     operation: .forecast,
                     measure: .savingsTotal,
                     dateRangeToken: .allTime
+                )
+            ),
+            MarinaManualQACase(
+                id: "deferred.budgetCoverageRatio.allTime",
+                prompt: "What is my coverage ratio all time?",
+                category: .deferredFormula,
+                expectedRouting: .legacyFallback,
+                expectedScenario: nil,
+                expectedLayer: .deferred,
+                notes: "All-time budget coverage is not part of the allowlisted metric shape.",
+                request: semanticRequest(
+                    entity: .budget,
+                    operation: .forecast,
+                    measure: .coverageRatio,
+                    dateRangeToken: .allTime
+                )
+            ),
+            MarinaManualQACase(
+                id: "deferred.incomeCoverageRatio.allTime",
+                prompt: "Does my income cover my budget all time?",
+                category: .deferredFormula,
+                expectedRouting: .legacyFallback,
+                expectedScenario: nil,
+                expectedLayer: .deferred,
+                notes: "All-time income coverage is not part of the allowlisted metric shape.",
+                request: semanticRequest(
+                    entity: .income,
+                    operation: .share,
+                    measure: .coverageRatio,
+                    dateRangeToken: .allTime
+                )
+            ),
+            MarinaManualQACase(
+                id: "deferred.categoryConcentration.allTime",
+                prompt: "Which category has the biggest share all time?",
+                category: .deferredFormula,
+                expectedRouting: .legacyFallback,
+                expectedScenario: nil,
+                expectedLayer: .deferred,
+                notes: "All-time category concentration remains deferred.",
+                request: semanticRequest(
+                    entity: .category,
+                    operation: .share,
+                    measure: .concentration,
+                    dateRangeToken: .allTime
+                )
+            ),
+            MarinaManualQACase(
+                id: "deferred.nextPlannedExpense.allTime",
+                prompt: "What is my next planned expense ever?",
+                category: .expenses,
+                expectedRouting: .legacyFallback,
+                expectedScenario: nil,
+                expectedLayer: .deferred,
+                notes: "All-time next planned expense is not an allowlisted next-window shape.",
+                request: semanticRequest(
+                    entity: .plannedExpense,
+                    operation: .next,
+                    measure: .effectiveAmount,
+                    dateRangeToken: .allTime,
+                    expenseScope: .planned
+                )
+            ),
+            MarinaManualQACase(
+                id: "deferred.projectedSpend.byCard",
+                prompt: "Show projected spend by card.",
+                category: .deferredFormula,
+                expectedRouting: .legacyFallback,
+                expectedScenario: nil,
+                expectedLayer: .deferred,
+                notes: "Projected-spend grouping by card is not allowlisted.",
+                request: semanticRequest(
+                    entity: .budget,
+                    operation: .forecast,
+                    measure: .projectedSpend,
+                    dimensions: [.card],
+                    expectedAnswerShape: .list
                 )
             ),
             MarinaManualQACase(
@@ -710,6 +963,36 @@ struct MarinaManualQAPromptMatrixTests {
                 )
             ),
             MarinaManualQACase(
+                id: "guardrail.mutation.addExpense",
+                prompt: "Add a $25 coffee expense.",
+                category: .mutationGuardrail,
+                expectedRouting: .unsupportedOrClarification,
+                expectedScenario: nil,
+                expectedLayer: .guardrail,
+                notes: "Create-style mutation requests must not route through universal query execution.",
+                request: readOnlyUnsupportedRequest()
+            ),
+            MarinaManualQACase(
+                id: "guardrail.mutation.createBudget",
+                prompt: "Create a July budget.",
+                category: .mutationGuardrail,
+                expectedRouting: .unsupportedOrClarification,
+                expectedScenario: nil,
+                expectedLayer: .guardrail,
+                notes: "Budget creation remains outside universal query execution.",
+                request: readOnlyUnsupportedRequest()
+            ),
+            MarinaManualQACase(
+                id: "guardrail.mutation.updatePreset",
+                prompt: "Change my Phone preset to $90.",
+                category: .mutationGuardrail,
+                expectedRouting: .unsupportedOrClarification,
+                expectedScenario: nil,
+                expectedLayer: .guardrail,
+                notes: "Update-style mutation requests must stay behind read-only guardrails.",
+                request: readOnlyUnsupportedRequest()
+            ),
+            MarinaManualQACase(
                 id: "guardrail.mutation.moveSavings",
                 prompt: "Move $50 to Savings Account.",
                 category: .mutationGuardrail,
@@ -773,6 +1056,72 @@ struct MarinaManualQAPromptMatrixTests {
                     operation: .list,
                     targetName: "Apple",
                     textQuery: "Apple",
+                    expectedAnswerShape: .clarification,
+                    unsupportedReason: .ambiguousEntity
+                )
+            ),
+            MarinaManualQACase(
+                id: "ambiguity.categoryMerchant.groceriesUnresolvedTarget",
+                prompt: "How much did I spend on Groceries?",
+                category: .ambiguity,
+                expectedRouting: .legacyFallback,
+                expectedScenario: nil,
+                expectedLayer: .resolver,
+                notes: "Category-vs-merchant target text must not be guessed into an allowlisted universal request.",
+                request: semanticRequest(
+                    entity: .variableExpense,
+                    operation: .sum,
+                    measure: .budgetImpact,
+                    targetName: "Groceries",
+                    expenseScope: .unified
+                )
+            ),
+            MarinaManualQACase(
+                id: "ambiguity.categoryMerchant.terminalClarification",
+                prompt: "How much did I spend on Groceries?",
+                category: .ambiguity,
+                expectedRouting: .unsupportedOrClarification,
+                expectedScenario: nil,
+                expectedLayer: .resolver,
+                notes: "Terminal category/merchant clarification shapes must not be allowlisted.",
+                request: semanticRequest(
+                    entity: .workspace,
+                    operation: .list,
+                    targetName: "Groceries",
+                    textQuery: "Groceries",
+                    expectedAnswerShape: .clarification,
+                    unsupportedReason: .ambiguousEntity
+                )
+            ),
+            MarinaManualQACase(
+                id: "ambiguity.incomeMerchant.paycheckUnresolvedTarget",
+                prompt: "How much came from Paycheck?",
+                category: .ambiguity,
+                expectedRouting: .legacyFallback,
+                expectedScenario: nil,
+                expectedLayer: .resolver,
+                notes: "Income-source-vs-merchant target text must not route without a clear semantic dimension.",
+                request: semanticRequest(
+                    entity: .variableExpense,
+                    operation: .sum,
+                    measure: .budgetImpact,
+                    targetName: "Paycheck",
+                    expenseScope: .unified
+                )
+            ),
+            MarinaManualQACase(
+                id: "ambiguity.incomeMerchant.terminalClarification",
+                prompt: "How much came from Paycheck?",
+                category: .ambiguity,
+                expectedRouting: .unsupportedOrClarification,
+                expectedScenario: nil,
+                expectedLayer: .resolver,
+                notes: "Terminal income/merchant clarification shapes must not be allowlisted.",
+                request: semanticRequest(
+                    entity: .workspace,
+                    operation: .list,
+                    targetName: "Paycheck",
+                    textQuery: "Paycheck",
                     expectedAnswerShape: .clarification,
                     unsupportedReason: .ambiguousEntity
                 )
@@ -857,6 +1206,15 @@ struct MarinaManualQAPromptMatrixTests {
             measure: .reconciliationBalance,
             dateRangeToken: .allTime,
             targetName: targetName
+        )
+    }
+
+    private func readOnlyUnsupportedRequest() -> MarinaSemanticRequest {
+        semanticRequest(
+            entity: .workspace,
+            operation: .list,
+            expectedAnswerShape: .unsupported,
+            unsupportedReason: .readOnly
         )
     }
 
@@ -952,6 +1310,8 @@ struct MarinaManualQAPromptMatrixTests {
         let appleMarketJune = VariableExpense(descriptionText: "Apple Market", amount: 18, transactionDate: date(2026, 6, 20), workspace: workspace, card: appleCard, category: groceries)
         let krogerJune = VariableExpense(descriptionText: "Kroger", amount: 30, transactionDate: date(2026, 6, 10), workspace: workspace, card: chaseCard, category: groceries)
         let bestBuyJune = VariableExpense(descriptionText: "Best Buy", amount: 300, transactionDate: date(2026, 6, 12), workspace: workspace, card: chaseCard, category: electronics)
+        let appleStoreMay = VariableExpense(descriptionText: "Apple Store", amount: 75, transactionDate: date(2026, 5, 8), workspace: workspace, card: appleCard, category: electronics)
+        let krogerMay = VariableExpense(descriptionText: "Kroger", amount: 42, transactionDate: date(2026, 5, 18), workspace: workspace, card: chaseCard, category: groceries)
 
         let phoneBill = PlannedExpense(
             title: "Phone Bill",
@@ -997,7 +1357,7 @@ struct MarinaManualQAPromptMatrixTests {
         alejandro.expenseAllocations = [krogerAllocation]
         alejandro.settlements = [settlement]
 
-        let variableExpenses = [appleStoreJune, appleMarketJune, krogerJune, bestBuyJune]
+        let variableExpenses = [appleStoreJune, appleMarketJune, krogerJune, bestBuyJune, appleStoreMay, krogerMay]
         let plannedExpenses = [phoneBill, rent]
         let incomes = [actualPaycheck, freelance, plannedPaycheck]
         let snapshot = MarinaWorkspaceSnapshot(

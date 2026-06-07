@@ -19,6 +19,21 @@ struct MarinaManualQAPromptInterpretationSmokeTests {
         #expect(interpreted.clarificationChoices == nil)
     }
 
+    @Test func atAppleMapsToMerchantTextWhenMerchantAndCardBothMatch() {
+        let fixture = makeFixture(includeAppleCard: true, includeAppleMerchantExpense: true)
+        let interpreted = validated("How much did I spend at Apple?", snapshot: fixture.snapshot)
+        let request = interpreted.request
+
+        #expect(request.entity == .variableExpense)
+        #expect(request.operation == .sum)
+        #expect(request.measure == .budgetImpact)
+        #expect(request.dimensions == [.merchantText])
+        #expect(request.textQuery?.contains("Apple") == true)
+        #expect(request.targetName == nil)
+        #expect(request.expectedAnswerShape == .metric)
+        #expect(interpreted.clarificationChoices == nil)
+    }
+
     @Test func onAppleCardMapsToCardTarget() {
         let fixture = makeFixture(includeAppleCard: true, includeAppleMerchantExpense: false)
         let interpreted = validated("How much did I spend on Apple Card?", snapshot: fixture.snapshot)
@@ -46,6 +61,20 @@ struct MarinaManualQAPromptInterpretationSmokeTests {
         #expect(choices.choices.map(\.title).contains("Apple Card"))
     }
 
+    @Test func onGroceriesMapsToCategoryTargetWhenCategoryExists() {
+        let fixture = makeFixture()
+        let interpreted = validated("How much did I spend on groceries?", snapshot: fixture.snapshot)
+        let request = interpreted.request
+
+        #expect(request.entity == .category)
+        #expect(request.operation == .sum)
+        #expect(request.measure == .budgetImpact)
+        #expect(request.dimensions == [.category])
+        #expect(request.targetName == "Groceries")
+        #expect(request.expenseScope == .unified)
+        #expect(request.expectedAnswerShape == .metric)
+    }
+
     @Test func incomeFromPaycheckMapsToIncomeSource() {
         let fixture = makeFixture()
         let interpreted = validated("How much income from Paycheck?", snapshot: fixture.snapshot)
@@ -60,6 +89,20 @@ struct MarinaManualQAPromptInterpretationSmokeTests {
         #expect(request.expectedAnswerShape == .metric)
     }
 
+    @Test func spendAtPaycheckStaysExpenseScopedInsteadOfIncomeSource() {
+        let fixture = makeFixture()
+        let interpreted = validated("How much did I spend at Paycheck?", snapshot: fixture.snapshot)
+        let request = interpreted.request
+
+        #expect(request.entity == .variableExpense)
+        #expect(request.operation == .sum)
+        #expect(request.measure == .budgetImpact)
+        #expect(request.dimensions == [.merchantText])
+        #expect(request.textQuery?.contains("Paycheck") == true)
+        #expect(request.targetName == nil)
+        #expect(request.expectedAnswerShape == .metric)
+    }
+
     @Test func genericSavingsTotalDoesNotBecomeUniversalExplicitAccount() {
         let fixture = makeFixture()
         let interpreted = validated("What is my savings total?", snapshot: fixture.snapshot)
@@ -68,6 +111,20 @@ struct MarinaManualQAPromptInterpretationSmokeTests {
         #expect(request.targetName != "Emergency")
         #expect(MarinaUniversalRoutingPolicy.internalParityProven.scenario(for: request) == nil)
         #expect(MarinaUniversalRoutingPolicy.internalParityProven.allows(request) == false)
+    }
+
+    @Test func explicitSavingsAccountWordingResolvesAccountTarget() {
+        let fixture = makeFixture()
+        let interpreted = validated("What is my Emergency savings account balance?", snapshot: fixture.snapshot)
+        let request = interpreted.request
+
+        #expect(request.entity == .savingsAccount)
+        #expect(request.operation == .sum)
+        #expect(request.measure == .savingsTotal)
+        #expect(request.dimensions == [.savingsAccount])
+        #expect(request.targetName == "Emergency")
+        #expect(request.dateRangeToken == .allTime)
+        #expect(request.expectedAnswerShape == .metric)
     }
 
     @Test func genericReconciliationBalanceDoesNotGuessExistingAccount() {
