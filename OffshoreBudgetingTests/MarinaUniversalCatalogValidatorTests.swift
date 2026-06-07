@@ -108,12 +108,27 @@ struct MarinaUniversalCatalogValidatorTests {
     @Test func savingsAccountRejectsMerchantTextSearch() {
         let request = MarinaUniversalValidationRequest(
             entity: .savingsAccount,
-            operation: .sum,
-            measure: .savingsTotal,
+            operation: .list,
             searchFields: [.merchantText]
         )
 
         #expect(validator.validate(request) == .unsupported(.fieldNotSearchable))
+    }
+
+    @Test func savingsAndReconciliationFormulaMeasuresAreDeferred() {
+        let savingsRequest = MarinaUniversalValidationRequest(
+            entity: .savingsAccount,
+            operation: .list,
+            measure: .savingsTotal
+        )
+        let reconciliationRequest = MarinaUniversalValidationRequest(
+            entity: .reconciliationAccount,
+            operation: .list,
+            measure: .reconciliationBalance
+        )
+
+        #expect(validator.validate(savingsRequest) == .unsupported(.measureNotAvailable))
+        #expect(validator.validate(reconciliationRequest) == .unsupported(.measureNotAvailable))
     }
 
     @Test func presetRejectsSavingsAndReconciliationMeasures() {

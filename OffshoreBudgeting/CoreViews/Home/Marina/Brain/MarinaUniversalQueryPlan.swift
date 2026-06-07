@@ -3,6 +3,8 @@ import Foundation
 enum MarinaUniversalEntitySurface: Equatable, Sendable {
     case semantic(MarinaSemanticEntity)
     case unifiedExpenses
+    case savingsLedgerEntries
+    case reconciliationLedgerEntries
 
     var semanticEntity: MarinaSemanticEntity? {
         guard case let .semantic(entity) = self else {
@@ -21,6 +23,9 @@ struct MarinaUniversalQueryPlan: Equatable, Sendable {
     let groupBy: MarinaRowGroupTarget?
     let sorts: [MarinaRowSort]
     let limit: Int?
+    let dateRange: HomeQueryDateRange?
+    let comparisonDateRange: HomeQueryDateRange?
+    let whatIfAmount: Double?
     let requiresDateField: Bool
     let requiresAmountField: Bool
 
@@ -37,6 +42,9 @@ struct MarinaUniversalQueryPlan: Equatable, Sendable {
         groupBy: MarinaRowGroupTarget? = nil,
         sorts: [MarinaRowSort] = [],
         limit: Int? = nil,
+        dateRange: HomeQueryDateRange? = nil,
+        comparisonDateRange: HomeQueryDateRange? = nil,
+        whatIfAmount: Double? = nil,
         requiresDateField: Bool = false,
         requiresAmountField: Bool = false
     ) {
@@ -49,6 +57,9 @@ struct MarinaUniversalQueryPlan: Equatable, Sendable {
             groupBy: groupBy,
             sorts: sorts,
             limit: limit,
+            dateRange: dateRange,
+            comparisonDateRange: comparisonDateRange,
+            whatIfAmount: whatIfAmount,
             requiresDateField: requiresDateField,
             requiresAmountField: requiresAmountField
         )
@@ -63,6 +74,9 @@ struct MarinaUniversalQueryPlan: Equatable, Sendable {
         groupBy: MarinaRowGroupTarget? = nil,
         sorts: [MarinaRowSort] = [],
         limit: Int? = nil,
+        dateRange: HomeQueryDateRange? = nil,
+        comparisonDateRange: HomeQueryDateRange? = nil,
+        whatIfAmount: Double? = nil,
         requiresDateField: Bool = false,
         requiresAmountField: Bool = false
     ) {
@@ -74,6 +88,9 @@ struct MarinaUniversalQueryPlan: Equatable, Sendable {
         self.groupBy = groupBy
         self.sorts = sorts
         self.limit = limit
+        self.dateRange = dateRange
+        self.comparisonDateRange = comparisonDateRange
+        self.whatIfAmount = whatIfAmount
         self.requiresDateField = requiresDateField
         self.requiresAmountField = requiresAmountField
     }

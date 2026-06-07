@@ -57,6 +57,10 @@ struct MarinaEntityAdapterRegistry {
                 plannedAdapter: plannedAdapter
             )
             .rows(from: snapshot)
+        case .savingsLedgerEntries:
+            return MarinaSavingsLedgerEntryAdapter().rows(from: snapshot)
+        case .reconciliationLedgerEntries:
+            return MarinaReconciliationLedgerEntryAdapter().rows(from: snapshot)
         }
     }
 
@@ -67,6 +71,8 @@ struct MarinaEntityAdapterRegistry {
         MarinaCategoryAdapter(),
         MarinaCardAdapter(),
         MarinaBudgetAdapter(),
-        MarinaPresetAdapter()
+        MarinaPresetAdapter(),
+        MarinaSavingsAccountAdapter(),
+        MarinaReconciliationAccountAdapter()
     ]
 }

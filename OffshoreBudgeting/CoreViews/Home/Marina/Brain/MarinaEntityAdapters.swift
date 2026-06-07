@@ -91,6 +91,153 @@ struct MarinaUnifiedExpenseAdapter {
     }
 }
 
+struct MarinaSavingsAccountAdapter: MarinaEntityAdapter {
+    let entity: MarinaSemanticEntity = .savingsAccount
+
+    func rows(from snapshot: MarinaWorkspaceSnapshot) -> [MarinaQueryableRow] {
+        snapshot.savingsAccounts.map { account in
+            MarinaQueryableRow(
+                id: account.id,
+                entity: entity,
+                displayName: displayName(account.name, fallbackID: account.id),
+                fields: [
+                    .id: .text(account.id.uuidString),
+                    .name: .text(account.name),
+                    .date: .date(account.createdAt),
+                    .createdAt: .date(account.createdAt),
+                    .updatedAt: .date(account.updatedAt)
+                ],
+                relationships: baseRelationships(workspace: account.workspace)
+            )
+        }
+    }
+}
+
+struct MarinaSavingsLedgerEntryAdapter {
+    func rows(from snapshot: MarinaWorkspaceSnapshot) -> [MarinaQueryableRow] {
+        snapshot.savingsEntries.map { entry in
+            let kind = entry.kind.rawValue
+            var fields: [MarinaFieldKey: MarinaValue] = [
+                .id: .text(entry.id.uuidString),
+                .amount: .money(entry.amount),
+                .date: .date(entry.date),
+                .note: .text(entry.note),
+                .kind: .text(kind),
+                .createdAt: .date(entry.createdAt),
+                .updatedAt: .date(entry.updatedAt)
+            ]
+
+            if let periodStartDate = entry.periodStartDate {
+                fields[.startDate] = .date(periodStartDate)
+            }
+            if let periodEndDate = entry.periodEndDate {
+                fields[.endDate] = .date(periodEndDate)
+            }
+
+            return MarinaQueryableRow(
+                id: entry.id,
+                entity: .savingsAccount,
+                displayName: displayName(entry.note.isEmpty ? kind : entry.note, fallbackID: entry.id),
+                fields: fields,
+                relationships: savingsLedgerRelationships(
+                    workspace: entry.workspace,
+                    account: entry.account,
+                    variableExpense: entry.variableExpense,
+                    plannedExpense: entry.plannedExpense
+                )
+            )
+        }
+    }
+}
+
+struct MarinaReconciliationAccountAdapter: MarinaEntityAdapter {
+    let entity: MarinaSemanticEntity = .reconciliationAccount
+
+    func rows(from snapshot: MarinaWorkspaceSnapshot) -> [MarinaQueryableRow] {
+        snapshot.reconciliationAccounts.map { account in
+            MarinaQueryableRow(
+                id: account.id,
+                entity: entity,
+                displayName: displayName(account.name, fallbackID: account.id),
+                fields: [
+                    .id: .text(account.id.uuidString),
+                    .name: .text(account.name),
+                    .color: .colorHex(account.hexColor),
+                    .archivedState: .boolean(account.isArchived)
+                ],
+                relationships: baseRelationships(workspace: account.workspace)
+            )
+        }
+    }
+}
+
+struct MarinaReconciliationLedgerEntryAdapter {
+    func rows(from snapshot: MarinaWorkspaceSnapshot) -> [MarinaQueryableRow] {
+        let allocationRows = snapshot.expenseAllocations.map { allocation in
+            let date = allocation.expense?.transactionDate
+                ?? allocation.plannedExpense?.expenseDate
+                ?? allocation.createdAt
+            let note = allocation.expense?.descriptionText
+                ?? allocation.plannedExpense?.title
+                ?? "Allocation"
+            return MarinaQueryableRow(
+                id: allocation.id,
+                entity: .reconciliationAccount,
+                displayName: displayName(note, fallbackID: allocation.id),
+                fields: [
+                    .id: .text(allocation.id.uuidString),
+                    .amount: .money(allocation.allocatedAmount),
+                    .date: .date(date),
+                    .note: .text(note),
+                    .kind: .text("allocation"),
+                    .createdAt: .date(allocation.createdAt),
+                    .updatedAt: .date(allocation.updatedAt)
+                ],
+                relationships: reconciliationLedgerRelationships(
+                    workspace: allocation.workspace,
+                    account: allocation.account,
+                    variableExpense: allocation.expense,
+                    plannedExpense: allocation.plannedExpense
+                )
+            )
+        }
+
+        let settlementRows = snapshot.allocationSettlements.map { settlement in
+            let note = settlement.note.isEmpty ? "Settlement" : settlement.note
+            return MarinaQueryableRow(
+                id: settlement.id,
+                entity: .reconciliationAccount,
+                displayName: displayName(note, fallbackID: settlement.id),
+                fields: [
+                    .id: .text(settlement.id.uuidString),
+                    .amount: .money(settlement.amount),
+                    .date: .date(settlement.date),
+                    .note: .text(note),
+                    .kind: .text("settlement")
+                ],
+                relationships: reconciliationLedgerRelationships(
+                    workspace: settlement.workspace,
+                    account: settlement.account,
+                    variableExpense: settlement.expense,
+                    plannedExpense: settlement.plannedExpense
+                )
+            )
+        }
+
+        return (allocationRows + settlementRows).sorted { left, right in
+            switch (left.fields[.date], right.fields[.date]) {
+            case let (.date(leftDate)?, .date(rightDate)?):
+                if leftDate != rightDate {
+                    return leftDate < rightDate
+                }
+            default:
+                break
+            }
+            return left.displayName < right.displayName
+        }
+    }
+}
+
 struct MarinaIncomeAdapter: MarinaEntityAdapter {
     let entity: MarinaSemanticEntity = .income
 
@@ -260,6 +407,98 @@ private func expenseRelationships(
     }
 
     return relationships
+}
+
+private func savingsLedgerRelationships(
+    workspace: Workspace?,
+    account: SavingsAccount?,
+    variableExpense: VariableExpense?,
+    plannedExpense: PlannedExpense?
+) -> [MarinaRelationshipKey: MarinaResolvedRelationship] {
+    var relationships = baseRelationships(workspace: workspace)
+
+    if let account {
+        relationships[.savingsAccount] = relationship(
+            .savingsAccount,
+            targetEntity: .savingsAccount,
+            id: account.id,
+            displayName: account.name
+        )
+    }
+
+    if let variableExpense {
+        relationships[.variableExpense] = relationship(
+            .variableExpense,
+            targetEntity: .variableExpense,
+            id: variableExpense.id,
+            displayName: variableExpense.descriptionText
+        )
+    }
+
+    if let plannedExpense {
+        relationships[.plannedExpense] = relationship(
+            .plannedExpense,
+            targetEntity: .plannedExpense,
+            id: plannedExpense.id,
+            displayName: plannedExpense.title
+        )
+    }
+
+    return relationships
+}
+
+private func reconciliationLedgerRelationships(
+    workspace: Workspace?,
+    account: AllocationAccount?,
+    variableExpense: VariableExpense?,
+    plannedExpense: PlannedExpense?
+) -> [MarinaRelationshipKey: MarinaResolvedRelationship] {
+    var relationships = baseRelationships(workspace: workspace)
+
+    if let account {
+        relationships[.reconciliationAccount] = relationship(
+            .reconciliationAccount,
+            targetEntity: .reconciliationAccount,
+            id: account.id,
+            displayName: account.name
+        )
+    }
+
+    if let variableExpense {
+        relationships[.variableExpense] = relationship(
+            .variableExpense,
+            targetEntity: .variableExpense,
+            id: variableExpense.id,
+            displayName: variableExpense.descriptionText
+        )
+        addExpenseRelationships(card: variableExpense.card, category: variableExpense.category, to: &relationships)
+    }
+
+    if let plannedExpense {
+        relationships[.plannedExpense] = relationship(
+            .plannedExpense,
+            targetEntity: .plannedExpense,
+            id: plannedExpense.id,
+            displayName: plannedExpense.title
+        )
+        addExpenseRelationships(card: plannedExpense.card, category: plannedExpense.category, to: &relationships)
+    }
+
+    return relationships
+}
+
+private func addExpenseRelationships(
+    card: Card?,
+    category: Category?,
+    to relationships: inout [MarinaRelationshipKey: MarinaResolvedRelationship]
+) {
+    if let card {
+        relationships[.card] = relationship(.card, targetEntity: .card, id: card.id, displayName: card.name)
+    }
+
+    if let category {
+        relationships[.category] = relationship(.category, targetEntity: .category, id: category.id, displayName: category.name)
+    }
 }
 
 private func relationship(

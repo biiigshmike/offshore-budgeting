@@ -79,9 +79,14 @@ struct MarinaUniversalValidationRequest: Equatable, Sendable {
 
 struct MarinaUniversalCatalogValidator: Sendable {
     let catalog: MarinaEntityCatalog
+    let formulaRegistry: MarinaFormulaRegistry?
 
-    init(catalog: MarinaEntityCatalog = MarinaEntityCatalog()) {
+    init(
+        catalog: MarinaEntityCatalog = MarinaEntityCatalog(),
+        formulaRegistry: MarinaFormulaRegistry? = nil
+    ) {
         self.catalog = catalog
+        self.formulaRegistry = formulaRegistry
     }
 
     func validate(_ request: MarinaUniversalValidationRequest) -> MarinaCapabilityResult {
@@ -93,12 +98,18 @@ struct MarinaUniversalCatalogValidator: Sendable {
             return .unsupported(.internalOnly)
         }
 
-        guard descriptor.supportedOperations.contains(request.operation) else {
+        guard descriptor.supportedOperations.contains(request.operation)
+            || formulaSupports(request) else {
             return .unsupported(.operationNotSupported)
         }
 
         if let measure = request.measure,
-           supports(surface: request.surface, measure: measure, descriptor: descriptor) == false {
+           supports(
+            surface: request.surface,
+            operation: request.operation,
+            measure: measure,
+            descriptor: descriptor
+           ) == false {
             return .unsupported(.measureNotAvailable)
         }
 
@@ -134,15 +145,29 @@ struct MarinaUniversalCatalogValidator: Sendable {
 
     private func supports(
         surface: MarinaUniversalEntitySurface,
+        operation: MarinaSemanticOperation,
         measure: MarinaSemanticMeasure,
         descriptor: MarinaUniversalSurfaceDescriptor
     ) -> Bool {
         switch surface {
         case let .semantic(entity):
             return catalog.supports(entity: entity, measure: measure) == .supported
-        case .unifiedExpenses:
+                || formulaRegistry?.supports(measure: measure, surface: surface, operation: operation) == true
+        case .unifiedExpenses, .savingsLedgerEntries, .reconciliationLedgerEntries:
             return descriptor.supportedMeasures.contains(measure)
+                || formulaRegistry?.supports(measure: measure, surface: surface, operation: operation) == true
         }
+    }
+
+    private func formulaSupports(_ request: MarinaUniversalValidationRequest) -> Bool {
+        guard let measure = request.measure else {
+            return false
+        }
+        return formulaRegistry?.supports(
+            measure: measure,
+            surface: request.surface,
+            operation: request.operation
+        ) == true
     }
 
     private func field(_ key: MarinaFieldKey, in descriptor: MarinaUniversalSurfaceDescriptor) -> MarinaFieldDescriptor? {
@@ -157,13 +182,22 @@ struct MarinaUniversalCatalogValidator: Sendable {
         for request: MarinaUniversalValidationRequest,
         descriptor: MarinaUniversalSurfaceDescriptor
     ) -> Bool {
+        if formulaSupports(request) {
+            return true
+        }
+
         if descriptor.defaultAmountField != nil {
             return true
         }
 
         guard let measure = request.measure,
               let measureDescriptor = catalog.measureDescriptor(for: measure),
-              supports(surface: request.surface, measure: measure, descriptor: descriptor) else {
+              supports(
+                surface: request.surface,
+                operation: request.operation,
+                measure: measure,
+                descriptor: descriptor
+              ) else {
             return false
         }
 

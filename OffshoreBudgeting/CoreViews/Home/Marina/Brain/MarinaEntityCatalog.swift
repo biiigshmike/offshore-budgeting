@@ -23,6 +23,7 @@ enum MarinaFieldKey: String, Codable, CaseIterable, Equatable, Hashable, Sendabl
     case descriptionText
     case source
     case note
+    case kind
     case color
     case archivedState
     case isPlanned
@@ -221,6 +222,10 @@ struct MarinaEntityCatalog: Sendable {
             }
         case .unifiedExpenses:
             return Self.unifiedExpensesDescriptor
+        case .savingsLedgerEntries:
+            return Self.savingsLedgerEntriesDescriptor
+        case .reconciliationLedgerEntries:
+            return Self.reconciliationLedgerEntriesDescriptor
         }
     }
 
@@ -288,6 +293,66 @@ extension MarinaEntityCatalog {
         defaultDateField: .date,
         defaultAmountField: .budgetImpact,
         defaultSearchFields: [.merchantText],
+        workspaceScoped: true,
+        isInternalOnly: false
+    )
+
+    static let savingsLedgerEntriesDescriptor = MarinaUniversalSurfaceDescriptor(
+        surface: .savingsLedgerEntries,
+        displayName: "Savings Ledger Entries",
+        aliases: ["savings ledger", "savings activity", "savings entries"],
+        fields: [
+            field(.id, "ID", valueType: .text),
+            field(.amount, "Amount", valueType: .money, filterable: true, sortable: true, aggregatable: true),
+            field(.date, "Date", valueType: .date, filterable: true, groupable: true, sortable: true),
+            field(.note, "Note", valueType: .text, searchable: true, filterable: true, sortable: true),
+            field(.kind, "Kind", aliases: ["entry kind"], valueType: .text, searchable: true, filterable: true, groupable: true, sortable: true),
+            field(.startDate, "Period start date", valueType: .date, filterable: true, sortable: true),
+            field(.endDate, "Period end date", valueType: .date, filterable: true, sortable: true),
+            field(.createdAt, "Created at", valueType: .date, filterable: true, sortable: true),
+            field(.updatedAt, "Updated at", valueType: .date, filterable: true, sortable: true)
+        ],
+        relationships: [
+            relationship(.workspace, "Workspace", targetEntity: .workspace, optional: true, groupable: false),
+            relationship(.savingsAccount, "Savings account", targetEntity: .savingsAccount, optional: true),
+            relationship(.variableExpense, "Variable expense", targetEntity: .variableExpense, optional: true),
+            relationship(.plannedExpense, "Planned expense", targetEntity: .plannedExpense, optional: true)
+        ],
+        supportedOperations: [.list, .count, .sum, .average, .last, .next, .group],
+        supportedMeasures: [.amount],
+        defaultDateField: .date,
+        defaultAmountField: .amount,
+        defaultSearchFields: [.note, .kind],
+        workspaceScoped: true,
+        isInternalOnly: false
+    )
+
+    static let reconciliationLedgerEntriesDescriptor = MarinaUniversalSurfaceDescriptor(
+        surface: .reconciliationLedgerEntries,
+        displayName: "Reconciliation Ledger Entries",
+        aliases: ["reconciliation activity", "allocation activity", "allocation ledger"],
+        fields: [
+            field(.id, "ID", valueType: .text),
+            field(.amount, "Amount", valueType: .money, filterable: true, sortable: true, aggregatable: true),
+            field(.date, "Date", valueType: .date, filterable: true, groupable: true, sortable: true),
+            field(.note, "Note", valueType: .text, searchable: true, filterable: true, sortable: true),
+            field(.kind, "Kind", aliases: ["activity kind"], valueType: .text, searchable: true, filterable: true, groupable: true, sortable: true),
+            field(.createdAt, "Created at", valueType: .date, filterable: true, sortable: true),
+            field(.updatedAt, "Updated at", valueType: .date, filterable: true, sortable: true)
+        ],
+        relationships: [
+            relationship(.workspace, "Workspace", targetEntity: .workspace, optional: true, groupable: false),
+            relationship(.reconciliationAccount, "Reconciliation account", aliases: ["allocation account"], targetEntity: .reconciliationAccount, optional: true),
+            relationship(.variableExpense, "Variable expense", targetEntity: .variableExpense, optional: true),
+            relationship(.plannedExpense, "Planned expense", targetEntity: .plannedExpense, optional: true),
+            relationship(.card, "Card", targetEntity: .card, optional: true),
+            relationship(.category, "Category", targetEntity: .category, optional: true)
+        ],
+        supportedOperations: [.list, .count, .sum, .average, .last, .next, .group],
+        supportedMeasures: [.amount],
+        defaultDateField: .date,
+        defaultAmountField: .amount,
+        defaultSearchFields: [.note, .kind],
         workspaceScoped: true,
         isInternalOnly: false
     )
@@ -415,18 +480,15 @@ extension MarinaEntityCatalog {
                 field(.id, "ID", valueType: .text),
                 field(.name, "Name", valueType: .text, searchable: true, filterable: true, sortable: true),
                 field(.color, "Color", valueType: .color, searchable: true, filterable: true),
-                field(.archivedState, "Archived state", valueType: .boolean, filterable: true),
-                field(.reconciliationBalance, "Reconciliation balance", aliases: ["balance"], valueType: .money, filterable: true, sortable: true, aggregatable: true)
+                field(.archivedState, "Archived state", valueType: .boolean, filterable: true, groupable: true, sortable: true)
             ],
             relationships: [
-                relationship(.workspace, "Workspace", targetEntity: .workspace, optional: true),
-                relationship(.plannedExpense, "Planned expense", targetEntity: .plannedExpense, optional: true),
-                relationship(.variableExpense, "Variable expense", targetEntity: .variableExpense, optional: true)
+                relationship(.workspace, "Workspace", targetEntity: .workspace, optional: true)
             ],
-            supportedOperations: [.sum],
-            supportedMeasures: [.reconciliationBalance, .name],
+            supportedOperations: [.list, .count, .group],
+            supportedMeasures: [.name, .color],
             defaultDateField: nil,
-            defaultAmountField: .reconciliationBalance,
+            defaultAmountField: nil,
             defaultSearchFields: [.name],
             workspaceScoped: true,
             isInternalOnly: false
@@ -438,17 +500,17 @@ extension MarinaEntityCatalog {
             fields: [
                 field(.id, "ID", valueType: .text),
                 field(.name, "Name", valueType: .text, searchable: true, filterable: true, sortable: true),
-                field(.savingsTotal, "Savings total", aliases: ["total", "balance"], valueType: .money, filterable: true, sortable: true, aggregatable: true),
+                field(.date, "Date", valueType: .date, filterable: true, sortable: true),
                 field(.createdAt, "Created at", valueType: .date, filterable: true, sortable: true),
                 field(.updatedAt, "Updated at", valueType: .date, filterable: true, sortable: true)
             ],
             relationships: [
                 relationship(.workspace, "Workspace", targetEntity: .workspace, optional: true)
             ],
-            supportedOperations: [.sum, .forecast],
-            supportedMeasures: [.savingsTotal, .name],
-            defaultDateField: .createdAt,
-            defaultAmountField: .savingsTotal,
+            supportedOperations: [.list, .count, .last, .group],
+            supportedMeasures: [.name],
+            defaultDateField: .date,
+            defaultAmountField: nil,
             defaultSearchFields: [.name],
             workspaceScoped: true,
             isInternalOnly: false
@@ -548,7 +610,7 @@ extension MarinaEntityCatalog {
         measure(.coverageRatio, "Coverage ratio", aliases: ["income coverage"], entities: [.budget, .income]),
         measure(.recurringBurden, "Recurring burden", aliases: ["fixed expenses", "preset burden"], entities: [.preset]),
         measure(.concentration, "Concentration", aliases: ["biggest share", "eating my budget"], entities: [.category]),
-        measure(.color, "Color", aliases: ["hex color"], entities: [.workspace, .category], fields: [.color]),
+        measure(.color, "Color", aliases: ["hex color"], entities: [.workspace, .reconciliationAccount, .category], fields: [.color]),
         measure(.name, "Name", aliases: ["title", "label"], entities: [.workspace, .card, .reconciliationAccount, .savingsAccount, .category, .preset], fields: [.name, .title])
     ]
 

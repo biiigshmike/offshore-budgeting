@@ -2,9 +2,14 @@ import Foundation
 
 struct MarinaSemanticUniversalPlanBridge {
     let catalog: MarinaEntityCatalog
+    let formulaRegistry: MarinaFormulaRegistry?
 
-    init(catalog: MarinaEntityCatalog = MarinaEntityCatalog()) {
+    init(
+        catalog: MarinaEntityCatalog = MarinaEntityCatalog(),
+        formulaRegistry: MarinaFormulaRegistry? = nil
+    ) {
         self.catalog = catalog
+        self.formulaRegistry = formulaRegistry
     }
 
     func makePlan(
@@ -45,7 +50,8 @@ struct MarinaSemanticUniversalPlanBridge {
             return .unsupported(.unsupportedCombination)
         }
 
-        guard supportedOperations.contains(request.operation) else {
+        guard supportedOperations.contains(request.operation)
+            || formulaSupports(request: request, surface: surface) else {
             return .unsupported(.unsupportedCombination)
         }
 
@@ -54,16 +60,18 @@ struct MarinaSemanticUniversalPlanBridge {
         }
 
         if let measure = request.measure {
-            guard simpleMeasures.contains(measure) else {
-                return .unsupported(.measureNotAvailable)
-            }
-
-            guard supports(surface: surface, measure: measure, descriptor: descriptor) else {
+            guard supports(
+                surface: surface,
+                operation: request.operation,
+                measure: measure,
+                descriptor: descriptor
+            ) else {
                 return .unsupported(.measureNotAvailable)
             }
         }
 
-        guard descriptor.supportedOperations.contains(request.operation) else {
+        guard descriptor.supportedOperations.contains(request.operation)
+            || formulaSupports(request: request, surface: surface) else {
             return .unsupported(.operationNotSupported)
         }
 
@@ -95,7 +103,7 @@ struct MarinaSemanticUniversalPlanBridge {
         planningContext: MarinaUniversalPlanningContext?,
         search: MarinaRowSearchClause? = nil
     ) -> MarinaSemanticUniversalPlanBridgeResult {
-        let filtersResult = filters(for: request, descriptor: descriptor)
+        let filtersResult = filters(for: request, surface: surface, descriptor: descriptor)
         guard case let .success(filters) = filtersResult else {
             if case let .failure(reason) = filtersResult {
                 return .unsupported(reason)
@@ -132,6 +140,8 @@ struct MarinaSemanticUniversalPlanBridge {
             return .unsupported(.unsupportedCombination)
         }
 
+        let resolvedDateContext = dateContext(for: request, planningContext: planningContext)
+
         return .plan(
             MarinaUniversalQueryPlan(
                 surface: surface,
@@ -142,6 +152,9 @@ struct MarinaSemanticUniversalPlanBridge {
                 groupBy: groupBy,
                 sorts: sorts,
                 limit: clampedLimit(request.resultLimit),
+                dateRange: resolvedDateContext?.dateRange,
+                comparisonDateRange: resolvedDateContext?.comparisonDateRange,
+                whatIfAmount: request.whatIfAmount,
                 requiresDateField: requiresDateField(
                     for: request,
                     surface: surface,
@@ -154,7 +167,17 @@ struct MarinaSemanticUniversalPlanBridge {
     }
 
     private var supportedEntities: Set<MarinaSemanticEntity> {
-        [.variableExpense, .plannedExpense, .income, .category, .card, .budget, .preset]
+        [
+            .variableExpense,
+            .plannedExpense,
+            .income,
+            .category,
+            .card,
+            .budget,
+            .preset,
+            .savingsAccount,
+            .reconciliationAccount
+        ]
     }
 
     private var supportedOperations: Set<MarinaSemanticOperation> {
@@ -175,20 +198,45 @@ struct MarinaSemanticUniversalPlanBridge {
             return supportedEntities.contains(entity)
         case .unifiedExpenses:
             return true
+        case .savingsLedgerEntries, .reconciliationLedgerEntries:
+            return false
         }
     }
 
     private func supports(
         surface: MarinaUniversalEntitySurface,
+        operation: MarinaSemanticOperation,
         measure: MarinaSemanticMeasure,
         descriptor: MarinaUniversalSurfaceDescriptor
     ) -> Bool {
+        if formulaRegistry?.supports(measure: measure, surface: surface, operation: operation) == true {
+            return true
+        }
+
+        guard simpleMeasures.contains(measure) else {
+            return false
+        }
+
         switch surface {
         case let .semantic(entity):
             return catalog.supports(entity: entity, measure: measure) == .supported
-        case .unifiedExpenses:
+        case .unifiedExpenses, .savingsLedgerEntries, .reconciliationLedgerEntries:
             return descriptor.supportedMeasures.contains(measure)
         }
+    }
+
+    private func formulaSupports(
+        request: MarinaSemanticRequest,
+        surface: MarinaUniversalEntitySurface
+    ) -> Bool {
+        guard let measure = request.measure else {
+            return false
+        }
+        return formulaRegistry?.supports(
+            measure: measure,
+            surface: surface,
+            operation: request.operation
+        ) == true
     }
 
     private func resolvedSurface(
@@ -238,6 +286,8 @@ struct MarinaSemanticUniversalPlanBridge {
             }
         case .unifiedExpenses:
             preferredFields = descriptor.defaultSearchFields
+        case .savingsLedgerEntries, .reconciliationLedgerEntries:
+            preferredFields = descriptor.defaultSearchFields
         }
 
         let searchableTextFields = Set(
@@ -256,6 +306,7 @@ struct MarinaSemanticUniversalPlanBridge {
 
     private func filters(
         for request: MarinaSemanticRequest,
+        surface: MarinaUniversalEntitySurface,
         descriptor: MarinaUniversalSurfaceDescriptor
     ) -> BridgeValueResult<[MarinaRowFilter]> {
         let target = trimmed(request.targetName)
@@ -264,6 +315,18 @@ struct MarinaSemanticUniversalPlanBridge {
         }
 
         let dimensions = relationshipDimensions(in: request.dimensions)
+        if dimensions.isEmpty,
+           supportsNameTarget(surface),
+           descriptor.fields.contains(where: { $0.key == .name && $0.isFilterable }) {
+            return .success([
+                MarinaRowFilter(
+                    target: .field(.name),
+                    operation: .equals,
+                    value: .text(target)
+                )
+            ])
+        }
+
         guard dimensions.count == 1,
               let dimension = dimensions.first,
               let relationship = relationshipKey(for: dimension) else {
@@ -327,6 +390,25 @@ struct MarinaSemanticUniversalPlanBridge {
                 value: .date(range.endDate)
             )
         ])
+    }
+
+    private func dateContext(
+        for request: MarinaSemanticRequest,
+        planningContext: MarinaUniversalPlanningContext?
+    ) -> (dateRange: HomeQueryDateRange?, comparisonDateRange: HomeQueryDateRange?)? {
+        guard let planningContext else {
+            return nil
+        }
+
+        let planner = MarinaQueryPlanner(calendar: planningContext.calendar)
+        let queryPlan = planner.plan(
+            request: request,
+            ambientDateRange: planningContext.ambientDateRange,
+            defaultBudgetingPeriod: planningContext.defaultBudgetingPeriod,
+            now: planningContext.now
+        )
+
+        return (queryPlan.dateRange, queryPlan.comparisonDateRange)
     }
 
     private func groupTarget(
@@ -447,6 +529,8 @@ struct MarinaSemanticUniversalPlanBridge {
             }
         case .unifiedExpenses:
             return .merchantText
+        case .savingsLedgerEntries, .reconciliationLedgerEntries:
+            return .note
         }
     }
 
@@ -472,6 +556,30 @@ struct MarinaSemanticUniversalPlanBridge {
             case .budgetImpact:
                 return .budgetImpact
             case .amount,
+                 .plannedAmount,
+                 .actualAmount,
+                 .effectiveAmount,
+                 .incomeAmount,
+                 .name,
+                 .color,
+                 .savingsTotal,
+                 .reconciliationBalance,
+                 .categoryAvailability,
+                 .remainingRoom,
+                 .burnRate,
+                 .projectedSpend,
+                 .safeDailySpend,
+                 .paceDifference,
+                 .coverageRatio,
+                 .recurringBurden,
+                 .concentration:
+                return nil
+            }
+        case .savingsLedgerEntries, .reconciliationLedgerEntries:
+            switch measure {
+            case .amount:
+                return .amount
+            case .budgetImpact,
                  .plannedAmount,
                  .actualAmount,
                  .effectiveAmount,
@@ -586,7 +694,16 @@ struct MarinaSemanticUniversalPlanBridge {
             return dateFilteredEntities.contains(entity)
         case .unifiedExpenses:
             return true
+        case .savingsLedgerEntries, .reconciliationLedgerEntries:
+            return false
         }
+    }
+
+    private func supportsNameTarget(_ surface: MarinaUniversalEntitySurface) -> Bool {
+        guard case let .semantic(entity) = surface else {
+            return false
+        }
+        return entity == .savingsAccount || entity == .reconciliationAccount
     }
 
     private func requiresAmountField(_ request: MarinaSemanticRequest) -> Bool {

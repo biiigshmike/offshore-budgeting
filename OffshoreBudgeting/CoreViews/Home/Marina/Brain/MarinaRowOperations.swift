@@ -96,6 +96,33 @@ struct MarinaRowOperationEngine: Sendable {
         }
     }
 
+    func search(
+        _ rows: [MarinaQueryableRow],
+        clause: MarinaRowSearchClause,
+        descriptor: MarinaUniversalSurfaceDescriptor
+    ) -> [MarinaQueryableRow] {
+        let query = normalizedText(clause.query)
+        guard query.isEmpty == false else {
+            return rows
+        }
+
+        let searchableFields = Set(
+            descriptor.fields
+                .filter { $0.isSearchable && $0.valueType == .text }
+                .map(\.key)
+        )
+        let fields = clause.fields.intersection(searchableFields)
+
+        return rows.filter { row in
+            fields.contains { field in
+                guard case let .text(value) = row.fields[field] else {
+                    return false
+                }
+                return normalizedText(value).contains(query)
+            }
+        }
+    }
+
     func filter(
         _ rows: [MarinaQueryableRow],
         filters: [MarinaRowFilter]

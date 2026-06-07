@@ -5,16 +5,19 @@ struct MarinaUniversalQueryRunner {
     let validator: MarinaUniversalCatalogValidator
     let adapterRegistry: MarinaEntityAdapterRegistry
     let rowEngine: MarinaRowOperationEngine
+    let formulaRegistry: MarinaFormulaRegistry?
 
     init(
         catalog: MarinaEntityCatalog = MarinaEntityCatalog(),
         adapterRegistry: MarinaEntityAdapterRegistry = MarinaEntityAdapterRegistry(),
-        rowEngine: MarinaRowOperationEngine = MarinaRowOperationEngine()
+        rowEngine: MarinaRowOperationEngine = MarinaRowOperationEngine(),
+        formulaRegistry: MarinaFormulaRegistry? = nil
     ) {
         self.catalog = catalog
         self.validator = MarinaUniversalCatalogValidator(catalog: catalog)
         self.adapterRegistry = adapterRegistry
         self.rowEngine = rowEngine
+        self.formulaRegistry = formulaRegistry
     }
 
     func run(
@@ -42,7 +45,7 @@ struct MarinaUniversalQueryRunner {
         }
 
         if let search = plan.search {
-            rows = rowEngine.search(rows, clause: search, catalog: catalog)
+            rows = rowEngine.search(rows, clause: search, descriptor: descriptor)
         }
         rows = rowEngine.filter(rows, filters: plan.filters)
         rows = rowEngine.sort(rows, sorts: effectiveSorts(for: plan, descriptor: descriptor))
@@ -70,8 +73,99 @@ struct MarinaUniversalQueryRunner {
         }
     }
 
+    @MainActor
+    func runFormulaAware(
+        plan: MarinaUniversalQueryPlan,
+        snapshot: MarinaWorkspaceSnapshot
+    ) -> MarinaUniversalQueryResult {
+        let validationRequest = makeValidationRequest(for: plan)
+        let formulaValidator = MarinaUniversalCatalogValidator(
+            catalog: catalog,
+            formulaRegistry: formulaRegistry
+        )
+        switch formulaValidator.validate(validationRequest) {
+        case .supported:
+            break
+        case let .unsupported(reason):
+            return .unsupported(reason)
+        }
+
+        if case .formulaBacked = measureExecutionKind(for: plan),
+           let formulaRegistry,
+           let measure = plan.measure {
+            return universalResult(
+                from: formulaRegistry.evaluate(
+                    request: MarinaFormulaRequest(
+                        surface: plan.surface,
+                        operation: plan.operation,
+                        measure: measure,
+                        dateRange: plan.dateRange,
+                        comparisonDateRange: plan.comparisonDateRange,
+                        filters: plan.filters,
+                        search: plan.search,
+                        groupBy: plan.groupBy,
+                        limit: plan.limit,
+                        whatIfAmount: plan.whatIfAmount
+                    ),
+                    snapshot: snapshot
+                )
+            )
+        }
+
+        return run(plan: plan, snapshot: snapshot)
+    }
+
     private var supportedRunnerOperations: Set<MarinaSemanticOperation> {
         [.list, .count, .sum, .average, .group, .last, .next]
+    }
+
+    private func measureExecutionKind(for plan: MarinaUniversalQueryPlan) -> MarinaMeasureExecutionKind {
+        guard let measure = plan.measure else {
+            return .unsupported(.measureNotAvailable)
+        }
+
+        if formulaRegistry?.supports(
+            measure: measure,
+            surface: plan.surface,
+            operation: plan.operation
+        ) == true {
+            return .formulaBacked
+        }
+
+        guard let field = field(for: measure, surface: plan.surface) else {
+            return .unsupported(.measureNotAvailable)
+        }
+
+        return .rowBacked(field: field)
+    }
+
+    private func universalResult(from formulaResult: MarinaFormulaResult) -> MarinaUniversalQueryResult {
+        switch formulaResult {
+        case let .metric(metric):
+            return .metric(
+                MarinaUniversalMetricResult(
+                    value: metric.value,
+                    evidenceRows: metric.evidenceRows
+                )
+            )
+        case let .rows(rows):
+            return .rows(rows)
+        case let .groups(groups):
+            return .groups(
+                groups.map { group in
+                    MarinaUniversalGroupResult(
+                        group: MarinaGroupedRows(
+                            key: group.displayName,
+                            displayName: group.displayName,
+                            rows: group.evidenceRows
+                        ),
+                        aggregate: group.value
+                    )
+                }
+            )
+        case let .unsupported(reason):
+            return .unsupported(reason)
+        }
     }
 
     private func sumResult(
@@ -231,6 +325,30 @@ struct MarinaUniversalQueryRunner {
             case .budgetImpact:
                 return .budgetImpact
             case .amount,
+                 .plannedAmount,
+                 .actualAmount,
+                 .effectiveAmount,
+                 .incomeAmount,
+                 .name,
+                 .color,
+                 .savingsTotal,
+                 .reconciliationBalance,
+                 .categoryAvailability,
+                 .remainingRoom,
+                 .burnRate,
+                 .projectedSpend,
+                 .safeDailySpend,
+                 .paceDifference,
+                 .coverageRatio,
+                 .recurringBurden,
+                 .concentration:
+                return nil
+            }
+        case .savingsLedgerEntries, .reconciliationLedgerEntries:
+            switch measure {
+            case .amount:
+                return .amount
+            case .budgetImpact,
                  .plannedAmount,
                  .actualAmount,
                  .effectiveAmount,
