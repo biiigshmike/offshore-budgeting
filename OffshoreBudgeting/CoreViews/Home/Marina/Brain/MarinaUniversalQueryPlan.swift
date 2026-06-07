@@ -106,6 +106,17 @@ enum MarinaUniversalQueryResult: Equatable, Sendable {
 struct MarinaUniversalMetricResult: Equatable, Sendable {
     let value: MarinaValue
     let evidenceRows: [MarinaQueryableRow]
+    let details: [MarinaFormulaMetricDetail]
+
+    init(
+        value: MarinaValue,
+        evidenceRows: [MarinaQueryableRow],
+        details: [MarinaFormulaMetricDetail] = []
+    ) {
+        self.value = value
+        self.evidenceRows = evidenceRows
+        self.details = details
+    }
 }
 
 struct MarinaUniversalGroupResult: Equatable, Sendable {

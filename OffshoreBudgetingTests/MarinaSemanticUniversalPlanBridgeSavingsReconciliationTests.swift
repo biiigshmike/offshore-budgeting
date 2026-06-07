@@ -180,11 +180,58 @@ struct MarinaSemanticUniversalPlanBridgeSavingsReconciliationTests {
         #expect(plan.dateRange == HomeQueryDateRange(startDate: date(2026, 6, 1), endDate: date(2026, 6, 30)))
     }
 
+    @Test func formulaBridgeMapsBudgetPaceFormulasWithDateContext() throws {
+        let context = context(now: date(2026, 6, 15))
+        let expectedRange = HomeQueryDateRange(startDate: date(2026, 6, 1), endDate: date(2026, 6, 30))
+        let cases: [(MarinaSemanticOperation, MarinaSemanticMeasure, MarinaSemanticAnswerShape)] = [
+            (.average, .burnRate, .metric),
+            (.forecast, .projectedSpend, .metric),
+            (.compare, .paceDifference, .comparison),
+            (.forecast, .coverageRatio, .metric)
+        ]
+
+        for testCase in cases {
+            let plan = try requirePlan(formulaBridge.makePlan(
+                from: request(
+                    entity: .budget,
+                    operation: testCase.0,
+                    measure: testCase.1,
+                    dateRangeToken: .currentMonth,
+                    shape: testCase.2
+                ),
+                planningContext: context
+            ))
+
+            #expect(plan.surface == .semantic(.budget))
+            #expect(plan.operation == testCase.0)
+            #expect(plan.measure == testCase.1)
+            #expect(plan.dateRange == expectedRange)
+        }
+    }
+
+    @Test func formulaBridgeMapsIncomeCoverageRatioWithDateContext() throws {
+        let plan = try requirePlan(formulaBridge.makePlan(
+            from: request(
+                entity: .income,
+                operation: .share,
+                measure: .coverageRatio,
+                dateRangeToken: .currentMonth,
+                shape: .metric
+            ),
+            planningContext: context(now: date(2026, 6, 15))
+        ))
+
+        #expect(plan.surface == .semantic(.income))
+        #expect(plan.operation == .share)
+        #expect(plan.measure == .coverageRatio)
+        #expect(plan.dateRange == HomeQueryDateRange(startDate: date(2026, 6, 1), endDate: date(2026, 6, 30)))
+    }
+
     @Test func formulaBridgeKeepsDeferredFormulasAndWhatIfUnsupported() {
         #expect(formulaBridge.makePlan(from: request(
-            entity: .budget,
+            entity: .category,
             operation: .forecast,
-            measure: .burnRate,
+            measure: .categoryAvailability,
             shape: .metric
         )) == .unsupported(.unsupportedCombination))
 

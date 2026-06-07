@@ -57,6 +57,83 @@ struct MarinaUniversalQueryRunnerFormulaTests {
         #expect(metric.evidenceRows.map(\.displayName) == ["June"])
     }
 
+    @Test func budgetPaceFormulaMeasuresRouteThroughRegistry() {
+        let fixture = makeFixture()
+        let runner = formulaRunner()
+        let range = HomeQueryDateRange(startDate: date(2026, 6, 1), endDate: date(2026, 6, 30))
+
+        let burnRate = requireMetric(runner.runFormulaAware(
+            plan: MarinaUniversalQueryPlan(
+                entity: .budget,
+                operation: .average,
+                measure: .burnRate,
+                dateRange: range
+            ),
+            snapshot: fixture.snapshot
+        ))
+        #expect(burnRate.value == .money(250.0 / 15.0))
+        #expect(burnRate.details.map(\.component) == [.spentSoFar, .elapsedDays, .averagePerDay])
+
+        let projectedSpend = requireMetric(runner.runFormulaAware(
+            plan: MarinaUniversalQueryPlan(
+                entity: .budget,
+                operation: .forecast,
+                measure: .projectedSpend,
+                dateRange: range
+            ),
+            snapshot: fixture.snapshot
+        ))
+        #expect(abs((numericValue(projectedSpend.value) ?? 0) - 500) < 0.0001)
+
+        let paceDifference = requireMetric(runner.runFormulaAware(
+            plan: MarinaUniversalQueryPlan(
+                entity: .budget,
+                operation: .compare,
+                measure: .paceDifference,
+                dateRange: range
+            ),
+            snapshot: fixture.snapshot
+        ))
+        #expect(paceDifference.value == .money(100))
+
+        let budgetCoverage = requireMetric(runner.runFormulaAware(
+            plan: MarinaUniversalQueryPlan(
+                entity: .budget,
+                operation: .forecast,
+                measure: .coverageRatio,
+                dateRange: range
+            ),
+            snapshot: fixture.snapshot
+        ))
+        #expect(budgetCoverage.value == .number(1_000.0 / 300.0))
+
+        let incomeCoverage = requireMetric(runner.runFormulaAware(
+            plan: MarinaUniversalQueryPlan(
+                entity: .income,
+                operation: .share,
+                measure: .coverageRatio,
+                dateRange: range
+            ),
+            snapshot: fixture.snapshot
+        ))
+        #expect(incomeCoverage.value == .number(1_000.0 / 300.0))
+        #expect(incomeCoverage.details.map(\.component) == [.income, .plannedExpenses, .coveragePercent, .difference])
+    }
+
+    @Test func budgetPaceFormulaMissingDateContextReturnsTypedUnsupported() {
+        let fixture = makeFixture()
+        let runner = formulaRunner()
+
+        #expect(runner.runFormulaAware(
+            plan: MarinaUniversalQueryPlan(
+                entity: .budget,
+                operation: .average,
+                measure: .burnRate
+            ),
+            snapshot: fixture.snapshot
+        ) == .unsupported(.missingDateField))
+    }
+
     @Test func unsupportedFormulaMeasureReturnsTypedUnsupported() {
         let fixture = makeFixture()
         let runner = formulaRunner()
@@ -114,6 +191,19 @@ struct MarinaUniversalQueryRunnerFormulaTests {
             return MarinaUniversalMetricResult(value: .empty, evidenceRows: [])
         }
         return metric
+    }
+
+    private func numericValue(_ value: MarinaValue?) -> Double? {
+        switch value {
+        case let .money(value)?:
+            return value
+        case let .number(value)?:
+            return value
+        case let .integer(value)?:
+            return Double(value)
+        case .text, .date, .boolean, .colorHex, .empty, nil:
+            return nil
+        }
     }
 
     private func makeFixture() -> FormulaRunnerFixture {

@@ -85,7 +85,11 @@ struct MarinaUniversalResultPresenter {
         case let .metric(metric):
             return .init(
                 executionResult: metricResult(
-                    MarinaUniversalMetricResult(value: metric.value, evidenceRows: metric.evidenceRows),
+                    MarinaUniversalMetricResult(
+                        value: metric.value,
+                        evidenceRows: metric.evidenceRows,
+                        details: metric.details
+                    ),
                     plan: plan,
                     context: context
                 )
@@ -104,19 +108,26 @@ struct MarinaUniversalResultPresenter {
         plan: MarinaUniversalQueryPlan,
         context: MarinaUniversalPresentationContext
     ) -> MarinaExecutionResult {
-        let value = formattedValue(metric.value)
-        let rows = [
+        let value = formattedMetricValue(metric.value, measure: plan.measure)
+        let detailRows = metric.details.map { detail in
+            HomeAnswerRow(
+                title: title(for: detail.component),
+                value: formattedDetailValue(detail),
+                amount: numericValue(detail.value)
+            )
+        }
+        let rows = (detailRows.isEmpty ? [
             HomeAnswerRow(
                 title: "Value",
                 value: value,
                 amount: numericValue(metric.value)
             )
-        ] + metric.evidenceRows.map { row in
+        ] : detailRows) + metric.evidenceRows.map { row in
             homeAnswerRow(from: row, plan: plan, role: .evidence)
         }
 
         return MarinaExecutionResult(
-            kind: .metric,
+            kind: kind(for: plan),
             title: title(for: plan),
             subtitle: subtitle(for: context),
             primaryValue: value,
@@ -265,8 +276,23 @@ struct MarinaUniversalResultPresenter {
             return "Reconciliation Balance"
         case .remainingRoom:
             return "Remaining Room"
+        case .burnRate:
+            return "Burn Rate"
+        case .projectedSpend:
+            return "Projected Spend"
         case .safeDailySpend:
             return "Safe Daily Spend"
+        case .paceDifference:
+            return "Pace Difference"
+        case .coverageRatio:
+            switch plan.entity {
+            case .income:
+                return "Income Coverage"
+            case .budget:
+                return "Budget Coverage"
+            case .workspace, .card, .plannedExpense, .variableExpense, .reconciliationAccount, .savingsAccount, .category, .preset:
+                return "Coverage Ratio"
+            }
         case .incomeAmount:
             return "Income"
         case .budgetImpact:
@@ -287,10 +313,6 @@ struct MarinaUniversalResultPresenter {
              .actualAmount,
              .effectiveAmount,
              .categoryAvailability,
-             .burnRate,
-             .projectedSpend,
-             .paceDifference,
-             .coverageRatio,
              .recurringBurden,
              .concentration,
              .color,
@@ -462,6 +484,123 @@ struct MarinaUniversalResultPresenter {
         case .empty:
             return "No value"
         }
+    }
+
+    private func formattedMetricValue(
+        _ value: MarinaValue,
+        measure: MarinaSemanticMeasure?
+    ) -> String {
+        switch measure {
+        case .coverageRatio:
+            return formattedValue(value, style: .percent)
+        case .paceDifference:
+            return formattedValue(value, style: .deltaMoney)
+        case .amount,
+             .plannedAmount,
+             .actualAmount,
+             .effectiveAmount,
+             .budgetImpact,
+             .savingsTotal,
+             .incomeAmount,
+             .reconciliationBalance,
+             .categoryAvailability,
+             .remainingRoom,
+             .burnRate,
+             .projectedSpend,
+             .safeDailySpend,
+             .recurringBurden,
+             .concentration,
+             .color,
+             .name,
+             nil:
+            return formattedValue(value)
+        }
+    }
+
+    private func formattedDetailValue(_ detail: MarinaFormulaMetricDetail) -> String {
+        formattedValue(detail.value, style: detail.style)
+    }
+
+    private func formattedValue(_ value: MarinaValue, style: MarinaFormulaValueStyle) -> String {
+        switch style {
+        case .automatic:
+            return formattedValue(value)
+        case .money:
+            return CurrencyFormatter.string(from: numericValue(value) ?? 0)
+        case .integer:
+            if case let .integer(value) = value {
+                return "\(value)"
+            }
+            return (numericValue(value) ?? 0).formatted(.number.precision(.fractionLength(0)))
+        case .percent:
+            return (numericValue(value) ?? 0).formatted(.percent.precision(.fractionLength(1)))
+        case .deltaMoney:
+            return deltaSummary(numericValue(value) ?? 0)
+        }
+    }
+
+    private func kind(for plan: MarinaUniversalQueryPlan) -> HomeAnswerKind {
+        switch plan.measure {
+        case .paceDifference:
+            return .comparison
+        case .amount,
+             .plannedAmount,
+             .actualAmount,
+             .effectiveAmount,
+             .budgetImpact,
+             .savingsTotal,
+             .incomeAmount,
+             .reconciliationBalance,
+             .categoryAvailability,
+             .remainingRoom,
+             .burnRate,
+             .projectedSpend,
+             .safeDailySpend,
+             .coverageRatio,
+             .recurringBurden,
+             .concentration,
+             .color,
+             .name,
+             nil:
+            return .metric
+        }
+    }
+
+    private func title(for component: MarinaFormulaMetricComponent) -> String {
+        switch component {
+        case .spentSoFar:
+            return "Spent so far"
+        case .elapsedDays:
+            return "Elapsed days"
+        case .averagePerDay:
+            return "Average per day"
+        case .projectedTotal:
+            return "Projected total"
+        case .expectedByNow:
+            return "Expected by now"
+        case .paceDifference:
+            return "Pace difference"
+        case .income:
+            return "Income"
+        case .plannedExpenses:
+            return "Planned expenses"
+        case .coveragePercent:
+            return "Coverage percent"
+        case .difference:
+            return "Difference"
+        }
+    }
+
+    private func deltaSummary(_ delta: Double) -> String {
+        if delta > 0 {
+            return "Up \(CurrencyFormatter.string(from: delta))"
+        }
+
+        if delta < 0 {
+            return "Down \(CurrencyFormatter.string(from: abs(delta)))"
+        }
+
+        return "No change"
     }
 
     private func numericValue(_ value: MarinaValue?) -> Double? {

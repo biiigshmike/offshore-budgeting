@@ -574,9 +574,15 @@ struct MarinaQueryExecutor {
         range: HomeQueryDateRange
     ) -> MarinaExecutionResult? {
         guard let measure = plan.measure else { return nil }
-        let progress = formulaDayProgress(for: range, now: plan.now)
-        let actualSpend = actualSpendToDate(snapshot: snapshot, range: range, now: plan.now)
-        let plannedSpend = plannedExpenseTotal(snapshot: snapshot, range: range)
+        let inputs = MarinaBudgetFormulaCalculator.inputs(
+            snapshot: snapshot,
+            range: range,
+            now: plan.now,
+            calendar: calendar
+        )
+        let progress = inputs.progress
+        let actualSpend = inputs.actualSpendToDate
+        let plannedSpend = inputs.plannedSpend
 
         switch measure {
         case .burnRate:
@@ -1516,15 +1522,12 @@ struct MarinaQueryExecutor {
         range: HomeQueryDateRange,
         now: Date
     ) -> Double {
-        let rangeStart = calendar.startOfDay(for: range.startDate)
-        let rangeEnd = calendar.startOfDay(for: range.endDate)
-        let today = calendar.startOfDay(for: now)
-
-        guard today >= rangeStart else { return 0 }
-
-        let clampedEnd = min(today, rangeEnd)
-        let spendRange = HomeQueryDateRange(startDate: range.startDate, endDate: endOfDay(clampedEnd))
-        return totalSpend(snapshot: snapshot, range: spendRange)
+        MarinaBudgetFormulaCalculator.actualSpendToDate(
+            snapshot: snapshot,
+            range: range,
+            now: now,
+            calendar: calendar
+        )
     }
 
     private func plannedExpenseTotal(
@@ -1532,52 +1535,28 @@ struct MarinaQueryExecutor {
         range: HomeQueryDateRange?,
         recurringOnly: Bool = false
     ) -> Double {
-        snapshot.homeCalculationPlannedExpenses
-            .filter { contains($0.expenseDate, in: range) }
-            .filter { recurringOnly == false || $0.sourcePresetID != nil }
-            .reduce(0.0) { total, expense in
-                total + SavingsMathService.plannedProjectedBudgetImpactAmount(for: expense)
-            }
+        MarinaBudgetFormulaCalculator.plannedExpenseTotal(
+            snapshot: snapshot,
+            range: range,
+            recurringOnly: recurringOnly
+        )
     }
 
     private func coverageIncome(snapshot: MarinaWorkspaceSnapshot, range: HomeQueryDateRange?) -> Double {
-        let actualIncome = incomeTotal(snapshot.incomes, range: range, state: .actual, source: nil)
-        if actualIncome > 0 {
-            return actualIncome
-        }
-        return incomeTotal(snapshot.incomes, range: range, state: .planned, source: nil)
+        MarinaBudgetFormulaCalculator.coverageIncome(snapshot: snapshot, range: range)
     }
 
     private func formulaDayProgress(for range: HomeQueryDateRange, now: Date) -> FormulaDayProgress {
-        let start = calendar.startOfDay(for: range.startDate)
-        let end = calendar.startOfDay(for: range.endDate)
-        let today = calendar.startOfDay(for: now)
-        let totalDays = inclusiveDayCount(from: start, through: end)
-
-        let elapsedDays: Int
-        if today < start {
-            elapsedDays = 0
-        } else if today > end {
-            elapsedDays = totalDays
-        } else {
-            elapsedDays = inclusiveDayCount(from: start, through: today)
-        }
-
-        let remainingDays: Int
-        if today < start {
-            remainingDays = totalDays
-        } else if today > end {
-            remainingDays = 0
-        } else {
-            remainingDays = inclusiveDayCount(from: today, through: end)
-        }
-
-        let elapsedPercent = totalDays > 0 ? Double(elapsedDays) / Double(totalDays) : 0
+        let progress = MarinaBudgetFormulaCalculator.dayProgress(
+            for: range,
+            now: now,
+            calendar: calendar
+        )
         return FormulaDayProgress(
-            elapsedDays: elapsedDays,
-            totalDays: totalDays,
-            remainingDays: remainingDays,
-            elapsedPercent: elapsedPercent
+            elapsedDays: progress.elapsedDays,
+            totalDays: progress.totalDays,
+            remainingDays: progress.remainingDays,
+            elapsedPercent: progress.elapsedPercent
         )
     }
 

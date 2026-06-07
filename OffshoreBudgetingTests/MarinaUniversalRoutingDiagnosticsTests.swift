@@ -30,9 +30,9 @@ struct MarinaUniversalRoutingDiagnosticsTests {
     @Test func harnessFallbackDiagnosticsIncludeReasonAndUniversalUsage() throws {
         let fixture = makeFixture()
         let request = semanticRequest(
-            entity: .budget,
+            entity: .category,
             operation: .forecast,
-            measure: .burnRate
+            measure: .categoryAvailability
         )
         let attempt = fixture.harness().attemptUniversalResult(
             request: request,
@@ -48,9 +48,9 @@ struct MarinaUniversalRoutingDiagnosticsTests {
 
         #expect(reason == .notAllowlisted)
         #expect(diagnostics.scenario == nil)
-        #expect(diagnostics.requestEntity == .budget)
+        #expect(diagnostics.requestEntity == .category)
         #expect(diagnostics.operation == .forecast)
-        #expect(diagnostics.measure == .burnRate)
+        #expect(diagnostics.measure == .categoryAvailability)
         #expect(diagnostics.usedUniversal == false)
         #expect(diagnostics.fallbackReason == .notAllowlisted)
     }

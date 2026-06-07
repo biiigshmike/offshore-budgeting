@@ -243,6 +243,67 @@ struct MarinaUniversalPresentationParityTests {
         )
     }
 
+    @Test func budgetBurnRatePresentationMatchesLegacyFormulaRows() throws {
+        try expectFormulaPresentationParity(
+            request: semanticRequest(
+                entity: .budget,
+                operation: .average,
+                measure: .burnRate,
+                dateRangeToken: .currentMonth
+            ),
+            rowTitle: "Average per day"
+        )
+    }
+
+    @Test func budgetProjectedSpendPresentationMatchesLegacyFormulaRows() throws {
+        try expectFormulaPresentationParity(
+            request: semanticRequest(
+                entity: .budget,
+                operation: .forecast,
+                measure: .projectedSpend,
+                dateRangeToken: .currentMonth
+            ),
+            rowTitle: "Projected total"
+        )
+    }
+
+    @Test func budgetPaceDifferencePresentationMatchesLegacyFormulaRows() throws {
+        try expectFormulaPresentationParity(
+            request: semanticRequest(
+                entity: .budget,
+                operation: .compare,
+                measure: .paceDifference,
+                dateRangeToken: .currentMonth,
+                shape: .comparison
+            ),
+            rowTitle: "Pace difference"
+        )
+    }
+
+    @Test func budgetCoverageRatioPresentationMatchesLegacyFormulaRows() throws {
+        try expectFormulaPresentationParity(
+            request: semanticRequest(
+                entity: .budget,
+                operation: .forecast,
+                measure: .coverageRatio,
+                dateRangeToken: .currentMonth
+            ),
+            rowTitle: "Coverage percent"
+        )
+    }
+
+    @Test func incomeCoverageRatioPresentationMatchesLegacyFormulaRows() throws {
+        try expectFormulaPresentationParity(
+            request: semanticRequest(
+                entity: .income,
+                operation: .share,
+                measure: .coverageRatio,
+                dateRangeToken: .currentMonth
+            ),
+            rowTitle: "Coverage percent"
+        )
+    }
+
     @Test func unifiedCategoryGroupPresentationKeepsUniversalShape() {
         let fixture = makeFixture()
         let request = semanticRequest(
@@ -301,6 +362,21 @@ struct MarinaUniversalPresentationParityTests {
         #expect(presented.title == "Spending by Card")
         #expect(rows.map(\.title) == ["Apple Card", "Chase Card", "Unassigned"])
         #expect(rows.map(\.amount) == [200, 30, 107])
+        expectNoDebugText(in: presented)
+    }
+
+    private func expectFormulaPresentationParity(
+        request: MarinaSemanticRequest,
+        rowTitle: String
+    ) throws {
+        let fixture = makeFixture()
+        let legacy = fixture.harness.runLegacy(request: request, context: fixture.context())
+        let presented = fixture.presentedResult(request: request, context: fixture.context())
+
+        #expect(presented.kind == legacy.kind)
+        #expect(presented.title == legacy.title)
+        #expect(presented.primaryValue == legacy.primaryValue)
+        #expect(presented.rows.first(where: { $0.title == rowTitle })?.amount == legacy.rows.first(where: { $0.title == rowTitle })?.amount)
         expectNoDebugText(in: presented)
     }
 

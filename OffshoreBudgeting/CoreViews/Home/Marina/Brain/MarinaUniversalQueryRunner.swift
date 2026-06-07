@@ -145,7 +145,8 @@ struct MarinaUniversalQueryRunner {
             return .metric(
                 MarinaUniversalMetricResult(
                     value: metric.value,
-                    evidenceRows: metric.evidenceRows
+                    evidenceRows: metric.evidenceRows,
+                    details: metric.details
                 )
             )
         case let .rows(rows):

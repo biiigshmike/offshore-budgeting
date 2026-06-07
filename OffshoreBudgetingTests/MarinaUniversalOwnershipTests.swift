@@ -25,14 +25,24 @@ struct MarinaUniversalOwnershipTests {
 
     @Test func deferredFormulasAreNotMarkedUniversalOwned() {
         let requests = [
-            semanticRequest(entity: .budget, operation: .forecast, measure: .burnRate),
-            semanticRequest(entity: .budget, operation: .forecast, measure: .projectedSpend),
-            semanticRequest(entity: .budget, operation: .forecast, measure: .paceDifference),
-            semanticRequest(entity: .budget, operation: .forecast, measure: .coverageRatio),
             semanticRequest(entity: .category, operation: .forecast, measure: .categoryAvailability),
-            semanticRequest(entity: .category, operation: .forecast, measure: .concentration),
-            semanticRequest(entity: .preset, operation: .forecast, measure: .recurringBurden),
+            semanticRequest(entity: .category, operation: .share, measure: .concentration),
+            semanticRequest(entity: .preset, operation: .sum, measure: .recurringBurden),
             semanticRequest(entity: .savingsAccount, operation: .forecast, measure: .savingsTotal)
+        ]
+
+        for request in requests {
+            expectNotUniversalOwned(request)
+        }
+    }
+
+    @Test func unsupportedBudgetPaceFormulaVariantsAreNotMarkedUniversalOwned() {
+        let requests = [
+            semanticRequest(entity: .budget, operation: .forecast, measure: .burnRate),
+            semanticRequest(entity: .budget, operation: .average, measure: .projectedSpend),
+            semanticRequest(entity: .budget, operation: .compare, measure: .paceDifference),
+            semanticRequest(entity: .budget, operation: .share, measure: .coverageRatio),
+            semanticRequest(entity: .income, operation: .forecast, measure: .coverageRatio)
         ]
 
         for request in requests {

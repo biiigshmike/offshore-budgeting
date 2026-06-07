@@ -175,7 +175,13 @@ struct MarinaUniversalRoutingHarness {
 
     private func requiresDateContext(_ scenario: MarinaUniversalRoutingScenario) -> Bool {
         switch scenario {
-        case .budgetRemainingRoom, .safeDailySpend:
+        case .budgetRemainingRoom,
+             .safeDailySpend,
+             .budgetBurnRate,
+             .budgetProjectedSpend,
+             .budgetPaceDifference,
+             .budgetCoverageRatio,
+             .incomeCoverageRatio:
             return true
         case .merchantVariableSpend,
              .categoryVariableSpend,

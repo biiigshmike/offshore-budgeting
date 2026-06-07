@@ -16,6 +16,11 @@ enum MarinaUniversalRoutingScenario: String, Codable, CaseIterable, Equatable, H
     case reconciliationBalanceExplicitAccount
     case budgetRemainingRoom
     case safeDailySpend
+    case budgetBurnRate
+    case budgetProjectedSpend
+    case budgetPaceDifference
+    case budgetCoverageRatio
+    case incomeCoverageRatio
 }
 
 struct MarinaUniversalRoutingPolicy: Equatable, Sendable {
@@ -59,7 +64,7 @@ struct MarinaUniversalRoutingPolicy: Equatable, Sendable {
     }
 
     private var blockedOperations: Set<MarinaSemanticOperation> {
-        [.compare, .share, .whatIf]
+        [.whatIf]
     }
 
     private func variableExpenseScenario(for request: MarinaSemanticRequest) -> MarinaUniversalRoutingScenario? {
@@ -192,6 +197,17 @@ struct MarinaUniversalRoutingPolicy: Equatable, Sendable {
             return .incomeBySource
         }
 
+        if request.operation == .share,
+           request.measure == .coverageRatio,
+           request.expectedAnswerShape == .metric,
+           exactDimensions(request, []),
+           hasNoNamedTargets(request),
+           request.incomeState == nil || request.incomeState == .all,
+           request.dateRangeToken != .allTime,
+           request.sort == nil {
+            return .incomeCoverageRatio
+        }
+
         return nil
     }
 
@@ -224,38 +240,27 @@ struct MarinaUniversalRoutingPolicy: Equatable, Sendable {
     }
 
     private func budgetScenario(for request: MarinaSemanticRequest) -> MarinaUniversalRoutingScenario? {
-        guard request.operation == .forecast,
-              request.expectedAnswerShape == .metric,
-              exactDimensions(request, []),
+        guard exactDimensions(request, []),
               hasNoNamedTargets(request),
               request.dateRangeToken != .allTime,
               request.sort == nil else {
             return nil
         }
 
-        switch request.measure {
-        case .remainingRoom:
+        switch (request.operation, request.measure, request.expectedAnswerShape) {
+        case (.forecast, .remainingRoom, .metric):
             return .budgetRemainingRoom
-        case .safeDailySpend:
+        case (.forecast, .safeDailySpend, .metric):
             return .safeDailySpend
-        case .amount,
-             .plannedAmount,
-             .actualAmount,
-             .effectiveAmount,
-             .budgetImpact,
-             .savingsTotal,
-             .incomeAmount,
-             .reconciliationBalance,
-             .categoryAvailability,
-             .burnRate,
-             .projectedSpend,
-             .paceDifference,
-             .coverageRatio,
-             .recurringBurden,
-             .concentration,
-             .color,
-             .name,
-             nil:
+        case (.average, .burnRate, .metric):
+            return .budgetBurnRate
+        case (.forecast, .projectedSpend, .metric):
+            return .budgetProjectedSpend
+        case (.compare, .paceDifference, .comparison):
+            return .budgetPaceDifference
+        case (.forecast, .coverageRatio, .metric):
+            return .budgetCoverageRatio
+        default:
             return nil
         }
     }
@@ -322,7 +327,12 @@ extension MarinaUniversalRoutingPolicy {
             .savingsTotalExplicitAccount,
             .reconciliationBalanceExplicitAccount,
             .budgetRemainingRoom,
-            .safeDailySpend
+            .safeDailySpend,
+            .budgetBurnRate,
+            .budgetProjectedSpend,
+            .budgetPaceDifference,
+            .budgetCoverageRatio,
+            .incomeCoverageRatio
         ]
     )
 }

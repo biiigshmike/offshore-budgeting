@@ -293,6 +293,87 @@ struct MarinaUniversalShadowParityTests {
         )
     }
 
+    @Test func budgetBurnRateFormulaMatchesLegacyExecutorTypedRow() {
+        let fixture = makeFixture()
+        let request = semanticRequest(
+            entity: .budget,
+            operation: .average,
+            measure: .burnRate,
+            dateRangeToken: .currentMonth
+        )
+
+        expectMoneyParity(
+            fixture.harness.legacyMoneyFact(from: fixture.harness.runLegacy(request: request, context: fixture.context()), selection: .last),
+            fixture.harness.universalMoneyFact(from: fixture.harness.runUniversal(request: request, context: fixture.context())),
+            scenario: "Budget burn rate formula"
+        )
+    }
+
+    @Test func budgetProjectedSpendFormulaMatchesLegacyExecutorTypedRow() {
+        let fixture = makeFixture()
+        let request = semanticRequest(
+            entity: .budget,
+            operation: .forecast,
+            measure: .projectedSpend,
+            dateRangeToken: .currentMonth
+        )
+
+        expectMoneyParity(
+            fixture.harness.legacyMoneyFact(from: fixture.harness.runLegacy(request: request, context: fixture.context()), selection: .last),
+            fixture.harness.universalMoneyFact(from: fixture.harness.runUniversal(request: request, context: fixture.context())),
+            scenario: "Budget projected spend formula"
+        )
+    }
+
+    @Test func budgetPaceDifferenceFormulaMatchesLegacyExecutorTypedRow() {
+        let fixture = makeFixture()
+        let request = semanticRequest(
+            entity: .budget,
+            operation: .compare,
+            measure: .paceDifference,
+            dateRangeToken: .currentMonth,
+            shape: .comparison
+        )
+
+        expectMoneyParity(
+            fixture.harness.legacyMoneyFact(from: fixture.harness.runLegacy(request: request, context: fixture.context()), selection: .last),
+            fixture.harness.universalMoneyFact(from: fixture.harness.runUniversal(request: request, context: fixture.context())),
+            scenario: "Budget pace difference formula"
+        )
+    }
+
+    @Test func budgetCoverageRatioFormulaMatchesLegacyExecutorTypedRow() {
+        let fixture = makeFixture()
+        let request = semanticRequest(
+            entity: .budget,
+            operation: .forecast,
+            measure: .coverageRatio,
+            dateRangeToken: .currentMonth
+        )
+
+        expectMoneyParity(
+            fixture.harness.legacyMoneyFact(from: fixture.harness.runLegacy(request: request, context: fixture.context()), selection: .index(2)),
+            fixture.harness.universalMoneyFact(from: fixture.harness.runUniversal(request: request, context: fixture.context())),
+            scenario: "Budget coverage ratio formula"
+        )
+    }
+
+    @Test func incomeCoverageRatioFormulaMatchesLegacyExecutorTypedRow() {
+        let fixture = makeFixture()
+        let request = semanticRequest(
+            entity: .income,
+            operation: .share,
+            measure: .coverageRatio,
+            dateRangeToken: .currentMonth
+        )
+
+        expectMoneyParity(
+            fixture.harness.legacyMoneyFact(from: fixture.harness.runLegacy(request: request, context: fixture.context()), selection: .index(2)),
+            fixture.harness.universalMoneyFact(from: fixture.harness.runUniversal(request: request, context: fixture.context())),
+            scenario: "Income coverage ratio formula"
+        )
+    }
+
     private func makeFixture() -> MarinaUniversalShadowParityFixture {
         let workspace = Workspace(name: "Personal", hexColor: "#3B82F6")
         let appleCard = Card(name: "Apple Card", theme: "ruby", effect: "plastic", workspace: workspace)

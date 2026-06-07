@@ -23,9 +23,9 @@ struct MarinaUniversalRoutingHarnessTests {
     @Test func nonAllowlistedRequestReturnsNotAllowlistedFallback() throws {
         let fixture = makeFixture()
         let request = semanticRequest(
-            entity: .budget,
+            entity: .category,
             operation: .forecast,
-            measure: .burnRate
+            measure: .categoryAvailability
         )
         let result = fixture.harness().attemptUniversalResult(
             request: request,
@@ -149,6 +149,59 @@ struct MarinaUniversalRoutingHarnessTests {
 
         #expect(universal.result.kind == .metric)
         try expectFirstAmount(universal.result, equals: 6)
+    }
+
+    @Test func allowlistedBudgetBurnRateReturnsUniversalResult() throws {
+        let fixture = makeFixture()
+        let request = semanticRequest(entity: .budget, operation: .average, measure: .burnRate)
+        let universal = try fixture.requireUniversalAttempt(for: request)
+
+        #expect(universal.result.kind == .metric)
+        #expect(universal.result.title == "Burn Rate")
+        #expect(universal.diagnostics.scenario == .budgetBurnRate)
+        try expectRowAmount(universal.result, title: "Average per day", equals: 440.0 / 15.0)
+    }
+
+    @Test func allowlistedBudgetProjectedSpendReturnsUniversalResult() throws {
+        let fixture = makeFixture()
+        let request = semanticRequest(entity: .budget, operation: .forecast, measure: .projectedSpend)
+        let universal = try fixture.requireUniversalAttempt(for: request)
+
+        #expect(universal.result.kind == .metric)
+        #expect(universal.result.title == "Projected Spend")
+        #expect(universal.diagnostics.scenario == .budgetProjectedSpend)
+        try expectRowAmount(universal.result, title: "Projected total", equals: 880)
+    }
+
+    @Test func allowlistedBudgetPaceDifferenceReturnsUniversalResult() throws {
+        let fixture = makeFixture()
+        let request = semanticRequest(
+            entity: .budget,
+            operation: .compare,
+            measure: .paceDifference,
+            shape: .comparison
+        )
+        let universal = try fixture.requireUniversalAttempt(for: request)
+
+        #expect(universal.result.kind == .comparison)
+        #expect(universal.result.title == "Pace Difference")
+        #expect(universal.diagnostics.scenario == .budgetPaceDifference)
+        try expectRowAmount(universal.result, title: "Pace difference", equals: -200)
+    }
+
+    @Test func allowlistedCoverageRatiosReturnUniversalResults() throws {
+        let fixture = makeFixture()
+        let budgetRequest = semanticRequest(entity: .budget, operation: .forecast, measure: .coverageRatio)
+        let incomeRequest = semanticRequest(entity: .income, operation: .share, measure: .coverageRatio)
+        let budgetUniversal = try fixture.requireUniversalAttempt(for: budgetRequest)
+        let incomeUniversal = try fixture.requireUniversalAttempt(for: incomeRequest)
+
+        #expect(budgetUniversal.result.title == "Budget Coverage")
+        #expect(incomeUniversal.result.title == "Income Coverage")
+        #expect(budgetUniversal.diagnostics.scenario == .budgetCoverageRatio)
+        #expect(incomeUniversal.diagnostics.scenario == .incomeCoverageRatio)
+        try expectRowAmount(budgetUniversal.result, title: "Coverage percent", equals: 2_650.0 / 1_280.0)
+        try expectRowAmount(incomeUniversal.result, title: "Coverage percent", equals: 2_650.0 / 1_280.0)
     }
 
     @Test func reconciliationBalanceWithoutExplicitAccountFallsBack() throws {
@@ -392,6 +445,16 @@ struct MarinaUniversalRoutingHarnessTests {
         accuracy: Double = 0.01
     ) throws {
         let amount = try #require(result.rows.first?.amount)
+        #expect(abs(amount - expectedAmount) <= accuracy, "Expected \(expectedAmount), got \(amount).")
+    }
+
+    private func expectRowAmount(
+        _ result: MarinaExecutionResult,
+        title: String,
+        equals expectedAmount: Double,
+        accuracy: Double = 0.01
+    ) throws {
+        let amount = try #require(result.rows.first(where: { $0.title == title })?.amount)
         #expect(abs(amount - expectedAmount) <= accuracy, "Expected \(expectedAmount), got \(amount).")
     }
 

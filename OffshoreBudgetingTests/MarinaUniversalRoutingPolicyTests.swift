@@ -218,22 +218,105 @@ struct MarinaUniversalRoutingPolicyTests {
             operation: .forecast,
             measure: .safeDailySpend
         )
+        let burnRate = semanticRequest(
+            entity: .budget,
+            operation: .average,
+            measure: .burnRate
+        )
+        let projectedSpend = semanticRequest(
+            entity: .budget,
+            operation: .forecast,
+            measure: .projectedSpend
+        )
+        let paceDifference = semanticRequest(
+            entity: .budget,
+            operation: .compare,
+            measure: .paceDifference,
+            shape: .comparison
+        )
+        let budgetCoverage = semanticRequest(
+            entity: .budget,
+            operation: .forecast,
+            measure: .coverageRatio
+        )
 
         #expect(policy.scenario(for: remainingRoom) == .budgetRemainingRoom)
         #expect(policy.scenario(for: safeDailySpend) == .safeDailySpend)
+        #expect(policy.scenario(for: burnRate) == .budgetBurnRate)
+        #expect(policy.scenario(for: projectedSpend) == .budgetProjectedSpend)
+        #expect(policy.scenario(for: paceDifference) == .budgetPaceDifference)
+        #expect(policy.scenario(for: budgetCoverage) == .budgetCoverageRatio)
         #expect(policy.allows(remainingRoom))
         #expect(policy.allows(safeDailySpend))
+        #expect(policy.allows(burnRate))
+        #expect(policy.allows(projectedSpend))
+        #expect(policy.allows(paceDifference))
+        #expect(policy.allows(budgetCoverage))
+    }
+
+    @Test func incomeCoverageRatioMapsToExactScenario() {
+        let request = semanticRequest(
+            entity: .income,
+            operation: .share,
+            measure: .coverageRatio
+        )
+
+        #expect(policy.scenario(for: request) == .incomeCoverageRatio)
+        #expect(policy.allows(request))
     }
 
     @Test func deferredMeasuresAreNotAllowlisted() {
-        let request = semanticRequest(
+        let requests = [
+            semanticRequest(
+                entity: .category,
+                operation: .forecast,
+                measure: .categoryAvailability
+            ),
+            semanticRequest(
+                entity: .category,
+                operation: .share,
+                measure: .concentration
+            ),
+            semanticRequest(
+                entity: .preset,
+                operation: .sum,
+                measure: .recurringBurden
+            ),
+            semanticRequest(
+                entity: .savingsAccount,
+                operation: .forecast,
+                measure: .savingsTotal
+            )
+        ]
+
+        for request in requests {
+            #expect(policy.scenario(for: request) == nil)
+            #expect(policy.allows(request) == false)
+        }
+    }
+
+    @Test func budgetPaceFormulaVariantsAreNotAllowlisted() {
+        let wrongOperation = semanticRequest(
             entity: .budget,
             operation: .forecast,
             measure: .burnRate
         )
+        let wrongShape = semanticRequest(
+            entity: .budget,
+            operation: .compare,
+            measure: .paceDifference
+        )
+        let allTime = semanticRequest(
+            entity: .budget,
+            operation: .forecast,
+            measure: .projectedSpend,
+            dateRangeToken: .allTime
+        )
 
-        #expect(policy.scenario(for: request) == nil)
-        #expect(policy.allows(request) == false)
+        for request in [wrongOperation, wrongShape, allTime] {
+            #expect(policy.scenario(for: request) == nil)
+            #expect(policy.allows(request) == false)
+        }
     }
 
     @Test func compareShareAndWhatIfAreNotAllowlisted() {

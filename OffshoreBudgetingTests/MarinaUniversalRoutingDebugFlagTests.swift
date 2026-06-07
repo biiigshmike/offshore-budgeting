@@ -59,9 +59,9 @@ struct MarinaUniversalRoutingDebugFlagTests {
             isDebugBuild: true
         )
         let request = semanticRequest(
-            entity: .budget,
+            entity: .category,
             operation: .forecast,
-            measure: .burnRate
+            measure: .categoryAvailability
         )
 
         #expect(policy == .internalParityProven)
@@ -81,9 +81,9 @@ struct MarinaUniversalRoutingDebugFlagTests {
         )
         let fixture = makeFixture()
         let request = semanticRequest(
-            entity: .budget,
+            entity: .category,
             operation: .forecast,
-            measure: .burnRate
+            measure: .categoryAvailability
         )
         let plan = fixture.plan(for: request)
         let executor = MarinaDualPathQueryExecutor(

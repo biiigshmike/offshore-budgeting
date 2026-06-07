@@ -52,7 +52,12 @@ struct MarinaUniversalOwnershipRegistry: Sendable {
         universalOwned(.savingsTotalExplicitAccount, "Explicit savings account total has shadow, presentation, and debug-routing parity."),
         universalOwned(.reconciliationBalanceExplicitAccount, "Explicit reconciliation account balance has shadow, presentation, and debug-routing parity."),
         universalOwned(.budgetRemainingRoom, "Budget remaining room has shadow, presentation, and debug-routing parity."),
-        universalOwned(.safeDailySpend, "Safe daily spend has shadow, presentation, and debug-routing parity.")
+        universalOwned(.safeDailySpend, "Safe daily spend has shadow, presentation, and debug-routing parity."),
+        universalOwned(.budgetBurnRate, "Budget burn rate has shadow, presentation, and debug-routing parity."),
+        universalOwned(.budgetProjectedSpend, "Budget projected spend has shadow, presentation, and debug-routing parity."),
+        universalOwned(.budgetPaceDifference, "Budget pace difference has shadow, presentation, and debug-routing parity."),
+        universalOwned(.budgetCoverageRatio, "Budget coverage ratio has shadow, presentation, and debug-routing parity."),
+        universalOwned(.incomeCoverageRatio, "Income coverage ratio has shadow, presentation, and debug-routing parity.")
     ]
 
     private static func universalOwned(
