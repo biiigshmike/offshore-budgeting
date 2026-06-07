@@ -1,0 +1,303 @@
+import Foundation
+
+enum MarinaUniversalRoutingScenario: String, Codable, CaseIterable, Equatable, Hashable, Sendable {
+    case merchantVariableSpend
+    case categoryVariableSpend
+    case cardVariableSpend
+    case plannedExpenseSum
+    case latestVariableExpense
+    case biggestVariableExpenseRows
+    case nextPlannedExpense
+    case unifiedExpenseCategoryGroups
+    case incomeTotal
+    case savingsTotalExplicitAccount
+    case reconciliationBalanceExplicitAccount
+    case budgetRemainingRoom
+    case safeDailySpend
+}
+
+struct MarinaUniversalRoutingPolicy: Equatable, Sendable {
+    let isEnabled: Bool
+    let allowedScenarios: Set<MarinaUniversalRoutingScenario>
+
+    func allows(_ request: MarinaSemanticRequest) -> Bool {
+        guard isEnabled,
+              let scenario = scenario(for: request) else {
+            return false
+        }
+        return allowedScenarios.contains(scenario)
+    }
+
+    func scenario(for request: MarinaSemanticRequest) -> MarinaUniversalRoutingScenario? {
+        guard request.expectedAnswerShape != .clarification,
+              request.expectedAnswerShape != .unsupported,
+              request.unsupportedReason == nil,
+              request.comparisonTargetName == nil,
+              request.whatIfAmount == nil,
+              blockedOperations.contains(request.operation) == false else {
+            return nil
+        }
+
+        switch request.entity {
+        case .variableExpense:
+            return variableExpenseScenario(for: request)
+        case .plannedExpense:
+            return plannedExpenseScenario(for: request)
+        case .income:
+            return incomeScenario(for: request)
+        case .savingsAccount:
+            return savingsScenario(for: request)
+        case .reconciliationAccount:
+            return reconciliationScenario(for: request)
+        case .budget:
+            return budgetScenario(for: request)
+        case .workspace, .card, .category, .preset:
+            return nil
+        }
+    }
+
+    private var blockedOperations: Set<MarinaSemanticOperation> {
+        [.compare, .share, .whatIf]
+    }
+
+    private func variableExpenseScenario(for request: MarinaSemanticRequest) -> MarinaUniversalRoutingScenario? {
+        guard expenseScopeIsNilOr(request, .variable) else {
+            if request.expenseScope == .unified {
+                return unifiedExpenseScenario(for: request)
+            }
+            return nil
+        }
+
+        if request.operation == .sum,
+           request.measure == .budgetImpact,
+           request.expectedAnswerShape == .metric,
+           exactDimensions(request, [.merchantText]),
+           hasTextQuery(request),
+           hasNoTargetName(request) {
+            return .merchantVariableSpend
+        }
+
+        if request.operation == .sum,
+           request.measure == .budgetImpact,
+           request.expectedAnswerShape == .metric,
+           exactDimensions(request, [.category]),
+           hasTargetName(request),
+           hasNoTextQuery(request) {
+            return .categoryVariableSpend
+        }
+
+        if request.operation == .sum,
+           request.measure == .budgetImpact,
+           request.expectedAnswerShape == .metric,
+           exactDimensions(request, [.card]),
+           hasTargetName(request),
+           hasNoTextQuery(request) {
+            return .cardVariableSpend
+        }
+
+        if request.operation == .last,
+           request.measure == .budgetImpact,
+           request.expectedAnswerShape == .metric,
+           exactDimensions(request, []),
+           hasNoNamedTargets(request),
+           request.sort == nil {
+            return .latestVariableExpense
+        }
+
+        if request.operation == .list,
+           request.measure == .budgetImpact,
+           request.expectedAnswerShape == .list,
+           exactDimensions(request, []),
+           hasNoNamedTargets(request),
+           request.sort == .amountDescending {
+            return .biggestVariableExpenseRows
+        }
+
+        return nil
+    }
+
+    private func unifiedExpenseScenario(for request: MarinaSemanticRequest) -> MarinaUniversalRoutingScenario? {
+        guard request.operation == .group,
+              request.measure == .budgetImpact,
+              request.expectedAnswerShape == .list,
+              request.expenseScope == .unified,
+              exactDimensions(request, [.category]),
+              hasNoNamedTargets(request),
+              request.sort == nil else {
+            return nil
+        }
+        return .unifiedExpenseCategoryGroups
+    }
+
+    private func plannedExpenseScenario(for request: MarinaSemanticRequest) -> MarinaUniversalRoutingScenario? {
+        if request.expenseScope == .unified {
+            return unifiedExpenseScenario(for: request)
+        }
+
+        guard expenseScopeIsNilOr(request, .planned) else {
+            return nil
+        }
+
+        if request.operation == .sum,
+           request.measure == .budgetImpact,
+           request.expectedAnswerShape == .metric,
+           exactDimensions(request, []),
+           hasNoNamedTargets(request) {
+            return .plannedExpenseSum
+        }
+
+        if request.operation == .next,
+           request.measure == .effectiveAmount,
+           request.expectedAnswerShape == .metric,
+           exactDimensions(request, []),
+           hasNoNamedTargets(request),
+           request.dateRangeToken != .allTime,
+           request.sort == nil {
+            return .nextPlannedExpense
+        }
+
+        return nil
+    }
+
+    private func incomeScenario(for request: MarinaSemanticRequest) -> MarinaUniversalRoutingScenario? {
+        guard request.operation == .sum,
+              request.measure == .incomeAmount,
+              request.expectedAnswerShape == .metric,
+              exactDimensions(request, []),
+              hasNoNamedTargets(request),
+              request.incomeState == nil || request.incomeState == .all,
+              request.sort == nil else {
+            return nil
+        }
+        return .incomeTotal
+    }
+
+    private func savingsScenario(for request: MarinaSemanticRequest) -> MarinaUniversalRoutingScenario? {
+        guard request.operation == .sum,
+              request.measure == .savingsTotal,
+              request.expectedAnswerShape == .metric,
+              exactDimensions(request, []),
+              hasTargetName(request),
+              hasNoTextQuery(request),
+              request.dateRangeToken == .allTime,
+              request.sort == nil else {
+            return nil
+        }
+        return .savingsTotalExplicitAccount
+    }
+
+    private func reconciliationScenario(for request: MarinaSemanticRequest) -> MarinaUniversalRoutingScenario? {
+        guard request.operation == .sum,
+              request.measure == .reconciliationBalance,
+              request.expectedAnswerShape == .metric,
+              exactDimensions(request, []),
+              hasTargetName(request),
+              hasNoTextQuery(request),
+              request.dateRangeToken == .allTime,
+              request.sort == nil else {
+            return nil
+        }
+        return .reconciliationBalanceExplicitAccount
+    }
+
+    private func budgetScenario(for request: MarinaSemanticRequest) -> MarinaUniversalRoutingScenario? {
+        guard request.operation == .forecast,
+              request.expectedAnswerShape == .metric,
+              exactDimensions(request, []),
+              hasNoNamedTargets(request),
+              request.dateRangeToken != .allTime,
+              request.sort == nil else {
+            return nil
+        }
+
+        switch request.measure {
+        case .remainingRoom:
+            return .budgetRemainingRoom
+        case .safeDailySpend:
+            return .safeDailySpend
+        case .amount,
+             .plannedAmount,
+             .actualAmount,
+             .effectiveAmount,
+             .budgetImpact,
+             .savingsTotal,
+             .incomeAmount,
+             .reconciliationBalance,
+             .categoryAvailability,
+             .burnRate,
+             .projectedSpend,
+             .paceDifference,
+             .coverageRatio,
+             .recurringBurden,
+             .concentration,
+             .color,
+             .name,
+             nil:
+            return nil
+        }
+    }
+
+    private func expenseScopeIsNilOr(
+        _ request: MarinaSemanticRequest,
+        _ expectedScope: MarinaSemanticExpenseScope
+    ) -> Bool {
+        request.expenseScope == nil || request.expenseScope == expectedScope
+    }
+
+    private func exactDimensions(
+        _ request: MarinaSemanticRequest,
+        _ expectedDimensions: [MarinaSemanticDimension]
+    ) -> Bool {
+        request.dimensions == expectedDimensions
+    }
+
+    private func hasTargetName(_ request: MarinaSemanticRequest) -> Bool {
+        trimmed(request.targetName).isEmpty == false
+    }
+
+    private func hasNoTargetName(_ request: MarinaSemanticRequest) -> Bool {
+        trimmed(request.targetName).isEmpty
+    }
+
+    private func hasTextQuery(_ request: MarinaSemanticRequest) -> Bool {
+        trimmed(request.textQuery).isEmpty == false
+    }
+
+    private func hasNoTextQuery(_ request: MarinaSemanticRequest) -> Bool {
+        trimmed(request.textQuery).isEmpty
+    }
+
+    private func hasNoNamedTargets(_ request: MarinaSemanticRequest) -> Bool {
+        hasNoTargetName(request) && hasNoTextQuery(request)
+    }
+
+    private func trimmed(_ value: String?) -> String {
+        (value ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+}
+
+extension MarinaUniversalRoutingPolicy {
+    static let disabled = MarinaUniversalRoutingPolicy(
+        isEnabled: false,
+        allowedScenarios: []
+    )
+
+    static let internalParityProven = MarinaUniversalRoutingPolicy(
+        isEnabled: true,
+        allowedScenarios: [
+            .merchantVariableSpend,
+            .categoryVariableSpend,
+            .cardVariableSpend,
+            .plannedExpenseSum,
+            .latestVariableExpense,
+            .biggestVariableExpenseRows,
+            .nextPlannedExpense,
+            .unifiedExpenseCategoryGroups,
+            .incomeTotal,
+            .savingsTotalExplicitAccount,
+            .reconciliationBalanceExplicitAccount,
+            .budgetRemainingRoom,
+            .safeDailySpend
+        ]
+    )
+}

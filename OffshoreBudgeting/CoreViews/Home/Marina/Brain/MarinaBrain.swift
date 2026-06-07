@@ -14,6 +14,7 @@ struct MarinaBrain {
     private let insightNarrator: any MarinaInsightNarrating
     private let presenter: MarinaAnswerPresenter
     private let followUpResolver: MarinaFollowUpResolver
+    private let universalRoutingPolicyProvider: () -> MarinaUniversalRoutingPolicy
 
     init(
         interpreter: (any MarinaModelInterpreting)? = nil,
@@ -24,7 +25,8 @@ struct MarinaBrain {
         insightAnalyzer: MarinaInsightAnalyzer? = nil,
         insightNarrator: (any MarinaInsightNarrating)? = nil,
         presenter: MarinaAnswerPresenter? = nil,
-        followUpResolver: MarinaFollowUpResolver? = nil
+        followUpResolver: MarinaFollowUpResolver? = nil,
+        universalRoutingPolicyProvider: (() -> MarinaUniversalRoutingPolicy)? = nil
     ) {
         self.interpreter = interpreter ?? MarinaModelInterpreterFactory.makeDefault()
         self.planner = planner ?? MarinaQueryPlanner()
@@ -35,6 +37,9 @@ struct MarinaBrain {
         self.insightNarrator = insightNarrator ?? MarinaInsightNarrator()
         self.presenter = presenter ?? MarinaAnswerPresenter()
         self.followUpResolver = followUpResolver ?? MarinaFollowUpResolver()
+        self.universalRoutingPolicyProvider = universalRoutingPolicyProvider ?? {
+            MarinaUniversalRoutingDebugFlagResolver.policy()
+        }
     }
 
     func answer(
@@ -212,7 +217,7 @@ struct MarinaBrain {
             now: context.now,
             clarificationChoices: validated.clarificationChoices
         )
-        let result = executor.execute(plan: queryPlan, snapshot: snapshot)
+        let result = execute(plan: queryPlan, snapshot: snapshot, context: context)
         let analyzedBundle = insightAnalyzer.insightBundle(for: result, plan: queryPlan)
         let insightBundle = analyzedBundle.isEmpty ? nil : analyzedBundle
         let insightContext = MarinaInsightContext(
@@ -237,6 +242,42 @@ struct MarinaBrain {
             answer: answer,
             insightContext: narratableContext,
             finalExplanationSuffix: narratableContext == nil ? nil : debugTrace
+        )
+    }
+
+    private func execute(
+        plan: MarinaQueryPlan,
+        snapshot: MarinaWorkspaceSnapshot,
+        context: MarinaBrainContext
+    ) -> MarinaExecutionResult {
+        let policy = universalRoutingPolicyProvider()
+        guard policy.isEnabled else {
+            return executor.execute(plan: plan, snapshot: snapshot)
+        }
+
+        let calendar = Calendar.current
+        let planningContext = MarinaUniversalPlanningContext(
+            ambientDateRange: context.ambientDateRange,
+            defaultBudgetingPeriod: context.defaultBudgetingPeriod,
+            now: context.now,
+            calendar: calendar
+        )
+        let formulaRegistry = MarinaFormulaRegistry(now: context.now, calendar: calendar)
+        let harness = MarinaUniversalRoutingHarness(
+            bridge: MarinaSemanticUniversalPlanBridge(formulaRegistry: formulaRegistry),
+            runner: MarinaUniversalQueryRunner(formulaRegistry: formulaRegistry),
+            presenter: MarinaUniversalResultPresenter(),
+            policy: policy
+        )
+        return MarinaDualPathQueryExecutor(
+            legacyExecutor: executor,
+            universalHarness: harness,
+            policy: policy
+        )
+        .execute(
+            plan: plan,
+            snapshot: snapshot,
+            planningContext: planningContext
         )
     }
 
