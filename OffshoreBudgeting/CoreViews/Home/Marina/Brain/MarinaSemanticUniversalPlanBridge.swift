@@ -10,13 +10,27 @@ struct MarinaSemanticUniversalPlanBridge {
     func makePlan(
         from request: MarinaSemanticRequest
     ) -> MarinaSemanticUniversalPlanBridgeResult {
+        makePlan(from: request, planningContext: nil)
+    }
+
+    func makePlan(
+        from request: MarinaSemanticRequest,
+        planningContext: MarinaUniversalPlanningContext
+    ) -> MarinaSemanticUniversalPlanBridgeResult {
+        makePlan(from: request, planningContext: Optional(planningContext))
+    }
+
+    private func makePlan(
+        from request: MarinaSemanticRequest,
+        planningContext: MarinaUniversalPlanningContext?
+    ) -> MarinaSemanticUniversalPlanBridgeResult {
         if request.unsupportedReason != nil || request.expectedAnswerShape == .unsupported {
             return .unsupported(.unsupportedCombination)
         }
 
         switch resolvedEntity(for: request) {
         case let .success(entity):
-            return makePlan(for: request, entity: entity)
+            return makePlan(for: request, entity: entity, planningContext: planningContext)
         case let .failure(reason):
             return .unsupported(reason)
         }
@@ -24,7 +38,8 @@ struct MarinaSemanticUniversalPlanBridge {
 
     private func makePlan(
         for request: MarinaSemanticRequest,
-        entity: MarinaSemanticEntity
+        entity: MarinaSemanticEntity,
+        planningContext: MarinaUniversalPlanningContext?
     ) -> MarinaSemanticUniversalPlanBridgeResult {
         guard supportedEntities.contains(entity) else {
             return .unsupported(.unsupportedCombination)
@@ -56,21 +71,46 @@ struct MarinaSemanticUniversalPlanBridge {
             if trimmed(request.textQuery).isEmpty == false {
                 return .unsupported(.fieldNotSearchable)
             }
-            return planWithoutSearch(for: request, entity: entity, descriptor: descriptor)
+            return planWithoutSearch(
+                for: request,
+                entity: entity,
+                descriptor: descriptor,
+                planningContext: planningContext
+            )
         }
 
-        return planWithoutSearch(for: request, entity: entity, descriptor: descriptor, search: search)
+        return planWithoutSearch(
+            for: request,
+            entity: entity,
+            descriptor: descriptor,
+            planningContext: planningContext,
+            search: search
+        )
     }
 
     private func planWithoutSearch(
         for request: MarinaSemanticRequest,
         entity: MarinaSemanticEntity,
         descriptor: MarinaEntityDescriptor,
+        planningContext: MarinaUniversalPlanningContext?,
         search: MarinaRowSearchClause? = nil
     ) -> MarinaSemanticUniversalPlanBridgeResult {
         let filtersResult = filters(for: request, descriptor: descriptor)
         guard case let .success(filters) = filtersResult else {
             if case let .failure(reason) = filtersResult {
+                return .unsupported(reason)
+            }
+            return .unsupported(.unsupportedCombination)
+        }
+
+        let dateFiltersResult = dateFilters(
+            for: request,
+            entity: entity,
+            descriptor: descriptor,
+            planningContext: planningContext
+        )
+        guard case let .success(dateFilters) = dateFiltersResult else {
+            if case let .failure(reason) = dateFiltersResult {
                 return .unsupported(reason)
             }
             return .unsupported(.unsupportedCombination)
@@ -98,11 +138,16 @@ struct MarinaSemanticUniversalPlanBridge {
                 operation: request.operation,
                 measure: request.measure,
                 search: search,
-                filters: filters,
+                filters: filters + dateFilters,
                 groupBy: groupBy,
                 sorts: sorts,
                 limit: clampedLimit(request.resultLimit),
-                requiresDateField: request.dateRangeToken != .allTime && descriptor.defaultDateField != nil,
+                requiresDateField: requiresDateField(
+                    for: request,
+                    entity: entity,
+                    descriptor: descriptor,
+                    planningContext: planningContext
+                ),
                 requiresAmountField: requiresAmountField(request)
             )
         )
@@ -118,6 +163,10 @@ struct MarinaSemanticUniversalPlanBridge {
 
     private var simpleMeasures: Set<MarinaSemanticMeasure> {
         [.budgetImpact, .amount, .plannedAmount, .actualAmount, .effectiveAmount, .incomeAmount, .name, .color]
+    }
+
+    private var dateFilteredEntities: Set<MarinaSemanticEntity> {
+        [.variableExpense, .plannedExpense, .income]
     }
 
     private func resolvedEntity(
@@ -198,6 +247,52 @@ struct MarinaSemanticUniversalPlanBridge {
                 target: .relationship(relationship),
                 operation: .equals,
                 value: .text(target)
+            )
+        ])
+    }
+
+    private func dateFilters(
+        for request: MarinaSemanticRequest,
+        entity: MarinaSemanticEntity,
+        descriptor: MarinaEntityDescriptor,
+        planningContext: MarinaUniversalPlanningContext?
+    ) -> BridgeValueResult<[MarinaRowFilter]> {
+        guard let planningContext,
+              request.dateRangeToken != .allTime,
+              dateFilteredEntities.contains(entity) else {
+            return .success([])
+        }
+
+        guard let dateField = descriptor.defaultDateField else {
+            return .failure(.missingDateField)
+        }
+
+        guard descriptor.fields.contains(where: { $0.key == dateField && $0.isFilterable }) else {
+            return .failure(.fieldNotFilterable)
+        }
+
+        let planner = MarinaQueryPlanner(calendar: planningContext.calendar)
+        let queryPlan = planner.plan(
+            request: request,
+            ambientDateRange: planningContext.ambientDateRange,
+            defaultBudgetingPeriod: planningContext.defaultBudgetingPeriod,
+            now: planningContext.now
+        )
+
+        guard let range = queryPlan.dateRange else {
+            return .success([])
+        }
+
+        return .success([
+            MarinaRowFilter(
+                target: .field(dateField),
+                operation: .greaterThanOrEqual,
+                value: .date(range.startDate)
+            ),
+            MarinaRowFilter(
+                target: .field(dateField),
+                operation: .lessThanOrEqual,
+                value: .date(range.endDate)
             )
         ])
     }
@@ -399,6 +494,18 @@ struct MarinaSemanticUniversalPlanBridge {
             return nil
         }
         return min(max(limit, 1), 20)
+    }
+
+    private func requiresDateField(
+        for request: MarinaSemanticRequest,
+        entity: MarinaSemanticEntity,
+        descriptor: MarinaEntityDescriptor,
+        planningContext: MarinaUniversalPlanningContext?
+    ) -> Bool {
+        if planningContext != nil {
+            return request.dateRangeToken != .allTime && dateFilteredEntities.contains(entity)
+        }
+        return request.dateRangeToken != .allTime && descriptor.defaultDateField != nil
     }
 
     private func requiresAmountField(_ request: MarinaSemanticRequest) -> Bool {
