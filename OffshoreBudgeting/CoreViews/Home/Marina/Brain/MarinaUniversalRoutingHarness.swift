@@ -22,9 +22,28 @@ struct MarinaUniversalRoutingDiagnostics: Equatable, Sendable {
     let requestEntity: MarinaSemanticEntity
     let operation: MarinaSemanticOperation
     let measure: MarinaSemanticMeasure?
+    let scenario: MarinaUniversalRoutingScenario?
     let usedUniversal: Bool
     let fallbackReason: MarinaUniversalFallbackReason?
     let notes: [String]
+
+    init(
+        requestEntity: MarinaSemanticEntity,
+        operation: MarinaSemanticOperation,
+        measure: MarinaSemanticMeasure?,
+        scenario: MarinaUniversalRoutingScenario? = nil,
+        usedUniversal: Bool,
+        fallbackReason: MarinaUniversalFallbackReason?,
+        notes: [String]
+    ) {
+        self.requestEntity = requestEntity
+        self.operation = operation
+        self.measure = measure
+        self.scenario = scenario
+        self.usedUniversal = usedUniversal
+        self.fallbackReason = fallbackReason
+        self.notes = notes
+    }
 }
 
 @MainActor
@@ -147,6 +166,7 @@ struct MarinaUniversalRoutingHarness {
             requestEntity: request.entity,
             operation: request.operation,
             measure: request.measure,
+            scenario: policy.scenario(for: request),
             usedUniversal: usedUniversal,
             fallbackReason: fallbackReason,
             notes: notes

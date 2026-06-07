@@ -165,7 +165,7 @@ struct MarinaSemanticPromptSuiteTests {
 
     @Test func promptSuite_executesEveryInAppQuestionPhrase() async throws {
         let fixture = try makeFixture()
-        let brain = MarinaBrain(interpreter: MarinaRuleBasedInterpreter())
+        let brain = legacyRuleBasedBrain()
         let cases: [AnswerCase] = [
             .init(prompt: "What workspace am I in?", kind: .metric),
             .init(prompt: "What is the name of this workspace?", kind: .metric),
@@ -243,7 +243,7 @@ struct MarinaSemanticPromptSuiteTests {
 
     @Test func promptSuite_plansAndExecutesRepresentativeAnswers() async throws {
         let fixture = try makeFixture()
-        let brain = MarinaBrain(interpreter: MarinaRuleBasedInterpreter())
+        let brain = legacyRuleBasedBrain()
 
         let cardCount = await answer("How many cards do I have?", using: brain, fixture: fixture)
         #expect(cardCount.kind == .metric)
@@ -342,7 +342,7 @@ struct MarinaSemanticPromptSuiteTests {
 
     @Test func formulaAnswers_explainDeterministicBudgetMath() async throws {
         let fixture = try makeFixture()
-        let brain = MarinaBrain(interpreter: MarinaRuleBasedInterpreter())
+        let brain = legacyRuleBasedBrain()
 
         let burnRate = await answer("What is my burn rate?", using: brain, fixture: fixture)
         #expect(burnRate.kind == .metric)
@@ -409,7 +409,7 @@ struct MarinaSemanticPromptSuiteTests {
 
     @Test func resolver_cardSummaryPhrasesResolveSameWorkspaceCardTarget() async throws {
         let fixture = try makeFixture(includeDebitCard: true)
-        let brain = MarinaBrain(interpreter: MarinaRuleBasedInterpreter())
+        let brain = legacyRuleBasedBrain()
 
         let prompts = [
             "Summarize my Debit Card.",
@@ -435,7 +435,7 @@ struct MarinaSemanticPromptSuiteTests {
 
     @Test func resolver_phraseInvarianceWorksAcrossNonHardcodedEntityTypes() async throws {
         let fixture = try makeFixture(includeTransportationCategory: true)
-        let brain = MarinaBrain(interpreter: MarinaRuleBasedInterpreter())
+        let brain = legacyRuleBasedBrain()
 
         let transportation = await answer("Summarize my Transportation.", using: brain, fixture: fixture)
         #expect(transportation.kind == .metric)
@@ -473,7 +473,7 @@ struct MarinaSemanticPromptSuiteTests {
 
     @Test func resolver_unknownNamedTargetNeverFallsBackToAggregate() async throws {
         let fixture = try makeFixture(includeDebitCard: false)
-        let brain = MarinaBrain(interpreter: MarinaRuleBasedInterpreter())
+        let brain = legacyRuleBasedBrain()
 
         let answer = await answer("Summarize my Debit Card.", using: brain, fixture: fixture)
 
@@ -485,7 +485,7 @@ struct MarinaSemanticPromptSuiteTests {
 
     @Test func resolver_incomeComparisonDoesNotInventSourceFromComparisonWords() async throws {
         let fixture = try makeFixture()
-        let brain = MarinaBrain(interpreter: MarinaRuleBasedInterpreter())
+        let brain = legacyRuleBasedBrain()
         let interpreter = MarinaRuleBasedInterpreter()
         let prompt = "Compare my actual income this month to last month. Am I up or down?"
 
@@ -511,7 +511,7 @@ struct MarinaSemanticPromptSuiteTests {
 
     @Test func promptSuite_negativeCasesStaySafe() async throws {
         let fixture = try makeFixture()
-        let brain = MarinaBrain(interpreter: MarinaRuleBasedInterpreter())
+        let brain = legacyRuleBasedBrain()
         let interpreter = MarinaRuleBasedInterpreter()
 
         let ambiguous = interpreter.interpret("How much did I spend on Apple?")
@@ -532,7 +532,7 @@ struct MarinaSemanticPromptSuiteTests {
 
     @Test func clarification_appleMerchantOrCardStoresExecutableChoices() async throws {
         let fixture = try makeFixture(includeAppleMerchantExpense: true)
-        let brain = MarinaBrain(interpreter: MarinaRuleBasedInterpreter())
+        let brain = legacyRuleBasedBrain()
 
         let clarification = await answer("How much did I spend on Apple?", using: brain, fixture: fixture)
         #expect(clarification.kind == .message)
@@ -563,7 +563,7 @@ struct MarinaSemanticPromptSuiteTests {
 
     @Test func resolver_appleCardOnlyDoesNotOfferSyntheticTextChoice() async throws {
         let fixture = try makeFixture(includeAppleMerchantExpense: false)
-        let brain = MarinaBrain(interpreter: MarinaRuleBasedInterpreter())
+        let brain = legacyRuleBasedBrain()
 
         let answer = await answer("How much did I spend on Apple?", using: brain, fixture: fixture)
 
@@ -574,7 +574,7 @@ struct MarinaSemanticPromptSuiteTests {
 
     @Test func resolver_groceryAmbiguityCreatesExecutableCategoryAndTextChoices() async throws {
         let fixture = try makeFixture()
-        let brain = MarinaBrain(interpreter: MarinaRuleBasedInterpreter())
+        let brain = legacyRuleBasedBrain()
 
         let clarification = await answer("How much did I spend on Grocery?", using: brain, fixture: fixture)
         #expect(clarification.kind == .message)
@@ -610,7 +610,7 @@ struct MarinaSemanticPromptSuiteTests {
 
     @Test func resolver_expenseMatchChoiceUsesStoredTitleInButtonAndAnswer() async throws {
         let fixture = try makeFixture(includeGroceryOutletExpense: true)
-        let brain = MarinaBrain(interpreter: MarinaRuleBasedInterpreter())
+        let brain = legacyRuleBasedBrain()
 
         let clarification = await answer("How much did I spend on Grocery?", using: brain, fixture: fixture)
         guard case .clarificationChoices(let choices)? = clarification.attachment else {
@@ -631,7 +631,7 @@ struct MarinaSemanticPromptSuiteTests {
 
     @Test func resolver_multipleExpenseTextMatchesUsesExplicitAggregateChoice() async throws {
         let fixture = try makeFixture()
-        let brain = MarinaBrain(interpreter: MarinaRuleBasedInterpreter())
+        let brain = legacyRuleBasedBrain()
 
         let clarification = await answer("Show Grocery expenses", using: brain, fixture: fixture)
         guard case .clarificationChoices(let choices)? = clarification.attachment else {
@@ -647,7 +647,7 @@ struct MarinaSemanticPromptSuiteTests {
 
     @Test func resolver_categoryOnlySpendTargetAutoResolvesWithoutTextChoice() async throws {
         let fixture = try makeFixture(includeTransportationCategory: true)
-        let brain = MarinaBrain(interpreter: MarinaRuleBasedInterpreter())
+        let brain = legacyRuleBasedBrain()
 
         let answer = await answer("What did I spend on Transportation?", using: brain, fixture: fixture)
 
@@ -659,7 +659,7 @@ struct MarinaSemanticPromptSuiteTests {
 
     @Test func resolver_showGroceryExpensesCanResolveCategoryOrExpenseTextLists() async throws {
         let fixture = try makeFixture()
-        let brain = MarinaBrain(interpreter: MarinaRuleBasedInterpreter())
+        let brain = legacyRuleBasedBrain()
 
         let clarification = await answer("Show Grocery expenses", using: brain, fixture: fixture)
         guard case .clarificationChoices(let choices)? = clarification.attachment else {
@@ -693,7 +693,7 @@ struct MarinaSemanticPromptSuiteTests {
 
     @Test func clarification_merchantWithoutPendingContextDoesNotBecomeWorkspace() async throws {
         let fixture = try makeFixture()
-        let brain = MarinaBrain(interpreter: MarinaRuleBasedInterpreter())
+        let brain = legacyRuleBasedBrain()
 
         let answer = await answer("merchant", using: brain, fixture: fixture)
 
@@ -704,7 +704,7 @@ struct MarinaSemanticPromptSuiteTests {
     @Test func merchantNoResultsAndMerchantMatchesUseDistinctCards() async throws {
         let noAppleFixture = try makeFixture(includeAppleMerchantExpense: false)
         let appleFixture = try makeFixture(includeAppleMerchantExpense: true)
-        let brain = MarinaBrain(interpreter: MarinaRuleBasedInterpreter())
+        let brain = legacyRuleBasedBrain()
         let request = MarinaSemanticRequest(
             entity: .variableExpense,
             operation: .sum,
@@ -2082,10 +2082,7 @@ struct MarinaSemanticPromptSuiteTests {
     @Test func brain_addsInsightToSuccessfulAnswersAndSkipsTerminalAnswers() async throws {
         let fixture = try makeFixture()
         let narrator = RecordingInsightNarrator(response: "Stub insight.")
-        let brain = MarinaBrain(
-            interpreter: MarinaRuleBasedInterpreter(),
-            insightNarrator: narrator
-        )
+        let brain = legacyRuleBasedBrain(insightNarrator: narrator)
 
         let successful = await answer("What is my safe spend today?", using: brain, fixture: fixture)
         #expect(successful.kind == .metric)
@@ -2117,10 +2114,7 @@ struct MarinaSemanticPromptSuiteTests {
 
     @Test func brain_keepsOriginalAnswerWhenInsightNarratorFails() async throws {
         let fixture = try makeFixture()
-        let brain = MarinaBrain(
-            interpreter: MarinaRuleBasedInterpreter(),
-            insightNarrator: ThrowingInsightNarrator()
-        )
+        let brain = legacyRuleBasedBrain(insightNarrator: ThrowingInsightNarrator())
 
         let answer = await answer("What is my safe spend today?", using: brain, fixture: fixture)
         #expect(answer.kind == .metric)
@@ -2131,10 +2125,7 @@ struct MarinaSemanticPromptSuiteTests {
     @Test func brain_answerSeedReturnsCardBeforeNarrationAndIncludesContextOnlyForNarratableAnswers() async throws {
         let fixture = try makeFixture()
         let narrator = RecordingInsightNarrator(response: "Stub insight.")
-        let brain = MarinaBrain(
-            interpreter: MarinaRuleBasedInterpreter(),
-            insightNarrator: narrator
-        )
+        let brain = legacyRuleBasedBrain(insightNarrator: narrator)
 
         let successful = await brain.answerSeed(
             prompt: "What is my safe spend today?",
@@ -2168,7 +2159,7 @@ struct MarinaSemanticPromptSuiteTests {
 
     @Test func brain_completedAnswerCombinesStreamedNarrationWithSeed() async throws {
         let fixture = try makeFixture()
-        let brain = MarinaBrain(interpreter: MarinaRuleBasedInterpreter())
+        let brain = legacyRuleBasedBrain()
         let seed = await brain.answerSeed(
             prompt: "What is my safe spend today?",
             workspace: fixture.workspace,
@@ -2188,7 +2179,7 @@ struct MarinaSemanticPromptSuiteTests {
 
     @Test func homeMetricParity_matchesCardCategoryAvailabilityIncomeAndNextPlannedCalculators() async throws {
         let fixture = try makeFixture()
-        let brain = MarinaBrain(interpreter: MarinaRuleBasedInterpreter())
+        let brain = legacyRuleBasedBrain()
         let homeContext = MarinaPanelHomeContext(dateRange: fixture.currentRange)
         let snapshot = try MarinaWorkspaceSnapshotProvider().snapshot(
             for: fixture.workspace,
@@ -2263,7 +2254,7 @@ struct MarinaSemanticPromptSuiteTests {
 
     @Test func homeMetricParity_honorsFutureExclusionButKeepsNextPlannedUnfiltered() async throws {
         let fixture = try makeFixture()
-        let brain = MarinaBrain(interpreter: MarinaRuleBasedInterpreter())
+        let brain = legacyRuleBasedBrain()
         let includeFutureContext = MarinaPanelHomeContext(dateRange: fixture.currentRange)
         let excludeFutureContext = MarinaPanelHomeContext(
             dateRange: fixture.currentRange,
@@ -2306,7 +2297,7 @@ struct MarinaSemanticPromptSuiteTests {
         fixture.context.insert(orphan)
         try fixture.context.save()
 
-        let brain = MarinaBrain(interpreter: MarinaRuleBasedInterpreter())
+        let brain = legacyRuleBasedBrain()
         let answer = await answer("Summarize my Apple Card.", using: brain, fixture: fixture)
         #expect(answer.primaryValue == CurrencyFormatter.string(from: 1_370))
     }
@@ -2314,7 +2305,7 @@ struct MarinaSemanticPromptSuiteTests {
     @Test func categoryAvailabilityList_returnsFilteredOverCategories() async throws {
         let fixture = try makeFixture(includeTransportationCategory: true)
         try addCategoryAvailabilityListScenario(to: fixture)
-        let brain = MarinaBrain(interpreter: MarinaRuleBasedInterpreter())
+        let brain = legacyRuleBasedBrain()
         let expected = try expectedCategoryAvailabilityNames(fixture: fixture, filter: .over, limit: 5)
 
         let answer = await answer("Which 5 categories are over limit?", using: brain, fixture: fixture)
@@ -2329,7 +2320,7 @@ struct MarinaSemanticPromptSuiteTests {
     @Test func categoryAvailabilityList_returnsNearAndUnderLimitCategories() async throws {
         let fixture = try makeFixture(includeTransportationCategory: true)
         try addCategoryAvailabilityListScenario(to: fixture)
-        let brain = MarinaBrain(interpreter: MarinaRuleBasedInterpreter())
+        let brain = legacyRuleBasedBrain()
 
         let near = await answer("Which categories are near limit?", using: brain, fixture: fixture)
         let expectedNear = try expectedCategoryAvailabilityNames(fixture: fixture, filter: .near, limit: 5)
@@ -2349,7 +2340,7 @@ struct MarinaSemanticPromptSuiteTests {
     @Test func categoryAvailabilityFollowUp_usesPreviousAvailabilityAnswer() async throws {
         let fixture = try makeFixture(includeTransportationCategory: true)
         try addCategoryAvailabilityListScenario(to: fixture)
-        let brain = MarinaBrain(interpreter: MarinaRuleBasedInterpreter())
+        let brain = legacyRuleBasedBrain()
         let summary = await answer("Show category availability.", using: brain, fixture: fixture)
         let context = MarinaConversationContext(recentAnswers: [summary])
 
@@ -2369,7 +2360,7 @@ struct MarinaSemanticPromptSuiteTests {
 
     @Test func semanticContext_persistsAndSurvivesStreamingNarrationReplacement() async throws {
         let fixture = try makeFixture()
-        let brain = MarinaBrain(interpreter: MarinaRuleBasedInterpreter())
+        let brain = legacyRuleBasedBrain()
         let seed = await brain.answerSeed(
             prompt: "Summarize my Apple Card.",
             workspace: fixture.workspace,
@@ -2412,7 +2403,7 @@ struct MarinaSemanticPromptSuiteTests {
 
     @Test func recommendedFollowUpConfirmation_yesExecutesStoredRequestAndKeepsVisiblePrompt() async throws {
         let fixture = try makeFixture()
-        let brain = MarinaBrain(interpreter: MarinaRuleBasedInterpreter())
+        let brain = legacyRuleBasedBrain()
         let summary = await answer("How is income progress?", using: brain, fixture: fixture)
         let context = MarinaConversationContext(recentAnswers: [summary])
 
@@ -2432,7 +2423,7 @@ struct MarinaSemanticPromptSuiteTests {
 
     @Test func recommendedFollowUpConfirmation_noReturnsCasualMessageWithoutQuery() async throws {
         let fixture = try makeFixture()
-        let brain = MarinaBrain(interpreter: MarinaRuleBasedInterpreter())
+        let brain = legacyRuleBasedBrain()
         let summary = await answer("How is income progress?", using: brain, fixture: fixture)
 
         let no = await answer(
@@ -2481,7 +2472,7 @@ struct MarinaSemanticPromptSuiteTests {
 
     @Test func spendTrendsRecommendedFollowUpsDrillIntoExpenseRowsAfterComparison() async throws {
         let fixture = try makeFixture()
-        let brain = MarinaBrain(interpreter: MarinaRuleBasedInterpreter())
+        let brain = legacyRuleBasedBrain()
         let trends = await answer("Show my spend trends.", using: brain, fixture: fixture)
         let trendsContext = MarinaConversationContext(recentAnswers: [trends])
 
@@ -2511,7 +2502,7 @@ struct MarinaSemanticPromptSuiteTests {
 
     @Test func spendTrendsExpenseDriverPromptRoutesToExpenseRows() async throws {
         let fixture = try makeFixture()
-        let brain = MarinaBrain(interpreter: MarinaRuleBasedInterpreter())
+        let brain = legacyRuleBasedBrain()
 
         let answer = await answer("See the expenses driving my spend trends.", using: brain, fixture: fixture)
 
@@ -2525,7 +2516,7 @@ struct MarinaSemanticPromptSuiteTests {
 
     @Test func comparisonDriverPromptsKeepCategoryDriversUnlessExpensesAreExplicit() async throws {
         let fixture = try makeFixture()
-        let brain = MarinaBrain(interpreter: MarinaRuleBasedInterpreter())
+        let brain = legacyRuleBasedBrain()
         let comparison = await answer("Compare this budget period to last period.", using: brain, fixture: fixture)
         let context = MarinaConversationContext(recentAnswers: [comparison])
 
@@ -2590,7 +2581,7 @@ struct MarinaSemanticPromptSuiteTests {
 
     @Test func followUpResolver_drillsDownAndCorrectsCardAnswers() async throws {
         let fixture = try makeFixture()
-        let brain = MarinaBrain(interpreter: MarinaRuleBasedInterpreter())
+        let brain = legacyRuleBasedBrain()
         let summary = await answer("Summarize my Apple Card.", using: brain, fixture: fixture)
         let context = MarinaConversationContext(recentAnswers: [summary])
 
@@ -2612,7 +2603,7 @@ struct MarinaSemanticPromptSuiteTests {
 
     @Test func followUpResolver_completeStandaloneExpenseListDoesNotInheritRecentCardContext() async throws {
         let fixture = try makeFixture()
-        let brain = MarinaBrain(interpreter: MarinaRuleBasedInterpreter())
+        let brain = legacyRuleBasedBrain()
         let summary = await answer("Summarize my Apple Card.", using: brain, fixture: fixture)
         let context = MarinaConversationContext(recentAnswers: [summary])
 
@@ -2633,7 +2624,7 @@ struct MarinaSemanticPromptSuiteTests {
 
     @Test func followUpResolver_drillsFromCategoryAvailabilityIntoCategoryTransactions() async throws {
         let fixture = try makeFixture()
-        let brain = MarinaBrain(interpreter: MarinaRuleBasedInterpreter())
+        let brain = legacyRuleBasedBrain()
         let availability = await answer("Show category availability.", using: brain, fixture: fixture)
         let context = MarinaConversationContext(recentAnswers: [availability])
 
@@ -2646,7 +2637,7 @@ struct MarinaSemanticPromptSuiteTests {
 
     @Test func followUpResolver_refinesExpenseIncomeSavingsReconciliationAndPresetAnswers() async throws {
         let fixture = try makeFixture()
-        let brain = MarinaBrain(interpreter: MarinaRuleBasedInterpreter())
+        let brain = legacyRuleBasedBrain()
 
         let targetSpend = await answer("Target spend", using: brain, fixture: fixture)
         let targetDetails = await answer(
@@ -2702,7 +2693,7 @@ struct MarinaSemanticPromptSuiteTests {
 
     @Test func followUpResolver_comparisonDriversAndAmbiguousCorrectionsStayDeterministic() async throws {
         let fixture = try makeFixture(includeAppleMerchantExpense: true)
-        let brain = MarinaBrain(interpreter: MarinaRuleBasedInterpreter())
+        let brain = legacyRuleBasedBrain()
 
         let comparison = await answer("Compare this budget period to last period.", using: brain, fixture: fixture)
         let drivers = await answer(
@@ -2734,7 +2725,7 @@ struct MarinaSemanticPromptSuiteTests {
 
     @Test func categoryAvailabilityList_emptyStatesAreSpecific() async throws {
         let fixture = try makeFixture()
-        let brain = MarinaBrain(interpreter: MarinaRuleBasedInterpreter())
+        let brain = legacyRuleBasedBrain()
         let may = HomeQueryDateRange(startDate: date(2026, 5, 1), endDate: date(2026, 5, 31))
 
         let noBudget = await answer(
@@ -2755,7 +2746,7 @@ struct MarinaSemanticPromptSuiteTests {
 
     @Test func safeSpendWhatIf_uncappedCategoriesUseBaseRoom() async throws {
         let fixture = try makeFixture(includeAppleMerchantExpense: false)
-        let brain = MarinaBrain(interpreter: MarinaRuleBasedInterpreter())
+        let brain = legacyRuleBasedBrain()
 
         let answer = await answer("If I spend $5 on Groceries, what happens to my safe spend?", using: brain, fixture: fixture)
 
@@ -2785,7 +2776,7 @@ struct MarinaSemanticPromptSuiteTests {
         fixture.context.insert(billsLimit)
         try fixture.context.save()
 
-        let brain = MarinaBrain(interpreter: MarinaRuleBasedInterpreter())
+        let brain = legacyRuleBasedBrain()
         let answer = await answer("If I spend $5 on Groceries, what happens to my safe spend?", using: brain, fixture: fixture)
 
         #expect(answer.kind == .comparison)
@@ -2858,6 +2849,16 @@ struct MarinaSemanticPromptSuiteTests {
             homeContext: MarinaPanelHomeContext(dateRange: fixture.currentRange),
             defaultBudgetingPeriod: .monthly,
             now: fixture.now
+        )
+    }
+
+    private func legacyRuleBasedBrain(
+        insightNarrator: (any MarinaInsightNarrating)? = nil
+    ) -> MarinaBrain {
+        MarinaBrain(
+            interpreter: MarinaRuleBasedInterpreter(),
+            insightNarrator: insightNarrator,
+            universalRoutingPolicyProvider: { .disabled }
         )
     }
 
