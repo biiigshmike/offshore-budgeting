@@ -181,7 +181,11 @@ struct MarinaUniversalRoutingHarness {
              .budgetProjectedSpend,
              .budgetPaceDifference,
              .budgetCoverageRatio,
-             .incomeCoverageRatio:
+             .incomeCoverageRatio,
+             .categoryAvailability,
+             .categoryConcentration,
+             .presetRecurringBurden,
+             .forecastSavings:
             return true
         case .merchantVariableSpend,
              .categoryVariableSpend,

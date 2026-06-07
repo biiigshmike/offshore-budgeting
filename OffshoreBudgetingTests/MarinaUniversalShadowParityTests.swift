@@ -374,6 +374,101 @@ struct MarinaUniversalShadowParityTests {
         )
     }
 
+    @Test func categoryAvailabilityFormulaMatchesLegacyExecutorTypedRows() {
+        let fixture = makeFixture()
+        let request = semanticRequest(
+            entity: .category,
+            operation: .forecast,
+            measure: .categoryAvailability,
+            dateRangeToken: .currentMonth
+        )
+        let legacy = fixture.harness.runLegacy(request: request, context: fixture.context())
+        let universal = fixture.harness.runUniversal(request: request, context: fixture.context())
+
+        guard case let .metric(metric) = universal else {
+            Issue.record("Expected universal category availability metric, got \(universal).")
+            return
+        }
+
+        #expect(detailValue(.overCount, in: metric) == rowInteger("Over", in: legacy))
+        #expect(detailValue(.nearCount, in: metric) == rowInteger("Near", in: legacy))
+        #expect(detailValue(.categoryCount, in: metric) == rowInteger("Categories", in: legacy))
+    }
+
+    @Test func categoryConcentrationFormulaMatchesLegacyExecutorTypedRows() {
+        let fixture = makeFixture()
+        let request = semanticRequest(
+            entity: .category,
+            operation: .share,
+            measure: .concentration,
+            dateRangeToken: .currentMonth
+        )
+        let legacy = fixture.harness.runLegacy(request: request, context: fixture.context())
+        let universal = fixture.harness.runUniversal(request: request, context: fixture.context())
+
+        guard case let .metric(metric) = universal else {
+            Issue.record("Expected universal category concentration metric, got \(universal).")
+            return
+        }
+
+        #expect(detailValue(.category, in: metric) == .text(legacy.rows.first(where: { $0.title == "Category" })?.value ?? ""))
+        expectOptionalNumber(numericValue(detailValue(.categorySpend, in: metric)), legacy.rows.first(where: { $0.title == "Category spend" })?.amount, scenario: "Category concentration spend")
+        expectOptionalNumber(numericValue(detailValue(.totalSpend, in: metric)), legacy.rows.first(where: { $0.title == "Total spend" })?.amount, scenario: "Category concentration total")
+        expectOptionalNumber(numericValue(metric.value), legacy.rows.first(where: { $0.title == "Concentration" })?.amount, scenario: "Category concentration ratio")
+    }
+
+    @Test func recurringBurdenFormulaMatchesLegacyExecutorTypedRows() {
+        let fixture = makeFixture()
+        let request = semanticRequest(
+            entity: .preset,
+            operation: .sum,
+            measure: .recurringBurden,
+            dateRangeToken: .currentMonth
+        )
+        let legacy = fixture.harness.runLegacy(request: request, context: fixture.context())
+        let universal = fixture.harness.runUniversal(request: request, context: fixture.context())
+
+        guard case let .metric(metric) = universal else {
+            Issue.record("Expected universal recurring burden metric, got \(universal).")
+            return
+        }
+
+        expectOptionalNumber(numericValue(detailValue(.recurringTotal, in: metric)), legacy.rows.first(where: { $0.title == "Recurring total" })?.amount, scenario: "Recurring burden total")
+        expectOptionalNumber(numericValue(detailValue(.plannedExpenses, in: metric)), legacy.rows.first(where: { $0.title == "Planned expenses" })?.amount, scenario: "Recurring burden planned expenses")
+        expectOptionalNumber(numericValue(metric.value), legacy.rows.first(where: { $0.title == "Recurring burden" })?.amount, scenario: "Recurring burden ratio")
+    }
+
+    @Test func forecastSavingsFormulaMatchesDeterministicLegacyCalculatorFacts() {
+        let fixture = makeFixture()
+        let request = semanticRequest(
+            entity: .savingsAccount,
+            operation: .forecast,
+            measure: .savingsTotal,
+            dateRangeToken: .currentMonth
+        )
+        let range = HomeQueryDateRange(startDate: date(2026, 6, 1), endDate: date(2026, 6, 30))
+        let legacy = fixture.harness.runLegacy(request: request, context: fixture.context())
+        let universal = fixture.harness.runUniversal(request: request, context: fixture.context())
+        let summary = MarinaSavingsForecastCalculator.calculate(
+            range: range,
+            incomes: fixture.snapshot.incomes,
+            plannedExpenses: fixture.snapshot.homeCalculationPlannedExpenses,
+            variableExpenses: fixture.snapshot.homeCalculationVariableExpenses,
+            savingsEntries: fixture.snapshot.savingsEntries
+        )
+
+        guard case let .metric(metric) = universal else {
+            Issue.record("Expected universal forecast savings metric, got \(universal).")
+            return
+        }
+
+        #expect(metric.value == .money(summary.projectedSavings))
+        #expect(detailValue(.projectedSavings, in: metric) == .money(summary.projectedSavings))
+        #expect(detailValue(.actualSavings, in: metric) == .money(summary.actualSavings))
+        #expect(detailValue(.gapToProjected, in: metric) == .money(summary.gapToProjected))
+        #expect(detailValue(.forecastStatus, in: metric) == legacy.rows.first(where: { $0.title == "Status" }).map { .text($0.value) })
+    }
+
     private func makeFixture() -> MarinaUniversalShadowParityFixture {
         let workspace = Workspace(name: "Personal", hexColor: "#3B82F6")
         let appleCard = Card(name: "Apple Card", theme: "ruby", effect: "plastic", workspace: workspace)
@@ -588,6 +683,50 @@ struct MarinaUniversalShadowParityTests {
             incomeState: incomeState,
             expectedAnswerShape: shape
         )
+    }
+
+    private func detailValue(
+        _ component: MarinaFormulaMetricComponent,
+        in metric: MarinaUniversalMetricResult
+    ) -> MarinaValue? {
+        metric.details.first { $0.component == component }?.value
+    }
+
+    private func rowInteger(_ title: String, in result: MarinaExecutionResult) -> MarinaValue? {
+        guard let value = result.rows.first(where: { $0.title == title })?.value,
+              let integer = Int(value) else {
+            return nil
+        }
+        return .integer(integer)
+    }
+
+    private func numericValue(_ value: MarinaValue?) -> Double? {
+        switch value {
+        case let .money(value)?:
+            return value
+        case let .number(value)?:
+            return value
+        case let .integer(value)?:
+            return Double(value)
+        case .text, .date, .boolean, .colorHex, .empty, nil:
+            return nil
+        }
+    }
+
+    private func expectOptionalNumber(
+        _ left: Double?,
+        _ right: Double?,
+        scenario: String,
+        accuracy: Double = 0.01
+    ) {
+        switch (left, right) {
+        case let (left?, right?):
+            #expect(abs(left - right) <= accuracy, "\(scenario) mismatch: \(left) vs \(right)")
+        case (nil, nil):
+            break
+        default:
+            Issue.record("\(scenario) optional number mismatch: \(String(describing: left)) vs \(String(describing: right)).")
+        }
     }
 
     private var calendar: Calendar {

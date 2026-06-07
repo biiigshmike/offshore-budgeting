@@ -1123,7 +1123,7 @@ struct HomeQueryEngine {
             rows: [
                 HomeAnswerRow(title: "Projected savings", value: currency(totals.projectedSavings)),
                 HomeAnswerRow(title: "Actual savings", value: currency(totals.actualSavings)),
-                HomeAnswerRow(title: "Gap vs projected", value: deltaSummary(totals.actualSavings - totals.projectedSavings))
+                HomeAnswerRow(title: "Gap vs projected", value: deltaSummary(totals.gapToProjected))
             ]
         )
     }
@@ -2241,16 +2241,6 @@ struct HomeQueryEngine {
             )
         }
 
-        let gap = totals.actualSavings - totals.projectedSavings
-        let statusLine: String
-        if totals.projectedSavings < 0 {
-            statusLine = "Overspending forecast for this period."
-        } else if totals.actualSavings < 0 {
-            statusLine = "Current actual savings are negative."
-        } else {
-            statusLine = "Forecast is currently on track."
-        }
-
         return HomeAnswer(
             queryID: query.id,
             kind: .metric,
@@ -2260,8 +2250,8 @@ struct HomeQueryEngine {
             rows: [
                 HomeAnswerRow(title: "Projected savings", value: currency(totals.projectedSavings)),
                 HomeAnswerRow(title: "Actual savings", value: currency(totals.actualSavings)),
-                HomeAnswerRow(title: "Gap to projected", value: deltaSummary(gap)),
-                HomeAnswerRow(title: "Status", value: statusLine)
+                HomeAnswerRow(title: "Gap to projected", value: deltaSummary(totals.gapToProjected)),
+                HomeAnswerRow(title: "Status", value: totals.statusLine)
             ]
         )
     }
@@ -3112,43 +3102,25 @@ struct HomeQueryEngine {
     ) -> (
         projectedSavings: Double,
         actualSavings: Double,
+        gapToProjected: Double,
+        statusLine: String,
         hasActivity: Bool
     ) {
-        let plannedIncomeTotal = incomes
-            .filter { $0.isPlanned && $0.date >= range.startDate && $0.date <= range.endDate }
-            .reduce(0.0) { $0 + $1.amount }
-
-        let actualIncomeTotal = incomes
-            .filter { $0.isPlanned == false && $0.date >= range.startDate && $0.date <= range.endDate }
-            .reduce(0.0) { $0 + $1.amount }
-
-        let plannedExpensesPlannedTotal = plannedExpenses
-            .filter { $0.expenseDate >= range.startDate && $0.expenseDate <= range.endDate }
-            .reduce(0.0) { $0 + SavingsMathService.plannedProjectedBudgetImpactAmount(for: $1) }
-
-        let plannedExpensesEffectiveActualTotal = plannedExpenses
-            .filter { $0.expenseDate >= range.startDate && $0.expenseDate <= range.endDate }
-            .reduce(0.0) { $0 + SavingsMathService.plannedBudgetImpactAmount(for: $1) }
-
-        let variableExpensesTotal = variableExpenses
-            .filter { $0.transactionDate >= range.startDate && $0.transactionDate <= range.endDate }
-            .reduce(0.0) { $0 + SavingsMathService.variableBudgetImpactAmount(for: $1) }
-        let actualSavingsAdjustments = SavingsMathService.actualSavingsAdjustmentTotal(
-            from: savingsEntries,
-            startDate: range.startDate,
-            endDate: range.endDate
+        let summary = MarinaSavingsForecastCalculator.calculate(
+            range: range,
+            incomes: incomes,
+            plannedExpenses: plannedExpenses,
+            variableExpenses: variableExpenses,
+            savingsEntries: savingsEntries
         )
 
-        let projectedSavings = plannedIncomeTotal - plannedExpensesPlannedTotal
-        let actualSavings = actualIncomeTotal - (plannedExpensesEffectiveActualTotal + variableExpensesTotal) + actualSavingsAdjustments
-        let hasActivity = plannedIncomeTotal != 0
-            || actualIncomeTotal != 0
-            || plannedExpensesPlannedTotal != 0
-            || plannedExpensesEffectiveActualTotal != 0
-            || variableExpensesTotal != 0
-            || actualSavingsAdjustments != 0
-
-        return (projectedSavings, actualSavings, hasActivity)
+        return (
+            summary.projectedSavings,
+            summary.actualSavings,
+            summary.gapToProjected,
+            summary.statusLine,
+            summary.hasActivity
+        )
     }
 
     private func monthRange(containing date: Date) -> HomeQueryDateRange {

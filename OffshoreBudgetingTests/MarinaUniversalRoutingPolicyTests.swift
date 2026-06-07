@@ -265,31 +265,89 @@ struct MarinaUniversalRoutingPolicyTests {
         #expect(policy.allows(request))
     }
 
-    @Test func deferredMeasuresAreNotAllowlisted() {
+    @Test func categoryFormulasMapOnlyExactMetricScenarios() {
+        let availability = semanticRequest(
+            entity: .category,
+            operation: .forecast,
+            measure: .categoryAvailability
+        )
+        let concentration = semanticRequest(
+            entity: .category,
+            operation: .share,
+            measure: .concentration
+        )
+
+        #expect(policy.scenario(for: availability) == .categoryAvailability)
+        #expect(policy.scenario(for: concentration) == .categoryConcentration)
+        #expect(policy.allows(availability))
+        #expect(policy.allows(concentration))
+    }
+
+    @Test func remainingFormulaShapesMapOnlyExactMetricScenarios() {
+        let recurringBurden = semanticRequest(
+            entity: .preset,
+            operation: .sum,
+            measure: .recurringBurden
+        )
+        let forecastSavings = semanticRequest(
+            entity: .savingsAccount,
+            operation: .forecast,
+            measure: .savingsTotal
+        )
+
+        #expect(policy.scenario(for: recurringBurden) == .presetRecurringBurden)
+        #expect(policy.scenario(for: forecastSavings) == .forecastSavings)
+        #expect(policy.allows(recurringBurden))
+        #expect(policy.allows(forecastSavings))
+    }
+
+    @Test func remainingFormulaVariantsAreNotAllowlisted() {
         let requests = [
-            semanticRequest(
-                entity: .category,
-                operation: .forecast,
-                measure: .categoryAvailability
-            ),
-            semanticRequest(
-                entity: .category,
-                operation: .share,
-                measure: .concentration
-            ),
-            semanticRequest(
-                entity: .preset,
-                operation: .sum,
-                measure: .recurringBurden
-            ),
-            semanticRequest(
-                entity: .savingsAccount,
-                operation: .forecast,
-                measure: .savingsTotal
-            )
+            semanticRequest(entity: .preset, operation: .forecast, measure: .recurringBurden),
+            semanticRequest(entity: .preset, operation: .sum, measure: .recurringBurden, dateRangeToken: .allTime),
+            semanticRequest(entity: .preset, operation: .sum, measure: .recurringBurden, targetName: "Phone"),
+            semanticRequest(entity: .preset, operation: .sum, measure: .recurringBurden, sort: .amountDescending),
+            semanticRequest(entity: .preset, operation: .sum, measure: .recurringBurden, shape: .list),
+            semanticRequest(entity: .savingsAccount, operation: .whatIf, measure: .savingsTotal),
+            semanticRequest(entity: .savingsAccount, operation: .forecast, measure: .savingsTotal, dateRangeToken: .allTime),
+            semanticRequest(entity: .savingsAccount, operation: .forecast, measure: .savingsTotal, targetName: "Savings Account"),
+            semanticRequest(entity: .savingsAccount, operation: .forecast, measure: .savingsTotal, sort: .amountDescending),
+            semanticRequest(entity: .savingsAccount, operation: .forecast, measure: .savingsTotal, shape: .list)
         ]
 
         for request in requests {
+            #expect(policy.scenario(for: request) == nil)
+            #expect(policy.allows(request) == false)
+        }
+    }
+
+    @Test func categoryFormulaVariantsAreNotAllowlisted() {
+        let listAvailability = semanticRequest(
+            entity: .category,
+            operation: .list,
+            measure: .categoryAvailability,
+            shape: .list
+        )
+        let filteredAvailability = semanticRequest(
+            entity: .category,
+            operation: .forecast,
+            measure: .categoryAvailability,
+            categoryAvailabilityFilter: .over
+        )
+        let targetedConcentration = semanticRequest(
+            entity: .category,
+            operation: .share,
+            measure: .concentration,
+            targetName: "Groceries"
+        )
+        let allTimeConcentration = semanticRequest(
+            entity: .category,
+            operation: .share,
+            measure: .concentration,
+            dateRangeToken: .allTime
+        )
+
+        for request in [listAvailability, filteredAvailability, targetedConcentration, allTimeConcentration] {
             #expect(policy.scenario(for: request) == nil)
             #expect(policy.allows(request) == false)
         }
@@ -478,6 +536,7 @@ struct MarinaUniversalRoutingPolicyTests {
         sort: MarinaSemanticSort? = nil,
         expenseScope: MarinaSemanticExpenseScope? = nil,
         incomeState: MarinaSemanticIncomeState? = nil,
+        categoryAvailabilityFilter: MarinaCategoryAvailabilityFilter? = nil,
         shape: MarinaSemanticAnswerShape = .metric
     ) -> MarinaSemanticRequest {
         MarinaSemanticRequest(
@@ -492,6 +551,7 @@ struct MarinaUniversalRoutingPolicyTests {
             sort: sort,
             expenseScope: expenseScope,
             incomeState: incomeState,
+            categoryAvailabilityFilter: categoryAvailabilityFilter,
             expectedAnswerShape: shape
         )
     }

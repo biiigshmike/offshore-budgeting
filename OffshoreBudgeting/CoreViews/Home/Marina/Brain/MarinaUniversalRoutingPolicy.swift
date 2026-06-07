@@ -21,6 +21,10 @@ enum MarinaUniversalRoutingScenario: String, Codable, CaseIterable, Equatable, H
     case budgetPaceDifference
     case budgetCoverageRatio
     case incomeCoverageRatio
+    case categoryAvailability
+    case categoryConcentration
+    case presetRecurringBurden
+    case forecastSavings
 }
 
 struct MarinaUniversalRoutingPolicy: Equatable, Sendable {
@@ -58,7 +62,11 @@ struct MarinaUniversalRoutingPolicy: Equatable, Sendable {
             return reconciliationScenario(for: request)
         case .budget:
             return budgetScenario(for: request)
-        case .workspace, .card, .category, .preset:
+        case .category:
+            return categoryScenario(for: request)
+        case .preset:
+            return presetScenario(for: request)
+        case .workspace, .card:
             return nil
         }
     }
@@ -212,6 +220,16 @@ struct MarinaUniversalRoutingPolicy: Equatable, Sendable {
     }
 
     private func savingsScenario(for request: MarinaSemanticRequest) -> MarinaUniversalRoutingScenario? {
+        if request.operation == .forecast,
+           request.measure == .savingsTotal,
+           request.expectedAnswerShape == .metric,
+           exactDimensions(request, []),
+           hasNoNamedTargets(request),
+           request.dateRangeToken != .allTime,
+           request.sort == nil {
+            return .forecastSavings
+        }
+
         guard request.operation == .sum,
               request.measure == .savingsTotal,
               request.expectedAnswerShape == .metric,
@@ -223,6 +241,19 @@ struct MarinaUniversalRoutingPolicy: Equatable, Sendable {
             return nil
         }
         return .savingsTotalExplicitAccount
+    }
+
+    private func presetScenario(for request: MarinaSemanticRequest) -> MarinaUniversalRoutingScenario? {
+        guard request.operation == .sum,
+              request.measure == .recurringBurden,
+              request.expectedAnswerShape == .metric,
+              exactDimensions(request, []),
+              hasNoNamedTargets(request),
+              request.dateRangeToken != .allTime,
+              request.sort == nil else {
+            return nil
+        }
+        return .presetRecurringBurden
     }
 
     private func reconciliationScenario(for request: MarinaSemanticRequest) -> MarinaUniversalRoutingScenario? {
@@ -260,6 +291,25 @@ struct MarinaUniversalRoutingPolicy: Equatable, Sendable {
             return .budgetPaceDifference
         case (.forecast, .coverageRatio, .metric):
             return .budgetCoverageRatio
+        default:
+            return nil
+        }
+    }
+
+    private func categoryScenario(for request: MarinaSemanticRequest) -> MarinaUniversalRoutingScenario? {
+        guard exactDimensions(request, []),
+              hasNoNamedTargets(request),
+              request.dateRangeToken != .allTime,
+              request.sort == nil,
+              request.categoryAvailabilityFilter == nil else {
+            return nil
+        }
+
+        switch (request.operation, request.measure, request.expectedAnswerShape) {
+        case (.forecast, .categoryAvailability, .metric):
+            return .categoryAvailability
+        case (.share, .concentration, .metric):
+            return .categoryConcentration
         default:
             return nil
         }
@@ -332,7 +382,11 @@ extension MarinaUniversalRoutingPolicy {
             .budgetProjectedSpend,
             .budgetPaceDifference,
             .budgetCoverageRatio,
-            .incomeCoverageRatio
+            .incomeCoverageRatio,
+            .categoryAvailability,
+            .categoryConcentration,
+            .presetRecurringBurden,
+            .forecastSavings
         ]
     )
 }

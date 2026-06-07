@@ -49,9 +49,9 @@ struct MarinaUniversalRoutingDebugFormatterTests {
 
     @Test func notAllowlistedFallbackSummaryShowsNoScenarioWhenUnmapped() {
         let diagnostics = MarinaUniversalRoutingDiagnostics(
-            requestEntity: .category,
+            requestEntity: .savingsAccount,
             operation: .forecast,
-            measure: .categoryAvailability,
+            measure: .savingsTotal,
             usedUniversal: false,
             fallbackReason: .notAllowlisted,
             notes: ["Request is not allowlisted for universal routing."]
@@ -61,9 +61,9 @@ struct MarinaUniversalRoutingDebugFormatterTests {
 
         #expect(summary.contains("Universal: fallback"))
         #expect(summary.contains("Scenario: none"))
-        #expect(summary.contains("Entity: category"))
+        #expect(summary.contains("Entity: savingsAccount"))
         #expect(summary.contains("Operation: forecast"))
-        #expect(summary.contains("Measure: categoryAvailability"))
+        #expect(summary.contains("Measure: savingsTotal"))
         #expect(summary.contains("Fallback: notAllowlisted"))
     }
 

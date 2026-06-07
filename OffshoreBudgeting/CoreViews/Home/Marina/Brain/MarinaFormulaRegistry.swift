@@ -52,12 +52,14 @@ struct MarinaFormulaGroup: Equatable, Sendable {
 
 enum MarinaFormulaSource: String, Codable, Equatable, Sendable {
     case homeQueryEngine
+    case marinaSavingsForecastCalculator
     case savingsMathService
     case savingsAccountService
     case allocationLedgerService
     case marinaBudgetFormulaCalculator
     case safeSpendTodayCalculator
     case homeCategoryLimitsAggregator
+    case homeCategoryMetricsCalculator
     case rowBackedFallback
 }
 
@@ -105,6 +107,9 @@ struct MarinaFormulaRegistry: Sendable {
 
         switch request.measure {
         case .savingsTotal:
+            if request.surface == .semantic(.savingsAccount), request.operation == .forecast {
+                return forecastSavingsMetric(request: request, snapshot: snapshot)
+            }
             return savingsTotal(request: request, snapshot: snapshot)
         case .reconciliationBalance:
             return reconciliationBalance(request: request, snapshot: snapshot)
@@ -115,15 +120,17 @@ struct MarinaFormulaRegistry: Sendable {
              .paceDifference,
              .coverageRatio:
             return budgetPaceMetric(request: request, snapshot: snapshot)
+        case .categoryAvailability,
+             .concentration:
+            return categoryMetric(request: request, snapshot: snapshot)
+        case .recurringBurden:
+            return recurringBurdenMetric(request: request, snapshot: snapshot)
         case .amount,
              .plannedAmount,
              .actualAmount,
              .effectiveAmount,
              .budgetImpact,
              .incomeAmount,
-             .categoryAvailability,
-             .recurringBurden,
-             .concentration,
              .color,
              .name:
             return .unsupported(.measureNotAvailable)
@@ -135,8 +142,9 @@ struct MarinaFormulaRegistry: Sendable {
         surface: MarinaUniversalEntitySurface
     ) -> Set<MarinaSemanticOperation> {
         switch (surface, measure) {
-        case (.semantic(.savingsAccount), .savingsTotal),
-             (.semantic(.reconciliationAccount), .reconciliationBalance):
+        case (.semantic(.savingsAccount), .savingsTotal):
+            return [.sum, .forecast]
+        case (.semantic(.reconciliationAccount), .reconciliationBalance):
             return [.sum]
         case (.semantic(.budget), .remainingRoom),
              (.semantic(.budget), .safeDailySpend):
@@ -151,6 +159,12 @@ struct MarinaFormulaRegistry: Sendable {
             return [.forecast]
         case (.semantic(.income), .coverageRatio):
             return [.share]
+        case (.semantic(.category), .categoryAvailability):
+            return [.forecast]
+        case (.semantic(.category), .concentration):
+            return [.share]
+        case (.semantic(.preset), .recurringBurden):
+            return [.sum]
         case (.semantic(_), _),
              (.unifiedExpenses, _),
              (.savingsLedgerEntries, _),
@@ -397,16 +411,208 @@ struct MarinaFormulaRegistry: Sendable {
         value: MarinaValue,
         request: MarinaFormulaRequest,
         evidenceRows: [MarinaQueryableRow],
-        details: [MarinaFormulaMetricDetail]
+        details: [MarinaFormulaMetricDetail],
+        source: MarinaFormulaSource = .marinaBudgetFormulaCalculator
     ) -> MarinaFormulaResult {
         .metric(
             MarinaFormulaMetric(
                 value: value,
                 evidenceRows: evidenceRows,
                 measure: request.measure,
-                source: .marinaBudgetFormulaCalculator,
+                source: source,
                 details: details
             )
+        )
+    }
+
+    private func categoryMetric(
+        request: MarinaFormulaRequest,
+        snapshot: MarinaWorkspaceSnapshot
+    ) -> MarinaFormulaResult {
+        guard let dateRange = request.dateRange else {
+            return .unsupported(.missingDateField)
+        }
+
+        switch request.measure {
+        case .categoryAvailability:
+            return categoryAvailabilityMetric(request: request, snapshot: snapshot, dateRange: dateRange)
+        case .concentration:
+            return categoryConcentrationMetric(request: request, snapshot: snapshot, dateRange: dateRange)
+        case .amount,
+             .plannedAmount,
+             .actualAmount,
+             .effectiveAmount,
+             .budgetImpact,
+             .savingsTotal,
+             .incomeAmount,
+             .reconciliationBalance,
+             .remainingRoom,
+             .burnRate,
+             .projectedSpend,
+             .safeDailySpend,
+             .paceDifference,
+             .coverageRatio,
+             .recurringBurden,
+             .color,
+             .name:
+            return .unsupported(.measureNotAvailable)
+        }
+    }
+
+    private func categoryAvailabilityMetric(
+        request: MarinaFormulaRequest,
+        snapshot: MarinaWorkspaceSnapshot,
+        dateRange: HomeQueryDateRange
+    ) -> MarinaFormulaResult {
+        let result = HomeCategoryLimitsAggregator.build(
+            budgets: snapshot.budgets,
+            categories: snapshot.categories,
+            plannedExpenses: snapshot.homeCalculationPlannedExpenses,
+            variableExpenses: snapshot.homeCalculationVariableExpenses,
+            rangeStart: dateRange.startDate,
+            rangeEnd: dateRange.endDate,
+            calendar: calendar
+        )
+
+        guard let activeBudget = result.activeBudget,
+              result.metrics.isEmpty == false else {
+            return .unsupported(.unsupportedCombination)
+        }
+
+        return metric(
+            value: .integer(result.metrics.count),
+            request: request,
+            evidenceRows: [],
+            details: [
+                .init(.activeBudget, value: .text(activeBudget.name)),
+                .init(.overCount, value: .integer(result.overCount), style: .integer),
+                .init(.nearCount, value: .integer(result.nearCount), style: .integer),
+                .init(.categoryCount, value: .integer(result.metrics.count), style: .integer)
+            ],
+            source: .homeCategoryLimitsAggregator
+        )
+    }
+
+    private func categoryConcentrationMetric(
+        request: MarinaFormulaRequest,
+        snapshot: MarinaWorkspaceSnapshot,
+        dateRange: HomeQueryDateRange
+    ) -> MarinaFormulaResult {
+        let result = HomeCategoryMetricsCalculator.calculate(
+            categories: snapshot.categories,
+            plannedExpenses: snapshot.homeCalculationPlannedExpenses,
+            variableExpenses: snapshot.homeCalculationVariableExpenses,
+            rangeStart: dateRange.startDate,
+            rangeEnd: dateRange.endDate
+        )
+
+        guard result.totalSpent > 0 else {
+            return .unsupported(.unsupportedCombination)
+        }
+
+        let selected: (name: String, total: Double)?
+        let categoryRows = evidenceRows(surface: request.surface, request: request, snapshot: snapshot)
+        if request.filters.isEmpty == false || request.search != nil {
+            guard categoryRows.count == 1 else {
+                return categoryRows.isEmpty ? .unsupported(.unresolvedEntity) : .unsupported(.ambiguousEntity)
+            }
+            let row = categoryRows[0]
+            let metric = result.metrics.first { $0.categoryID == row.id }
+            selected = (row.displayName, metric?.totalSpent ?? 0)
+        } else {
+            selected = result.metrics.first.map { ($0.categoryName, $0.totalSpent) }
+        }
+
+        guard let selected,
+              let concentration = MarinaBudgetFormulaCalculator.concentration(
+                partTotal: selected.total,
+                wholeTotal: result.totalSpent
+              ) else {
+            return .unsupported(.unsupportedCombination)
+        }
+
+        return metric(
+            value: .number(concentration),
+            request: request,
+            evidenceRows: [],
+            details: [
+                .init(.category, value: .text(selected.name)),
+                .init(.categorySpend, value: .money(selected.total), style: .money),
+                .init(.totalSpend, value: .money(result.totalSpent), style: .money),
+                .init(.concentration, value: .number(concentration), style: .percent)
+            ],
+            source: .homeCategoryMetricsCalculator
+        )
+    }
+
+    private func recurringBurdenMetric(
+        request: MarinaFormulaRequest,
+        snapshot: MarinaWorkspaceSnapshot
+    ) -> MarinaFormulaResult {
+        guard let dateRange = request.dateRange else {
+            return .unsupported(.missingDateField)
+        }
+
+        let recurringTotal = MarinaBudgetFormulaCalculator.plannedExpenseTotal(
+            snapshot: snapshot,
+            range: dateRange,
+            recurringOnly: true
+        )
+        let plannedExpenseTotal = MarinaBudgetFormulaCalculator.plannedExpenseTotal(
+            snapshot: snapshot,
+            range: dateRange
+        )
+
+        guard let recurringBurden = MarinaBudgetFormulaCalculator.recurringBurden(
+            recurringTotal: recurringTotal,
+            plannedExpenseTotal: plannedExpenseTotal
+        ) else {
+            return .unsupported(.unsupportedCombination)
+        }
+
+        return metric(
+            value: .number(recurringBurden),
+            request: request,
+            evidenceRows: [],
+            details: [
+                .init(.recurringTotal, value: .money(recurringTotal), style: .money),
+                .init(.plannedExpenses, value: .money(plannedExpenseTotal), style: .money),
+                .init(.recurringBurden, value: .number(recurringBurden), style: .percent)
+            ]
+        )
+    }
+
+    private func forecastSavingsMetric(
+        request: MarinaFormulaRequest,
+        snapshot: MarinaWorkspaceSnapshot
+    ) -> MarinaFormulaResult {
+        guard let dateRange = request.dateRange else {
+            return .unsupported(.missingDateField)
+        }
+
+        let summary = MarinaSavingsForecastCalculator.calculate(
+            range: dateRange,
+            incomes: snapshot.incomes,
+            plannedExpenses: snapshot.homeCalculationPlannedExpenses,
+            variableExpenses: snapshot.homeCalculationVariableExpenses,
+            savingsEntries: snapshot.savingsEntries
+        )
+
+        guard summary.hasActivity else {
+            return .unsupported(.unsupportedCombination)
+        }
+
+        return metric(
+            value: .money(summary.projectedSavings),
+            request: request,
+            evidenceRows: [],
+            details: [
+                .init(.projectedSavings, value: .money(summary.projectedSavings), style: .money),
+                .init(.actualSavings, value: .money(summary.actualSavings), style: .money),
+                .init(.gapToProjected, value: .money(summary.gapToProjected), style: .deltaMoney),
+                .init(.forecastStatus, value: .text(summary.statusLine))
+            ],
+            source: .marinaSavingsForecastCalculator
         )
     }
 

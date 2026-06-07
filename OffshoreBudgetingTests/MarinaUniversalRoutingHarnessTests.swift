@@ -23,9 +23,10 @@ struct MarinaUniversalRoutingHarnessTests {
     @Test func nonAllowlistedRequestReturnsNotAllowlistedFallback() throws {
         let fixture = makeFixture()
         let request = semanticRequest(
-            entity: .category,
+            entity: .savingsAccount,
             operation: .forecast,
-            measure: .categoryAvailability
+            measure: .savingsTotal,
+            dateRangeToken: .allTime
         )
         let result = fixture.harness().attemptUniversalResult(
             request: request,
@@ -202,6 +203,43 @@ struct MarinaUniversalRoutingHarnessTests {
         #expect(incomeUniversal.diagnostics.scenario == .incomeCoverageRatio)
         try expectRowAmount(budgetUniversal.result, title: "Coverage percent", equals: 2_650.0 / 1_280.0)
         try expectRowAmount(incomeUniversal.result, title: "Coverage percent", equals: 2_650.0 / 1_280.0)
+    }
+
+    @Test func allowlistedCategoryFormulasReturnUniversalResults() throws {
+        let fixture = makeFixture()
+        let availabilityRequest = semanticRequest(entity: .category, operation: .forecast, measure: .categoryAvailability)
+        let concentrationRequest = semanticRequest(entity: .category, operation: .share, measure: .concentration)
+        let availability = try fixture.requireUniversalAttempt(for: availabilityRequest)
+        let concentration = try fixture.requireUniversalAttempt(for: concentrationRequest)
+
+        #expect(availability.result.kind == .metric)
+        #expect(availability.result.title == "Category Availability")
+        #expect(availability.result.primaryValue == "0 over, 0 near")
+        #expect(availability.diagnostics.scenario == .categoryAvailability)
+        try expectRowAmount(availability.result, title: "Categories", equals: 2)
+
+        #expect(concentration.result.kind == .metric)
+        #expect(concentration.result.title == "Budget Concentration")
+        #expect(concentration.diagnostics.scenario == .categoryConcentration)
+        try expectRowAmount(concentration.result, title: "Concentration", equals: 1_200.0 / 1_738.0)
+    }
+
+    @Test func allowlistedRemainingFormulaShapesReturnUniversalResults() throws {
+        let fixture = makeFixture()
+        let recurringRequest = semanticRequest(entity: .preset, operation: .sum, measure: .recurringBurden)
+        let forecastRequest = semanticRequest(entity: .savingsAccount, operation: .forecast, measure: .savingsTotal)
+        let recurring = try fixture.requireUniversalAttempt(for: recurringRequest)
+        let forecast = try fixture.requireUniversalAttempt(for: forecastRequest)
+
+        #expect(recurring.result.kind == .metric)
+        #expect(recurring.result.title == "Recurring Burden")
+        #expect(recurring.diagnostics.scenario == .presetRecurringBurden)
+        try expectRowAmount(recurring.result, title: "Recurring burden", equals: 80.0 / 1_280.0)
+
+        #expect(forecast.result.kind == .metric)
+        #expect(forecast.result.title == "Forecast Savings")
+        #expect(forecast.diagnostics.scenario == .forecastSavings)
+        try expectRowAmount(forecast.result, title: "Projected savings", equals: 820)
     }
 
     @Test func reconciliationBalanceWithoutExplicitAccountFallsBack() throws {

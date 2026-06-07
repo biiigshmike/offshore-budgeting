@@ -23,12 +23,27 @@ struct MarinaUniversalOwnershipTests {
         #expect(registry.records.count == policy.allowedScenarios.count)
     }
 
-    @Test func deferredFormulasAreNotMarkedUniversalOwned() {
+    @Test func unsupportedRemainingFormulaVariantsAreNotMarkedUniversalOwned() {
         let requests = [
-            semanticRequest(entity: .category, operation: .forecast, measure: .categoryAvailability),
-            semanticRequest(entity: .category, operation: .share, measure: .concentration),
-            semanticRequest(entity: .preset, operation: .sum, measure: .recurringBurden),
-            semanticRequest(entity: .savingsAccount, operation: .forecast, measure: .savingsTotal)
+            semanticRequest(entity: .preset, operation: .forecast, measure: .recurringBurden),
+            semanticRequest(entity: .preset, operation: .sum, measure: .recurringBurden, dateRangeToken: .allTime),
+            semanticRequest(entity: .preset, operation: .sum, measure: .recurringBurden, targetName: "Phone"),
+            semanticRequest(entity: .savingsAccount, operation: .whatIf, measure: .savingsTotal),
+            semanticRequest(entity: .savingsAccount, operation: .forecast, measure: .savingsTotal, dateRangeToken: .allTime),
+            semanticRequest(entity: .savingsAccount, operation: .forecast, measure: .savingsTotal, targetName: "Savings Account")
+        ]
+
+        for request in requests {
+            expectNotUniversalOwned(request)
+        }
+    }
+
+    @Test func unsupportedCategoryFormulaVariantsAreNotMarkedUniversalOwned() {
+        let requests = [
+            semanticRequest(entity: .category, operation: .list, measure: .categoryAvailability, expectedAnswerShape: .list),
+            semanticRequest(entity: .category, operation: .forecast, measure: .categoryAvailability, categoryAvailabilityFilter: .over),
+            semanticRequest(entity: .category, operation: .share, measure: .concentration, targetName: "Groceries"),
+            semanticRequest(entity: .category, operation: .share, measure: .concentration, dateRangeToken: .allTime)
         ]
 
         for request in requests {
@@ -161,6 +176,7 @@ struct MarinaUniversalOwnershipTests {
         expenseScope: MarinaSemanticExpenseScope? = nil,
         incomeState: MarinaSemanticIncomeState? = nil,
         whatIfAmount: Double? = nil,
+        categoryAvailabilityFilter: MarinaCategoryAvailabilityFilter? = nil,
         expectedAnswerShape: MarinaSemanticAnswerShape = .metric,
         unsupportedReason: MarinaSemanticUnsupportedReason? = nil
     ) -> MarinaSemanticRequest {
@@ -176,6 +192,7 @@ struct MarinaUniversalOwnershipTests {
             expenseScope: expenseScope,
             incomeState: incomeState,
             whatIfAmount: whatIfAmount,
+            categoryAvailabilityFilter: categoryAvailabilityFilter,
             expectedAnswerShape: expectedAnswerShape,
             unsupportedReason: unsupportedReason
         )

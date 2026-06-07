@@ -304,6 +304,71 @@ struct MarinaUniversalPresentationParityTests {
         )
     }
 
+    @Test func categoryAvailabilityPresentationMatchesLegacyFormulaRows() {
+        let fixture = makeFixture()
+        let request = semanticRequest(
+            entity: .category,
+            operation: .forecast,
+            measure: .categoryAvailability,
+            dateRangeToken: .currentMonth
+        )
+        let legacy = fixture.harness.runLegacy(request: request, context: fixture.context())
+        let presented = fixture.presentedResult(request: request, context: fixture.context())
+
+        #expect(presented.kind == legacy.kind)
+        #expect(presented.title == legacy.title)
+        #expect(presented.primaryValue == legacy.primaryValue)
+        #expect(presented.rows.first(where: { $0.title == "Over" })?.value == legacy.rows.first(where: { $0.title == "Over" })?.value)
+        #expect(presented.rows.first(where: { $0.title == "Near" })?.value == legacy.rows.first(where: { $0.title == "Near" })?.value)
+        #expect(presented.rows.first(where: { $0.title == "Categories" })?.value == legacy.rows.first(where: { $0.title == "Categories" })?.value)
+        expectNoDebugText(in: presented)
+    }
+
+    @Test func categoryConcentrationPresentationMatchesLegacyFormulaRows() throws {
+        try expectFormulaPresentationParity(
+            request: semanticRequest(
+                entity: .category,
+                operation: .share,
+                measure: .concentration,
+                dateRangeToken: .currentMonth
+            ),
+            rowTitle: "Concentration"
+        )
+    }
+
+    @Test func recurringBurdenPresentationMatchesLegacyFormulaRows() throws {
+        try expectFormulaPresentationParity(
+            request: semanticRequest(
+                entity: .preset,
+                operation: .sum,
+                measure: .recurringBurden,
+                dateRangeToken: .currentMonth
+            ),
+            rowTitle: "Recurring burden"
+        )
+    }
+
+    @Test func forecastSavingsPresentationMatchesLegacyFormulaRows() {
+        let fixture = makeFixture()
+        let request = semanticRequest(
+            entity: .savingsAccount,
+            operation: .forecast,
+            measure: .savingsTotal,
+            dateRangeToken: .currentMonth
+        )
+        let legacy = fixture.harness.runLegacy(request: request, context: fixture.context())
+        let presented = fixture.presentedResult(request: request, context: fixture.context())
+
+        #expect(presented.kind == legacy.kind)
+        #expect(presented.title == legacy.title)
+        #expect(presented.primaryValue == legacy.primaryValue)
+        #expect(presented.rows.first(where: { $0.title == "Projected savings" })?.value == legacy.rows.first(where: { $0.title == "Projected savings" })?.value)
+        #expect(presented.rows.first(where: { $0.title == "Actual savings" })?.value == legacy.rows.first(where: { $0.title == "Actual savings" })?.value)
+        #expect(presented.rows.first(where: { $0.title == "Gap to projected" })?.value == legacy.rows.first(where: { $0.title == "Gap to projected" })?.value)
+        #expect(presented.rows.first(where: { $0.title == "Status" })?.value == legacy.rows.first(where: { $0.title == "Status" })?.value)
+        expectNoDebugText(in: presented)
+    }
+
     @Test func unifiedCategoryGroupPresentationKeepsUniversalShape() {
         let fixture = makeFixture()
         let request = semanticRequest(

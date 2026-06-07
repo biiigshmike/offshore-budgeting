@@ -84,6 +84,24 @@ struct MarinaSemanticUniversalPlanBridgeSavingsReconciliationTests {
         ])
     }
 
+    @Test func formulaBridgeMapsForecastSavingsWithDateContext() throws {
+        let plan = try requirePlan(formulaBridge.makePlan(
+            from: request(
+                entity: .savingsAccount,
+                operation: .forecast,
+                measure: .savingsTotal,
+                dateRangeToken: .currentMonth,
+                shape: .metric
+            ),
+            planningContext: context(now: date(2026, 6, 15))
+        ))
+
+        #expect(plan.surface == .semantic(.savingsAccount))
+        #expect(plan.operation == .forecast)
+        #expect(plan.measure == .savingsTotal)
+        #expect(plan.dateRange == HomeQueryDateRange(startDate: date(2026, 6, 1), endDate: date(2026, 6, 30)))
+    }
+
     @Test func reconciliationAccountListAndCountMapToUniversalPlans() throws {
         let listPlan = try requirePlan(bridge.makePlan(from: request(
             entity: .reconciliationAccount,
@@ -227,11 +245,63 @@ struct MarinaSemanticUniversalPlanBridgeSavingsReconciliationTests {
         #expect(plan.dateRange == HomeQueryDateRange(startDate: date(2026, 6, 1), endDate: date(2026, 6, 30)))
     }
 
-    @Test func formulaBridgeKeepsDeferredFormulasAndWhatIfUnsupported() {
+    @Test func formulaBridgeMapsCategoryFormulasWithDateContext() throws {
+        let context = context(now: date(2026, 6, 15))
+        let expectedRange = HomeQueryDateRange(startDate: date(2026, 6, 1), endDate: date(2026, 6, 30))
+        let cases: [(MarinaSemanticOperation, MarinaSemanticMeasure)] = [
+            (.forecast, .categoryAvailability),
+            (.share, .concentration)
+        ]
+
+        for testCase in cases {
+            let plan = try requirePlan(formulaBridge.makePlan(
+                from: request(
+                    entity: .category,
+                    operation: testCase.0,
+                    measure: testCase.1,
+                    dateRangeToken: .currentMonth,
+                    shape: .metric
+                ),
+                planningContext: context
+            ))
+
+            #expect(plan.surface == .semantic(.category))
+            #expect(plan.operation == testCase.0)
+            #expect(plan.measure == testCase.1)
+            #expect(plan.dateRange == expectedRange)
+        }
+    }
+
+    @Test func formulaBridgeMapsPresetRecurringBurdenWithDateContext() throws {
+        let plan = try requirePlan(formulaBridge.makePlan(
+            from: request(
+                entity: .preset,
+                operation: .sum,
+                measure: .recurringBurden,
+                dateRangeToken: .currentMonth,
+                shape: .metric
+            ),
+            planningContext: context(now: date(2026, 6, 15))
+        ))
+
+        #expect(plan.surface == .semantic(.preset))
+        #expect(plan.operation == .sum)
+        #expect(plan.measure == .recurringBurden)
+        #expect(plan.dateRange == HomeQueryDateRange(startDate: date(2026, 6, 1), endDate: date(2026, 6, 30)))
+    }
+
+    @Test func formulaBridgeKeepsDeferredFormulaVariantsAndWhatIfUnsupported() {
         #expect(formulaBridge.makePlan(from: request(
             entity: .category,
-            operation: .forecast,
+            operation: .list,
             measure: .categoryAvailability,
+            shape: .list
+        )) == .unsupported(.measureNotAvailable))
+
+        #expect(formulaBridge.makePlan(from: request(
+            entity: .preset,
+            operation: .forecast,
+            measure: .recurringBurden,
             shape: .metric
         )) == .unsupported(.unsupportedCombination))
 

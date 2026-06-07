@@ -11,6 +11,20 @@ enum MarinaFormulaMetricComponent: String, Codable, Equatable, Sendable {
     case plannedExpenses
     case coveragePercent
     case difference
+    case activeBudget
+    case overCount
+    case nearCount
+    case categoryCount
+    case category
+    case categorySpend
+    case totalSpend
+    case concentration
+    case recurringTotal
+    case recurringBurden
+    case projectedSavings
+    case actualSavings
+    case gapToProjected
+    case forecastStatus
 }
 
 enum MarinaFormulaValueStyle: String, Codable, Equatable, Sendable {
@@ -265,4 +279,75 @@ enum MarinaBudgetFormulaCalculator {
 
 private struct BudgetFormulaExpenseRow {
     let budgetImpact: Double
+}
+
+struct MarinaSavingsForecastSummary: Equatable, Sendable {
+    let projectedSavings: Double
+    let actualSavings: Double
+    let gapToProjected: Double
+    let statusLine: String
+    let hasActivity: Bool
+}
+
+enum MarinaSavingsForecastCalculator {
+    static func calculate(
+        range: HomeQueryDateRange,
+        incomes: [Income],
+        plannedExpenses: [PlannedExpense],
+        variableExpenses: [VariableExpense],
+        savingsEntries: [SavingsLedgerEntry]
+    ) -> MarinaSavingsForecastSummary {
+        let plannedIncomeTotal = incomes
+            .filter { $0.isPlanned && $0.date >= range.startDate && $0.date <= range.endDate }
+            .reduce(0.0) { $0 + $1.amount }
+
+        let actualIncomeTotal = incomes
+            .filter { $0.isPlanned == false && $0.date >= range.startDate && $0.date <= range.endDate }
+            .reduce(0.0) { $0 + $1.amount }
+
+        let plannedExpensesPlannedTotal = plannedExpenses
+            .filter { $0.expenseDate >= range.startDate && $0.expenseDate <= range.endDate }
+            .reduce(0.0) { $0 + SavingsMathService.plannedProjectedBudgetImpactAmount(for: $1) }
+
+        let plannedExpensesEffectiveActualTotal = plannedExpenses
+            .filter { $0.expenseDate >= range.startDate && $0.expenseDate <= range.endDate }
+            .reduce(0.0) { $0 + SavingsMathService.plannedBudgetImpactAmount(for: $1) }
+
+        let variableExpensesTotal = variableExpenses
+            .filter { $0.transactionDate >= range.startDate && $0.transactionDate <= range.endDate }
+            .reduce(0.0) { $0 + SavingsMathService.variableBudgetImpactAmount(for: $1) }
+
+        let actualSavingsAdjustments = SavingsMathService.actualSavingsAdjustmentTotal(
+            from: savingsEntries,
+            startDate: range.startDate,
+            endDate: range.endDate
+        )
+
+        let projectedSavings = plannedIncomeTotal - plannedExpensesPlannedTotal
+        let actualSavings = actualIncomeTotal - (plannedExpensesEffectiveActualTotal + variableExpensesTotal) + actualSavingsAdjustments
+        let gapToProjected = actualSavings - projectedSavings
+        let hasActivity = plannedIncomeTotal != 0
+            || actualIncomeTotal != 0
+            || plannedExpensesPlannedTotal != 0
+            || plannedExpensesEffectiveActualTotal != 0
+            || variableExpensesTotal != 0
+            || actualSavingsAdjustments != 0
+
+        let statusLine: String
+        if projectedSavings < 0 {
+            statusLine = "Overspending forecast for this period."
+        } else if actualSavings < 0 {
+            statusLine = "Current actual savings are negative."
+        } else {
+            statusLine = "Forecast is currently on track."
+        }
+
+        return MarinaSavingsForecastSummary(
+            projectedSavings: projectedSavings,
+            actualSavings: actualSavings,
+            gapToProjected: gapToProjected,
+            statusLine: statusLine,
+            hasActivity: hasActivity
+        )
+    }
 }

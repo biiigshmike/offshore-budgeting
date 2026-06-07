@@ -120,7 +120,67 @@ struct MarinaUniversalQueryRunnerFormulaTests {
         #expect(incomeCoverage.details.map(\.component) == [.income, .plannedExpenses, .coveragePercent, .difference])
     }
 
-    @Test func budgetPaceFormulaMissingDateContextReturnsTypedUnsupported() {
+    @Test func categoryFormulaMeasuresRouteThroughRegistry() {
+        let fixture = makeFixture()
+        let runner = formulaRunner()
+        let range = HomeQueryDateRange(startDate: date(2026, 6, 1), endDate: date(2026, 6, 30))
+
+        let availability = requireMetric(runner.runFormulaAware(
+            plan: MarinaUniversalQueryPlan(
+                entity: .category,
+                operation: .forecast,
+                measure: .categoryAvailability,
+                dateRange: range
+            ),
+            snapshot: fixture.snapshot
+        ))
+        #expect(availability.value == .integer(1))
+        #expect(availability.details.map(\.component) == [.activeBudget, .overCount, .nearCount, .categoryCount])
+
+        let concentration = requireMetric(runner.runFormulaAware(
+            plan: MarinaUniversalQueryPlan(
+                entity: .category,
+                operation: .share,
+                measure: .concentration,
+                dateRange: range
+            ),
+            snapshot: fixture.snapshot
+        ))
+        #expect(concentration.value == .number(1))
+        #expect(concentration.details.map(\.component) == [.category, .categorySpend, .totalSpend, .concentration])
+    }
+
+    @Test func remainingFormulaMeasuresRouteThroughRegistry() {
+        let fixture = makeFixture()
+        let runner = formulaRunner()
+        let range = HomeQueryDateRange(startDate: date(2026, 6, 1), endDate: date(2026, 6, 30))
+
+        let recurringBurden = requireMetric(runner.runFormulaAware(
+            plan: MarinaUniversalQueryPlan(
+                entity: .preset,
+                operation: .sum,
+                measure: .recurringBurden,
+                dateRange: range
+            ),
+            snapshot: fixture.snapshot
+        ))
+        #expect(recurringBurden.value == .number(100.0 / 300.0))
+        #expect(recurringBurden.details.map(\.component) == [.recurringTotal, .plannedExpenses, .recurringBurden])
+
+        let forecastSavings = requireMetric(runner.runFormulaAware(
+            plan: MarinaUniversalQueryPlan(
+                entity: .savingsAccount,
+                operation: .forecast,
+                measure: .savingsTotal,
+                dateRange: range
+            ),
+            snapshot: fixture.snapshot
+        ))
+        #expect(forecastSavings.value == .money(200))
+        #expect(forecastSavings.details.map(\.component) == [.projectedSavings, .actualSavings, .gapToProjected, .forecastStatus])
+    }
+
+    @Test func formulaMissingDateContextReturnsTypedUnsupported() {
         let fixture = makeFixture()
         let runner = formulaRunner()
 
@@ -129,6 +189,33 @@ struct MarinaUniversalQueryRunnerFormulaTests {
                 entity: .budget,
                 operation: .average,
                 measure: .burnRate
+            ),
+            snapshot: fixture.snapshot
+        ) == .unsupported(.missingDateField))
+
+        #expect(runner.runFormulaAware(
+            plan: MarinaUniversalQueryPlan(
+                entity: .category,
+                operation: .forecast,
+                measure: .categoryAvailability
+            ),
+            snapshot: fixture.snapshot
+        ) == .unsupported(.missingDateField))
+
+        #expect(runner.runFormulaAware(
+            plan: MarinaUniversalQueryPlan(
+                entity: .preset,
+                operation: .sum,
+                measure: .recurringBurden
+            ),
+            snapshot: fixture.snapshot
+        ) == .unsupported(.missingDateField))
+
+        #expect(runner.runFormulaAware(
+            plan: MarinaUniversalQueryPlan(
+                entity: .savingsAccount,
+                operation: .forecast,
+                measure: .savingsTotal
             ),
             snapshot: fixture.snapshot
         ) == .unsupported(.missingDateField))
@@ -145,6 +232,11 @@ struct MarinaUniversalQueryRunnerFormulaTests {
 
         #expect(runner.runFormulaAware(
             plan: MarinaUniversalQueryPlan(entity: .preset, operation: .sum, measure: .savingsTotal),
+            snapshot: fixture.snapshot
+        ) == .unsupported(.measureNotAvailable))
+
+        #expect(runner.runFormulaAware(
+            plan: MarinaUniversalQueryPlan(entity: .preset, operation: .forecast, measure: .recurringBurden),
             snapshot: fixture.snapshot
         ) == .unsupported(.measureNotAvailable))
     }
@@ -212,18 +304,27 @@ struct MarinaUniversalQueryRunnerFormulaTests {
         let card = Card(name: "Apple Card", theme: "ruby", effect: "plastic", workspace: workspace)
         let category = Offshore.Category(name: "General", hexColor: "#22C55E", workspace: workspace)
         let emergency = SavingsAccount(name: "Emergency Fund", total: 300, createdAt: date(2026, 1, 1), updatedAt: date(2026, 6, 1), workspace: workspace)
+        let internetPreset = Preset(title: "Internet", plannedAmount: 200, workspace: workspace, defaultCard: card, defaultCategory: category)
         let variableExpense = VariableExpense(descriptionText: "Groceries", amount: 150, transactionDate: date(2026, 6, 14), workspace: workspace, card: card, category: category)
         let incomeActual = Income(source: "Paycheck", amount: 1_000, date: date(2026, 6, 1), isPlanned: false, workspace: workspace)
         let incomePlanned = Income(source: "Bonus", amount: 500, date: date(2026, 6, 20), isPlanned: true, workspace: workspace)
         let consumedPlanned = PlannedExpense(title: "Rent", plannedAmount: 100, expenseDate: date(2026, 6, 10), workspace: workspace, card: card, category: category)
-        let remainingPlanned = PlannedExpense(title: "Internet", plannedAmount: 200, expenseDate: date(2026, 6, 20), workspace: workspace, card: card, category: category)
+        let remainingPlanned = PlannedExpense(title: "Internet", plannedAmount: 200, expenseDate: date(2026, 6, 20), workspace: workspace, card: card, category: category, sourcePresetID: internetPreset.id)
+        let savingsAdjustment = SavingsLedgerEntry(
+            date: date(2026, 6, 15),
+            amount: 25,
+            note: "Manual savings",
+            kindRaw: SavingsLedgerEntryKind.manualAdjustment.rawValue,
+            workspace: workspace,
+            account: emergency
+        )
 
         let snapshot = MarinaWorkspaceSnapshot(
             workspace: workspace,
             budgets: [budget],
             cards: [card],
             categories: [category],
-            presets: [],
+            presets: [internetPreset],
             plannedExpenses: [consumedPlanned, remainingPlanned],
             variableExpenses: [variableExpense],
             homePlannedExpenses: [consumedPlanned, remainingPlanned],
@@ -233,7 +334,7 @@ struct MarinaUniversalQueryRunnerFormulaTests {
             expenseAllocations: [],
             allocationSettlements: [],
             savingsAccounts: [emergency],
-            savingsEntries: [],
+            savingsEntries: [savingsAdjustment],
             incomes: [incomeActual, incomePlanned]
         )
 

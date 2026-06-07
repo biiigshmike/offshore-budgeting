@@ -16,8 +16,15 @@ struct MarinaFormulaRegistryTests {
         #expect(registry.supports(measure: .paceDifference, surface: .semantic(.budget), operation: .compare))
         #expect(registry.supports(measure: .coverageRatio, surface: .semantic(.budget), operation: .forecast))
         #expect(registry.supports(measure: .coverageRatio, surface: .semantic(.income), operation: .share))
+        #expect(registry.supports(measure: .categoryAvailability, surface: .semantic(.category), operation: .forecast))
+        #expect(registry.supports(measure: .concentration, surface: .semantic(.category), operation: .share))
+        #expect(registry.supports(measure: .recurringBurden, surface: .semantic(.preset), operation: .sum))
+        #expect(registry.supports(measure: .savingsTotal, surface: .semantic(.savingsAccount), operation: .forecast))
 
-        #expect(registry.supports(measure: .categoryAvailability, surface: .semantic(.category)) == false)
+        #expect(registry.supports(measure: .categoryAvailability, surface: .semantic(.category), operation: .list) == false)
+        #expect(registry.supports(measure: .concentration, surface: .semantic(.category), operation: .forecast) == false)
+        #expect(registry.supports(measure: .recurringBurden, surface: .semantic(.preset), operation: .forecast) == false)
+        #expect(registry.supports(measure: .savingsTotal, surface: .semantic(.savingsAccount), operation: .share) == false)
         #expect(registry.supports(measure: .burnRate, surface: .semantic(.budget), operation: .forecast) == false)
         #expect(registry.supports(measure: .savingsTotal, surface: .semantic(.preset)) == false)
     }
@@ -190,6 +197,126 @@ struct MarinaFormulaRegistryTests {
         #expect(detailValue(.difference, in: incomeCoverage) == .money(700))
     }
 
+    @Test func categoryFormulasDelegateToDeterministicCategoryServices() throws {
+        let fixture = makeCategoryFormulaFixture()
+        let registry = MarinaFormulaRegistry(now: date(2026, 6, 15), calendar: calendar)
+        let range = HomeQueryDateRange(startDate: date(2026, 6, 1), endDate: date(2026, 6, 30))
+
+        let availability = requireMetric(registry.evaluate(
+            request: formulaRequest(
+                surface: .semantic(.category),
+                operation: .forecast,
+                measure: .categoryAvailability,
+                dateRange: range
+            ),
+            snapshot: fixture.snapshot
+        ))
+        let availabilityResult = HomeCategoryLimitsAggregator.build(
+            budgets: fixture.snapshot.budgets,
+            categories: fixture.snapshot.categories,
+            plannedExpenses: fixture.snapshot.homeCalculationPlannedExpenses,
+            variableExpenses: fixture.snapshot.homeCalculationVariableExpenses,
+            rangeStart: range.startDate,
+            rangeEnd: range.endDate,
+            calendar: calendar
+        )
+
+        #expect(availability.value == .integer(availabilityResult.metrics.count))
+        #expect(availability.source == .homeCategoryLimitsAggregator)
+        #expect(detailValue(.activeBudget, in: availability) == .text("June"))
+        #expect(detailValue(.overCount, in: availability) == .integer(availabilityResult.overCount))
+        #expect(detailValue(.nearCount, in: availability) == .integer(availabilityResult.nearCount))
+        #expect(detailValue(.categoryCount, in: availability) == .integer(availabilityResult.metrics.count))
+
+        let concentration = requireMetric(registry.evaluate(
+            request: formulaRequest(
+                surface: .semantic(.category),
+                operation: .share,
+                measure: .concentration,
+                dateRange: range
+            ),
+            snapshot: fixture.snapshot
+        ))
+        let categoryMetrics = HomeCategoryMetricsCalculator.calculate(
+            categories: fixture.snapshot.categories,
+            plannedExpenses: fixture.snapshot.homeCalculationPlannedExpenses,
+            variableExpenses: fixture.snapshot.homeCalculationVariableExpenses,
+            rangeStart: range.startDate,
+            rangeEnd: range.endDate
+        )
+        let selected = try #require(categoryMetrics.metrics.first)
+        let expectedConcentration = try #require(MarinaBudgetFormulaCalculator.concentration(
+            partTotal: selected.totalSpent,
+            wholeTotal: categoryMetrics.totalSpent
+        ))
+
+        #expect(concentration.value == .number(expectedConcentration))
+        #expect(concentration.source == .homeCategoryMetricsCalculator)
+        #expect(detailValue(.category, in: concentration) == .text(selected.categoryName))
+        #expect(detailValue(.categorySpend, in: concentration) == .money(selected.totalSpent))
+        #expect(detailValue(.totalSpend, in: concentration) == .money(categoryMetrics.totalSpent))
+        #expect(detailValue(.concentration, in: concentration) == .number(expectedConcentration))
+    }
+
+    @Test func remainingFormulaShapesDelegateToDeterministicCalculators() throws {
+        let fixture = makeRemainingFormulaFixture()
+        let registry = MarinaFormulaRegistry(now: date(2026, 6, 15), calendar: calendar)
+        let range = HomeQueryDateRange(startDate: date(2026, 6, 1), endDate: date(2026, 6, 30))
+
+        let recurringBurden = requireMetric(registry.evaluate(
+            request: formulaRequest(
+                surface: .semantic(.preset),
+                operation: .sum,
+                measure: .recurringBurden,
+                dateRange: range
+            ),
+            snapshot: fixture.snapshot
+        ))
+        let recurringTotal = MarinaBudgetFormulaCalculator.plannedExpenseTotal(
+            snapshot: fixture.snapshot,
+            range: range,
+            recurringOnly: true
+        )
+        let plannedExpenseTotal = MarinaBudgetFormulaCalculator.plannedExpenseTotal(
+            snapshot: fixture.snapshot,
+            range: range
+        )
+        let expectedBurden = try #require(MarinaBudgetFormulaCalculator.recurringBurden(
+            recurringTotal: recurringTotal,
+            plannedExpenseTotal: plannedExpenseTotal
+        ))
+
+        #expect(recurringBurden.value == .number(expectedBurden))
+        #expect(recurringBurden.source == .marinaBudgetFormulaCalculator)
+        #expect(detailValue(.recurringTotal, in: recurringBurden) == .money(recurringTotal))
+        #expect(detailValue(.plannedExpenses, in: recurringBurden) == .money(plannedExpenseTotal))
+        #expect(detailValue(.recurringBurden, in: recurringBurden) == .number(expectedBurden))
+
+        let forecastSavings = requireMetric(registry.evaluate(
+            request: formulaRequest(
+                surface: .semantic(.savingsAccount),
+                operation: .forecast,
+                measure: .savingsTotal,
+                dateRange: range
+            ),
+            snapshot: fixture.snapshot
+        ))
+        let summary = MarinaSavingsForecastCalculator.calculate(
+            range: range,
+            incomes: fixture.snapshot.incomes,
+            plannedExpenses: fixture.snapshot.homeCalculationPlannedExpenses,
+            variableExpenses: fixture.snapshot.homeCalculationVariableExpenses,
+            savingsEntries: fixture.snapshot.savingsEntries
+        )
+
+        #expect(forecastSavings.value == .money(summary.projectedSavings))
+        #expect(forecastSavings.source == .marinaSavingsForecastCalculator)
+        #expect(detailValue(.projectedSavings, in: forecastSavings) == .money(summary.projectedSavings))
+        #expect(detailValue(.actualSavings, in: forecastSavings) == .money(summary.actualSavings))
+        #expect(detailValue(.gapToProjected, in: forecastSavings) == .money(summary.gapToProjected))
+        #expect(detailValue(.forecastStatus, in: forecastSavings) == .text(summary.statusLine))
+    }
+
     @Test func supportedFormulaMissingRequiredContextReturnsTypedUnsupported() {
         let fixture = makeFixture()
         let registry = MarinaFormulaRegistry(now: date(2026, 6, 15), calendar: calendar)
@@ -202,6 +329,110 @@ struct MarinaFormulaRegistryTests {
             request: formulaRequest(surface: .semantic(.budget), operation: .average, measure: .burnRate),
             snapshot: fixture.snapshot
         ) == .unsupported(.missingDateField))
+        #expect(registry.evaluate(
+            request: formulaRequest(surface: .semantic(.category), operation: .forecast, measure: .categoryAvailability),
+            snapshot: fixture.snapshot
+        ) == .unsupported(.missingDateField))
+        #expect(registry.evaluate(
+            request: formulaRequest(surface: .semantic(.category), operation: .share, measure: .concentration),
+            snapshot: fixture.snapshot
+        ) == .unsupported(.missingDateField))
+        #expect(registry.evaluate(
+            request: formulaRequest(surface: .semantic(.preset), operation: .sum, measure: .recurringBurden),
+            snapshot: fixture.snapshot
+        ) == .unsupported(.missingDateField))
+        #expect(registry.evaluate(
+            request: formulaRequest(surface: .semantic(.savingsAccount), operation: .forecast, measure: .savingsTotal),
+            snapshot: fixture.snapshot
+        ) == .unsupported(.missingDateField))
+    }
+
+    @Test func categoryFormulaInvalidDataReturnsTypedUnsupported() {
+        let fixture = makeFixture()
+        let registry = MarinaFormulaRegistry(now: date(2026, 6, 15), calendar: calendar)
+        let range = HomeQueryDateRange(startDate: date(2026, 7, 1), endDate: date(2026, 7, 31))
+        let noBudgetSnapshot = MarinaWorkspaceSnapshot(
+            workspace: fixture.snapshot.workspace,
+            budgets: [],
+            cards: fixture.snapshot.cards,
+            categories: fixture.snapshot.categories,
+            presets: fixture.snapshot.presets,
+            plannedExpenses: fixture.snapshot.plannedExpenses,
+            variableExpenses: fixture.snapshot.variableExpenses,
+            homePlannedExpenses: fixture.snapshot.homePlannedExpenses,
+            homeCalculationPlannedExpenses: fixture.snapshot.homeCalculationPlannedExpenses,
+            homeCalculationVariableExpenses: fixture.snapshot.homeCalculationVariableExpenses,
+            reconciliationAccounts: fixture.snapshot.reconciliationAccounts,
+            expenseAllocations: fixture.snapshot.expenseAllocations,
+            allocationSettlements: fixture.snapshot.allocationSettlements,
+            savingsAccounts: fixture.snapshot.savingsAccounts,
+            savingsEntries: fixture.snapshot.savingsEntries,
+            incomes: fixture.snapshot.incomes
+        )
+
+        #expect(registry.evaluate(
+            request: formulaRequest(
+                surface: .semantic(.category),
+                operation: .forecast,
+                measure: .categoryAvailability,
+                dateRange: range
+            ),
+            snapshot: noBudgetSnapshot
+        ) == .unsupported(.unsupportedCombination))
+
+        #expect(registry.evaluate(
+            request: formulaRequest(
+                surface: .semantic(.category),
+                operation: .share,
+                measure: .concentration,
+                dateRange: range
+            ),
+            snapshot: noBudgetSnapshot
+        ) == .unsupported(.unsupportedCombination))
+    }
+
+    @Test func remainingFormulaInvalidDataReturnsTypedUnsupported() {
+        let fixture = makeFixture()
+        let registry = MarinaFormulaRegistry(now: date(2026, 6, 15), calendar: calendar)
+        let range = HomeQueryDateRange(startDate: date(2026, 7, 1), endDate: date(2026, 7, 31))
+        let emptySnapshot = MarinaWorkspaceSnapshot(
+            workspace: fixture.snapshot.workspace,
+            budgets: fixture.snapshot.budgets,
+            cards: fixture.snapshot.cards,
+            categories: fixture.snapshot.categories,
+            presets: fixture.snapshot.presets,
+            plannedExpenses: [],
+            variableExpenses: [],
+            homePlannedExpenses: [],
+            homeCalculationPlannedExpenses: [],
+            homeCalculationVariableExpenses: [],
+            reconciliationAccounts: fixture.snapshot.reconciliationAccounts,
+            expenseAllocations: [],
+            allocationSettlements: [],
+            savingsAccounts: fixture.snapshot.savingsAccounts,
+            savingsEntries: [],
+            incomes: []
+        )
+
+        #expect(registry.evaluate(
+            request: formulaRequest(
+                surface: .semantic(.preset),
+                operation: .sum,
+                measure: .recurringBurden,
+                dateRange: range
+            ),
+            snapshot: emptySnapshot
+        ) == .unsupported(.unsupportedCombination))
+
+        #expect(registry.evaluate(
+            request: formulaRequest(
+                surface: .semantic(.savingsAccount),
+                operation: .forecast,
+                measure: .savingsTotal,
+                dateRange: range
+            ),
+            snapshot: emptySnapshot
+        ) == .unsupported(.unsupportedCombination))
     }
 
     @Test func formulaRegistryDoesNotMutateSnapshotData() {
@@ -233,6 +464,33 @@ struct MarinaFormulaRegistryTests {
                 surface: .semantic(.budget),
                 operation: .forecast,
                 measure: .projectedSpend,
+                dateRange: HomeQueryDateRange(startDate: date(2026, 6, 1), endDate: date(2026, 6, 30))
+            ),
+            snapshot: fixture.snapshot
+        )
+        _ = registry.evaluate(
+            request: formulaRequest(
+                surface: .semantic(.category),
+                operation: .share,
+                measure: .concentration,
+                dateRange: HomeQueryDateRange(startDate: date(2026, 6, 1), endDate: date(2026, 6, 30))
+            ),
+            snapshot: fixture.snapshot
+        )
+        _ = registry.evaluate(
+            request: formulaRequest(
+                surface: .semantic(.preset),
+                operation: .sum,
+                measure: .recurringBurden,
+                dateRange: HomeQueryDateRange(startDate: date(2026, 6, 1), endDate: date(2026, 6, 30))
+            ),
+            snapshot: fixture.snapshot
+        )
+        _ = registry.evaluate(
+            request: formulaRequest(
+                surface: .semantic(.savingsAccount),
+                operation: .forecast,
+                measure: .savingsTotal,
                 dateRange: HomeQueryDateRange(startDate: date(2026, 6, 1), endDate: date(2026, 6, 30))
             ),
             snapshot: fixture.snapshot
@@ -335,6 +593,105 @@ struct MarinaFormulaRegistryTests {
             savingsAccounts: [emergency, travelSavings],
             savingsEntries: [],
             incomes: [incomeActual, incomePlanned]
+        )
+
+        return FormulaFixture(snapshot: snapshot, emergency: emergency, roommate: roommate)
+    }
+
+    private func makeCategoryFormulaFixture() -> FormulaFixture {
+        let workspace = Workspace(name: "Personal", hexColor: "#3B82F6")
+        let budget = Budget(name: "June", startDate: date(2026, 6, 1), endDate: date(2026, 6, 30), workspace: workspace)
+        let card = Card(name: "Apple Card", theme: "ruby", effect: "plastic", workspace: workspace)
+        let groceries = Offshore.Category(name: "Groceries", hexColor: "#22C55E", workspace: workspace)
+        let bills = Offshore.Category(name: "Bills", hexColor: "#0EA5E9", workspace: workspace)
+        let groceriesLimit = BudgetCategoryLimit(minAmount: 0, maxAmount: 100, budget: budget, category: groceries)
+        let billsLimit = BudgetCategoryLimit(minAmount: 0, maxAmount: 500, budget: budget, category: bills)
+        budget.categoryLimits = [groceriesLimit, billsLimit]
+
+        let emergency = SavingsAccount(name: "Emergency Fund", total: 300, createdAt: date(2026, 1, 1), updatedAt: date(2026, 6, 1), workspace: workspace)
+        let roommate = AllocationAccount(name: "Roommate", hexColor: "#14B8A6", workspace: workspace)
+        let rent = PlannedExpense(title: "Rent", plannedAmount: 450, expenseDate: date(2026, 6, 10), workspace: workspace, card: card, category: bills)
+        let groceriesRun = VariableExpense(descriptionText: "Groceries", amount: 150, transactionDate: date(2026, 6, 14), workspace: workspace, card: card, category: groceries)
+
+        let snapshot = MarinaWorkspaceSnapshot(
+            workspace: workspace,
+            budgets: [budget],
+            cards: [card],
+            categories: [groceries, bills],
+            presets: [],
+            plannedExpenses: [rent],
+            variableExpenses: [groceriesRun],
+            homePlannedExpenses: [rent],
+            homeCalculationPlannedExpenses: [rent],
+            homeCalculationVariableExpenses: [groceriesRun],
+            reconciliationAccounts: [roommate],
+            expenseAllocations: [],
+            allocationSettlements: [],
+            savingsAccounts: [emergency],
+            savingsEntries: [],
+            incomes: []
+        )
+
+        return FormulaFixture(snapshot: snapshot, emergency: emergency, roommate: roommate)
+    }
+
+    private func makeRemainingFormulaFixture() -> FormulaFixture {
+        let workspace = Workspace(name: "Personal", hexColor: "#3B82F6")
+        let budget = Budget(name: "June", startDate: date(2026, 6, 1), endDate: date(2026, 6, 30), workspace: workspace)
+        let card = Card(name: "Apple Card", theme: "ruby", effect: "plastic", workspace: workspace)
+        let category = Offshore.Category(name: "General", hexColor: "#22C55E", workspace: workspace)
+        let phonePreset = Preset(title: "Phone", plannedAmount: 80, workspace: workspace, defaultCard: card, defaultCategory: category)
+
+        let emergency = SavingsAccount(name: "Emergency Fund", total: 300, createdAt: date(2026, 1, 1), updatedAt: date(2026, 6, 1), workspace: workspace)
+        let roommate = AllocationAccount(name: "Roommate", hexColor: "#14B8A6", workspace: workspace)
+        let phoneBill = PlannedExpense(
+            title: "Phone Bill",
+            plannedAmount: 80,
+            expenseDate: date(2026, 6, 16),
+            workspace: workspace,
+            card: card,
+            category: category,
+            sourcePresetID: phonePreset.id,
+            sourceBudgetID: budget.id
+        )
+        let rent = PlannedExpense(
+            title: "Rent",
+            plannedAmount: 120,
+            expenseDate: date(2026, 6, 25),
+            workspace: workspace,
+            card: card,
+            category: category,
+            sourceBudgetID: budget.id
+        )
+        let variableExpense = VariableExpense(descriptionText: "Groceries", amount: 100, transactionDate: date(2026, 6, 14), workspace: workspace, card: card, category: category)
+        let actualIncome = Income(source: "Paycheck", amount: 900, date: date(2026, 6, 1), isPlanned: false, workspace: workspace)
+        let plannedIncome = Income(source: "Expected Paycheck", amount: 1_000, date: date(2026, 6, 20), isPlanned: true, workspace: workspace)
+        let savingsAdjustment = SavingsLedgerEntry(
+            date: date(2026, 6, 15),
+            amount: 25,
+            note: "Manual savings",
+            kindRaw: SavingsLedgerEntryKind.manualAdjustment.rawValue,
+            workspace: workspace,
+            account: emergency
+        )
+
+        let snapshot = MarinaWorkspaceSnapshot(
+            workspace: workspace,
+            budgets: [budget],
+            cards: [card],
+            categories: [category],
+            presets: [phonePreset],
+            plannedExpenses: [phoneBill, rent],
+            variableExpenses: [variableExpense],
+            homePlannedExpenses: [phoneBill, rent],
+            homeCalculationPlannedExpenses: [phoneBill, rent],
+            homeCalculationVariableExpenses: [variableExpense],
+            reconciliationAccounts: [roommate],
+            expenseAllocations: [],
+            allocationSettlements: [],
+            savingsAccounts: [emergency],
+            savingsEntries: [savingsAdjustment],
+            incomes: [actualIncome, plannedIncome]
         )
 
         return FormulaFixture(snapshot: snapshot, emergency: emergency, roommate: roommate)

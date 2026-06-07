@@ -108,7 +108,7 @@ struct MarinaUniversalResultPresenter {
         plan: MarinaUniversalQueryPlan,
         context: MarinaUniversalPresentationContext
     ) -> MarinaExecutionResult {
-        let value = formattedMetricValue(metric.value, measure: plan.measure)
+        let value = formattedMetricValue(metric.value, measure: plan.measure, details: metric.details)
         let detailRows = metric.details.map { detail in
             HomeAnswerRow(
                 title: title(for: detail.component),
@@ -271,6 +271,9 @@ struct MarinaUniversalResultPresenter {
 
         switch plan.measure {
         case .savingsTotal:
+            if plan.operation == .forecast {
+                return "Forecast Savings"
+            }
             return "Savings Total"
         case .reconciliationBalance:
             return "Reconciliation Balance"
@@ -293,6 +296,12 @@ struct MarinaUniversalResultPresenter {
             case .workspace, .card, .plannedExpense, .variableExpense, .reconciliationAccount, .savingsAccount, .category, .preset:
                 return "Coverage Ratio"
             }
+        case .categoryAvailability:
+            return "Category Availability"
+        case .concentration:
+            return "Budget Concentration"
+        case .recurringBurden:
+            return "Recurring Burden"
         case .incomeAmount:
             return "Income"
         case .budgetImpact:
@@ -312,9 +321,6 @@ struct MarinaUniversalResultPresenter {
              .plannedAmount,
              .actualAmount,
              .effectiveAmount,
-             .categoryAvailability,
-             .recurringBurden,
-             .concentration,
              .color,
              .name,
              nil:
@@ -488,13 +494,24 @@ struct MarinaUniversalResultPresenter {
 
     private func formattedMetricValue(
         _ value: MarinaValue,
-        measure: MarinaSemanticMeasure?
+        measure: MarinaSemanticMeasure?,
+        details: [MarinaFormulaMetricDetail] = []
     ) -> String {
         switch measure {
         case .coverageRatio:
             return formattedValue(value, style: .percent)
+        case .categoryAvailability:
+            guard let overCount = integerDetail(.overCount, in: details),
+                  let nearCount = integerDetail(.nearCount, in: details) else {
+                return formattedValue(value)
+            }
+            return "\(AppNumberFormat.integer(overCount)) over, \(AppNumberFormat.integer(nearCount)) near"
         case .paceDifference:
             return formattedValue(value, style: .deltaMoney)
+        case .concentration:
+            return formattedValue(value, style: .percent)
+        case .recurringBurden:
+            return formattedValue(value, style: .percent)
         case .amount,
              .plannedAmount,
              .actualAmount,
@@ -503,13 +520,10 @@ struct MarinaUniversalResultPresenter {
              .savingsTotal,
              .incomeAmount,
              .reconciliationBalance,
-             .categoryAvailability,
              .remainingRoom,
              .burnRate,
              .projectedSpend,
              .safeDailySpend,
-             .recurringBurden,
-             .concentration,
              .color,
              .name,
              nil:
@@ -588,6 +602,54 @@ struct MarinaUniversalResultPresenter {
             return "Coverage percent"
         case .difference:
             return "Difference"
+        case .activeBudget:
+            return "Budget"
+        case .overCount:
+            return "Over"
+        case .nearCount:
+            return "Near"
+        case .categoryCount:
+            return "Categories"
+        case .category:
+            return "Category"
+        case .categorySpend:
+            return "Category spend"
+        case .totalSpend:
+            return "Total spend"
+        case .concentration:
+            return "Concentration"
+        case .recurringTotal:
+            return "Recurring total"
+        case .recurringBurden:
+            return "Recurring burden"
+        case .projectedSavings:
+            return "Projected savings"
+        case .actualSavings:
+            return "Actual savings"
+        case .gapToProjected:
+            return "Gap to projected"
+        case .forecastStatus:
+            return "Status"
+        }
+    }
+
+    private func integerDetail(
+        _ component: MarinaFormulaMetricComponent,
+        in details: [MarinaFormulaMetricDetail]
+    ) -> Int? {
+        guard let value = details.first(where: { $0.component == component })?.value else {
+            return nil
+        }
+
+        switch value {
+        case let .integer(value):
+            return value
+        case let .number(value):
+            return Int(value)
+        case let .money(value):
+            return Int(value)
+        case .text, .date, .boolean, .colorHex, .empty:
+            return nil
         }
     }
 
