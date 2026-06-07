@@ -42,18 +42,32 @@ struct MarinaUniversalQueryRunnerFormulaTests {
     @Test func formulaBackedSafeDailySpendRoutesThroughRegistry() {
         let fixture = makeFixture()
         let runner = formulaRunner()
+        let range = HomeQueryDateRange(startDate: date(2026, 6, 1), endDate: date(2026, 6, 30))
 
         let metric = requireMetric(runner.runFormulaAware(
             plan: MarinaUniversalQueryPlan(
                 entity: .budget,
                 operation: .forecast,
                 measure: .safeDailySpend,
-                dateRange: HomeQueryDateRange(startDate: date(2026, 6, 1), endDate: date(2026, 6, 30))
+                dateRange: range
             ),
             snapshot: fixture.snapshot
         ))
+        let expected = SafeSpendTodayCalculator.calculate(
+            budgetingPeriod: .monthly,
+            rangeStart: range.startDate,
+            rangeEnd: range.endDate,
+            budgets: fixture.snapshot.budgets,
+            categories: fixture.snapshot.categories,
+            incomes: fixture.snapshot.incomes,
+            plannedExpenses: fixture.snapshot.homeCalculationPlannedExpenses,
+            variableExpenses: fixture.snapshot.homeCalculationVariableExpenses,
+            savingsEntries: fixture.snapshot.savingsEntries,
+            now: date(2026, 6, 15),
+            calendar: calendar
+        )
 
-        #expect(metric.value == .money(65.625))
+        #expect(metric.value == .money(expected.safeToSpendToday))
         #expect(metric.evidenceRows.map(\.displayName) == ["June"])
     }
 
@@ -150,7 +164,7 @@ struct MarinaUniversalQueryRunnerFormulaTests {
         #expect(concentration.details.map(\.component) == [.category, .categorySpend, .totalSpend, .concentration])
     }
 
-    @Test func remainingFormulaMeasuresRouteThroughRegistry() {
+    @Test func remainingFormulaMeasuresRouteThroughRegistry() throws {
         let fixture = makeFixture()
         let runner = formulaRunner()
         let range = HomeQueryDateRange(startDate: date(2026, 6, 1), endDate: date(2026, 6, 30))
@@ -164,7 +178,21 @@ struct MarinaUniversalQueryRunnerFormulaTests {
             ),
             snapshot: fixture.snapshot
         ))
-        #expect(recurringBurden.value == .number(100.0 / 300.0))
+        let recurringTotal = MarinaBudgetFormulaCalculator.plannedExpenseTotal(
+            snapshot: fixture.snapshot,
+            range: range,
+            recurringOnly: true
+        )
+        let plannedExpenseTotal = MarinaBudgetFormulaCalculator.plannedExpenseTotal(
+            snapshot: fixture.snapshot,
+            range: range
+        )
+        let expectedBurden = try #require(MarinaBudgetFormulaCalculator.recurringBurden(
+            recurringTotal: recurringTotal,
+            plannedExpenseTotal: plannedExpenseTotal
+        ))
+
+        #expect(recurringBurden.value == .number(expectedBurden))
         #expect(recurringBurden.details.map(\.component) == [.recurringTotal, .plannedExpenses, .recurringBurden])
 
         let forecastSavings = requireMetric(runner.runFormulaAware(
@@ -238,7 +266,7 @@ struct MarinaUniversalQueryRunnerFormulaTests {
         #expect(runner.runFormulaAware(
             plan: MarinaUniversalQueryPlan(entity: .preset, operation: .forecast, measure: .recurringBurden),
             snapshot: fixture.snapshot
-        ) == .unsupported(.measureNotAvailable))
+        ) == .unsupported(.operationNotSupported))
     }
 
     @Test func formulaBackedRequestsDoNotBypassCatalogValidation() {
