@@ -1,6 +1,6 @@
 import Foundation
 
-enum MarinaValue: Equatable, Sendable {
+nonisolated enum MarinaValue: Equatable, Sendable {
     case text(String)
     case money(Double)
     case number(Double)
@@ -11,14 +11,14 @@ enum MarinaValue: Equatable, Sendable {
     case empty
 }
 
-struct MarinaResolvedRelationship: Equatable, Sendable {
+nonisolated struct MarinaResolvedRelationship: Equatable, Sendable {
     let key: MarinaRelationshipKey
     let targetEntity: MarinaSemanticEntity?
     let targetID: UUID?
     let displayName: String?
 }
 
-struct MarinaQueryableRow: Equatable, Sendable {
+nonisolated struct MarinaQueryableRow: Equatable, Sendable {
     let id: UUID
     let entity: MarinaSemanticEntity
     let displayName: String

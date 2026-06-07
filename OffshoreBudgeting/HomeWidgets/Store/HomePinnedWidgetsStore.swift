@@ -7,7 +7,7 @@
 
 import Foundation
 
-enum HomeWidgetID: String, CaseIterable, Identifiable, Codable {
+nonisolated enum HomeWidgetID: String, CaseIterable, Identifiable, Codable {
     case income
     case savingsOutlook
     case nextPlannedExpense

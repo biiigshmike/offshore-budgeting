@@ -1,6 +1,6 @@
 import Foundation
 
-enum MarinaFormulaMetricComponent: String, Codable, Equatable, Sendable {
+nonisolated enum MarinaFormulaMetricComponent: String, Codable, Equatable, Sendable {
     case spentSoFar
     case elapsedDays
     case averagePerDay
@@ -27,7 +27,7 @@ enum MarinaFormulaMetricComponent: String, Codable, Equatable, Sendable {
     case forecastStatus
 }
 
-enum MarinaFormulaValueStyle: String, Codable, Equatable, Sendable {
+nonisolated enum MarinaFormulaValueStyle: String, Codable, Equatable, Sendable {
     case automatic
     case money
     case integer
@@ -35,7 +35,7 @@ enum MarinaFormulaValueStyle: String, Codable, Equatable, Sendable {
     case deltaMoney
 }
 
-struct MarinaFormulaMetricDetail: Equatable, Sendable {
+nonisolated struct MarinaFormulaMetricDetail: Equatable, Sendable {
     let component: MarinaFormulaMetricComponent
     let value: MarinaValue
     let style: MarinaFormulaValueStyle

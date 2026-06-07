@@ -45,14 +45,14 @@ struct WhatIfScenarioStore {
 
     // MARK: - Public Models
 
-    struct ScenarioInfo: Codable, Identifiable, Equatable {
+    nonisolated struct ScenarioInfo: Codable, Identifiable, Equatable {
         var id: UUID
         var name: String
         var lastAccessed: Double
         var createdAt: Double
     }
 
-    struct WhatIfCategoryBounds: Codable, Equatable {
+    nonisolated struct WhatIfCategoryBounds: Codable, Equatable {
         var min: Double
         var max: Double
         var scenarioSpend: Double?
@@ -294,7 +294,7 @@ struct WhatIfScenarioStore {
     // Global scenarios store "overrides" by category.
     // When applying to a date range:
     // scenarioBounds = overrideBounds ?? baselineBounds
-    struct GlobalScenarioInfo: Codable, Identifiable, Equatable {
+    nonisolated struct GlobalScenarioInfo: Codable, Identifiable, Equatable {
         var id: UUID
         var name: String
         var lastAccessed: Double
@@ -761,7 +761,7 @@ private struct LegacyGlobalScenarioPayload: Codable {
     let overridesByCategoryID: [UUID: Double]
 }
 
-struct WhatIfGlobalScenariosSyncPayload: Codable, Equatable {
+nonisolated struct WhatIfGlobalScenariosSyncPayload: Codable, Equatable {
     var scenarios: [WhatIfScenarioStore.GlobalScenarioInfo]
     var selectedScenarioID: UUID?
     var pinnedScenarioIDs: [UUID]

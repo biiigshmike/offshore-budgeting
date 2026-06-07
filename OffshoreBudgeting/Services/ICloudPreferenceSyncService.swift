@@ -17,7 +17,7 @@ protocol ICloudKeyValueStoring: AnyObject {
 
 extension NSUbiquitousKeyValueStore: ICloudKeyValueStoring {}
 
-struct HomeLayoutSyncEnvelope: Codable, Equatable {
+nonisolated struct HomeLayoutSyncEnvelope: Codable, Equatable {
     var schemaVersion: Int
     var workspaceID: UUID
     var updatedAt: Double
@@ -25,7 +25,7 @@ struct HomeLayoutSyncEnvelope: Codable, Equatable {
     var pinnedItems: [HomePinnedItem]
 }
 
-struct WhatIfGlobalScenariosSyncEnvelope: Codable, Equatable {
+nonisolated struct WhatIfGlobalScenariosSyncEnvelope: Codable, Equatable {
     var schemaVersion: Int
     var workspaceID: UUID
     var updatedAt: Double
@@ -34,7 +34,7 @@ struct WhatIfGlobalScenariosSyncEnvelope: Codable, Equatable {
 }
 
 struct ICloudPreferenceSyncService {
-    enum SyncResolution: Equatable {
+    nonisolated enum SyncResolution: Equatable {
         case skipped
         case uploadedLocal
         case appliedRemote

@@ -1,6 +1,6 @@
 import Foundation
 
-enum MarinaUniversalEntitySurface: Equatable, Sendable {
+nonisolated enum MarinaUniversalEntitySurface: Equatable, Sendable {
     case semantic(MarinaSemanticEntity)
     case unifiedExpenses
     case savingsLedgerEntries
@@ -14,7 +14,7 @@ enum MarinaUniversalEntitySurface: Equatable, Sendable {
     }
 }
 
-struct MarinaUniversalQueryPlan: Equatable, Sendable {
+nonisolated struct MarinaUniversalQueryPlan: Equatable, Sendable {
     let surface: MarinaUniversalEntitySurface
     let operation: MarinaSemanticOperation
     let measure: MarinaSemanticMeasure?
@@ -96,14 +96,14 @@ struct MarinaUniversalQueryPlan: Equatable, Sendable {
     }
 }
 
-enum MarinaUniversalQueryResult: Equatable, Sendable {
+nonisolated enum MarinaUniversalQueryResult: Equatable, Sendable {
     case rows([MarinaQueryableRow])
     case metric(MarinaUniversalMetricResult)
     case groups([MarinaUniversalGroupResult])
     case unsupported(MarinaCapabilityFailureReason)
 }
 
-struct MarinaUniversalMetricResult: Equatable, Sendable {
+nonisolated struct MarinaUniversalMetricResult: Equatable, Sendable {
     let value: MarinaValue
     let evidenceRows: [MarinaQueryableRow]
     let details: [MarinaFormulaMetricDetail]
@@ -119,7 +119,7 @@ struct MarinaUniversalMetricResult: Equatable, Sendable {
     }
 }
 
-struct MarinaUniversalGroupResult: Equatable, Sendable {
+nonisolated struct MarinaUniversalGroupResult: Equatable, Sendable {
     let group: MarinaGroupedRows
     let aggregate: MarinaValue?
 }

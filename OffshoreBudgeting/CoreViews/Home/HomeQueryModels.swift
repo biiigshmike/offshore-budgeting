@@ -1,6 +1,6 @@
 import Foundation
 
-struct HomeQueryDateRange: Codable, Equatable, Sendable {
+nonisolated struct HomeQueryDateRange: Codable, Equatable, Sendable {
     let startDate: Date
     let endDate: Date
 
@@ -15,7 +15,7 @@ struct HomeQueryDateRange: Codable, Equatable, Sendable {
     }
 }
 
-struct MarinaPanelHomeContext: Equatable, Sendable {
+nonisolated struct MarinaPanelHomeContext: Equatable, Sendable {
     let dateRange: HomeQueryDateRange?
     let excludeFuturePlannedExpensesFromCalculations: Bool
     let excludeFutureVariableExpensesFromCalculations: Bool
@@ -31,7 +31,7 @@ struct MarinaPanelHomeContext: Equatable, Sendable {
     }
 }
 
-enum HomeQueryPeriodUnit: String, Codable, Equatable, Sendable {
+nonisolated enum HomeQueryPeriodUnit: String, Codable, Equatable, Sendable {
     case day
     case week
     case month
@@ -39,7 +39,7 @@ enum HomeQueryPeriodUnit: String, Codable, Equatable, Sendable {
     case year
 }
 
-enum HomeQueryIntent: String, CaseIterable, Codable, Equatable {
+nonisolated enum HomeQueryIntent: String, CaseIterable, Codable, Equatable {
     case periodOverview
     case spendThisMonth
     case categorySpendTotal
@@ -81,7 +81,7 @@ enum HomeQueryIntent: String, CaseIterable, Codable, Equatable {
     case topCardChangesThisMonth
 }
 
-struct HomeQuery: Identifiable, Codable, Equatable {
+nonisolated struct HomeQuery: Identifiable, Codable, Equatable {
     static let defaultTopCategoryLimit = 3
     static let defaultRecentTransactionsLimit = 5
     static let maxResultLimit = 20
@@ -323,7 +323,7 @@ struct HomeAnswer: Identifiable, Codable, Equatable {
     }
 }
 
-struct MarinaClarificationChoice: Identifiable, Codable, Equatable, Sendable {
+nonisolated struct MarinaClarificationChoice: Identifiable, Codable, Equatable, Sendable {
     let id: UUID
     let title: String
     let kindLabel: String?
@@ -362,7 +362,7 @@ struct MarinaClarificationChoice: Identifiable, Codable, Equatable, Sendable {
     }
 }
 
-struct MarinaClarificationChoices: Identifiable, Codable, Equatable, Sendable {
+nonisolated struct MarinaClarificationChoices: Identifiable, Codable, Equatable, Sendable {
     let id: UUID
     let originalPrompt: String?
     let question: String

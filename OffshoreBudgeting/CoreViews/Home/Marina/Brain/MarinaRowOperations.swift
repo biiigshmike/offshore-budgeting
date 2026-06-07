@@ -1,11 +1,11 @@
 import Foundation
 
-struct MarinaRowSearchClause: Equatable, Sendable {
+nonisolated struct MarinaRowSearchClause: Equatable, Sendable {
     let fields: Set<MarinaFieldKey>
     let query: String
 }
 
-enum MarinaRowFilterOperator: Equatable, Sendable {
+nonisolated enum MarinaRowFilterOperator: Equatable, Sendable {
     case equals
     case contains
     case greaterThan
@@ -15,12 +15,12 @@ enum MarinaRowFilterOperator: Equatable, Sendable {
     case between
 }
 
-enum MarinaRowFilterTarget: Equatable, Sendable {
+nonisolated enum MarinaRowFilterTarget: Equatable, Sendable {
     case field(MarinaFieldKey)
     case relationship(MarinaRelationshipKey)
 }
 
-struct MarinaRowFilter: Equatable, Sendable {
+nonisolated struct MarinaRowFilter: Equatable, Sendable {
     let target: MarinaRowFilterTarget
     let operation: MarinaRowFilterOperator
     let value: MarinaValue
@@ -39,27 +39,27 @@ struct MarinaRowFilter: Equatable, Sendable {
     }
 }
 
-enum MarinaRowSortDirection: Equatable, Sendable {
+nonisolated enum MarinaRowSortDirection: Equatable, Sendable {
     case ascending
     case descending
 }
 
-enum MarinaRowSortTarget: Equatable, Sendable {
+nonisolated enum MarinaRowSortTarget: Equatable, Sendable {
     case field(MarinaFieldKey)
     case relationship(MarinaRelationshipKey)
 }
 
-struct MarinaRowSort: Equatable, Sendable {
+nonisolated struct MarinaRowSort: Equatable, Sendable {
     let target: MarinaRowSortTarget
     let direction: MarinaRowSortDirection
 }
 
-enum MarinaRowGroupTarget: Equatable, Sendable {
+nonisolated enum MarinaRowGroupTarget: Equatable, Sendable {
     case field(MarinaFieldKey)
     case relationship(MarinaRelationshipKey)
 }
 
-struct MarinaGroupedRows: Equatable, Sendable {
+nonisolated struct MarinaGroupedRows: Equatable, Sendable {
     let key: String
     let displayName: String
     let rows: [MarinaQueryableRow]

@@ -1,6 +1,6 @@
 import Foundation
 
-enum MarinaUniversalRoutingScenario: String, Codable, CaseIterable, Equatable, Hashable, Sendable {
+nonisolated enum MarinaUniversalRoutingScenario: String, Codable, CaseIterable, Equatable, Hashable, Sendable {
     case merchantVariableSpend
     case categoryVariableSpend
     case cardVariableSpend
@@ -27,7 +27,7 @@ enum MarinaUniversalRoutingScenario: String, Codable, CaseIterable, Equatable, H
     case forecastSavings
 }
 
-struct MarinaUniversalRoutingPolicy: Equatable, Sendable {
+nonisolated struct MarinaUniversalRoutingPolicy: Equatable, Sendable {
     let isEnabled: Bool
     let allowedScenarios: Set<MarinaUniversalRoutingScenario>
 
@@ -355,12 +355,12 @@ struct MarinaUniversalRoutingPolicy: Equatable, Sendable {
 }
 
 extension MarinaUniversalRoutingPolicy {
-    static let disabled = MarinaUniversalRoutingPolicy(
+    nonisolated static let disabled = MarinaUniversalRoutingPolicy(
         isEnabled: false,
         allowedScenarios: []
     )
 
-    static let internalParityProven = MarinaUniversalRoutingPolicy(
+    nonisolated static let internalParityProven = MarinaUniversalRoutingPolicy(
         isEnabled: true,
         allowedScenarios: [
             .merchantVariableSpend,

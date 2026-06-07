@@ -722,7 +722,7 @@ struct MarinaSemanticUniversalPlanBridge {
     }
 }
 
-enum MarinaSemanticUniversalPlanBridgeResult: Equatable, Sendable {
+nonisolated enum MarinaSemanticUniversalPlanBridgeResult: Equatable, Sendable {
     case plan(MarinaUniversalQueryPlan)
     case unsupported(MarinaCapabilityFailureReason)
 }

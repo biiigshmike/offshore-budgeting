@@ -126,7 +126,7 @@ enum SpendTrendsWidgetSnapshotStore {
         }
     }
 
-    struct CardOption: Codable, Hashable {
+    nonisolated struct CardOption: Codable, Hashable {
         let id: String
         let name: String
         let themeToken: String

@@ -1,6 +1,6 @@
 import Foundation
 
-enum MarinaFieldKey: String, Codable, CaseIterable, Equatable, Hashable, Sendable {
+nonisolated enum MarinaFieldKey: String, Codable, CaseIterable, Equatable, Hashable, Sendable {
     case id
     case name
     case title
@@ -29,7 +29,7 @@ enum MarinaFieldKey: String, Codable, CaseIterable, Equatable, Hashable, Sendabl
     case isPlanned
 }
 
-enum MarinaRelationshipKey: String, Codable, CaseIterable, Equatable, Hashable, Sendable {
+nonisolated enum MarinaRelationshipKey: String, Codable, CaseIterable, Equatable, Hashable, Sendable {
     case workspace
     case budget
     case card
@@ -43,7 +43,7 @@ enum MarinaRelationshipKey: String, Codable, CaseIterable, Equatable, Hashable, 
     case variableExpense
 }
 
-enum MarinaValueType: String, Codable, Equatable, Hashable, Sendable {
+nonisolated enum MarinaValueType: String, Codable, Equatable, Hashable, Sendable {
     case text
     case money
     case number
@@ -53,7 +53,7 @@ enum MarinaValueType: String, Codable, Equatable, Hashable, Sendable {
     case relationship
 }
 
-enum MarinaQueryVerb: String, Codable, CaseIterable, Equatable, Hashable, Sendable {
+nonisolated enum MarinaQueryVerb: String, Codable, CaseIterable, Equatable, Hashable, Sendable {
     case list
     case fetch
     case count
@@ -69,7 +69,7 @@ enum MarinaQueryVerb: String, Codable, CaseIterable, Equatable, Hashable, Sendab
     case whatIf
 }
 
-struct MarinaFieldDescriptor: Equatable, Sendable {
+nonisolated struct MarinaFieldDescriptor: Equatable, Sendable {
     let key: MarinaFieldKey
     let displayName: String
     let aliases: [String]
@@ -81,7 +81,7 @@ struct MarinaFieldDescriptor: Equatable, Sendable {
     let isAggregatable: Bool
 }
 
-struct MarinaRelationshipDescriptor: Equatable, Sendable {
+nonisolated struct MarinaRelationshipDescriptor: Equatable, Sendable {
     let key: MarinaRelationshipKey
     let displayName: String
     let aliases: [String]
@@ -92,7 +92,7 @@ struct MarinaRelationshipDescriptor: Equatable, Sendable {
     let isOptional: Bool
 }
 
-struct MarinaMeasureDescriptor: Equatable, Sendable {
+nonisolated struct MarinaMeasureDescriptor: Equatable, Sendable {
     let measure: MarinaSemanticMeasure
     let displayName: String
     let aliases: [String]
@@ -101,7 +101,7 @@ struct MarinaMeasureDescriptor: Equatable, Sendable {
     let requiredRelationships: Set<MarinaRelationshipKey>
 }
 
-struct MarinaEntityDescriptor: Equatable, Sendable {
+nonisolated struct MarinaEntityDescriptor: Equatable, Sendable {
     let entity: MarinaSemanticEntity
     let displayName: String
     let aliases: [String]
@@ -116,7 +116,7 @@ struct MarinaEntityDescriptor: Equatable, Sendable {
     let isInternalOnly: Bool
 }
 
-struct MarinaUniversalSurfaceDescriptor: Equatable, Sendable {
+nonisolated struct MarinaUniversalSurfaceDescriptor: Equatable, Sendable {
     let surface: MarinaUniversalEntitySurface
     let displayName: String
     let aliases: [String]
@@ -176,7 +176,7 @@ struct MarinaUniversalSurfaceDescriptor: Equatable, Sendable {
     }
 }
 
-enum MarinaCapabilityFailureReason: String, Codable, Equatable, Sendable {
+nonisolated enum MarinaCapabilityFailureReason: String, Codable, Equatable, Sendable {
     case missingEntityDescriptor
     case internalOnly
     case operationNotSupported
@@ -193,7 +193,7 @@ enum MarinaCapabilityFailureReason: String, Codable, Equatable, Sendable {
     case unsupportedCombination
 }
 
-enum MarinaCapabilityResult: Equatable, Sendable {
+nonisolated enum MarinaCapabilityResult: Equatable, Sendable {
     case supported
     case unsupported(MarinaCapabilityFailureReason)
 }

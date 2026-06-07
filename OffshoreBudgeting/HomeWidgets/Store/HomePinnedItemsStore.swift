@@ -9,7 +9,7 @@ import Foundation
 
 // MARK: - Unified pinned items
 
-enum HomeTileSize: String, CaseIterable, Codable, Equatable {
+nonisolated enum HomeTileSize: String, CaseIterable, Codable, Equatable {
     case small
     case wide
 
@@ -23,7 +23,7 @@ enum HomeTileSize: String, CaseIterable, Codable, Equatable {
     }
 }
 
-enum HomePinnedItem: Identifiable, Codable, Equatable {
+nonisolated enum HomePinnedItem: Identifiable, Codable, Equatable {
 
     case widget(HomeWidgetID, HomeTileSize)
     case card(UUID, HomeTileSize)

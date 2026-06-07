@@ -1,7 +1,7 @@
 import Foundation
 import SwiftData
 
-enum MarinaSemanticEntity: String, Codable, CaseIterable, Equatable, Sendable {
+nonisolated enum MarinaSemanticEntity: String, Codable, CaseIterable, Equatable, Sendable {
     case workspace
     case budget
     case card
@@ -14,7 +14,7 @@ enum MarinaSemanticEntity: String, Codable, CaseIterable, Equatable, Sendable {
     case preset
 }
 
-enum MarinaSemanticOperation: String, Codable, CaseIterable, Equatable, Sendable {
+nonisolated enum MarinaSemanticOperation: String, Codable, CaseIterable, Equatable, Sendable {
     case list
     case count
     case sum
@@ -28,7 +28,7 @@ enum MarinaSemanticOperation: String, Codable, CaseIterable, Equatable, Sendable
     case whatIf
 }
 
-enum MarinaSemanticMeasure: String, Codable, CaseIterable, Equatable, Sendable {
+nonisolated enum MarinaSemanticMeasure: String, Codable, CaseIterable, Equatable, Sendable {
     case amount
     case plannedAmount
     case actualAmount
@@ -50,14 +50,14 @@ enum MarinaSemanticMeasure: String, Codable, CaseIterable, Equatable, Sendable {
     case name
 }
 
-enum MarinaCategoryAvailabilityFilter: String, Codable, CaseIterable, Equatable, Sendable {
+nonisolated enum MarinaCategoryAvailabilityFilter: String, Codable, CaseIterable, Equatable, Sendable {
     case all
     case over
     case near
     case underLimit
 }
 
-enum MarinaSemanticDimension: String, Codable, CaseIterable, Equatable, Sendable {
+nonisolated enum MarinaSemanticDimension: String, Codable, CaseIterable, Equatable, Sendable {
     case date
     case category
     case card
@@ -70,7 +70,7 @@ enum MarinaSemanticDimension: String, Codable, CaseIterable, Equatable, Sendable
     case workspace
 }
 
-enum MarinaSemanticDateRangeToken: String, Codable, CaseIterable, Equatable, Sendable {
+nonisolated enum MarinaSemanticDateRangeToken: String, Codable, CaseIterable, Equatable, Sendable {
     case currentPeriod
     case previousPeriod
     case currentMonth
@@ -79,7 +79,7 @@ enum MarinaSemanticDateRangeToken: String, Codable, CaseIterable, Equatable, Sen
     case allTime
 }
 
-enum MarinaSemanticSort: String, Codable, CaseIterable, Equatable, Sendable {
+nonisolated enum MarinaSemanticSort: String, Codable, CaseIterable, Equatable, Sendable {
     case dateAscending
     case dateDescending
     case amountAscending
@@ -87,7 +87,7 @@ enum MarinaSemanticSort: String, Codable, CaseIterable, Equatable, Sendable {
     case nameAscending
 }
 
-enum MarinaSemanticAnswerShape: String, Codable, CaseIterable, Equatable, Sendable {
+nonisolated enum MarinaSemanticAnswerShape: String, Codable, CaseIterable, Equatable, Sendable {
     case metric
     case list
     case comparison
@@ -95,19 +95,19 @@ enum MarinaSemanticAnswerShape: String, Codable, CaseIterable, Equatable, Sendab
     case unsupported
 }
 
-enum MarinaSemanticExpenseScope: String, Codable, CaseIterable, Equatable, Sendable {
+nonisolated enum MarinaSemanticExpenseScope: String, Codable, CaseIterable, Equatable, Sendable {
     case planned
     case variable
     case unified
 }
 
-enum MarinaSemanticIncomeState: String, Codable, CaseIterable, Equatable, Sendable {
+nonisolated enum MarinaSemanticIncomeState: String, Codable, CaseIterable, Equatable, Sendable {
     case planned
     case actual
     case all
 }
 
-enum MarinaSemanticUnsupportedReason: String, Codable, Equatable, Sendable {
+nonisolated enum MarinaSemanticUnsupportedReason: String, Codable, Equatable, Sendable {
     case readOnly
     case unavailableModel
     case unsupportedCombination
@@ -119,7 +119,7 @@ enum MarinaSemanticUnsupportedReason: String, Codable, Equatable, Sendable {
     case unsupportedLanguageOrLocale
 }
 
-struct MarinaSemanticRequest: Codable, Equatable, Sendable {
+nonisolated struct MarinaSemanticRequest: Codable, Equatable, Sendable {
     var entity: MarinaSemanticEntity
     var operation: MarinaSemanticOperation
     var measure: MarinaSemanticMeasure?
@@ -180,20 +180,20 @@ struct MarinaSemanticRequest: Codable, Equatable, Sendable {
     }
 }
 
-enum MarinaSemanticConfidence: String, Codable, Equatable, Sendable {
+nonisolated enum MarinaSemanticConfidence: String, Codable, Equatable, Sendable {
     case high
     case medium
     case low
 }
 
-enum MarinaSemanticSource: String, Codable, Equatable, Sendable {
+nonisolated enum MarinaSemanticSource: String, Codable, Equatable, Sendable {
     case ruleBased
     case foundationModel
     case repairedFoundationModel
     case unavailableFallback
 }
 
-struct MarinaInterpretedSemanticRequest: Equatable, Sendable {
+nonisolated struct MarinaInterpretedSemanticRequest: Equatable, Sendable {
     var request: MarinaSemanticRequest
     var confidence: MarinaSemanticConfidence
     var source: MarinaSemanticSource

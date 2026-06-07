@@ -11,7 +11,7 @@
 import Foundation
 import SwiftUI
 
-enum CurrencyFormatter {
+nonisolated enum CurrencyFormatter {
 
     // MARK: - Settings Keys
 
