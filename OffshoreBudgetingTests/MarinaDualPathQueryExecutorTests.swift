@@ -80,6 +80,40 @@ struct MarinaDualPathQueryExecutorTests {
         #expect(diagnostics.notes.contains { $0.contains("Universal routing succeeded") })
     }
 
+    @Test func enabledPhase17GroupedRequestReturnsUniversalResult() throws {
+        let fixture = makeFixture()
+        let request = semanticRequest(
+            entity: .income,
+            operation: .group,
+            measure: .incomeAmount,
+            dimensions: [.incomeSource],
+            incomeState: .all,
+            shape: .list
+        )
+        let plan = fixture.plan(for: request)
+        let executor = MarinaDualPathQueryExecutor(
+            legacyExecutor: fixture.legacyExecutor,
+            universalHarness: fixture.harness(),
+            policy: .internalParityProven
+        )
+
+        let result = executor.executeResult(
+            plan: plan,
+            snapshot: fixture.snapshot,
+            planningContext: fixture.context()
+        )
+
+        guard case let .universal(actual, diagnostics) = result else {
+            Issue.record("Expected universal result, got \(result).")
+            throw TestFailure()
+        }
+        #expect(actual.kind == .list)
+        #expect(actual.title == "Income by Source")
+        #expect(diagnostics.usedUniversal)
+        #expect(diagnostics.scenario == .incomeBySource)
+        #expect(diagnostics.fallbackReason == nil)
+    }
+
     @Test func enabledNonAllowlistedRequestFallsBackToLegacy() throws {
         let fixture = makeFixture()
         let request = semanticRequest(

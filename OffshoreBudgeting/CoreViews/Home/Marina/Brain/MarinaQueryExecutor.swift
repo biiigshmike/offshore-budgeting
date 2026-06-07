@@ -115,6 +115,9 @@ struct MarinaQueryExecutor {
         guard let card = resolveCard(named: targetName, in: snapshot) else {
             return unsupported(.unresolvedEntity)
         }
+        // Universal ownership note:
+        // cardVariableSpend is owned by universal for the Phase 14 variableExpense + card semantic shape.
+        // This broader card branch remains the legacy fallback during migration.
         let metrics = homeCardMetrics(for: card, plan: plan, snapshot: snapshot)
         return MarinaExecutionResult(
             kind: .metric,
@@ -202,6 +205,9 @@ struct MarinaQueryExecutor {
         let total = rows
             .reduce(0.0) { $0 + $1.budgetImpact }
         let primaryValue = plan.operation == .average && rows.isEmpty == false ? total / Double(rows.count) : total
+        // Universal ownership note:
+        // categoryVariableSpend is owned by universal for the Phase 14 variableExpense + category semantic shape.
+        // This broader category branch remains the legacy fallback during migration.
         return MarinaExecutionResult(
             kind: .metric,
             title: plan.operation == .average
@@ -343,6 +349,9 @@ struct MarinaQueryExecutor {
             )
         }
 
+        // Universal ownership note:
+        // reconciliationBalanceExplicitAccount is parity-proven through universal.
+        // Keep this branch as the legacy fallback until universal routing is promoted beyond debug.
         let total = reconciliationBalance(for: account, range: plan.dateRange)
         return MarinaExecutionResult(
             kind: .metric,
@@ -371,6 +380,9 @@ struct MarinaQueryExecutor {
         let account = plan.targetName.flatMap { resolveSavingsAccount(named: $0, in: snapshot) } ?? snapshot.savingsAccounts.first
 
         if plan.dateRange == nil {
+            // Universal ownership note:
+            // savingsTotalExplicitAccount is parity-proven through universal.
+            // Keep this branch as the legacy fallback until universal routing is promoted beyond debug.
             let total = account?.total ?? snapshot.savingsEntries.reduce(0.0) { $0 + $1.amount }
             return MarinaExecutionResult(
                 kind: .metric,
@@ -455,6 +467,9 @@ struct MarinaQueryExecutor {
             return listResult(title: MarinaL10n.common("income", defaultValue: "Income", comment: "Common label for income."), subtitle: rangeLabel(plan.dateRange), rows: rows)
         }
 
+        // Universal ownership note:
+        // incomeTotal and incomeBySource are universal-owned for exact Phase 14/17 semantic shapes.
+        // Source-filtered totals, narrowed income states, and other shaped income variants remain legacy-owned for now.
         let total = incomeTotal(snapshot.incomes, range: plan.dateRange, state: plan.semanticRequest.incomeState ?? .all, source: plan.targetName)
         return MarinaExecutionResult(
             kind: .metric,
@@ -539,6 +554,9 @@ struct MarinaQueryExecutor {
             )
         }
 
+        // Universal ownership note:
+        // budgetRemainingRoom is parity-proven through universal for forecast + remainingRoom requests.
+        // This HomeQuery branch remains the legacy fallback during migration.
         return executionResult(
             from: homeAnswer(
                 query: HomeQuery(intent: plan.measure == .remainingRoom ? .safeSpendToday : .periodOverview, dateRange: targetBudgetRange ?? plan.dateRange),
@@ -593,6 +611,9 @@ struct MarinaQueryExecutor {
                 ]
             )
         case .safeDailySpend:
+            // Universal ownership note:
+            // safeDailySpend is parity-proven through universal.
+            // Keep this formula branch as the legacy fallback until universal routing is promoted beyond debug.
             let summary = safeSpendSummary(snapshot: snapshot, plan: plan, rangeOverride: range)
             guard let safeDailySpend = MarinaBudgetFormulaCalculator.safeDailySpend(
                 remainingRoom: summary.periodRemainingRoom,
@@ -743,6 +764,9 @@ struct MarinaQueryExecutor {
 
     private func expenseResult(plan: MarinaQueryPlan, snapshot: MarinaWorkspaceSnapshot) -> MarinaExecutionResult {
         if plan.operation == .next, plan.entity == .plannedExpense {
+            // Universal ownership note:
+            // nextPlannedExpense is parity-proven through universal.
+            // Keep this branch as the legacy fallback until universal routing is promoted beyond debug.
             return executionResult(
                 from: homeAnswer(
                     query: HomeQuery(
@@ -757,6 +781,9 @@ struct MarinaQueryExecutor {
             )
         }
 
+        // Universal ownership note:
+        // unifiedExpenseCategoryGroups and unifiedExpenseCardGroups are parity-proven through universal.
+        // Other grouped expense shapes remain legacy-owned for now.
         if plan.operation == .group, plan.dimensions.contains(.category) {
             return executionResult(
                 from: homeAnswer(
@@ -770,6 +797,9 @@ struct MarinaQueryExecutor {
         let rows = filteredExpenseRows(plan: plan, snapshot: snapshot)
 
         if plan.operation == .last {
+            // Universal ownership note:
+            // latestVariableExpense is parity-proven through universal for unfiltered variable expense latest-row requests.
+            // This branch remains the legacy fallback for all expense latest-row shapes.
             let matching = rows.sorted { $0.date > $1.date }
             guard let row = matching.first else {
                 if let textQuery = plan.semanticRequest.textQuery {
@@ -788,6 +818,9 @@ struct MarinaQueryExecutor {
         }
 
         if plan.operation == .sum {
+            // Universal ownership note:
+            // merchantVariableSpend, categoryVariableSpend, cardVariableSpend, and plannedExpenseSum are
+            // parity-proven through universal for their exact Phase 14 semantic shapes.
             if rows.isEmpty, let textQuery = plan.semanticRequest.textQuery {
                 return expenseTextNoResultsResult(textQuery: textQuery, plan: plan, snapshot: snapshot)
             }
@@ -837,6 +870,9 @@ struct MarinaQueryExecutor {
             return expenseTextNoResultsResult(textQuery: textQuery, plan: plan, snapshot: snapshot)
         }
 
+        // Universal ownership note:
+        // biggestVariableExpenseRows is parity-proven through universal for amount-descending variable expense lists.
+        // This branch remains the legacy fallback for all expense list shapes.
         let answerRows = sortedExpenseRows(rows, sort: plan.semanticRequest.sort)
             .prefix(plan.resultLimit)
             .map { row in

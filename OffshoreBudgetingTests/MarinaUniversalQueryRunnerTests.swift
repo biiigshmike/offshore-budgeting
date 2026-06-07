@@ -157,6 +157,66 @@ struct MarinaUniversalQueryRunnerTests {
         ])
     }
 
+    @Test func groupsUnifiedExpensesByCardAggregatesPlannedVariableAndUnassignedRows() throws {
+        let firstDate = Date(timeIntervalSince1970: 1_780_300_800)
+        let secondDate = Date(timeIntervalSince1970: 1_780_387_200)
+        let oldDate = Date(timeIntervalSince1970: 1_777_795_200)
+        let futureDate = Date(timeIntervalSince1970: 1_782_892_800)
+        let workspace = Workspace(name: "Personal", hexColor: "#3B82F6")
+        let appleCard = Card(name: "Apple Card", theme: "ruby", effect: "plastic", workspace: workspace)
+        let chaseCard = Card(name: "Chase Card", theme: "sky", effect: "matte", workspace: workspace)
+        let budget = Budget(name: "June", startDate: firstDate, endDate: secondDate, workspace: workspace)
+        let plannedExpenses = [
+            PlannedExpense(title: "Phone Bill", plannedAmount: 80, expenseDate: secondDate, workspace: workspace, card: appleCard, sourceBudgetID: budget.id),
+            PlannedExpense(title: "Cash Plan", plannedAmount: 100, expenseDate: secondDate, workspace: workspace, card: nil, sourceBudgetID: budget.id),
+            PlannedExpense(title: "Old Cash Plan", plannedAmount: 50, expenseDate: oldDate, workspace: workspace, card: nil, sourceBudgetID: budget.id)
+        ]
+        let variableExpenses = [
+            VariableExpense(descriptionText: "Apple Store", amount: 120, transactionDate: firstDate, workspace: workspace, card: appleCard),
+            VariableExpense(descriptionText: "Kroger", amount: 30, transactionDate: secondDate, workspace: workspace, card: chaseCard),
+            VariableExpense(descriptionText: "Cash Coffee", amount: 7, transactionDate: firstDate, workspace: workspace, card: nil),
+            VariableExpense(descriptionText: "Future Cash", amount: 9, transactionDate: futureDate, workspace: workspace, card: nil)
+        ]
+        let snapshot = MarinaWorkspaceSnapshot(
+            workspace: workspace,
+            budgets: [budget],
+            cards: [appleCard, chaseCard],
+            categories: [],
+            presets: [],
+            plannedExpenses: plannedExpenses,
+            variableExpenses: variableExpenses,
+            homePlannedExpenses: plannedExpenses,
+            homeCalculationPlannedExpenses: plannedExpenses,
+            homeCalculationVariableExpenses: variableExpenses,
+            reconciliationAccounts: [],
+            expenseAllocations: [],
+            allocationSettlements: [],
+            savingsAccounts: [],
+            savingsEntries: [],
+            incomes: []
+        )
+
+        let groups = requireGroups(runner.run(
+            plan: MarinaUniversalQueryPlan(
+                surface: .unifiedExpenses,
+                operation: .group,
+                measure: .budgetImpact,
+                filters: [
+                    MarinaRowFilter(target: .field(.date), operation: .greaterThanOrEqual, value: .date(firstDate)),
+                    MarinaRowFilter(target: .field(.date), operation: .lessThanOrEqual, value: .date(secondDate))
+                ],
+                groupBy: .relationship(.card)
+            ),
+            snapshot: snapshot
+        ))
+
+        #expect(groupSummaries(groups) == [
+            GroupSummary(name: "Apple Card", aggregate: .money(200)),
+            GroupSummary(name: "Chase Card", aggregate: .money(30)),
+            GroupSummary(name: "Unassigned", aggregate: .money(107))
+        ])
+    }
+
     @Test func listsPlannedExpenses() throws {
         let fixture = makeFixture()
         let rows = requireRows(runner.run(

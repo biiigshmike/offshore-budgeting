@@ -155,6 +155,34 @@ struct MarinaSemanticUniversalPlanBridgeUnifiedExpenseTests {
         ])
     }
 
+    @Test func spendingByCardShadowRequestRunsUnifiedGroup() throws {
+        let fixture = makeFixture()
+        let plan = try requirePlan(bridge.makePlan(
+            from: request(
+                entity: .variableExpense,
+                operation: .group,
+                measure: .budgetImpact,
+                dimensions: [.card],
+                dateRangeToken: .currentPeriod,
+                expenseScope: .unified,
+                shape: .list
+            ),
+            planningContext: fixture.context(ambientDateRange: fixture.currentPeriod)
+        ))
+        let groups = requireGroups(runner.run(plan: plan, snapshot: fixture.snapshot))
+
+        #expect(plan.surface == .unifiedExpenses)
+        #expect(plan.groupBy == .relationship(.card))
+        #expect(dateFilters(in: plan) == [
+            MarinaRowFilter(target: .field(.date), operation: .greaterThanOrEqual, value: .date(date(2026, 6, 1))),
+            MarinaRowFilter(target: .field(.date), operation: .lessThanOrEqual, value: .date(date(2026, 6, 30)))
+        ])
+        #expect(groupSummaries(groups) == [
+            UnifiedBridgeGroupSummary(name: "Apple Card", aggregate: .money(293)),
+            UnifiedBridgeGroupSummary(name: "Chase Card", aggregate: .money(1_200))
+        ])
+    }
+
     @Test func biggestSpendingRowsShadowRequestRunsUnifiedSortAndLimit() throws {
         let fixture = makeFixture()
         let plan = try requirePlan(bridge.makePlan(from: request(

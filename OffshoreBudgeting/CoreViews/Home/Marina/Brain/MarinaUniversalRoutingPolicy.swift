@@ -9,7 +9,9 @@ enum MarinaUniversalRoutingScenario: String, Codable, CaseIterable, Equatable, H
     case biggestVariableExpenseRows
     case nextPlannedExpense
     case unifiedExpenseCategoryGroups
+    case unifiedExpenseCardGroups
     case incomeTotal
+    case incomeBySource
     case savingsTotalExplicitAccount
     case reconciliationBalanceExplicitAccount
     case budgetRemainingRoom
@@ -121,12 +123,21 @@ struct MarinaUniversalRoutingPolicy: Equatable, Sendable {
               request.measure == .budgetImpact,
               request.expectedAnswerShape == .list,
               request.expenseScope == .unified,
-              exactDimensions(request, [.category]),
               hasNoNamedTargets(request),
               request.sort == nil else {
             return nil
         }
-        return .unifiedExpenseCategoryGroups
+
+        if exactDimensions(request, [.category]) {
+            return .unifiedExpenseCategoryGroups
+        }
+
+        if exactDimensions(request, [.card]),
+           request.dateRangeToken != .allTime {
+            return .unifiedExpenseCardGroups
+        }
+
+        return nil
     }
 
     private func plannedExpenseScenario(for request: MarinaSemanticRequest) -> MarinaUniversalRoutingScenario? {
@@ -160,16 +171,28 @@ struct MarinaUniversalRoutingPolicy: Equatable, Sendable {
     }
 
     private func incomeScenario(for request: MarinaSemanticRequest) -> MarinaUniversalRoutingScenario? {
-        guard request.operation == .sum,
-              request.measure == .incomeAmount,
-              request.expectedAnswerShape == .metric,
-              exactDimensions(request, []),
-              hasNoNamedTargets(request),
-              request.incomeState == nil || request.incomeState == .all,
-              request.sort == nil else {
-            return nil
+        if request.operation == .sum,
+           request.measure == .incomeAmount,
+           request.expectedAnswerShape == .metric,
+           exactDimensions(request, []),
+           hasNoNamedTargets(request),
+           request.incomeState == nil || request.incomeState == .all,
+           request.sort == nil {
+            return .incomeTotal
         }
-        return .incomeTotal
+
+        if request.operation == .group,
+           request.measure == .incomeAmount,
+           request.expectedAnswerShape == .list,
+           exactDimensions(request, [.incomeSource]),
+           hasNoNamedTargets(request),
+           request.incomeState == nil || request.incomeState == .all,
+           request.dateRangeToken != .allTime,
+           request.sort == nil {
+            return .incomeBySource
+        }
+
+        return nil
     }
 
     private func savingsScenario(for request: MarinaSemanticRequest) -> MarinaUniversalRoutingScenario? {
@@ -293,7 +316,9 @@ extension MarinaUniversalRoutingPolicy {
             .biggestVariableExpenseRows,
             .nextPlannedExpense,
             .unifiedExpenseCategoryGroups,
+            .unifiedExpenseCardGroups,
             .incomeTotal,
+            .incomeBySource,
             .savingsTotalExplicitAccount,
             .reconciliationBalanceExplicitAccount,
             .budgetRemainingRoom,

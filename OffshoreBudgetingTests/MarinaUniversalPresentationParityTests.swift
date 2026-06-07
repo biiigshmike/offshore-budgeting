@@ -87,6 +87,48 @@ struct MarinaUniversalPresentationParityTests {
         )
     }
 
+    @Test func latestVariableExpensePresentationMatchesLegacyFacts() {
+        let fixture = makeFixture()
+        let request = semanticRequest(
+            entity: .variableExpense,
+            operation: .last,
+            measure: .budgetImpact,
+            dateRangeToken: .currentMonth,
+            expenseScope: .variable,
+            shape: .metric
+        )
+        let legacy = fixture.harness.runLegacy(request: request, context: fixture.context())
+        let presented = fixture.presentedResult(request: request, context: fixture.context())
+
+        expectRowParity(
+            fixture.harness.legacyRowsFact(from: legacy),
+            fixture.harness.legacyRowsFact(from: presented),
+            scenario: "Latest variable expense presentation"
+        )
+    }
+
+    @Test func biggestVariableExpenseRowsPresentationMatchesLegacyFacts() {
+        let fixture = makeFixture()
+        let request = semanticRequest(
+            entity: .variableExpense,
+            operation: .list,
+            measure: .budgetImpact,
+            dateRangeToken: .currentMonth,
+            resultLimit: 3,
+            sort: .amountDescending,
+            expenseScope: .variable,
+            shape: .list
+        )
+        let legacy = fixture.harness.runLegacy(request: request, context: fixture.context())
+        let presented = fixture.presentedResult(request: request, context: fixture.context())
+
+        expectRowParity(
+            fixture.harness.legacyRowsFact(from: legacy),
+            fixture.harness.legacyRowsFact(from: presented),
+            scenario: "Biggest variable expense rows presentation"
+        )
+    }
+
     @Test func nextPlannedExpensePresentationMatchesLegacyFacts() {
         let fixture = makeFixture()
         let request = semanticRequest(
@@ -220,6 +262,48 @@ struct MarinaUniversalPresentationParityTests {
         #expect(rows.map(\.amount) == [575, 38, 1_200])
     }
 
+    @Test func incomeBySourcePresentationMatchesManualFixtureMath() {
+        let fixture = makeFixture()
+        let request = semanticRequest(
+            entity: .income,
+            operation: .group,
+            measure: .incomeAmount,
+            dimensions: [.incomeSource],
+            dateRangeToken: .currentPeriod,
+            incomeState: .all,
+            shape: .list
+        )
+        let presented = fixture.presentedResult(request: request, context: fixture.context(ambientDateRange: fixture.currentPeriod))
+        let rows = presented.rows.sorted { $0.title < $1.title }
+
+        #expect(presented.kind == .list)
+        #expect(presented.title == "Income by Source")
+        #expect(rows.map(\.title) == ["Freelance", "Paycheck"])
+        #expect(rows.map(\.amount) == [650, 2_000])
+        expectNoDebugText(in: presented)
+    }
+
+    @Test func unifiedCardGroupPresentationMatchesManualFixtureMathAndUnassignedRows() {
+        let fixture = makeCardGroupFixture()
+        let request = semanticRequest(
+            entity: .variableExpense,
+            operation: .group,
+            measure: .budgetImpact,
+            dimensions: [.card],
+            dateRangeToken: .currentMonth,
+            expenseScope: .unified,
+            shape: .list
+        )
+        let presented = fixture.presentedResult(request: request, context: fixture.context())
+        let rows = presented.rows.sorted { $0.title < $1.title }
+
+        #expect(presented.kind == .list)
+        #expect(presented.title == "Spending by Card")
+        #expect(rows.map(\.title) == ["Apple Card", "Chase Card", "Unassigned"])
+        #expect(rows.map(\.amount) == [200, 30, 107])
+        expectNoDebugText(in: presented)
+    }
+
     private func makeFixture() -> MarinaUniversalPresentationParityFixture {
         let workspace = Workspace(name: "Personal", hexColor: "#3B82F6")
         let appleCard = Card(name: "Apple Card", theme: "ruby", effect: "plastic", workspace: workspace)
@@ -314,6 +398,65 @@ struct MarinaUniversalPresentationParityTests {
             now: date(2026, 6, 15),
             calendar: calendar
         )
+    }
+
+    private func makeCardGroupFixture() -> MarinaUniversalPresentationParityFixture {
+        let workspace = Workspace(name: "Personal", hexColor: "#3B82F6")
+        let appleCard = Card(name: "Apple Card", theme: "ruby", effect: "plastic", workspace: workspace)
+        let chaseCard = Card(name: "Chase Card", theme: "sky", effect: "matte", workspace: workspace)
+        let budget = Budget(name: "June", startDate: date(2026, 6, 1), endDate: date(2026, 6, 30), workspace: workspace)
+        let plannedExpenses = [
+            PlannedExpense(title: "Phone Bill", plannedAmount: 80, expenseDate: date(2026, 6, 16), workspace: workspace, card: appleCard, sourceBudgetID: budget.id),
+            PlannedExpense(title: "Cash Plan", plannedAmount: 100, expenseDate: date(2026, 6, 20), workspace: workspace, card: nil, sourceBudgetID: budget.id),
+            PlannedExpense(title: "Old Cash Plan", plannedAmount: 50, expenseDate: date(2026, 5, 20), workspace: workspace, card: nil, sourceBudgetID: budget.id)
+        ]
+        let variableExpenses = [
+            VariableExpense(descriptionText: "Apple Store", amount: 120, transactionDate: date(2026, 6, 5), workspace: workspace, card: appleCard),
+            VariableExpense(descriptionText: "Kroger", amount: 30, transactionDate: date(2026, 6, 10), workspace: workspace, card: chaseCard),
+            VariableExpense(descriptionText: "Cash Coffee", amount: 7, transactionDate: date(2026, 6, 11), workspace: workspace, card: nil),
+            VariableExpense(descriptionText: "Future Cash", amount: 9, transactionDate: date(2026, 7, 1), workspace: workspace, card: nil)
+        ]
+        let snapshot = MarinaWorkspaceSnapshot(
+            workspace: workspace,
+            budgets: [budget],
+            cards: [appleCard, chaseCard],
+            categories: [],
+            presets: [],
+            plannedExpenses: plannedExpenses,
+            variableExpenses: variableExpenses,
+            homePlannedExpenses: plannedExpenses,
+            homeCalculationPlannedExpenses: plannedExpenses,
+            homeCalculationVariableExpenses: variableExpenses,
+            reconciliationAccounts: [],
+            expenseAllocations: [],
+            allocationSettlements: [],
+            savingsAccounts: [],
+            savingsEntries: [],
+            incomes: []
+        )
+
+        return MarinaUniversalPresentationParityFixture(
+            snapshot: snapshot,
+            currentPeriod: HomeQueryDateRange(startDate: date(2026, 6, 1), endDate: date(2026, 6, 30)),
+            now: date(2026, 6, 15),
+            calendar: calendar
+        )
+    }
+
+    private func expectNoDebugText(in result: MarinaExecutionResult) {
+        let forbidden = ["Universal routing", "Diagnostics", "Scenario=", "usedUniversal", "fallbackReason"]
+        let visibleValues = [
+            result.title,
+            result.subtitle,
+            result.primaryValue,
+            result.explanation
+        ].compactMap { $0 } + result.rows.flatMap { [$0.title, $0.value] }
+
+        for value in visibleValues {
+            for token in forbidden {
+                #expect(value.contains(token) == false)
+            }
+        }
     }
 
     private func semanticRequest(

@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 @testable import Offshore
 
@@ -179,6 +180,28 @@ struct MarinaSemanticUniversalPlanBridgeTests {
         #expect(plan.groupBy == .relationship(.incomeSource))
     }
 
+    @Test func incomeGroupByIncomeSourceMapsToDateFilteredGroupPlan() throws {
+        let plan = try requirePlan(bridge.makePlan(
+            from: request(
+                entity: .income,
+                operation: .group,
+                measure: .incomeAmount,
+                dimensions: [.incomeSource],
+                dateRangeToken: .currentMonth,
+                shape: .list
+            ),
+            planningContext: context()
+        ))
+
+        #expect(plan.surface == .semantic(.income))
+        #expect(plan.groupBy == .relationship(.incomeSource))
+        #expect(plan.filters == [
+            MarinaRowFilter(target: .field(.date), operation: .greaterThanOrEqual, value: .date(date(2026, 6, 1))),
+            MarinaRowFilter(target: .field(.date), operation: .lessThanOrEqual, value: .date(date(2026, 6, 30)))
+        ])
+        #expect(plan.requiresDateField)
+    }
+
     @Test func categoryListMapsToUniversalListPlan() throws {
         let plan = try requirePlan(bridge.makePlan(from: request(entity: .category, operation: .list, shape: .list)))
 
@@ -241,6 +264,7 @@ struct MarinaSemanticUniversalPlanBridgeTests {
         operation: MarinaSemanticOperation,
         measure: MarinaSemanticMeasure? = nil,
         dimensions: [MarinaSemanticDimension] = [],
+        dateRangeToken: MarinaSemanticDateRangeToken = .currentPeriod,
         targetName: String? = nil,
         textQuery: String? = nil,
         resultLimit: Int? = nil,
@@ -253,6 +277,7 @@ struct MarinaSemanticUniversalPlanBridgeTests {
             operation: operation,
             measure: measure,
             dimensions: dimensions,
+            dateRangeToken: dateRangeToken,
             targetName: targetName,
             textQuery: textQuery,
             resultLimit: resultLimit,
@@ -260,6 +285,24 @@ struct MarinaSemanticUniversalPlanBridgeTests {
             expenseScope: expenseScope,
             expectedAnswerShape: shape
         )
+    }
+
+    private func context() -> MarinaUniversalPlanningContext {
+        MarinaUniversalPlanningContext(
+            defaultBudgetingPeriod: .monthly,
+            now: date(2026, 6, 15),
+            calendar: calendar
+        )
+    }
+
+    private var calendar: Calendar {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0) ?? .current
+        return calendar
+    }
+
+    private func date(_ year: Int, _ month: Int, _ day: Int) -> Date {
+        DateComponents(calendar: calendar, timeZone: TimeZone(secondsFromGMT: 0), year: year, month: month, day: day).date!
     }
 
     private func requirePlan(

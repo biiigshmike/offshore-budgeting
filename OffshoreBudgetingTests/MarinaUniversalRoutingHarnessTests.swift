@@ -80,6 +80,44 @@ struct MarinaUniversalRoutingHarnessTests {
         try expectFirstAmount(universal.result, equals: 4_750)
     }
 
+    @Test func allowlistedIncomeBySourceReturnsUniversalResult() throws {
+        let fixture = makeFixture()
+        let request = semanticRequest(
+            entity: .income,
+            operation: .group,
+            measure: .incomeAmount,
+            dimensions: [.incomeSource],
+            incomeState: .all,
+            shape: .list
+        )
+        let universal = try fixture.requireUniversalAttempt(for: request)
+        let rows = universal.result.rows.sorted { $0.title < $1.title }
+
+        #expect(universal.result.kind == .list)
+        #expect(universal.diagnostics.scenario == .incomeBySource)
+        #expect(rows.map(\.title) == ["Freelance", "Paycheck"])
+        #expect(rows.map(\.amount) == [650, 4_100])
+    }
+
+    @Test func allowlistedUnifiedExpenseCardGroupsReturnUniversalResult() throws {
+        let fixture = makeFixture()
+        let request = semanticRequest(
+            entity: .variableExpense,
+            operation: .group,
+            measure: .budgetImpact,
+            dimensions: [.card],
+            expenseScope: .unified,
+            shape: .list
+        )
+        let universal = try fixture.requireUniversalAttempt(for: request)
+        let rows = universal.result.rows.sorted { $0.title < $1.title }
+
+        #expect(universal.result.kind == .list)
+        #expect(universal.diagnostics.scenario == .unifiedExpenseCardGroups)
+        #expect(rows.map(\.title) == ["Apple Card", "Chase Card"])
+        #expect(rows.map(\.amount) == [218, 1_520])
+    }
+
     @Test func allowlistedSavingsTotalWithExplicitAccountReturnsUniversalResult() throws {
         let fixture = makeFixture()
         let request = savingsTotalRequest(targetName: "Savings Account")

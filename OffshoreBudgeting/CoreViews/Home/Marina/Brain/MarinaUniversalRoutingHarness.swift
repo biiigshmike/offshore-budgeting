@@ -185,7 +185,9 @@ struct MarinaUniversalRoutingHarness {
              .biggestVariableExpenseRows,
              .nextPlannedExpense,
              .unifiedExpenseCategoryGroups,
+             .unifiedExpenseCardGroups,
              .incomeTotal,
+             .incomeBySource,
              .savingsTotalExplicitAccount,
              .reconciliationBalanceExplicitAccount:
             return false

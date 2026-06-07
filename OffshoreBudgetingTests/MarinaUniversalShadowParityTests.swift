@@ -162,6 +162,53 @@ struct MarinaUniversalShadowParityTests {
         )
     }
 
+    @Test func unifiedExpenseGroupsByCardMatchManualFixtureMath() {
+        let fixture = makeFixture()
+        let request = semanticRequest(
+            entity: .variableExpense,
+            operation: .group,
+            measure: .budgetImpact,
+            dimensions: [.card],
+            dateRangeToken: .currentMonth,
+            expenseScope: .unified,
+            shape: .list
+        )
+        let universal = fixture.harness.runUniversal(request: request, context: fixture.context())
+
+        expectUnorderedGroupParity(
+            .groups([
+                MarinaComparableGroup(displayName: "Apple Card", amount: 293, count: nil),
+                MarinaComparableGroup(displayName: "Chase Card", amount: 1_520, count: nil)
+            ]),
+            fixture.harness.universalGroupsFact(from: universal),
+            scenario: "Unified expense card groups manual fixture"
+        )
+    }
+
+    @Test func incomeBySourceMatchesManualFixtureMath() {
+        let fixture = makeFixture()
+        let request = semanticRequest(
+            entity: .income,
+            operation: .group,
+            measure: .incomeAmount,
+            dimensions: [.incomeSource],
+            dateRangeToken: .currentPeriod,
+            incomeState: .all,
+            shape: .list
+        )
+        let context = fixture.context(ambientDateRange: fixture.currentPeriod)
+        let universal = fixture.harness.runUniversal(request: request, context: context)
+
+        expectUnorderedGroupParity(
+            .groups([
+                MarinaComparableGroup(displayName: "Freelance", amount: 650, count: nil),
+                MarinaComparableGroup(displayName: "Paycheck", amount: 2_000, count: nil)
+            ]),
+            fixture.harness.universalGroupsFact(from: universal),
+            scenario: "Income by source manual fixture"
+        )
+    }
+
     @Test func incomeTotalMatchesLegacyExecutor() {
         let fixture = makeFixture()
         let request = semanticRequest(

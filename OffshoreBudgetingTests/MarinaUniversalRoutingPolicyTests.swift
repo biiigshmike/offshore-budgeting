@@ -125,6 +125,20 @@ struct MarinaUniversalRoutingPolicyTests {
         #expect(policy.allows(request))
     }
 
+    @Test func unifiedGroupByCardMapsToUnifiedCardScenario() {
+        let request = semanticRequest(
+            entity: .variableExpense,
+            operation: .group,
+            measure: .budgetImpact,
+            dimensions: [.card],
+            expenseScope: .unified,
+            shape: .list
+        )
+
+        #expect(policy.scenario(for: request) == .unifiedExpenseCardGroups)
+        #expect(policy.allows(request))
+    }
+
     @Test func incomeTotalMapsToIncomeScenario() {
         let request = semanticRequest(
             entity: .income,
@@ -134,6 +148,20 @@ struct MarinaUniversalRoutingPolicyTests {
         )
 
         #expect(policy.scenario(for: request) == .incomeTotal)
+        #expect(policy.allows(request))
+    }
+
+    @Test func incomeBySourceMapsToIncomeSourceScenario() {
+        let request = semanticRequest(
+            entity: .income,
+            operation: .group,
+            measure: .incomeAmount,
+            dimensions: [.incomeSource],
+            incomeState: .all,
+            shape: .list
+        )
+
+        #expect(policy.scenario(for: request) == .incomeBySource)
         #expect(policy.allows(request))
     }
 
@@ -251,6 +279,80 @@ struct MarinaUniversalRoutingPolicyTests {
 
         #expect(policy.scenario(for: plannedOnly) == nil)
         #expect(policy.scenario(for: actualOnly) == nil)
+    }
+
+    @Test func narrowedIncomeBySourceStatesAreNotAllowlisted() {
+        for state in [MarinaSemanticIncomeState.planned, .actual] {
+            let request = semanticRequest(
+                entity: .income,
+                operation: .group,
+                measure: .incomeAmount,
+                dimensions: [.incomeSource],
+                incomeState: state,
+                shape: .list
+            )
+
+            #expect(policy.scenario(for: request) == nil)
+            #expect(policy.allows(request) == false)
+        }
+    }
+
+    @Test func phase17GroupedScenariosRejectAllTimeTargetsSortsAndExtraDimensions() {
+        let incomeAllTime = semanticRequest(
+            entity: .income,
+            operation: .group,
+            measure: .incomeAmount,
+            dimensions: [.incomeSource],
+            dateRangeToken: .allTime,
+            shape: .list
+        )
+        let incomeTarget = semanticRequest(
+            entity: .income,
+            operation: .group,
+            measure: .incomeAmount,
+            dimensions: [.incomeSource],
+            targetName: "Paycheck",
+            shape: .list
+        )
+        let incomeSorted = semanticRequest(
+            entity: .income,
+            operation: .group,
+            measure: .incomeAmount,
+            dimensions: [.incomeSource],
+            sort: .amountDescending,
+            shape: .list
+        )
+        let unifiedAllTime = semanticRequest(
+            entity: .variableExpense,
+            operation: .group,
+            measure: .budgetImpact,
+            dimensions: [.card],
+            dateRangeToken: .allTime,
+            expenseScope: .unified,
+            shape: .list
+        )
+        let unifiedExtraDimension = semanticRequest(
+            entity: .variableExpense,
+            operation: .group,
+            measure: .budgetImpact,
+            dimensions: [.card, .category],
+            expenseScope: .unified,
+            shape: .list
+        )
+        let unifiedTarget = semanticRequest(
+            entity: .variableExpense,
+            operation: .group,
+            measure: .budgetImpact,
+            dimensions: [.card],
+            targetName: "Apple Card",
+            expenseScope: .unified,
+            shape: .list
+        )
+
+        for request in [incomeAllTime, incomeTarget, incomeSorted, unifiedAllTime, unifiedExtraDimension, unifiedTarget] {
+            #expect(policy.scenario(for: request) == nil)
+            #expect(policy.allows(request) == false)
+        }
     }
 
     @Test func plannedEffectiveAmountSumAndBudgetSumRemainingRoomAreNotAllowlisted() {
