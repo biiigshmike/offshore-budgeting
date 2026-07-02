@@ -59,7 +59,9 @@ struct MarinaSemanticRequestValidator {
         }
 
         let resolution = candidateResolver.resolveWithTrace(interpreted: interpreted, snapshot: snapshot)
-        let resolved = resolution.interpreted
+        var resolved = resolution.interpreted
+        var resolverOutput = resolved
+        var candidateSearches = resolution.candidateSearches
         request = resolved.request
         notes = resolved.diagnosticNotes
         source = resolved.source
@@ -75,8 +77,8 @@ struct MarinaSemanticRequestValidator {
             )
             return MarinaSemanticValidationTrace(
                 interpreted: terminal,
-                resolverOutput: resolved,
-                candidateSearches: resolution.candidateSearches,
+                resolverOutput: resolverOutput,
+                candidateSearches: candidateSearches,
                 explicitPromptTargets: explicitTargets
             )
         }
@@ -103,6 +105,52 @@ struct MarinaSemanticRequestValidator {
             }
         }
 
+        if shouldAttemptExplicitPromptTargetFallback(
+            source: source,
+            request: interpreted.request,
+            explicitTargets: explicitTargets
+        ) {
+            let fallback = candidateResolver.resolveExplicitPromptTargetsWithTrace(
+                interpreted: interpretedWith(
+                    request: request,
+                    interpreted: resolved,
+                    source: source,
+                    notes: notes,
+                    clarificationChoices: resolved.clarificationChoices
+                ),
+                snapshot: snapshot,
+                explicitPromptTargets: explicitTargets
+            )
+            candidateSearches.append(contentsOf: fallback.candidateSearches)
+            resolved = fallback.interpreted
+            resolverOutput = resolved
+            request = resolved.request
+            notes = resolved.diagnosticNotes
+            source = resolved.source
+
+            if request.expectedAnswerShape == .clarification || request.expectedAnswerShape == .unsupported {
+                notes.append("Validation accepted explicit prompt target fallback terminal semantic shape.")
+                let terminal = interpretedWith(
+                    request: request,
+                    interpreted: resolved,
+                    source: source,
+                    notes: notes,
+                    clarificationChoices: resolved.clarificationChoices
+                )
+                return MarinaSemanticValidationTrace(
+                    interpreted: terminal,
+                    resolverOutput: resolverOutput,
+                    candidateSearches: candidateSearches,
+                    explicitPromptTargets: explicitTargets
+                )
+            }
+
+            if let normalized = categoryExpenseListRequestIfNeeded(request) {
+                request = normalized
+                notes.append("Validation normalized explicit prompt target fallback category list semantics.")
+            }
+        }
+
         if shouldEnforcePromptTargetRetention(source: source),
            let targetLoss = targetLossRejection(for: request, explicitTargets: explicitTargets) {
             notes.append("Validation rejected semantic request because prompt target(s) were not retained: \(targetLoss.joined(separator: ", ")).")
@@ -115,8 +163,8 @@ struct MarinaSemanticRequestValidator {
             )
             return MarinaSemanticValidationTrace(
                 interpreted: rejected,
-                resolverOutput: resolved,
-                candidateSearches: resolution.candidateSearches,
+                resolverOutput: resolverOutput,
+                candidateSearches: candidateSearches,
                 explicitPromptTargets: explicitTargets
             )
         }
@@ -127,8 +175,8 @@ struct MarinaSemanticRequestValidator {
             let rejected = interpretedWith(request: request, interpreted: resolved, source: source, notes: notes)
             return MarinaSemanticValidationTrace(
                 interpreted: rejected,
-                resolverOutput: resolved,
-                candidateSearches: resolution.candidateSearches,
+                resolverOutput: resolverOutput,
+                candidateSearches: candidateSearches,
                 explicitPromptTargets: explicitTargets
             )
         }
@@ -138,8 +186,8 @@ struct MarinaSemanticRequestValidator {
             let rejectedInterpreted = interpretedWith(request: rejected, interpreted: resolved, source: source, notes: notes)
             return MarinaSemanticValidationTrace(
                 interpreted: rejectedInterpreted,
-                resolverOutput: resolved,
-                candidateSearches: resolution.candidateSearches,
+                resolverOutput: resolverOutput,
+                candidateSearches: candidateSearches,
                 explicitPromptTargets: explicitTargets
             )
         }
@@ -148,8 +196,8 @@ struct MarinaSemanticRequestValidator {
         let accepted = interpretedWith(request: request, interpreted: resolved, source: source, notes: notes)
         return MarinaSemanticValidationTrace(
             interpreted: accepted,
-            resolverOutput: resolved,
-            candidateSearches: resolution.candidateSearches,
+            resolverOutput: resolverOutput,
+            candidateSearches: candidateSearches,
             explicitPromptTargets: explicitTargets
         )
     }
@@ -474,6 +522,21 @@ struct MarinaSemanticRequestValidator {
 
     private func shouldEnforcePromptTargetRetention(source: MarinaSemanticSource) -> Bool {
         source == .foundationModel || source == .repairedFoundationModel
+    }
+
+    private func shouldAttemptExplicitPromptTargetFallback(
+        source: MarinaSemanticSource,
+        request: MarinaSemanticRequest,
+        explicitTargets: [String]
+    ) -> Bool {
+        guard shouldEnforcePromptTargetRetention(source: source),
+              explicitTargets.isEmpty == false,
+              request.targetName?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty != false,
+              request.textQuery?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty != false,
+              request.comparisonTargetName?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty != false else {
+            return false
+        }
+        return true
     }
 
     private func unique(_ dimensions: [MarinaSemanticDimension]) -> [MarinaSemanticDimension] {

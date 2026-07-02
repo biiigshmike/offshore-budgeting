@@ -207,7 +207,7 @@ struct MarinaPanelView: View {
                 onSelect: selectChatSession,
                 onNewChat: startNewChat,
                 onRename: beginRenameChat,
-                onDelete: beginDeleteChat,
+                onDelete: deleteChatFromHistory,
                 onDismiss: { isShowingChatHistory = false }
             )
         }
@@ -1427,22 +1427,34 @@ struct MarinaPanelView: View {
 
     private func deletePendingChat() {
         guard let pendingDeleteSession else { return }
-        let deletingActiveSession = pendingDeleteSession.id == activeSessionID
 
         do {
-            let fallback = try chatSessionStore.deleteSession(
-                id: pendingDeleteSession.id,
-                workspace: workspace,
-                modelContext: modelContext
-            )
-            if deletingActiveSession || activeSessionID == nil {
-                loadSession(fallback)
-            }
+            try deleteChat(id: pendingDeleteSession.id)
         } catch {
             return
         }
 
         self.pendingDeleteSession = nil
+    }
+
+    private func deleteChatFromHistory(id: UUID) {
+        do {
+            try deleteChat(id: id)
+        } catch {
+            return
+        }
+    }
+
+    private func deleteChat(id: UUID) throws {
+        let deletingActiveSession = id == activeSessionID
+        let fallback = try chatSessionStore.deleteSession(
+            id: id,
+            workspace: workspace,
+            modelContext: modelContext
+        )
+        if deletingActiveSession || activeSessionID == nil {
+            loadSession(fallback)
+        }
     }
 
     private func clearConversation() {
@@ -1512,13 +1524,20 @@ struct MarinaPanelView: View {
 }
 
 private struct MarinaChatHistoryView: View {
+    private struct PendingDeleteSession {
+        let id: UUID
+        let title: String
+    }
+
     let sessions: [MarinaChatSession]
     let activeSessionID: UUID?
     let onSelect: (MarinaChatSession) -> Void
     let onNewChat: () -> Void
     let onRename: (MarinaChatSession) -> Void
-    let onDelete: (MarinaChatSession) -> Void
+    let onDelete: (UUID) -> Void
     let onDismiss: () -> Void
+
+    @State private var pendingDeleteSession: PendingDeleteSession?
 
     var body: some View {
         NavigationStack {
@@ -1561,16 +1580,14 @@ private struct MarinaChatHistoryView: View {
                                 }
 
                                 Button(role: .destructive) {
-                                    onDismiss()
-                                    onDelete(session)
+                                    beginDelete(session)
                                 } label: {
                                     Label(String(localized: "common.delete", defaultValue: "Delete", comment: "Delete action label."), systemImage: "trash")
                                 }
                             }
                             .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                                 Button(role: .destructive) {
-                                    onDismiss()
-                                    onDelete(session)
+                                    beginDelete(session)
                                 } label: {
                                     Label(String(localized: "common.delete", defaultValue: "Delete", comment: "Delete action label."), systemImage: "trash")
                                 }
@@ -1603,6 +1620,19 @@ private struct MarinaChatHistoryView: View {
                 }
             }
         }
+        .alert(
+            String(localized: "marina.chat.delete.title", defaultValue: "Delete Chat?", comment: "Alert title for deleting a Marina chat."),
+            isPresented: deleteChatAlertBinding
+        ) {
+            Button(String(localized: "common.cancel", defaultValue: "Cancel", comment: "Cancel action label."), role: .cancel) {
+                pendingDeleteSession = nil
+            }
+            Button(String(localized: "common.delete", defaultValue: "Delete", comment: "Delete action label."), role: .destructive) {
+                confirmDelete()
+            }
+        } message: {
+            Text(deleteChatMessage)
+        }
     }
 
     private func sessionRow(_ session: MarinaChatSession) -> some View {
@@ -1634,6 +1664,42 @@ private struct MarinaChatHistoryView: View {
     private func sessionTitle(_ session: MarinaChatSession) -> String {
         let title = session.title.trimmingCharacters(in: .whitespacesAndNewlines)
         return title.isEmpty ? MarinaChatSessionStore.defaultTitle : title
+    }
+
+    private var deleteChatAlertBinding: Binding<Bool> {
+        Binding(
+            get: { pendingDeleteSession != nil },
+            set: { isPresented in
+                if isPresented == false {
+                    pendingDeleteSession = nil
+                }
+            }
+        )
+    }
+
+    private var deleteChatMessage: String {
+        guard let pendingDeleteSession else {
+            return String(localized: "marina.chat.delete.message", defaultValue: "This removes the chat transcript and follow-up context.", comment: "Alert message for deleting a Marina chat.")
+        }
+        return MarinaL10n.format(
+            "marina.chat.delete.messageFormat",
+            defaultValue: "Delete \"%@\"? This removes the chat transcript and follow-up context.",
+            comment: "Alert message for deleting a named Marina chat.",
+            pendingDeleteSession.title
+        )
+    }
+
+    private func beginDelete(_ session: MarinaChatSession) {
+        pendingDeleteSession = PendingDeleteSession(
+            id: session.id,
+            title: sessionTitle(session)
+        )
+    }
+
+    private func confirmDelete() {
+        guard let pendingDeleteSession else { return }
+        onDelete(pendingDeleteSession.id)
+        self.pendingDeleteSession = nil
     }
 }
 

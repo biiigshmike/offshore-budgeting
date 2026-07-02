@@ -2825,20 +2825,27 @@ struct MarinaSemanticPromptSuiteTests {
         ])
         let brain = modelBackedBrain(interpreter: interpreter, policy: .internalParityProven)
 
-        for prompt in [
-            "What did I spend at Uber?",
-            "Show my Food & Drink expenses from last month.",
-            "How much did I spend on Groceries last month?",
-            "Compare Apple Card to Debit Card."
-        ] {
-            let answer = await seed(prompt, using: brain, fixture: fixture)
-            #expect(answer.answer.kind == .message, "Expected target-loss rejection for \(prompt), got \(answer.answer.title)")
-            #expect(answer.debugTrace?.validatorOutput.expectedAnswerShape == .unsupported, "Expected unsupported target-loss trace for \(prompt)")
-            #expect(answer.debugTrace?.validatorOutput.unsupportedReason == .unresolvedEntity, "Expected unresolved target-loss reason for \(prompt)")
-            #expect(answer.answer.title != "Budget Overview")
-            #expect(answer.answer.title != "Card Spend")
-            #expect(answer.answer.title != "Card Spend Comparison")
-        }
+        let wrongTarget = await seed("What did I spend at Uber?", using: brain, fixture: fixture)
+        #expect(wrongTarget.answer.kind == .message)
+        #expect(wrongTarget.debugTrace?.validatorOutput.expectedAnswerShape == .unsupported)
+        #expect(wrongTarget.debugTrace?.validatorOutput.unsupportedReason == .unresolvedEntity)
+        #expect(wrongTarget.answer.title != "Card Spend")
+
+        let food = await seed("Show my Food & Drink expenses from last month.", using: brain, fixture: fixture)
+        assertCategoryExpenseListContract(food.debugTrace?.validatorOutput, targetName: "Food & Drink", dateRangeToken: .previousMonth)
+        #expect(food.answer.title != "Budget Overview")
+
+        let groceries = await seed("How much did I spend on Groceries last month?", using: brain, fixture: fixture)
+        #expect(groceries.answer.kind == .message)
+        #expect(groceries.debugTrace?.validatorOutput.expectedAnswerShape == .clarification)
+        #expect(groceries.debugTrace?.validatorOutput.unsupportedReason == .ambiguousEntity)
+        #expect(groceries.answer.title != "Budget Overview")
+
+        let comparison = await seed("Compare Apple Card to Debit Card.", using: brain, fixture: fixture)
+        #expect(comparison.answer.kind == .message)
+        #expect(comparison.debugTrace?.validatorOutput.expectedAnswerShape == .clarification)
+        #expect(comparison.debugTrace?.validatorOutput.unsupportedReason == .ambiguousEntity)
+        #expect(comparison.answer.title != "Card Spend Comparison")
     }
 
     @Test func stabilization_standalonePromptsDoNotInheritPreviousContextWithMockedModelOutput() async throws {
@@ -2896,6 +2903,7 @@ struct MarinaSemanticPromptSuiteTests {
         let fixture = try makeFixture(includeDebitCard: true, includeStabilizationTargets: true)
         let interpreter = PromptMappedInterpreter([
             "Show my Hair Care Expenses": interpreted(.foundationModel, request: categoryExpenseListAsCategory("Hair Care")),
+            "What did I spend on Hair Care last month?": interpreted(.foundationModel, request: droppedCategoryExpenseList(dateRangeToken: .previousMonth)),
             "Show my Food & Drink expenses from last month.": interpreted(.foundationModel, request: categoryExpenseListAsCategory("Food & Drink", dateRangeToken: .previousMonth))
         ])
         let brain = modelBackedBrain(interpreter: interpreter, policy: .internalParityProven)
@@ -2904,6 +2912,11 @@ struct MarinaSemanticPromptSuiteTests {
         assertCategoryExpenseListContract(hairCare.debugTrace?.validatorOutput, targetName: "Hair Care", dateRangeToken: .currentPeriod)
         #expect(hairCare.answer.kind == .list)
         #expect(hairCare.answer.rows.contains { $0.title == "Salon Visit" })
+
+        let droppedHairCare = await seed("What did I spend on Hair Care last month?", using: brain, fixture: fixture)
+        assertCategoryExpenseListContract(droppedHairCare.debugTrace?.validatorOutput, targetName: "Hair Care", dateRangeToken: .previousMonth)
+        #expect(droppedHairCare.debugTrace?.candidateSearches.contains { $0.rawTargetText == "Hair Care" && $0.slot == "explicitPromptTarget" } == true)
+        #expect(droppedHairCare.debugTrace?.validatorOutput.expectedAnswerShape != .unsupported)
 
         let food = await seed("Show my Food & Drink expenses from last month.", using: brain, fixture: fixture)
         assertCategoryExpenseListContract(food.debugTrace?.validatorOutput, targetName: "Food & Drink", dateRangeToken: .previousMonth)
@@ -3455,6 +3468,22 @@ struct MarinaSemanticPromptSuiteTests {
         )
     }
 
+    private func droppedCategoryExpenseList(
+        dateRangeToken: MarinaSemanticDateRangeToken = .currentPeriod
+    ) -> MarinaSemanticRequest {
+        MarinaSemanticRequest(
+            entity: .variableExpense,
+            operation: .list,
+            measure: .budgetImpact,
+            dimensions: [.category, .merchantText],
+            dateRangeToken: dateRangeToken,
+            resultLimit: 10,
+            sort: .dateDescending,
+            expenseScope: .unified,
+            expectedAnswerShape: .list
+        )
+    }
+
     private func assertCategoryExpenseListContract(
         _ request: MarinaSemanticRequest?,
         targetName: String,
@@ -3468,6 +3497,7 @@ struct MarinaSemanticPromptSuiteTests {
         #expect(request.operation == .list)
         #expect(request.measure == .budgetImpact)
         #expect(request.dimensions.contains(.category))
+        #expect(request.dimensions.contains(.merchantText) == false)
         #expect(request.targetName == targetName)
         #expect(request.dateRangeToken == dateRangeToken)
         #expect(request.expenseScope == .unified)

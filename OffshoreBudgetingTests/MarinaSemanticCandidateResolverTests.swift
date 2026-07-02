@@ -159,6 +159,139 @@ struct MarinaSemanticCandidateResolverTests {
         #expect(resolved.request.expectedAnswerShape == .comparison)
     }
 
+    @Test func explicitPromptTargetFallbackRecoversDroppedCategoryAndTracesSearch() {
+        let fixture = makeFixture(includeHairCareCategory: true)
+        let validator = MarinaSemanticRequestValidator()
+        let interpreted = MarinaInterpretedSemanticRequest(
+            request: MarinaSemanticRequest(
+                entity: .variableExpense,
+                operation: .list,
+                measure: .budgetImpact,
+                dimensions: [.category, .merchantText],
+                dateRangeToken: .previousMonth,
+                resultLimit: 10,
+                expectedAnswerShape: .list
+            ),
+            confidence: .medium,
+            source: .foundationModel
+        )
+
+        let trace = validator.validateWithTrace(
+            interpreted: interpreted,
+            snapshot: fixture.snapshot,
+            originalPrompt: "What did I spend on Hair Care last month?"
+        )
+
+        #expect(trace.interpreted.request.entity == .variableExpense)
+        #expect(trace.interpreted.request.operation == .list)
+        #expect(trace.interpreted.request.measure == .budgetImpact)
+        #expect(trace.interpreted.request.dimensions == [.category])
+        #expect(trace.interpreted.request.dimensions.contains(.merchantText) == false)
+        #expect(trace.interpreted.request.dateRangeToken == .previousMonth)
+        #expect(trace.interpreted.request.targetName == "Hair Care")
+        #expect(trace.interpreted.request.targetDisplayName == "Hair Care")
+        #expect(trace.interpreted.request.expenseScope == .unified)
+        #expect(trace.interpreted.request.expectedAnswerShape == .list)
+        #expect(trace.candidateSearches.contains { $0.rawTargetText == "Hair Care" && $0.slot == "explicitPromptTarget" })
+    }
+
+    @Test func explicitPromptTargetFallbackDoesNotAutoSelectWeakMatches() {
+        let fixture = makeFixture(includeAppleMerchant: true)
+        let interpreted = MarinaInterpretedSemanticRequest(
+            request: MarinaSemanticRequest(
+                entity: .variableExpense,
+                operation: .sum,
+                measure: .budgetImpact,
+                dimensions: [.merchantText],
+                expectedAnswerShape: .metric
+            ),
+            confidence: .medium,
+            source: .foundationModel
+        )
+
+        let resolved = resolver.resolveExplicitPromptTargetsWithTrace(
+            interpreted: interpreted,
+            snapshot: fixture.snapshot,
+            explicitPromptTargets: ["Store Apple"]
+        )
+
+        #expect(resolved.interpreted.request == interpreted.request)
+        #expect(resolved.candidateSearches.first?.ambiguityStatus == .weakOnly)
+        #expect(resolved.candidateSearches.first?.recommendedDisplayName == nil)
+    }
+
+    @Test func explicitPromptTargetFallbackClarifiesAmbiguousStrongMatches() {
+        let fixture = makeFixture(includeTargetCategory: true)
+        let interpreted = MarinaInterpretedSemanticRequest(
+            request: MarinaSemanticRequest(
+                entity: .variableExpense,
+                operation: .sum,
+                measure: .budgetImpact,
+                expectedAnswerShape: .metric
+            ),
+            confidence: .medium,
+            source: .foundationModel
+        )
+
+        let resolved = resolver.resolveExplicitPromptTargetsWithTrace(
+            interpreted: interpreted,
+            snapshot: fixture.snapshot,
+            explicitPromptTargets: ["Target"]
+        )
+
+        #expect(resolved.interpreted.request.expectedAnswerShape == .clarification)
+        #expect(resolved.interpreted.request.unsupportedReason == .ambiguousEntity)
+        #expect(resolved.interpreted.clarificationChoices?.choices.contains { $0.title == "Target" && $0.kindLabel == "Category" } == true)
+        #expect(resolved.interpreted.clarificationChoices?.choices.contains { $0.title == "Target groceries" && $0.kindLabel == "Expense match" } == true)
+    }
+
+    @Test func explicitPromptTargetFallbackUsesCategoryHintAndDropsContradictoryMerchantDimension() {
+        let fixture = makeFixture(includeTargetCategory: true)
+        let interpreted = MarinaInterpretedSemanticRequest(
+            request: MarinaSemanticRequest(
+                entity: .variableExpense,
+                operation: .list,
+                measure: .budgetImpact,
+                dimensions: [.category, .merchantText],
+                expectedAnswerShape: .list
+            ),
+            confidence: .medium,
+            source: .foundationModel
+        )
+
+        let resolved = resolver.resolveExplicitPromptTargetsWithTrace(
+            interpreted: interpreted,
+            snapshot: fixture.snapshot,
+            explicitPromptTargets: ["Target"]
+        )
+
+        #expect(resolved.interpreted.request.entity == .variableExpense)
+        #expect(resolved.interpreted.request.dimensions == [.category])
+        #expect(resolved.interpreted.request.dimensions.contains(.merchantText) == false)
+        #expect(resolved.interpreted.request.targetName == "Target")
+        #expect(resolved.interpreted.request.textQuery == nil)
+    }
+
+    @Test func existingTargetPathStillResolvesCategoryHint() {
+        let fixture = makeFixture(includeHairCareCategory: true)
+        let resolved = resolve(
+            MarinaSemanticRequest(
+                entity: .variableExpense,
+                operation: .list,
+                measure: .budgetImpact,
+                dimensions: [.category],
+                targetName: "Hair Care",
+                expectedAnswerShape: .list
+            ),
+            snapshot: fixture.snapshot
+        )
+
+        #expect(resolved.request.entity == .variableExpense)
+        #expect(resolved.request.dimensions == [.category])
+        #expect(resolved.request.targetName == "Hair Care")
+        #expect(resolved.request.expectedAnswerShape == .list)
+    }
+
     private func resolve(
         _ request: MarinaSemanticRequest,
         snapshot: MarinaWorkspaceSnapshot
@@ -175,12 +308,16 @@ struct MarinaSemanticCandidateResolverTests {
 
     private func makeFixture(
         includeTargetCategory: Bool = false,
-        includeAppleMerchant: Bool = false
+        includeAppleMerchant: Bool = false,
+        includeHairCareCategory: Bool = false
     ) -> ResolverFixture {
         let workspace = Workspace(name: "Personal", hexColor: "#3B82F6")
         let appleCard = Card(name: "Apple Card", workspace: workspace)
         let chaseCard = Card(name: "Chase Card", workspace: workspace)
         let groceries = Offshore.Category(name: "Groceries", hexColor: "#22C55E", workspace: workspace)
+        let hairCare = includeHairCareCategory
+            ? Offshore.Category(name: "Hair Care", hexColor: "#DB2777", workspace: workspace)
+            : nil
         let targetCategory = includeTargetCategory
             ? Offshore.Category(name: "Target", hexColor: "#0EA5E9", workspace: workspace)
             : nil
@@ -194,7 +331,7 @@ struct MarinaSemanticCandidateResolverTests {
             ? VariableExpense(descriptionText: "Apple Store", amount: 120, transactionDate: date(2026, 7, 9), workspace: workspace, card: appleCard, category: groceries)
             : nil
         let planned = PlannedExpense(title: "Grocery Envelope", plannedAmount: 200, expenseDate: date(2026, 7, 10), workspace: workspace, card: chaseCard, category: groceries)
-        let categories = [groceries] + [targetCategory].compactMap { $0 }
+        let categories = [groceries] + [targetCategory, hairCare].compactMap { $0 }
         let variableExpenses = [target, groceryOutlet] + [appleStore].compactMap { $0 }
         let snapshot = MarinaWorkspaceSnapshot(
             workspace: workspace,

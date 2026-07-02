@@ -118,6 +118,102 @@ struct MarinaSemanticCandidateResolver {
         )
     }
 
+    func resolveExplicitPromptTargetsWithTrace(
+        interpreted: MarinaInterpretedSemanticRequest,
+        snapshot: MarinaWorkspaceSnapshot,
+        explicitPromptTargets: [String]
+    ) -> MarinaSemanticCandidateResolution {
+        var notes = interpreted.diagnosticNotes
+        var candidateSearches: [MarinaCandidateSearchTrace] = []
+
+        guard interpreted.request.expectedAnswerShape != .clarification,
+              interpreted.request.expectedAnswerShape != .unsupported,
+              explicitPromptTargets.isEmpty == false else {
+            return MarinaSemanticCandidateResolution(
+                interpreted: interpreted,
+                candidateSearches: candidateSearches
+            )
+        }
+
+        if explicitPromptTargets.count > 1 {
+            let choices = explicitPromptTargets.flatMap { target -> [MarinaClarificationChoice] in
+                let searchResult = candidateSearchResult(target: target, request: interpreted.request, snapshot: snapshot)
+                candidateSearches.append(MarinaCandidateSearchTrace(rawTargetText: target, slot: "explicitPromptTarget", result: searchResult))
+                return candidateChoices(
+                    from: searchResult.matches.filter(\.isStrongEnoughForAutomaticResolution),
+                    target: target,
+                    slot: .primary,
+                    baseRequest: interpreted.request
+                )
+            }
+            let dedupedChoices = deduped(choices)
+            guard dedupedChoices.count > 1 else {
+                return MarinaSemanticCandidateResolution(
+                    interpreted: interpreted,
+                    candidateSearches: candidateSearches
+                )
+            }
+
+            let question = MarinaL10n.string("marina.clarification.explicitPromptTargetFallback", defaultValue: "Which target should Marina use?", comment: "Clarification question when multiple prompt targets could be recovered.")
+            var request = clarificationRequest(
+                question: question,
+                target: explicitPromptTargets.joined(separator: ", "),
+                dateRangeToken: interpreted.request.dateRangeToken
+            )
+            request.targetName = nil
+            request.textQuery = nil
+            notes.append("Candidate resolver found multiple explicit prompt targets: \(explicitPromptTargets.joined(separator: ", ")).")
+            return MarinaSemanticCandidateResolution(
+                interpreted: interpretedWith(
+                    request: request,
+                    interpreted: interpreted,
+                    notes: notes,
+                    choices: MarinaClarificationChoices(question: question, choices: dedupedChoices)
+                ),
+                candidateSearches: candidateSearches
+            )
+        }
+
+        let target = explicitPromptTargets[0]
+        let searchResult = candidateSearchResult(target: target, request: interpreted.request, snapshot: snapshot)
+        candidateSearches.append(MarinaCandidateSearchTrace(rawTargetText: target, slot: "explicitPromptTarget", result: searchResult))
+
+        if let terminal = terminalInterpretedRequest(
+            searchResult: searchResult,
+            target: target,
+            slot: .primary,
+            request: interpreted.request,
+            interpreted: interpreted,
+            notes: notes
+        ) {
+            return MarinaSemanticCandidateResolution(
+                interpreted: terminal,
+                candidateSearches: candidateSearches
+            )
+        }
+
+        let match = explicitDimensionMatch(in: searchResult, request: interpreted.request)
+            ?? searchResult.recommendedMatch
+        guard let match else {
+            return MarinaSemanticCandidateResolution(
+                interpreted: interpreted,
+                candidateSearches: candidateSearches
+            )
+        }
+
+        let request = fallbackSemanticRequest(applying: match, target: target, baseRequest: interpreted.request)
+        notes.append("Candidate resolver recovered explicit prompt target \(match.displayName) from \"\(target)\".")
+        return MarinaSemanticCandidateResolution(
+            interpreted: interpretedWith(
+                request: request,
+                interpreted: interpreted,
+                notes: notes,
+                choices: interpreted.clarificationChoices
+            ),
+            candidateSearches: candidateSearches
+        )
+    }
+
     private func interpretedWith(
         request: MarinaSemanticRequest,
         interpreted: MarinaInterpretedSemanticRequest,
@@ -289,6 +385,36 @@ struct MarinaSemanticCandidateResolver {
             return reconciliationAccountRequest(accountName: match.displayName, baseRequest: request)
         case .workspace:
             return request
+        }
+    }
+
+    private func fallbackSemanticRequest(
+        applying match: MarinaCandidateMatch,
+        target: String,
+        baseRequest request: MarinaSemanticRequest
+    ) -> MarinaSemanticRequest {
+        switch match.entity {
+        case .category:
+            return categoryRequest(categoryName: match.displayName, baseRequest: request)
+        case .income:
+            return incomeSourceRequest(source: match.displayName, baseRequest: request)
+        case .variableExpense, .plannedExpense:
+            return expenseTextRequest(textQuery: match.displayName, displayName: match.displayName, baseRequest: request)
+        case .card:
+            return cardRequest(cardName: match.displayName, baseRequest: request)
+        case .budget:
+            return budgetRequest(budgetName: match.displayName, baseRequest: request)
+        case .preset:
+            return presetRequest(presetName: match.displayName, baseRequest: request)
+        case .savingsAccount:
+            return savingsAccountRequest(accountName: match.displayName, baseRequest: request)
+        case .reconciliationAccount:
+            return reconciliationAccountRequest(accountName: match.displayName, baseRequest: request)
+        case .workspace:
+            var repaired = request
+            repaired.targetName = target
+            repaired.targetDisplayName = match.displayName
+            return repaired
         }
     }
 
