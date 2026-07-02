@@ -3133,6 +3133,7 @@ struct MarinaSemanticPromptSuiteTests {
         let interpreter = PromptMappedInterpreter([
             "Compare Apple Card to Debit Card last month.": interpreted(.foundationModel, request: droppedCardComparison),
             "Which was higher last month, Apple Card or Debit Card?": interpreted(.foundationModel, request: droppedCardComparison),
+            "Compare my debit card and Apple Card spend last month.": interpreted(.foundationModel, request: badCardList),
             "Show my Apple Card expenses.": interpreted(.foundationModel, request: badCardList),
             "Show my Uber expenses.": interpreted(.foundationModel, request: badCardList),
             "Show me my Uber expenses.": interpreted(.foundationModel, request: badCardList),
@@ -3151,6 +3152,17 @@ struct MarinaSemanticPromptSuiteTests {
         #expect(higher.debugTrace?.validatorOutput.targetName == "Apple Card")
         #expect(higher.debugTrace?.validatorOutput.comparisonTargetName == "Debit Card")
         #expect(higher.debugTrace?.validatorOutput.expectedAnswerShape == .comparison)
+
+        let naturalComparison = await seed("Compare my debit card and Apple Card spend last month.", using: brain, fixture: fixture)
+        #expect(naturalComparison.answer.kind == .comparison)
+        #expect(naturalComparison.answer.title == "Card Spend Comparison")
+        #expect(naturalComparison.debugTrace?.validatorOutput.entity == .card)
+        #expect(naturalComparison.debugTrace?.validatorOutput.operation == .compare)
+        #expect(naturalComparison.debugTrace?.validatorOutput.measure == .budgetImpact)
+        #expect(naturalComparison.debugTrace?.validatorOutput.dimensions == [.card])
+        #expect(naturalComparison.debugTrace?.validatorOutput.targetName == "Debit Card")
+        #expect(naturalComparison.debugTrace?.validatorOutput.comparisonTargetName == "Apple Card")
+        #expect(naturalComparison.debugTrace?.validatorOutput.expectedAnswerShape == .comparison)
 
         let appleCardList = await seed("Show my Apple Card expenses.", using: brain, fixture: fixture)
         #expect(appleCardList.answer.kind == .list)

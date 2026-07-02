@@ -367,6 +367,9 @@ nonisolated struct MarinaClarificationChoices: Identifiable, Codable, Equatable,
     let originalPrompt: String?
     let question: String
     var choices: [MarinaClarificationChoice]
+    // TODO: Comparison clarifications need a multi-select mode. The current model
+    // stores one resolved choice; future card/category comparisons should support
+    // selecting exactly two choices with Clear, Cancel, and Submit/Compare actions.
     var resolvedChoiceID: UUID?
 
     init(

@@ -113,6 +113,10 @@ struct MarinaSemanticRequestValidator {
             request: interpreted.request,
             explicitTargets: explicitTargets
         ) {
+            let hasExplicitCardComparisonIntent = hasClearCardComparisonIntent(
+                in: originalPrompt,
+                request: request
+            )
             let fallback = candidateResolver.resolveExplicitPromptTargetsWithTrace(
                 interpreted: interpretedWith(
                     request: request,
@@ -122,7 +126,8 @@ struct MarinaSemanticRequestValidator {
                     clarificationChoices: resolved.clarificationChoices
                 ),
                 snapshot: snapshot,
-                explicitPromptTargets: explicitTargets
+                explicitPromptTargets: explicitTargets,
+                hasExplicitCardComparisonIntent: hasExplicitCardComparisonIntent
             )
             candidateSearches.append(contentsOf: fallback.candidateSearches)
             resolved = fallback.interpreted
@@ -626,6 +631,31 @@ struct MarinaSemanticRequestValidator {
             return false
         }
         return true
+    }
+
+    private func hasClearCardComparisonIntent(
+        in prompt: String?,
+        request: MarinaSemanticRequest
+    ) -> Bool {
+        guard request.entity == .card || request.dimensions.contains(.card),
+              let prompt,
+              prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false else {
+            return false
+        }
+
+        let normalized = targetNormalized(prompt)
+        let tokens = Set(normalized.split(separator: " ").map(String.init))
+        if tokens.contains("compare")
+            || tokens.contains("comparison")
+            || tokens.contains("versus")
+            || tokens.contains("vs")
+            || tokens.contains("higher")
+            || tokens.contains("lower") {
+            return true
+        }
+
+        return normalized.contains("which was higher")
+            || normalized.contains("which was lower")
     }
 
     private func unique(_ dimensions: [MarinaSemanticDimension]) -> [MarinaSemanticDimension] {
