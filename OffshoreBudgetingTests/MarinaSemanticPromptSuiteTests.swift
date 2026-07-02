@@ -3098,6 +3098,193 @@ struct MarinaSemanticPromptSuiteTests {
         )
     }
 
+    @Test func standalonePrompt_doesNotUseRecentContext_forSubscriptionsExpenseList() async throws {
+        let fixture = try makeFixture(includeStabilizationTargets: true)
+        let interpreter = PromptMappedInterpreter([
+            "What is my safe spend today?": interpreted(.foundationModel, request: safeDailySpend()),
+            "Show me my Subscriptions expenses for this month.": interpreted(
+                .foundationModel,
+                request: categoryExpenseListAsCategory("Subscriptions", dateRangeToken: .currentMonth)
+            )
+        ])
+        let brain = modelBackedBrain(interpreter: interpreter, policy: .internalParityProven)
+
+        let safeSpend = await seed("What is my safe spend today?", using: brain, fixture: fixture)
+        let subscriptions = await seed(
+            "Show me my Subscriptions expenses for this month.",
+            using: brain,
+            fixture: fixture,
+            conversationContext: MarinaConversationContext(recentAnswers: [safeSpend.answer])
+        )
+
+        #expect(subscriptions.debugTrace?.promptTreatment == .standalone)
+        #expect(subscriptions.debugTrace?.priorContextChangedRequest == false)
+        #expect(subscriptions.debugTrace?.explicitPromptTargets.contains("Subscriptions") == true)
+        #expect(subscriptions.debugTrace?.explicitPromptTargets.contains("Me My Subscriptions") == false)
+        assertCategoryExpenseListContract(
+            subscriptions.debugTrace?.validatorOutput,
+            targetName: "Subscriptions",
+            dateRangeToken: .currentMonth
+        )
+        #expect(subscriptions.answer.rows.contains { $0.title == "Music Subscription" })
+    }
+
+    @Test func standalonePrompt_doesNotUseRecentContext_forProjectedSpend() async throws {
+        let fixture = try makeFixture(includeStabilizationTargets: true)
+        let interpreter = PromptMappedInterpreter([
+            "What is my safe spend today?": interpreted(.foundationModel, request: safeDailySpend()),
+            "What is my projected spend this month?": interpreted(.foundationModel, request: projectedSpend(dateRangeToken: .currentMonth))
+        ])
+        let brain = modelBackedBrain(interpreter: interpreter, policy: .internalParityProven)
+
+        let safeSpend = await seed("What is my safe spend today?", using: brain, fixture: fixture)
+        let projected = await seed(
+            "What is my projected spend this month?",
+            using: brain,
+            fixture: fixture,
+            conversationContext: MarinaConversationContext(recentAnswers: [safeSpend.answer])
+        )
+
+        #expect(projected.debugTrace?.promptTreatment == .standalone)
+        #expect(projected.debugTrace?.priorContextChangedRequest == false)
+        #expect(projected.debugTrace?.validatorOutput.measure == .projectedSpend)
+        #expect(projected.answer.title != "Budget Overview")
+    }
+
+    @Test func standalonePrompt_doesNotUseRecentContext_forUberSpend() async throws {
+        let fixture = try makeFixture(includeStabilizationTargets: true)
+        let interpreter = PromptMappedInterpreter([
+            "What is my safe spend today?": interpreted(.foundationModel, request: safeDailySpend()),
+            "What did I spend at Uber?": interpreted(.foundationModel, request: merchantSpend("Uber"))
+        ])
+        let brain = modelBackedBrain(interpreter: interpreter, policy: .internalParityProven)
+
+        let safeSpend = await seed("What is my safe spend today?", using: brain, fixture: fixture)
+        let uber = await seed(
+            "What did I spend at Uber?",
+            using: brain,
+            fixture: fixture,
+            conversationContext: MarinaConversationContext(recentAnswers: [safeSpend.answer])
+        )
+
+        #expect(uber.debugTrace?.promptTreatment == .standalone)
+        #expect(uber.debugTrace?.priorContextChangedRequest == false)
+        #expect(uber.debugTrace?.validatorOutput.textQuery == "Uber")
+        #expect(uber.debugTrace?.validatorOutput.dimensions.contains(.merchantText) == true)
+        #expect(uber.debugTrace?.validatorOutput.dimensions.contains(.card) == false)
+        #expect(uber.answer.title != "Budget Overview")
+        #expect(uber.answer.title != "Card Spend")
+    }
+
+    @Test func standalonePrompt_doesNotUseRecentContext_forGroceriesAfterComparison() async throws {
+        let fixture = try makeFixture(includeDebitCard: true, includeStabilizationTargets: true)
+        let interpreter = PromptMappedInterpreter([
+            "Compare Apple Card to Debit Card.": interpreted(.foundationModel, request: cardComparison("Apple Card", "Debit Card")),
+            "How much did I spend on Groceries last month?": interpreted(
+                .foundationModel,
+                request: categorySpendTotalAsCategory("Groceries", dateRangeToken: .previousMonth)
+            )
+        ])
+        let brain = modelBackedBrain(interpreter: interpreter, policy: .internalParityProven)
+
+        let comparison = await seed("Compare Apple Card to Debit Card.", using: brain, fixture: fixture)
+        let groceries = await seed(
+            "How much did I spend on Groceries last month?",
+            using: brain,
+            fixture: fixture,
+            conversationContext: MarinaConversationContext(recentAnswers: [comparison.answer])
+        )
+
+        #expect(groceries.debugTrace?.promptTreatment == .standalone)
+        #expect(groceries.debugTrace?.priorContextChangedRequest == false)
+        #expect(groceries.debugTrace?.validatorOutput.targetName == "Groceries")
+        #expect(groceries.debugTrace?.validatorOutput.comparisonTargetName == nil)
+        #expect(groceries.answer.title != "Card Spend Comparison")
+    }
+
+    @Test func fullPromptAfterRecommendedFollowUp_doesNotExecuteVisibleFollowUp() async throws {
+        let fixture = try makeFixture(includeStabilizationTargets: true)
+        let interpreter = PromptMappedInterpreter([
+            "How is income progress?": interpreted(.foundationModel, request: incomeProgress()),
+            "Show my Hair Care expenses.": interpreted(.foundationModel, request: categoryExpenseListAsCategory("Hair Care"))
+        ])
+        let brain = modelBackedBrain(interpreter: interpreter, policy: .internalParityProven)
+
+        let income = await seed("How is income progress?", using: brain, fixture: fixture)
+        let context = MarinaConversationContext(recentAnswers: [income.answer])
+        #expect(context.lastRecommendedFollowUp != nil)
+
+        let hairCare = await seed(
+            "Show my Hair Care expenses.",
+            using: brain,
+            fixture: fixture,
+            conversationContext: context
+        )
+
+        #expect(hairCare.debugTrace?.promptTreatment == .standalone)
+        #expect(hairCare.debugTrace?.priorContextChangedRequest == false)
+        assertCategoryExpenseListContract(
+            hairCare.debugTrace?.validatorOutput,
+            targetName: "Hair Care",
+            dateRangeToken: .currentPeriod
+        )
+        #expect(hairCare.answer.rows.contains { $0.title == "Salon Visit" })
+        #expect(hairCare.answer.title != "Income Comparison")
+    }
+
+    @Test func showMoreAfterList_stillUsesContext() async throws {
+        let fixture = try makeFixture()
+        let brain = legacyRuleBasedBrain()
+        let showMore = MarinaFollowUpSuggestion(
+            title: "Show more",
+            prompt: "Show more.",
+            reason: .showMore,
+            executionMode: .executable,
+            semanticRequest: MarinaSemanticRequest(
+                entity: .category,
+                operation: .list,
+                measure: .categoryAvailability,
+                dimensions: [.category],
+                dateRangeToken: .currentPeriod,
+                resultLimit: 10,
+                expectedAnswerShape: .list
+            )
+        )
+        let list = HomeAnswer(
+            queryID: UUID(),
+            kind: .list,
+            userPrompt: "Show category availability.",
+            title: "Category Availability",
+            insightBundle: MarinaInsightBundle(followUps: [showMore])
+        )
+        let context = MarinaConversationContext(recentAnswers: [list])
+        #expect(context.lastRecommendedFollowUp?.reason == .showMore)
+
+        let more = await seed("Show more.", using: brain, fixture: fixture, conversationContext: context)
+
+        #expect(more.debugTrace?.promptTreatment == .contextualFollowUp)
+        #expect(more.debugTrace?.priorContextChangedRequest == true)
+        #expect(more.debugTrace?.validatorOutput.resultLimit == 10)
+    }
+
+    @Test func whatAboutLastMonth_stillUsesContextWhenPriorRequestExists() async throws {
+        let fixture = try makeFixture()
+        let brain = legacyRuleBasedBrain()
+        let savings = await answer("Summarize my Savings Account.", using: brain, fixture: fixture)
+
+        let previous = await seed(
+            "what about last month",
+            using: brain,
+            fixture: fixture,
+            conversationContext: MarinaConversationContext(recentAnswers: [savings])
+        )
+
+        #expect(previous.debugTrace?.promptTreatment == .contextualFollowUp)
+        #expect(previous.debugTrace?.priorContextChangedRequest == true)
+        #expect(previous.debugTrace?.validatorOutput.dateRangeToken == .previousMonth)
+        #expect(previous.answer.title == "Savings Status")
+    }
+
     @Test func semanticContracts_savingsContributionWhatIfIsFutureWorkAtRoutingAndFormulaLayers() throws {
         let fixture = try makeFixture()
         let snapshot = try MarinaWorkspaceSnapshotProvider().snapshot(for: fixture.workspace, modelContext: fixture.context)
@@ -3635,6 +3822,27 @@ struct MarinaSemanticPromptSuiteTests {
         )
     }
 
+    private func projectedSpend(dateRangeToken: MarinaSemanticDateRangeToken = .currentPeriod) -> MarinaSemanticRequest {
+        MarinaSemanticRequest(
+            entity: .budget,
+            operation: .forecast,
+            measure: .projectedSpend,
+            dateRangeToken: dateRangeToken,
+            expectedAnswerShape: .metric
+        )
+    }
+
+    private func incomeProgress() -> MarinaSemanticRequest {
+        MarinaSemanticRequest(
+            entity: .income,
+            operation: .share,
+            measure: .incomeAmount,
+            dateRangeToken: .currentPeriod,
+            incomeState: .all,
+            expectedAnswerShape: .metric
+        )
+    }
+
     private func budgetConcentration() -> MarinaSemanticRequest {
         MarinaSemanticRequest(
             entity: .category,
@@ -4099,6 +4307,9 @@ struct MarinaSemanticPromptSuiteTests {
         let hairCare = includeStabilizationTargets
             ? Category(name: "Hair Care", hexColor: "#DB2777", workspace: workspace)
             : nil
+        let subscriptions = includeStabilizationTargets
+            ? Category(name: "Subscriptions", hexColor: "#7C3AED", workspace: workspace)
+            : nil
 
         let currentBudget = Budget(
             name: "April 2026",
@@ -4292,6 +4503,16 @@ struct MarinaSemanticPromptSuiteTests {
                 category: hairCare
             )
             : nil
+        let musicSubscription = includeStabilizationTargets
+            ? VariableExpense(
+                descriptionText: "Music Subscription",
+                amount: 14,
+                transactionDate: date(2026, 4, 6),
+                workspace: workspace,
+                card: chase,
+                category: subscriptions
+            )
+            : nil
 
         let actualPaycheck = Income(source: "Paycheck", amount: 3_000, date: date(2026, 4, 1), isPlanned: false, workspace: workspace)
         let plannedPaycheck = Income(source: "Paycheck", amount: 3_200, date: date(2026, 4, 1), isPlanned: true, workspace: workspace)
@@ -4354,6 +4575,9 @@ struct MarinaSemanticPromptSuiteTests {
         if let hairCare {
             context.insert(hairCare)
         }
+        if let subscriptions {
+            context.insert(subscriptions)
+        }
         context.insert(currentBudget)
         context.insert(groceriesLimit)
         context.insert(previousBudget)
@@ -4392,6 +4616,9 @@ struct MarinaSemanticPromptSuiteTests {
         }
         if let salonVisit {
             context.insert(salonVisit)
+        }
+        if let musicSubscription {
+            context.insert(musicSubscription)
         }
         context.insert(actualPaycheck)
         context.insert(plannedPaycheck)

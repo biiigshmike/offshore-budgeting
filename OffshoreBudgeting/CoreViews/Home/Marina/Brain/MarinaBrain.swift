@@ -534,6 +534,12 @@ enum MarinaFollowUpResolution: Equatable, Sendable {
     case declined
 }
 
+private enum MarinaPromptContextIntent {
+    case explicitFollowUp
+    case possibleFollowUp
+    case standalone
+}
+
 struct MarinaFollowUpResolver {
     func resolve(
         prompt: String,
@@ -550,6 +556,10 @@ struct MarinaFollowUpResolver {
             return nil
         }
 
+        if let visibleFollowUp = visibleRecommendedFollowUpPrompt(normalized: normalized, conversationContext: conversationContext) {
+            return visibleFollowUp
+        }
+
         if let semanticContext = conversationContext.lastSemanticContext,
            let request = request(from: prompt, normalized: normalized, context: semanticContext) {
             return .request(request, diagnosticNote: "Resolved from recent Marina conversation context.")
@@ -560,7 +570,7 @@ struct MarinaFollowUpResolver {
     }
 
     private func shouldResolveFromConversation(prompt normalized: String) -> Bool {
-        if isCompleteStandalonePrompt(normalized) {
+        if contextIntent(for: normalized) == .standalone {
             return false
         }
 
@@ -571,19 +581,65 @@ struct MarinaFollowUpResolver {
             || containsAny(normalized, ["drove", "driving", "behind", "made up", "what caused", "caused", "changed"])
     }
 
-    private func isCompleteStandalonePrompt(_ normalized: String) -> Bool {
-        guard containsContextualReference(normalized) == false,
-              isCorrectionPrompt(normalized) == false else {
-            return false
+    private func contextIntent(for normalized: String) -> MarinaPromptContextIntent {
+        if isExplicitDependentFollowUp(normalized) {
+            return .explicitFollowUp
         }
 
+        if isStandalonePrompt(normalized) {
+            return .standalone
+        }
+
+        return .possibleFollowUp
+    }
+
+    private func isExplicitDependentFollowUp(_ normalized: String) -> Bool {
+        if isDateOnlyFollowUp(normalized) {
+            return true
+        }
+
+        if normalized == "more" {
+            return true
+        }
+
+        if containsAny(normalized, [
+            "show more",
+            "show me more",
+            "break that down",
+            "breakdown",
+            "compare that",
+            "compare this",
+            "show details",
+            "details",
+            "drill down",
+            "which ones",
+            "which one",
+            "behind this",
+            "behind it",
+            "what made this up",
+            "what caused this",
+            "what caused it"
+        ]) {
+            return true
+        }
+
+        if containsContextualReference(normalized) {
+            return true
+        }
+
+        return false
+    }
+
+    private func isStandalonePrompt(_ normalized: String) -> Bool {
         if containsAny(normalized, [
             "category availability",
             "spend trends",
             "safe spend",
+            "projected spend",
             "savings outlook",
             "income progress",
-            "next planned expense"
+            "next planned expense",
+            "what is eating my budget"
         ]) {
             return true
         }
@@ -619,6 +675,8 @@ struct MarinaFollowUpResolver {
             "categories",
             "merchant",
             "savings",
+            "subscription",
+            "subscriptions",
             "preset",
             "planned expense",
             "variable expense"
@@ -631,14 +689,24 @@ struct MarinaFollowUpResolver {
             || normalized.hasPrefix("my ")
             || normalized.hasPrefix("i ")
         let hasExplicitTargetPhrase = containsAny(normalized, [" on ", " for ", " from ", " tied to ", " assigned to ", " linked to "])
-        return hasPersonalReference || hasExplicitTargetPhrase || wordCount(in: normalized) >= 6
+        let hasDatePhrase = explicitDateToken(in: normalized) != nil || normalized.contains("today")
+        let hasComparisonTargets = containsAny(normalized, [" to ", " or ", " vs ", " versus "])
+        return hasPersonalReference
+            || hasExplicitTargetPhrase
+            || hasDatePhrase
+            || hasComparisonTargets
+            || wordCount(in: normalized) >= 6
     }
 
     private func containsContextualReference(_ normalized: String) -> Bool {
-        let contextualPronouns: Set<String> = ["this", "that", "these", "those", "it", "ones", "one"]
-        if normalized
-            .split(whereSeparator: { $0.isWhitespace })
-            .contains(where: { contextualPronouns.contains(String($0)) }) {
+        let contextualPronouns: Set<String> = ["that", "these", "those", "it", "ones", "one"]
+        let words = normalized.split(whereSeparator: { $0.isWhitespace }).map(String.init)
+        if words.contains(where: { contextualPronouns.contains($0) }) {
+            return true
+        }
+
+        if words.contains("this"),
+           isStandaloneDatePhrase(normalized) == false {
             return true
         }
 
@@ -650,6 +718,33 @@ struct MarinaFollowUpResolver {
             "driving",
             "caused",
             "made up"
+        ])
+    }
+
+    private func isDateOnlyFollowUp(_ normalized: String) -> Bool {
+        [
+            "last month",
+            "this month",
+            "previous month",
+            "last period",
+            "this period",
+            "previous period",
+            "current period",
+            "all time",
+            "today"
+        ].contains(normalized)
+    }
+
+    private func isStandaloneDatePhrase(_ normalized: String) -> Bool {
+        containsAny(normalized, [
+            "this month",
+            "last month",
+            "previous month",
+            "this period",
+            "current period",
+            "last period",
+            "previous period",
+            "today"
         ])
     }
 
@@ -678,6 +773,24 @@ struct MarinaFollowUpResolver {
             return nil
         }
         return .prompt(followUp.prompt, diagnosticNote: "Resolved from recommended Marina follow-up confirmation.")
+    }
+
+    private func visibleRecommendedFollowUpPrompt(
+        normalized: String,
+        conversationContext: MarinaConversationContext
+    ) -> MarinaFollowUpResolution? {
+        guard let followUp = conversationContext.lastRecommendedFollowUp,
+              let request = followUp.semanticRequest else {
+            return nil
+        }
+
+        let visiblePrompt = normalize(followUp.prompt)
+        let visibleTitle = normalize(followUp.title)
+        guard normalized == visiblePrompt || normalized == visibleTitle else {
+            return nil
+        }
+
+        return .request(request, diagnosticNote: "Resolved from recent Marina conversation context.")
     }
 
     private func request(
