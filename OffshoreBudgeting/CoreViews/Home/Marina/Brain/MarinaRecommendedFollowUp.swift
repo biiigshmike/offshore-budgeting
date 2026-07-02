@@ -6,6 +6,33 @@ enum MarinaRecommendedFollowUp {
             ?? suggestion(in: followUps, mode: .clarificationRequired)
     }
 
+    static func suggestion(
+        from followUps: [MarinaFollowUpSuggestion],
+        memory: MarinaFollowUpMemory
+    ) -> MarinaFollowUpSuggestion? {
+        suggestion(in: followUps, mode: .executable, memory: memory)
+            ?? suggestion(in: followUps, mode: .clarificationRequired, memory: memory)
+    }
+
+    static func filteredFollowUps(
+        from followUps: [MarinaFollowUpSuggestion],
+        memory: MarinaFollowUpMemory
+    ) -> [MarinaFollowUpSuggestion] {
+        guard let selected = suggestion(from: followUps, memory: memory) else {
+            return []
+        }
+
+        let selectedRank = reasonRank(selected.reason)
+        return followUps.filter { followUp in
+            guard memory.shouldSuppress(followUp) == false else { return false }
+            guard followUp.id != selected.id else { return true }
+            guard followUp.executionMode == selected.executionMode else {
+                return selected.executionMode == .executable
+            }
+            return reasonRank(followUp.reason) >= selectedRank
+        }
+    }
+
     static func confirmationQuestion(for followUp: MarinaFollowUpSuggestion) -> String {
         guard followUp.executionMode == .executable else {
             return MarinaL10n.string("marina.followUp.confirmation.clarification", defaultValue: "Want to narrow that down?", comment: "Confirmation question for a clarification-required Marina follow-up.")
@@ -128,6 +155,26 @@ enum MarinaRecommendedFollowUp {
                 let rightRank = reasonRank(right.element.reason)
                 if leftRank != rightRank {
                     return leftRank < rightRank
+                }
+                return left.offset < right.offset
+            }?
+            .element
+    }
+
+    private static func suggestion(
+        in followUps: [MarinaFollowUpSuggestion],
+        mode: MarinaFollowUpExecutionMode,
+        memory: MarinaFollowUpMemory
+    ) -> MarinaFollowUpSuggestion? {
+        followUps
+            .enumerated()
+            .filter { $0.element.executionMode == mode }
+            .filter { memory.shouldSuppress($0.element) == false }
+            .min { left, right in
+                let leftScore = reasonRank(left.element.reason) + memory.scorePenalty(for: left.element)
+                let rightScore = reasonRank(right.element.reason) + memory.scorePenalty(for: right.element)
+                if leftScore != rightScore {
+                    return leftScore < rightScore
                 }
                 return left.offset < right.offset
             }?

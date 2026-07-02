@@ -119,6 +119,133 @@ struct MarinaUniversalRoutingHarnessTests {
         #expect(rows.map(\.amount) == [218, 1_520])
     }
 
+    @Test func rowBackedVariableExpenseListSearchSortAndLimitReturnsUniversalResult() throws {
+        let fixture = makeFixture()
+        let request = semanticRequest(
+            entity: .variableExpense,
+            operation: .list,
+            measure: .budgetImpact,
+            textQuery: "Apple",
+            resultLimit: 1,
+            sort: .amountDescending,
+            expenseScope: .variable,
+            shape: .list
+        )
+        let universal = try fixture.requireUniversalAttempt(for: request)
+
+        #expect(universal.result.kind == .list)
+        #expect(universal.diagnostics.scenario == .rowBackedQuery)
+        #expect(universal.result.rows.map(\.title) == ["Apple Store"])
+        #expect(universal.result.rows.map(\.amount) == [120])
+    }
+
+    @Test func rowBackedVariableExpenseCountAndAverageReturnUniversalResults() throws {
+        let fixture = makeFixture()
+        let countRequest = semanticRequest(
+            entity: .variableExpense,
+            operation: .count,
+            expenseScope: .variable
+        )
+        let averageRequest = semanticRequest(
+            entity: .variableExpense,
+            operation: .average,
+            measure: .budgetImpact,
+            expenseScope: .variable
+        )
+        let count = try fixture.requireUniversalAttempt(for: countRequest)
+        let average = try fixture.requireUniversalAttempt(for: averageRequest)
+
+        #expect(count.diagnostics.scenario == .rowBackedQuery)
+        #expect(average.diagnostics.scenario == .rowBackedQuery)
+        try expectFirstAmount(count.result, equals: 4)
+        try expectFirstAmount(average.result, equals: 114.5)
+    }
+
+    @Test func rowBackedPlannedExpenseRelationshipFiltersAndLastReturnUniversalResults() throws {
+        let fixture = makeFixture()
+        let listRequest = semanticRequest(
+            entity: .plannedExpense,
+            operation: .list,
+            dimensions: [.card],
+            targetName: "Apple Card",
+            expenseScope: .planned,
+            shape: .list
+        )
+        let lastRequest = semanticRequest(
+            entity: .plannedExpense,
+            operation: .last,
+            measure: .effectiveAmount,
+            expenseScope: .planned,
+            shape: .metric
+        )
+        let list = try fixture.requireUniversalAttempt(for: listRequest)
+        let last = try fixture.requireUniversalAttempt(for: lastRequest)
+
+        #expect(list.diagnostics.scenario == .rowBackedQuery)
+        #expect(list.result.rows.map(\.title) == ["Phone Bill"])
+        #expect(last.diagnostics.scenario == .rowBackedQuery)
+        #expect(last.result.rows.map(\.title) == ["Rent"])
+    }
+
+    @Test func rowBackedUnifiedAllTimeGroupAndCountReturnUniversalResults() throws {
+        let fixture = makeFixture()
+        let groupRequest = semanticRequest(
+            entity: .variableExpense,
+            operation: .group,
+            measure: .budgetImpact,
+            dimensions: [.card],
+            dateRangeToken: .allTime,
+            expenseScope: .unified,
+            shape: .list
+        )
+        let countRequest = semanticRequest(
+            entity: .plannedExpense,
+            operation: .count,
+            dateRangeToken: .allTime,
+            expenseScope: .unified
+        )
+        let groups = try fixture.requireUniversalAttempt(for: groupRequest)
+        let count = try fixture.requireUniversalAttempt(for: countRequest)
+
+        #expect(groups.diagnostics.scenario == .rowBackedQuery)
+        #expect(groups.result.rows.sorted { $0.title < $1.title }.map(\.amount) == [218, 1_520])
+        #expect(count.diagnostics.scenario == .rowBackedQuery)
+        try expectFirstAmount(count.result, equals: 6)
+    }
+
+    @Test func rowBackedIncomeStateCategoryCardAndPresetShapesReturnUniversalResults() throws {
+        let fixture = makeFixture()
+        let plannedIncome = try fixture.requireUniversalAttempt(for: semanticRequest(
+            entity: .income,
+            operation: .sum,
+            measure: .incomeAmount,
+            incomeState: .planned
+        ))
+        let categories = try fixture.requireUniversalAttempt(for: semanticRequest(
+            entity: .category,
+            operation: .list,
+            shape: .list
+        ))
+        let cards = try fixture.requireUniversalAttempt(for: semanticRequest(
+            entity: .card,
+            operation: .count
+        ))
+        let presetSum = try fixture.requireUniversalAttempt(for: semanticRequest(
+            entity: .preset,
+            operation: .sum,
+            measure: .plannedAmount
+        ))
+
+        #expect(plannedIncome.diagnostics.scenario == .rowBackedQuery)
+        try expectFirstAmount(plannedIncome.result, equals: 2_100)
+        #expect(categories.diagnostics.scenario == .rowBackedQuery)
+        #expect(categories.result.rows.map(\.title).sorted() == ["Electronics", "Groceries"])
+        #expect(cards.diagnostics.scenario == .rowBackedQuery)
+        try expectFirstAmount(cards.result, equals: 2)
+        #expect(presetSum.diagnostics.scenario == .rowBackedQuery)
+        try expectFirstAmount(presetSum.result, equals: 80)
+    }
+
     @Test func allowlistedSavingsTotalWithExplicitAccountReturnsUniversalResult() throws {
         let fixture = makeFixture()
         let request = savingsTotalRequest(targetName: "Savings Account")

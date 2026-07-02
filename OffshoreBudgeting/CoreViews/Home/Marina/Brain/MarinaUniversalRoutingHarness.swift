@@ -199,7 +199,8 @@ struct MarinaUniversalRoutingHarness {
              .incomeTotal,
              .incomeBySource,
              .savingsTotalExplicitAccount,
-             .reconciliationBalanceExplicitAccount:
+             .reconciliationBalanceExplicitAccount,
+             .rowBackedQuery:
             return false
         }
     }

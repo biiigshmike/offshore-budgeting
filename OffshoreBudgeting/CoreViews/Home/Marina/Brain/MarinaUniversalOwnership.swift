@@ -61,7 +61,8 @@ struct MarinaUniversalOwnershipRegistry: Sendable {
         universalOwned(.categoryAvailability, "Category availability has shadow, presentation, and debug-routing parity for the exact metric shape."),
         universalOwned(.categoryConcentration, "Category concentration has shadow, presentation, and debug-routing parity for the exact metric shape."),
         universalOwned(.presetRecurringBurden, "Preset recurring burden has shadow, presentation, and debug-routing parity for the exact metric shape."),
-        universalOwned(.forecastSavings, "Forecast savings has shadow, presentation, and debug-routing parity for the exact metric shape.")
+        universalOwned(.forecastSavings, "Forecast savings has shadow, presentation, and debug-routing parity for the exact metric shape."),
+        universalOwned(.rowBackedQuery, "Normal row-backed queries route through universal with bridge, runner, presentation, and fallback coverage.")
     ]
 
     private static func universalOwned(

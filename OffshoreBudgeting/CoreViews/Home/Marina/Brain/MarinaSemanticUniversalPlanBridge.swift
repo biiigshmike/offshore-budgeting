@@ -111,6 +111,18 @@ struct MarinaSemanticUniversalPlanBridge {
             return .unsupported(.unsupportedCombination)
         }
 
+        let incomeStateFiltersResult = incomeStateFilters(
+            for: request,
+            surface: surface,
+            descriptor: descriptor
+        )
+        guard case let .success(incomeStateFilters) = incomeStateFiltersResult else {
+            if case let .failure(reason) = incomeStateFiltersResult {
+                return .unsupported(reason)
+            }
+            return .unsupported(.unsupportedCombination)
+        }
+
         let dateFiltersResult = dateFilters(
             for: request,
             surface: surface,
@@ -148,7 +160,7 @@ struct MarinaSemanticUniversalPlanBridge {
                 operation: request.operation,
                 measure: request.measure,
                 search: search,
-                filters: filters + dateFilters,
+                filters: filters + incomeStateFilters + dateFilters,
                 groupBy: groupBy,
                 sorts: sorts,
                 limit: clampedLimit(request.resultLimit),
@@ -344,6 +356,35 @@ struct MarinaSemanticUniversalPlanBridge {
                 value: .text(target)
             )
         ])
+    }
+
+    private func incomeStateFilters(
+        for request: MarinaSemanticRequest,
+        surface: MarinaUniversalEntitySurface,
+        descriptor: MarinaUniversalSurfaceDescriptor
+    ) -> BridgeValueResult<[MarinaRowFilter]> {
+        guard case .semantic(.income) = surface,
+              let incomeState = request.incomeState,
+              incomeState != .all else {
+            return .success([])
+        }
+
+        guard descriptor.fields.contains(where: { $0.key == .isPlanned && $0.isFilterable }) else {
+            return .failure(.fieldNotFilterable)
+        }
+
+        switch incomeState {
+        case .planned:
+            return .success([
+                MarinaRowFilter(target: .field(.isPlanned), operation: .equals, value: .boolean(true))
+            ])
+        case .actual:
+            return .success([
+                MarinaRowFilter(target: .field(.isPlanned), operation: .equals, value: .boolean(false))
+            ])
+        case .all:
+            return .success([])
+        }
     }
 
     private func dateFilters(

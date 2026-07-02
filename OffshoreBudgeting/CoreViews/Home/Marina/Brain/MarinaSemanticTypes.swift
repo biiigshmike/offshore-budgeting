@@ -344,6 +344,7 @@ struct MarinaAnswerSemanticContext: Codable, Equatable, Sendable {
 }
 
 struct MarinaConversationTurn: Codable, Equatable, Sendable {
+    let userPrompt: String?
     let title: String
     let kind: HomeAnswerKind
     let subtitle: String?
@@ -351,6 +352,49 @@ struct MarinaConversationTurn: Codable, Equatable, Sendable {
     let rowTitles: [String]
     let semanticContext: MarinaAnswerSemanticContext?
     let recommendedFollowUp: MarinaFollowUpSuggestion?
+
+    init(
+        userPrompt: String? = nil,
+        title: String,
+        kind: HomeAnswerKind,
+        subtitle: String?,
+        primaryValue: String?,
+        rowTitles: [String],
+        semanticContext: MarinaAnswerSemanticContext?,
+        recommendedFollowUp: MarinaFollowUpSuggestion?
+    ) {
+        self.userPrompt = userPrompt
+        self.title = title
+        self.kind = kind
+        self.subtitle = subtitle
+        self.primaryValue = primaryValue
+        self.rowTitles = rowTitles
+        self.semanticContext = semanticContext
+        self.recommendedFollowUp = recommendedFollowUp
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case userPrompt
+        case title
+        case kind
+        case subtitle
+        case primaryValue
+        case rowTitles
+        case semanticContext
+        case recommendedFollowUp
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        userPrompt = try container.decodeIfPresent(String.self, forKey: .userPrompt)
+        title = try container.decode(String.self, forKey: .title)
+        kind = try container.decode(HomeAnswerKind.self, forKey: .kind)
+        subtitle = try container.decodeIfPresent(String.self, forKey: .subtitle)
+        primaryValue = try container.decodeIfPresent(String.self, forKey: .primaryValue)
+        rowTitles = try container.decodeIfPresent([String].self, forKey: .rowTitles) ?? []
+        semanticContext = try? container.decodeIfPresent(MarinaAnswerSemanticContext.self, forKey: .semanticContext)
+        recommendedFollowUp = try? container.decodeIfPresent(MarinaFollowUpSuggestion.self, forKey: .recommendedFollowUp)
+    }
 }
 
 struct MarinaConversationContext: Codable, Equatable, Sendable {
@@ -367,6 +411,7 @@ struct MarinaConversationContext: Codable, Equatable, Sendable {
         self.init(
             recentTurns: recentAnswers.suffix(Self.maxTurns).map { answer in
                 MarinaConversationTurn(
+                    userPrompt: answer.userPrompt,
                     title: answer.title,
                     kind: answer.kind,
                     subtitle: answer.subtitle,
@@ -389,6 +434,145 @@ struct MarinaConversationContext: Codable, Equatable, Sendable {
 
     var lastRecommendedFollowUp: MarinaFollowUpSuggestion? {
         lastTurn?.recommendedFollowUp
+    }
+
+    var followUpMemory: MarinaFollowUpMemory {
+        MarinaFollowUpMemory(recentTurns: recentTurns)
+    }
+}
+
+struct MarinaFollowUpMemory: Codable, Equatable, Sendable {
+    static let empty = MarinaFollowUpMemory()
+
+    let recentSuggestions: [MarinaFollowUpMemoryEntry]
+    let recentDeclines: [MarinaFollowUpMemoryEntry]
+    let recentAcceptances: [MarinaFollowUpMemoryEntry]
+
+    init(
+        recentSuggestions: [MarinaFollowUpMemoryEntry] = [],
+        recentDeclines: [MarinaFollowUpMemoryEntry] = [],
+        recentAcceptances: [MarinaFollowUpMemoryEntry] = []
+    ) {
+        self.recentSuggestions = recentSuggestions
+        self.recentDeclines = recentDeclines
+        self.recentAcceptances = recentAcceptances
+    }
+
+    init(recentTurns: [MarinaConversationTurn]) {
+        var suggestions: [MarinaFollowUpMemoryEntry] = []
+        var declines: [MarinaFollowUpMemoryEntry] = []
+        var acceptances: [MarinaFollowUpMemoryEntry] = []
+
+        for turn in recentTurns {
+            if let followUp = turn.recommendedFollowUp {
+                suggestions.append(MarinaFollowUpMemoryEntry(followUp: followUp))
+            }
+        }
+
+        for index in recentTurns.indices.dropFirst() {
+            guard let previousFollowUp = recentTurns[recentTurns.index(before: index)].recommendedFollowUp,
+                  let prompt = recentTurns[index].userPrompt else {
+                continue
+            }
+
+            let entry = MarinaFollowUpMemoryEntry(followUp: previousFollowUp)
+            if MarinaRecommendedFollowUp.isNegative(prompt) {
+                declines.append(entry)
+            } else if MarinaRecommendedFollowUp.isAffirmative(prompt) {
+                acceptances.append(entry)
+            }
+        }
+
+        self.init(
+            recentSuggestions: suggestions,
+            recentDeclines: declines,
+            recentAcceptances: acceptances
+        )
+    }
+
+    func shouldSuppress(_ suggestion: MarinaFollowUpSuggestion) -> Bool {
+        let entry = MarinaFollowUpMemoryEntry(followUp: suggestion)
+        return recentDeclines.contains { $0.fingerprint == entry.fingerprint }
+            || recentSuggestions.contains { $0.fingerprint == entry.fingerprint }
+            || repeatedShowMore(entry)
+    }
+
+    func scorePenalty(for suggestion: MarinaFollowUpSuggestion) -> Int {
+        let entry = MarinaFollowUpMemoryEntry(followUp: suggestion)
+        if recentDeclines.contains(where: { $0.similarityKey == entry.similarityKey }) {
+            return 200
+        }
+        if recentSuggestions.contains(where: { $0.similarityKey == entry.similarityKey }) {
+            return 40
+        }
+        return 0
+    }
+
+    private func repeatedShowMore(_ entry: MarinaFollowUpMemoryEntry) -> Bool {
+        entry.reason == .showMore
+            && recentSuggestions.contains {
+                $0.reason == .showMore && $0.similarityKey == entry.similarityKey
+            }
+    }
+}
+
+struct MarinaFollowUpMemoryEntry: Codable, Equatable, Sendable {
+    let reason: MarinaFollowUpSuggestion.Reason
+    let fingerprint: String
+    let similarityKey: String
+
+    init(followUp: MarinaFollowUpSuggestion) {
+        reason = followUp.reason
+        fingerprint = Self.fingerprint(for: followUp, includeListLimit: true)
+        similarityKey = Self.fingerprint(for: followUp, includeListLimit: false)
+    }
+
+    nonisolated private static func fingerprint(
+        for followUp: MarinaFollowUpSuggestion,
+        includeListLimit: Bool
+    ) -> String {
+        var components = [
+            "reason:\(followUp.reason.rawValue)",
+            "mode:\(followUp.executionMode.rawValue)"
+        ]
+
+        if let request = followUp.semanticRequest {
+            components.append(contentsOf: [
+                "entity:\(request.entity.rawValue)",
+                "operation:\(request.operation.rawValue)",
+                "measure:\(request.measure?.rawValue ?? "none")",
+                "shape:\(request.expectedAnswerShape.rawValue)",
+                "date:\(request.dateRangeToken.rawValue)",
+                "target:\(normalized(request.targetName))",
+                "display:\(normalized(request.targetDisplayName))",
+                "query:\(normalized(request.textQuery))",
+                "comparison:\(normalized(request.comparisonTargetName))",
+                "dimensions:\(request.dimensions.map(\.rawValue).sorted().joined(separator: ","))",
+                "amount:\(request.whatIfAmount.map(Self.amountComponent) ?? "none")",
+                "filter:\(request.categoryAvailabilityFilter?.rawValue ?? "none")",
+                "scope:\(request.expenseScope?.rawValue ?? "none")",
+                "incomeState:\(request.incomeState?.rawValue ?? "none")",
+                "sort:\(request.sort?.rawValue ?? "none")"
+            ])
+            if includeListLimit {
+                components.append("limit:\(request.resultLimit.map(String.init) ?? "none")")
+            }
+        } else {
+            components.append("prompt:\(normalized(followUp.prompt))")
+        }
+
+        return components.joined(separator: "|")
+    }
+
+    nonisolated private static func normalized(_ value: String?) -> String {
+        (value ?? "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
+            .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+    }
+
+    nonisolated private static func amountComponent(_ amount: Double) -> String {
+        String(Int((amount * 100).rounded()))
     }
 }
 

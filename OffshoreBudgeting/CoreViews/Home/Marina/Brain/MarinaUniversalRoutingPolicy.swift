@@ -25,6 +25,7 @@ nonisolated enum MarinaUniversalRoutingScenario: String, Codable, CaseIterable, 
     case categoryConcentration
     case presetRecurringBurden
     case forecastSavings
+    case rowBackedQuery
 }
 
 nonisolated struct MarinaUniversalRoutingPolicy: Equatable, Sendable {
@@ -49,30 +50,192 @@ nonisolated struct MarinaUniversalRoutingPolicy: Equatable, Sendable {
             return nil
         }
 
+        let provenScenario: MarinaUniversalRoutingScenario?
         switch request.entity {
         case .variableExpense:
-            return variableExpenseScenario(for: request)
+            provenScenario = variableExpenseScenario(for: request)
         case .plannedExpense:
-            return plannedExpenseScenario(for: request)
+            provenScenario = plannedExpenseScenario(for: request)
         case .income:
-            return incomeScenario(for: request)
+            provenScenario = incomeScenario(for: request)
         case .savingsAccount:
-            return savingsScenario(for: request)
+            provenScenario = savingsScenario(for: request)
         case .reconciliationAccount:
-            return reconciliationScenario(for: request)
+            provenScenario = reconciliationScenario(for: request)
         case .budget:
-            return budgetScenario(for: request)
+            provenScenario = budgetScenario(for: request)
         case .category:
-            return categoryScenario(for: request)
+            provenScenario = categoryScenario(for: request)
         case .preset:
-            return presetScenario(for: request)
+            provenScenario = presetScenario(for: request)
         case .workspace, .card:
+            provenScenario = nil
+        }
+
+        if let provenScenario {
+            return provenScenario
+        }
+
+        return rowBackedScenario(for: request)
+    }
+
+    private func rowBackedScenario(for request: MarinaSemanticRequest) -> MarinaUniversalRoutingScenario? {
+        guard rowBackedOperations.contains(request.operation),
+              request.categoryAvailabilityFilter == nil,
+              request.comparisonTargetName == nil,
+              request.whatIfAmount == nil,
+              request.operation != .next || request.dateRangeToken != .allTime,
+              rowBackedShapeIsSupported(request),
+              targetShapeIsSupported(request) else {
+            return nil
+        }
+
+        if request.expenseScope == .unified {
+            switch request.entity {
+            case .variableExpense, .plannedExpense:
+                guard rowBackedUnifiedExpenseOperations.contains(request.operation),
+                      rowBackedMeasure(request.measure, isIn: unifiedExpenseMeasures),
+                      dimensionsAreSupported(request, allowed: unifiedExpenseDimensions) else {
+                    return nil
+                }
+                return .rowBackedQuery
+            case .workspace, .budget, .card, .reconciliationAccount, .savingsAccount, .income, .category, .preset:
+                return nil
+            }
+        }
+
+        switch request.entity {
+        case .variableExpense:
+            guard expenseScopeIsNilOr(request, .variable),
+                  rowBackedVariableExpenseOperations.contains(request.operation),
+                  rowBackedMeasure(request.measure, isIn: variableExpenseMeasures),
+                  dimensionsAreSupported(request, allowed: expenseDimensions) else {
+                return nil
+            }
+            return .rowBackedQuery
+        case .plannedExpense:
+            guard expenseScopeIsNilOr(request, .planned),
+                  rowBackedPlannedExpenseOperations.contains(request.operation),
+                  rowBackedMeasure(request.measure, isIn: plannedExpenseMeasures),
+                  dimensionsAreSupported(request, allowed: plannedExpenseDimensions) else {
+                return nil
+            }
+            return .rowBackedQuery
+        case .income:
+            guard request.expenseScope == nil,
+                  rowBackedIncomeOperations.contains(request.operation),
+                  rowBackedMeasure(request.measure, isIn: incomeMeasures),
+                  dimensionsAreSupported(request, allowed: incomeDimensions) else {
+                return nil
+            }
+            return .rowBackedQuery
+        case .category:
+            guard request.expenseScope == nil,
+                  rowBackedMetadataOperations.contains(request.operation),
+                  rowBackedMeasure(request.measure, isIn: categoryMetadataMeasures),
+                  dimensionsAreSupported(request, allowed: []) else {
+                return nil
+            }
+            return .rowBackedQuery
+        case .card:
+            guard request.expenseScope == nil,
+                  rowBackedMetadataOperations.contains(request.operation),
+                  rowBackedMeasure(request.measure, isIn: cardMetadataMeasures),
+                  dimensionsAreSupported(request, allowed: []) else {
+                return nil
+            }
+            return .rowBackedQuery
+        case .preset:
+            guard request.expenseScope == nil,
+                  rowBackedPresetOperations.contains(request.operation),
+                  rowBackedMeasure(request.measure, isIn: presetMeasures),
+                  dimensionsAreSupported(request, allowed: presetDimensions) else {
+                return nil
+            }
+            return .rowBackedQuery
+        case .workspace, .budget, .reconciliationAccount, .savingsAccount:
             return nil
         }
     }
 
     private var blockedOperations: Set<MarinaSemanticOperation> {
         [.whatIf]
+    }
+
+    private var rowBackedOperations: Set<MarinaSemanticOperation> {
+        [.list, .count, .sum, .average, .group, .last, .next]
+    }
+
+    private var rowBackedVariableExpenseOperations: Set<MarinaSemanticOperation> {
+        [.list, .count, .sum, .average, .group, .last]
+    }
+
+    private var rowBackedPlannedExpenseOperations: Set<MarinaSemanticOperation> {
+        [.list, .count, .sum, .average, .group, .last, .next]
+    }
+
+    private var rowBackedUnifiedExpenseOperations: Set<MarinaSemanticOperation> {
+        [.list, .count, .sum, .average, .group, .last, .next]
+    }
+
+    private var rowBackedIncomeOperations: Set<MarinaSemanticOperation> {
+        [.list, .count, .sum, .average, .group]
+    }
+
+    private var rowBackedMetadataOperations: Set<MarinaSemanticOperation> {
+        [.list, .count]
+    }
+
+    private var rowBackedPresetOperations: Set<MarinaSemanticOperation> {
+        [.list, .sum, .group]
+    }
+
+    private var variableExpenseMeasures: Set<MarinaSemanticMeasure> {
+        [.amount, .budgetImpact]
+    }
+
+    private var plannedExpenseMeasures: Set<MarinaSemanticMeasure> {
+        [.amount, .plannedAmount, .actualAmount, .effectiveAmount, .budgetImpact]
+    }
+
+    private var unifiedExpenseMeasures: Set<MarinaSemanticMeasure> {
+        [.budgetImpact]
+    }
+
+    private var incomeMeasures: Set<MarinaSemanticMeasure> {
+        [.amount, .incomeAmount]
+    }
+
+    private var categoryMetadataMeasures: Set<MarinaSemanticMeasure> {
+        [.name, .color]
+    }
+
+    private var cardMetadataMeasures: Set<MarinaSemanticMeasure> {
+        [.name]
+    }
+
+    private var presetMeasures: Set<MarinaSemanticMeasure> {
+        [.plannedAmount, .actualAmount, .name]
+    }
+
+    private var expenseDimensions: Set<MarinaSemanticDimension> {
+        [.category, .card, .merchantText]
+    }
+
+    private var plannedExpenseDimensions: Set<MarinaSemanticDimension> {
+        [.category, .card, .merchantText, .preset, .budget]
+    }
+
+    private var unifiedExpenseDimensions: Set<MarinaSemanticDimension> {
+        [.category, .card, .merchantText, .preset, .budget]
+    }
+
+    private var incomeDimensions: Set<MarinaSemanticDimension> {
+        [.incomeSource, .card]
+    }
+
+    private var presetDimensions: Set<MarinaSemanticDimension> {
+        [.category, .card, .budget]
     }
 
     private func variableExpenseScenario(for request: MarinaSemanticRequest) -> MarinaUniversalRoutingScenario? {
@@ -349,6 +512,77 @@ nonisolated struct MarinaUniversalRoutingPolicy: Equatable, Sendable {
         hasNoTargetName(request) && hasNoTextQuery(request)
     }
 
+    private func rowBackedMeasure(
+        _ measure: MarinaSemanticMeasure?,
+        isIn allowedMeasures: Set<MarinaSemanticMeasure>
+    ) -> Bool {
+        guard let measure else {
+            return true
+        }
+        return allowedMeasures.contains(measure)
+    }
+
+    private func rowBackedShapeIsSupported(_ request: MarinaSemanticRequest) -> Bool {
+        switch request.expectedAnswerShape {
+        case .clarification, .unsupported, .comparison:
+            return false
+        case .list:
+            return request.operation == .list
+                || request.operation == .group
+                || request.operation == .last
+                || request.operation == .next
+        case .metric:
+            return request.operation == .count
+                || request.operation == .sum
+                || request.operation == .average
+                || request.operation == .last
+                || request.operation == .next
+        }
+    }
+
+    private func targetShapeIsSupported(_ request: MarinaSemanticRequest) -> Bool {
+        if hasNoTargetName(request) {
+            return true
+        }
+
+        let relationshipDimensions = request.dimensions.filter {
+            relationshipBackedDimensions.contains($0)
+        }
+        return relationshipDimensions.count == 1
+    }
+
+    private var relationshipBackedDimensions: Set<MarinaSemanticDimension> {
+        [.category, .card, .incomeSource, .preset, .budget]
+    }
+
+    private func dimensionsAreSupported(
+        _ request: MarinaSemanticRequest,
+        allowed allowedDimensions: Set<MarinaSemanticDimension>
+    ) -> Bool {
+        guard request.dimensions.allSatisfy({ allowedDimensions.contains($0) }) else {
+            return false
+        }
+
+        if request.operation == .group {
+            guard hasNoTargetName(request), request.sort == nil else {
+                return false
+            }
+            let groupableDimensions = request.dimensions.filter {
+                relationshipBackedDimensions.contains($0)
+            }
+            return groupableDimensions.count == 1
+        }
+
+        if hasTargetName(request) {
+            let filterDimensions = request.dimensions.filter {
+                relationshipBackedDimensions.contains($0)
+            }
+            return filterDimensions.count == 1
+        }
+
+        return true
+    }
+
     private func trimmed(_ value: String?) -> String {
         (value ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
     }
@@ -386,7 +620,8 @@ extension MarinaUniversalRoutingPolicy {
             .categoryAvailability,
             .categoryConcentration,
             .presetRecurringBurden,
-            .forecastSavings
+            .forecastSavings,
+            .rowBackedQuery
         ]
     )
 }

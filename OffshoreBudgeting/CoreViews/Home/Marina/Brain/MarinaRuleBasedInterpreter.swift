@@ -800,13 +800,14 @@ struct MarinaRuleBasedInterpreter: MarinaModelInterpreting {
         }
 
         if targetNormalized.contains("savings") {
+            let accountName = savingsTarget(in: normalized)
             return MarinaSemanticRequest(
                 entity: .savingsAccount,
                 operation: .sum,
                 measure: .savingsTotal,
-                dimensions: [.savingsAccount],
+                dimensions: accountName == nil ? [] : [.savingsAccount],
                 dateRangeToken: hasExplicitDateScope(normalized) ? dateToken(for: normalized) : .allTime,
-                targetName: target,
+                targetName: accountName,
                 expectedAnswerShape: .metric
             )
         }
@@ -1090,7 +1091,28 @@ struct MarinaRuleBasedInterpreter: MarinaModelInterpreting {
                 target.removeFirst(prefix.count)
             }
         }
-        if ["current", "actual", "planned", "total"].contains(target) {
+        if [
+            "current",
+            "actual",
+            "planned",
+            "total",
+            "what is my",
+            "what's my",
+            "what is",
+            "what's",
+            "how much is my",
+            "how much is",
+            "summarize my",
+            "summarize the",
+            "summarize",
+            "show my",
+            "show",
+            "list my",
+            "list",
+            "compare my",
+            "compare the",
+            "compare"
+        ].contains(target) {
             return nil
         }
         guard target.isEmpty == false else { return nil }
@@ -1113,8 +1135,16 @@ struct MarinaRuleBasedInterpreter: MarinaModelInterpreting {
 
     private func savingsTarget(in normalized: String) -> String? {
         if normalized.contains("savings account"),
-           let target = targetBeforeAnyMarker(in: normalized, markers: [" balance", " total"]) {
-            return target
+           let rawTarget = prefixBeforeAnyMarker(in: normalized, markers: [" savings account"]),
+           isPromptScaffold(rawTarget) {
+            return targetAfterAnyMarker(in: normalized, markers: [
+                "savings account named ",
+                "savings account called "
+            ])
+        }
+        if normalized.contains("savings account"),
+           let target = targetBeforeAnyMarker(in: normalized, markers: [" savings account"]) {
+            return strippedTarget(target, typeWords: ["savings account", "savings"]) ?? target
         }
         return typedTarget(in: normalized, typeWords: ["savings account", "savings"])
     }
@@ -1157,6 +1187,28 @@ struct MarinaRuleBasedInterpreter: MarinaModelInterpreting {
             "Presets",
             "Savings"
         ].contains(target)
+    }
+
+    private func isPromptScaffold(_ target: String) -> Bool {
+        [
+            "",
+            "my",
+            "the",
+            "current",
+            "what is my",
+            "what's my",
+            "what is",
+            "what's",
+            "how much is my",
+            "how much is",
+            "summarize my",
+            "summarize the",
+            "summarize",
+            "show my",
+            "show",
+            "list my",
+            "list"
+        ].contains(target.trimmingCharacters(in: .whitespacesAndNewlines).lowercased())
     }
 
     private func shouldKeepTypeWord(_ typeWord: String) -> Bool {

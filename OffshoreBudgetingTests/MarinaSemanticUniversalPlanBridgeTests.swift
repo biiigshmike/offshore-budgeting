@@ -168,6 +168,39 @@ struct MarinaSemanticUniversalPlanBridgeTests {
         ])
     }
 
+    @Test func incomeStateMapsToIsPlannedFieldFilter() throws {
+        let planned = try requirePlan(bridge.makePlan(from: request(
+            entity: .income,
+            operation: .sum,
+            measure: .incomeAmount,
+            incomeState: .planned
+        )))
+        let actual = try requirePlan(bridge.makePlan(from: request(
+            entity: .income,
+            operation: .sum,
+            measure: .incomeAmount,
+            incomeState: .actual
+        )))
+
+        #expect(planned.filters == [
+            MarinaRowFilter(target: .field(.isPlanned), operation: .equals, value: .boolean(true))
+        ])
+        #expect(actual.filters == [
+            MarinaRowFilter(target: .field(.isPlanned), operation: .equals, value: .boolean(false))
+        ])
+    }
+
+    @Test func allIncomeStateDoesNotAddIsPlannedFilter() throws {
+        let plan = try requirePlan(bridge.makePlan(from: request(
+            entity: .income,
+            operation: .sum,
+            measure: .incomeAmount,
+            incomeState: .all
+        )))
+
+        #expect(plan.filters.isEmpty)
+    }
+
     @Test func incomeGroupByIncomeSourceMapsToGroupPlan() throws {
         let plan = try requirePlan(bridge.makePlan(from: request(
             entity: .income,
@@ -270,6 +303,7 @@ struct MarinaSemanticUniversalPlanBridgeTests {
         resultLimit: Int? = nil,
         sort: MarinaSemanticSort? = nil,
         expenseScope: MarinaSemanticExpenseScope? = nil,
+        incomeState: MarinaSemanticIncomeState? = nil,
         shape: MarinaSemanticAnswerShape = .metric
     ) -> MarinaSemanticRequest {
         MarinaSemanticRequest(
@@ -283,6 +317,7 @@ struct MarinaSemanticUniversalPlanBridgeTests {
             resultLimit: resultLimit,
             sort: sort,
             expenseScope: expenseScope,
+            incomeState: incomeState,
             expectedAnswerShape: shape
         )
     }

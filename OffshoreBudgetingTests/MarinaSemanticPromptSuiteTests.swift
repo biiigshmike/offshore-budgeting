@@ -789,7 +789,38 @@ struct MarinaSemanticPromptSuiteTests {
         #expect(store.loadAnswers(workspaceID: workspaceID).isEmpty)
     }
 
-    @Test func hybrid_highConfidencePromptDoesNotCallModelInterpreter() async throws {
+    @Test func factory_defaultUsesModelBackedInterpreterBeforeRuleBasedParser() async throws {
+        let fixture = try makeFixture()
+        let model = RecordingInterpreter(
+            result: MarinaInterpretedSemanticRequest(
+                request: MarinaSemanticRequest(entity: .income, operation: .sum, measure: .incomeAmount, expectedAnswerShape: .metric),
+                confidence: .medium,
+                source: .foundationModel
+            )
+        )
+        let interpreter = MarinaModelInterpreterFactory.makeDefault(modelBackedInterpreter: model)
+        let context = brainContext(fixture)
+
+        let interpreted = try await interpreter.interpretedSemanticRequest(for: "How many cards do I have?", context: context)
+
+        #expect(interpreted.source == .foundationModel)
+        #expect(interpreted.request.entity == .income)
+        #expect(model.callCount == 1)
+    }
+
+    @Test func factory_noModelBackedInterpreterReturnsUnavailableFallback() async throws {
+        let fixture = try makeFixture()
+        let interpreter = MarinaModelInterpreterFactory.makeDefault(modelBackedInterpreter: nil)
+        let context = brainContext(fixture)
+
+        let interpreted = try await interpreter.interpretedSemanticRequest(for: "How many cards do I have?", context: context)
+
+        #expect(interpreted.source == .unavailableFallback)
+        #expect(interpreted.request.expectedAnswerShape == .unsupported)
+        #expect(interpreted.request.unsupportedReason == .unavailableModel)
+    }
+
+    @Test func migrationHybrid_highConfidencePromptDoesNotCallModelInterpreter() async throws {
         let fixture = try makeFixture()
         let model = RecordingInterpreter(
             result: MarinaInterpretedSemanticRequest(
@@ -808,7 +839,7 @@ struct MarinaSemanticPromptSuiteTests {
         #expect(model.callCount == 0)
     }
 
-    @Test func hybrid_lowConfidencePromptCallsModelInterpreter() async throws {
+    @Test func migrationHybrid_lowConfidencePromptCallsModelInterpreter() async throws {
         let fixture = try makeFixture()
         let model = RecordingInterpreter(
             result: MarinaInterpretedSemanticRequest(
@@ -1520,6 +1551,108 @@ struct MarinaSemanticPromptSuiteTests {
 
         let noFollowUp = insightContext(followUps: [])
         #expect(noFollowUp.recommendedFollowUp == nil)
+    }
+
+    @Test func recommendedFollowUpMemory_noMemorySelectionRemainsUnchanged() throws {
+        let safeDaily = followUp(
+            title: "What can I spend per day?",
+            prompt: "What can I spend per day?",
+            reason: .safeDailySpend,
+            mode: .executable
+        )
+        let whatIf = followUp(
+            title: "What if I spend $50?",
+            prompt: "What if I spend $50?",
+            reason: .whatIf,
+            mode: .executable
+        )
+
+        #expect(MarinaRecommendedFollowUp.suggestion(from: [safeDaily, whatIf])?.reason == .whatIf)
+    }
+
+    @Test func recommendedFollowUpMemory_suppressesRecentlySuggestedIdenticalFollowUp() throws {
+        let suggested = semanticFollowUp(reason: .safeDailySpend, targetName: "April Budget")
+        let memory = MarinaConversationContext(recentAnswers: [
+            answerWithFollowUps([suggested])
+        ]).followUpMemory
+
+        #expect(MarinaRecommendedFollowUp.suggestion(from: [suggested], memory: memory) == nil)
+    }
+
+    @Test func recommendedFollowUpMemory_suppressesRecentlyDeclinedIdenticalFollowUp() throws {
+        let declined = semanticFollowUp(reason: .whatIf, targetName: "April Budget", whatIfAmount: 50)
+        let memory = MarinaConversationContext(recentAnswers: [
+            answerWithFollowUps([declined], userPrompt: "How much room do I have?"),
+            HomeAnswer(queryID: UUID(), kind: .message, userPrompt: "No thanks", title: "")
+        ]).followUpMemory
+
+        #expect(memory.recentDeclines == [MarinaFollowUpMemoryEntry(followUp: declined)])
+        #expect(MarinaRecommendedFollowUp.suggestion(from: [declined], memory: memory) == nil)
+    }
+
+    @Test func recommendedFollowUpMemory_allSuppressedCandidatesReturnNoRecommendation() throws {
+        let suggested = semanticFollowUp(reason: .breakdown, targetName: "Groceries", entity: .category)
+        let memory = MarinaConversationContext(recentAnswers: [
+            answerWithFollowUps([suggested])
+        ]).followUpMemory
+
+        #expect(MarinaRecommendedFollowUp.filteredFollowUps(from: [suggested], memory: memory).isEmpty)
+    }
+
+    @Test func recommendedFollowUpMemory_sameReasonDifferentTargetRemainsEligible() throws {
+        let groceries = semanticFollowUp(reason: .breakdown, targetName: "Groceries", entity: .category)
+        let dining = semanticFollowUp(reason: .breakdown, targetName: "Dining", entity: .category)
+        let memory = MarinaConversationContext(recentAnswers: [
+            answerWithFollowUps([groceries])
+        ]).followUpMemory
+
+        #expect(MarinaRecommendedFollowUp.suggestion(from: [dining], memory: memory) == dining)
+    }
+
+    @Test func recommendedFollowUpMemory_acceptanceIsNotStoredAsDecline() throws {
+        let accepted = semanticFollowUp(reason: .comparePreviousPeriod, targetName: "Income", entity: .income)
+        let memory = MarinaConversationContext(recentAnswers: [
+            answerWithFollowUps([accepted], userPrompt: "How is income progress?"),
+            HomeAnswer(queryID: UUID(), kind: .comparison, userPrompt: "Yes", title: "Income Comparison")
+        ]).followUpMemory
+
+        #expect(memory.recentAcceptances == [MarinaFollowUpMemoryEntry(followUp: accepted)])
+        #expect(memory.recentDeclines.isEmpty)
+    }
+
+    @Test func recommendedFollowUpMemory_negativeWithoutVisibleFollowUpDoesNotDecline() throws {
+        let memory = MarinaConversationContext(recentAnswers: [
+            HomeAnswer(queryID: UUID(), kind: .message, userPrompt: "No", title: "")
+        ]).followUpMemory
+
+        #expect(memory.recentDeclines.isEmpty)
+        #expect(memory.recentAcceptances.isEmpty)
+    }
+
+    @Test func recommendedFollowUpMemory_showMoreDoesNotLoopForSameListContext() throws {
+        let first = semanticFollowUp(
+            reason: .showMore,
+            targetName: "Groceries",
+            entity: .variableExpense,
+            operation: .list,
+            measure: .budgetImpact,
+            resultLimit: 10,
+            answerShape: .list
+        )
+        let next = semanticFollowUp(
+            reason: .showMore,
+            targetName: "Groceries",
+            entity: .variableExpense,
+            operation: .list,
+            measure: .budgetImpact,
+            resultLimit: 15,
+            answerShape: .list
+        )
+        let memory = MarinaConversationContext(recentAnswers: [
+            answerWithFollowUps([first])
+        ]).followUpMemory
+
+        #expect(MarinaRecommendedFollowUp.suggestion(from: [next], memory: memory) == nil)
     }
 
     @Test func insightAnalyzer_emitsDomainSignalsForFormulaAnswers() throws {
@@ -2622,6 +2755,195 @@ struct MarinaSemanticPromptSuiteTests {
         #expect(standalone.semanticContext?.request.targetName != "Apple Card")
     }
 
+    @Test func stabilization_knownPromptShapesStayTargetedWithMockedModelOutput() async throws {
+        let fixture = try makeFixture(includeDebitCard: true, includeStabilizationTargets: true)
+        let interpreter = PromptMappedInterpreter([
+            "What did I spend at Uber?": interpreted(.foundationModel, request: merchantSpend("Uber")),
+            "Show my Food & Drink expenses from last month.": interpreted(.foundationModel, request: categoryList("Food & Drink", dateRangeToken: .previousMonth)),
+            "How much did I spend on Groceries last month?": interpreted(.foundationModel, request: categorySpend("Groceries", dateRangeToken: .previousMonth)),
+            "Compare Apple Card to Debit Card.": interpreted(.foundationModel, request: cardComparison("Apple Card", "Debit Card")),
+            "What is my safe spend today?": interpreted(.foundationModel, request: safeDailySpend()),
+            "What is eating my budget?": interpreted(.foundationModel, request: budgetConcentration())
+        ])
+        let brain = modelBackedBrain(interpreter: interpreter, policy: .internalParityProven)
+
+        let uber = await seed("What did I spend at Uber?", using: brain, fixture: fixture)
+        #expect(uber.answer.kind == .metric)
+        #expect(uber.answer.title != "Card Spend")
+        #expect(uber.debugTrace?.validatorOutput.textQuery == "Uber")
+        #expect(uber.debugTrace?.validatorOutput.dimensions.contains(.merchantText) == true)
+        #expect(uber.debugTrace?.executionRoute == .universal)
+        #expect(uber.debugTrace?.universalScenario == .merchantVariableSpend)
+
+        let food = await seed("Show my Food & Drink expenses from last month.", using: brain, fixture: fixture)
+        #expect(food.answer.kind == .list)
+        #expect(food.debugTrace?.validatorOutput.targetName == "Food & Drink")
+        #expect(food.debugTrace?.validatorOutput.dateRangeToken == .previousMonth)
+        #expect(food.answer.rows.isEmpty == false)
+        #expect(food.answer.rows.allSatisfy { $0.title.contains("Burger") || $0.title.contains("Cafe") })
+
+        let groceries = await seed("How much did I spend on Groceries last month?", using: brain, fixture: fixture)
+        #expect(groceries.answer.kind == .metric)
+        #expect(groceries.answer.title != "Budget Overview")
+        #expect(groceries.debugTrace?.validatorOutput.targetName == "Groceries")
+        #expect(groceries.debugTrace?.validatorOutput.dateRangeToken == .previousMonth)
+        #expect(groceries.debugTrace?.universalScenario == .categoryVariableSpend)
+
+        let comparison = await seed("Compare Apple Card to Debit Card.", using: brain, fixture: fixture)
+        #expect(comparison.answer.kind == .comparison)
+        #expect(comparison.answer.title == "Card Spend Comparison")
+        #expect(comparison.debugTrace?.validatorOutput.targetName == "Apple Card")
+        #expect(comparison.debugTrace?.validatorOutput.comparisonTargetName == "Debit Card")
+
+        let safeSpend = await seed("What is my safe spend today?", using: brain, fixture: fixture)
+        #expect(safeSpend.answer.kind == .metric)
+        #expect(safeSpend.answer.title == "Safe Daily Spend")
+        #expect(safeSpend.debugTrace?.validatorOutput.measure == .safeDailySpend)
+        #expect(safeSpend.answer.rows.contains { $0.title == "Safe per day" })
+
+        let concentration = await seed("What is eating my budget?", using: brain, fixture: fixture)
+        #expect(concentration.answer.kind == .metric)
+        #expect(concentration.answer.title == "Budget Concentration")
+        #expect(concentration.answer.rows.contains { $0.title == "Category spend" })
+        #expect(concentration.answer.rows.contains { $0.title == "Total spend" })
+        #expect(concentration.answer.rows.contains { $0.title == "Concentration" })
+    }
+
+    @Test func stabilization_promptTargetLossCannotValidateToBroadAnswer() async throws {
+        let fixture = try makeFixture(includeDebitCard: true, includeStabilizationTargets: true)
+        let interpreter = PromptMappedInterpreter([
+            "What did I spend at Uber?": interpreted(.foundationModel, request: cardSpend("Apple Card")),
+            "Show my Food & Drink expenses from last month.": interpreted(.foundationModel, request: broadExpenseList(dateRangeToken: .previousMonth)),
+            "How much did I spend on Groceries last month?": interpreted(.foundationModel, request: budgetOverview(dateRangeToken: .previousMonth)),
+            "Compare Apple Card to Debit Card.": interpreted(.foundationModel, request: MarinaSemanticRequest(
+                entity: .card,
+                operation: .compare,
+                measure: .budgetImpact,
+                dimensions: [.card],
+                expectedAnswerShape: .comparison
+            ))
+        ])
+        let brain = modelBackedBrain(interpreter: interpreter, policy: .internalParityProven)
+
+        for prompt in [
+            "What did I spend at Uber?",
+            "Show my Food & Drink expenses from last month.",
+            "How much did I spend on Groceries last month?",
+            "Compare Apple Card to Debit Card."
+        ] {
+            let answer = await seed(prompt, using: brain, fixture: fixture)
+            #expect(answer.answer.kind == .message, "Expected target-loss rejection for \(prompt), got \(answer.answer.title)")
+            #expect(answer.debugTrace?.validatorOutput.expectedAnswerShape == .unsupported, "Expected unsupported target-loss trace for \(prompt)")
+            #expect(answer.debugTrace?.validatorOutput.unsupportedReason == .unresolvedEntity, "Expected unresolved target-loss reason for \(prompt)")
+            #expect(answer.answer.title != "Budget Overview")
+            #expect(answer.answer.title != "Card Spend")
+            #expect(answer.answer.title != "Card Spend Comparison")
+        }
+    }
+
+    @Test func stabilization_standalonePromptsDoNotInheritPreviousContextWithMockedModelOutput() async throws {
+        let fixture = try makeFixture(includeDebitCard: true, includeStabilizationTargets: true)
+        let interpreter = PromptMappedInterpreter([
+            "What is my safe spend today?": interpreted(.foundationModel, request: safeDailySpend()),
+            "What did I spend at Uber?": interpreted(.foundationModel, request: merchantSpend("Uber")),
+            "What is eating my budget?": interpreted(.foundationModel, request: budgetConcentration()),
+            "Show my Food & Drink expenses from last month.": interpreted(.foundationModel, request: categoryList("Food & Drink", dateRangeToken: .previousMonth)),
+            "Compare Apple Card to Debit Card.": interpreted(.foundationModel, request: cardComparison("Apple Card", "Debit Card")),
+            "How much did I spend on Groceries last month?": interpreted(.foundationModel, request: categorySpend("Groceries", dateRangeToken: .previousMonth))
+        ])
+        let brain = modelBackedBrain(interpreter: interpreter, policy: .internalParityProven)
+
+        let safeSpend = await seed("What is my safe spend today?", using: brain, fixture: fixture)
+        let uberAfterSafeSpend = await seed(
+            "What did I spend at Uber?",
+            using: brain,
+            fixture: fixture,
+            conversationContext: MarinaConversationContext(recentAnswers: [safeSpend.answer])
+        )
+        #expect(uberAfterSafeSpend.debugTrace?.promptTreatment == .standalone)
+        #expect(uberAfterSafeSpend.debugTrace?.priorContextChangedRequest == false)
+        #expect(uberAfterSafeSpend.debugTrace?.validatorOutput.textQuery == "Uber")
+        #expect(uberAfterSafeSpend.answer.title != "Safe Daily Spend")
+        #expect(uberAfterSafeSpend.answer.title != "Card Spend")
+
+        let concentration = await seed("What is eating my budget?", using: brain, fixture: fixture)
+        let foodAfterConcentration = await seed(
+            "Show my Food & Drink expenses from last month.",
+            using: brain,
+            fixture: fixture,
+            conversationContext: MarinaConversationContext(recentAnswers: [concentration.answer])
+        )
+        #expect(foodAfterConcentration.debugTrace?.promptTreatment == .standalone)
+        #expect(foodAfterConcentration.debugTrace?.priorContextChangedRequest == false)
+        #expect(foodAfterConcentration.debugTrace?.validatorOutput.targetName == "Food & Drink")
+        #expect(foodAfterConcentration.debugTrace?.validatorOutput.dateRangeToken == .previousMonth)
+
+        let comparison = await seed("Compare Apple Card to Debit Card.", using: brain, fixture: fixture)
+        let groceriesAfterComparison = await seed(
+            "How much did I spend on Groceries last month?",
+            using: brain,
+            fixture: fixture,
+            conversationContext: MarinaConversationContext(recentAnswers: [comparison.answer])
+        )
+        #expect(groceriesAfterComparison.debugTrace?.promptTreatment == .standalone)
+        #expect(groceriesAfterComparison.debugTrace?.priorContextChangedRequest == false)
+        #expect(groceriesAfterComparison.debugTrace?.validatorOutput.targetName == "Groceries")
+        #expect(groceriesAfterComparison.debugTrace?.validatorOutput.comparisonTargetName == nil)
+        #expect(groceriesAfterComparison.answer.title != "Card Spend Comparison")
+    }
+
+    @Test func stabilization_nonexistentAndWeakTargetsDoNotBecomeConfidentBroadAnswers() async throws {
+        let fixture = try makeFixture(includeStabilizationTargets: true)
+        let validator = MarinaSemanticRequestValidator()
+        let snapshot = try MarinaWorkspaceSnapshotProvider().snapshot(for: fixture.workspace, modelContext: fixture.context)
+
+        let missingMerchant = validator.validate(
+            interpreted: interpreted(.foundationModel, request: MarinaSemanticRequest(
+                entity: .variableExpense,
+                operation: .sum,
+                measure: .budgetImpact,
+                targetName: "Moon Cafe",
+                expectedAnswerShape: .metric
+            )),
+            snapshot: snapshot,
+            originalPrompt: "What did I spend at Moon Cafe?"
+        )
+        #expect(missingMerchant.request.expectedAnswerShape == .unsupported)
+        #expect(missingMerchant.request.unsupportedReason == .unresolvedEntity)
+
+        let weakSearch = MarinaCandidateSearchService().search(
+            MarinaCandidateSearchRequest(
+                rawTargetText: "Food Coffee",
+                semanticRequest: categorySpend("Food Coffee"),
+                snapshot: snapshot
+            )
+        )
+        #expect(weakSearch.ambiguityStatus == .weakOnly || weakSearch.ambiguityStatus == .noUsefulCandidate)
+        #expect(weakSearch.recommendedMatch == nil)
+    }
+
+    @Test func stabilization_narrationReceivesOnlyDeterministicEvidence() async throws {
+        let fixture = try makeFixture(includeStabilizationTargets: true)
+        let narrator = RecordingInsightNarrator(response: "Uber was your biggest category at $999.")
+        let brain = modelBackedBrain(
+            interpreter: PromptMappedInterpreter([
+                "What did I spend at Uber?": interpreted(.foundationModel, request: merchantSpend("Uber"))
+            ]),
+            policy: .internalParityProven,
+            insightNarrator: narrator
+        )
+
+        _ = await answer("What did I spend at Uber?", using: brain, fixture: fixture)
+
+        let context = try #require(narrator.contexts.first)
+        #expect(context.entity == .variableExpense)
+        #expect(context.measure == .budgetImpact)
+        #expect(context.rows.allSatisfy { $0.title.contains("Uber") || $0.role != .evidence })
+        #expect(context.rows.contains { $0.amount == 18 })
+        #expect(context.rows.contains { $0.title.contains("Debit Card") } == false)
+        #expect(context.rows.contains { $0.title.contains("Apple Card") } == false)
+    }
+
     @Test func followUpResolver_drillsFromCategoryAvailabilityIntoCategoryTransactions() async throws {
         let fixture = try makeFixture()
         let brain = legacyRuleBasedBrain()
@@ -2852,6 +3174,25 @@ struct MarinaSemanticPromptSuiteTests {
         )
     }
 
+    private func seed(
+        _ prompt: String,
+        using brain: MarinaBrain,
+        fixture: Fixture,
+        homeContext: MarinaPanelHomeContext? = nil,
+        conversationContext: MarinaConversationContext = MarinaConversationContext()
+    ) async -> MarinaAnswerSeed {
+        await brain.answerSeed(
+            prompt: prompt,
+            workspace: fixture.workspace,
+            modelContext: fixture.context,
+            ambientDateRange: fixture.currentRange,
+            homeContext: homeContext ?? MarinaPanelHomeContext(dateRange: fixture.currentRange),
+            defaultBudgetingPeriod: .monthly,
+            conversationContext: conversationContext,
+            now: fixture.now
+        )
+    }
+
     private func legacyRuleBasedBrain(
         insightNarrator: (any MarinaInsightNarrating)? = nil
     ) -> MarinaBrain {
@@ -2859,6 +3200,144 @@ struct MarinaSemanticPromptSuiteTests {
             interpreter: MarinaRuleBasedInterpreter(),
             insightNarrator: insightNarrator,
             universalRoutingPolicyProvider: { .disabled }
+        )
+    }
+
+    private func modelBackedBrain(
+        interpreter: any MarinaModelInterpreting,
+        policy: MarinaUniversalRoutingPolicy,
+        insightNarrator: (any MarinaInsightNarrating)? = nil
+    ) -> MarinaBrain {
+        MarinaBrain(
+            interpreter: interpreter,
+            insightNarrator: insightNarrator,
+            universalRoutingPolicyProvider: { policy }
+        )
+    }
+
+    private func interpreted(
+        _ source: MarinaSemanticSource,
+        request: MarinaSemanticRequest
+    ) -> MarinaInterpretedSemanticRequest {
+        MarinaInterpretedSemanticRequest(
+            request: request,
+            confidence: .medium,
+            source: source
+        )
+    }
+
+    private func merchantSpend(_ textQuery: String) -> MarinaSemanticRequest {
+        MarinaSemanticRequest(
+            entity: .variableExpense,
+            operation: .sum,
+            measure: .budgetImpact,
+            dimensions: [.merchantText],
+            textQuery: textQuery,
+            targetDisplayName: textQuery,
+            expenseScope: .variable,
+            expectedAnswerShape: .metric
+        )
+    }
+
+    private func categorySpend(
+        _ categoryName: String,
+        dateRangeToken: MarinaSemanticDateRangeToken = .currentPeriod
+    ) -> MarinaSemanticRequest {
+        MarinaSemanticRequest(
+            entity: .variableExpense,
+            operation: .sum,
+            measure: .budgetImpact,
+            dimensions: [.category],
+            dateRangeToken: dateRangeToken,
+            targetName: categoryName,
+            targetDisplayName: categoryName,
+            expenseScope: .variable,
+            expectedAnswerShape: .metric
+        )
+    }
+
+    private func categoryList(
+        _ categoryName: String,
+        dateRangeToken: MarinaSemanticDateRangeToken = .currentPeriod
+    ) -> MarinaSemanticRequest {
+        MarinaSemanticRequest(
+            entity: .variableExpense,
+            operation: .list,
+            measure: .budgetImpact,
+            dimensions: [.category],
+            dateRangeToken: dateRangeToken,
+            targetName: categoryName,
+            targetDisplayName: categoryName,
+            resultLimit: 10,
+            sort: .dateDescending,
+            expenseScope: .unified,
+            expectedAnswerShape: .list
+        )
+    }
+
+    private func cardSpend(_ cardName: String) -> MarinaSemanticRequest {
+        MarinaSemanticRequest(
+            entity: .card,
+            operation: .sum,
+            measure: .budgetImpact,
+            dimensions: [.card],
+            targetName: cardName,
+            targetDisplayName: cardName,
+            expenseScope: .variable,
+            expectedAnswerShape: .metric
+        )
+    }
+
+    private func cardComparison(_ leftName: String, _ rightName: String) -> MarinaSemanticRequest {
+        MarinaSemanticRequest(
+            entity: .card,
+            operation: .compare,
+            measure: .budgetImpact,
+            dimensions: [.card],
+            targetName: leftName,
+            comparisonTargetName: rightName,
+            expectedAnswerShape: .comparison
+        )
+    }
+
+    private func safeDailySpend() -> MarinaSemanticRequest {
+        MarinaSemanticRequest(
+            entity: .budget,
+            operation: .forecast,
+            measure: .safeDailySpend,
+            expectedAnswerShape: .metric
+        )
+    }
+
+    private func budgetConcentration() -> MarinaSemanticRequest {
+        MarinaSemanticRequest(
+            entity: .category,
+            operation: .share,
+            measure: .concentration,
+            expectedAnswerShape: .metric
+        )
+    }
+
+    private func broadExpenseList(dateRangeToken: MarinaSemanticDateRangeToken = .currentPeriod) -> MarinaSemanticRequest {
+        MarinaSemanticRequest(
+            entity: .variableExpense,
+            operation: .list,
+            measure: .budgetImpact,
+            dateRangeToken: dateRangeToken,
+            resultLimit: 10,
+            sort: .dateDescending,
+            expenseScope: .unified,
+            expectedAnswerShape: .list
+        )
+    }
+
+    private func budgetOverview(dateRangeToken: MarinaSemanticDateRangeToken = .currentPeriod) -> MarinaSemanticRequest {
+        MarinaSemanticRequest(
+            entity: .budget,
+            operation: .forecast,
+            measure: .remainingRoom,
+            dateRangeToken: dateRangeToken,
+            expectedAnswerShape: .metric
         )
     }
 
@@ -3048,6 +3527,82 @@ struct MarinaSemanticPromptSuiteTests {
         )
     }
 
+    private func semanticFollowUp(
+        reason: MarinaFollowUpSuggestion.Reason,
+        targetName: String?,
+        entity: MarinaSemanticEntity = .budget,
+        operation: MarinaSemanticOperation? = nil,
+        measure: MarinaSemanticMeasure? = nil,
+        resultLimit: Int? = nil,
+        whatIfAmount: Double? = nil,
+        answerShape: MarinaSemanticAnswerShape? = nil
+    ) -> MarinaFollowUpSuggestion {
+        let resolvedOperation = operation ?? {
+            switch reason {
+            case .whatIf:
+                return .whatIf
+            case .comparePreviousPeriod:
+                return .compare
+            case .showMore, .inspectRows:
+                return .list
+            case .breakdown:
+                return .group
+            case .forecast, .safeDailySpend, .nextDue:
+                return .forecast
+            }
+        }()
+        let resolvedMeasure = measure ?? {
+            switch reason {
+            case .safeDailySpend:
+                return MarinaSemanticMeasure.safeDailySpend
+            case .whatIf, .breakdown, .inspectRows, .showMore:
+                return .budgetImpact
+            case .comparePreviousPeriod, .forecast, .nextDue:
+                return .incomeAmount
+            }
+        }()
+        let resolvedShape = answerShape ?? {
+            switch resolvedOperation {
+            case .list, .group, .next, .last:
+                return .list
+            case .compare, .whatIf:
+                return .comparison
+            case .count, .sum, .average, .share, .forecast:
+                return .metric
+            }
+        }()
+
+        return MarinaFollowUpSuggestion(
+            title: reason.rawValue,
+            prompt: targetName.map { "\(reason.rawValue) \($0)" } ?? reason.rawValue,
+            reason: reason,
+            executionMode: .executable,
+            semanticRequest: MarinaSemanticRequest(
+                entity: entity,
+                operation: resolvedOperation,
+                measure: resolvedMeasure,
+                dateRangeToken: .currentPeriod,
+                targetName: targetName,
+                resultLimit: resultLimit,
+                whatIfAmount: whatIfAmount,
+                expectedAnswerShape: resolvedShape
+            )
+        )
+    }
+
+    private func answerWithFollowUps(
+        _ followUps: [MarinaFollowUpSuggestion],
+        userPrompt: String = "Summary"
+    ) -> HomeAnswer {
+        HomeAnswer(
+            queryID: UUID(),
+            kind: .metric,
+            userPrompt: userPrompt,
+            title: "Summary",
+            insightBundle: MarinaInsightBundle(followUps: followUps)
+        )
+    }
+
     private func reconciliationInsightContext(
         amount: Double,
         dateRange: HomeQueryDateRange? = nil
@@ -3136,6 +3691,36 @@ struct MarinaSemanticPromptSuiteTests {
         }
     }
 
+    private final class PromptMappedInterpreter: MarinaModelInterpreting {
+        private let results: [String: MarinaInterpretedSemanticRequest]
+        private(set) var prompts: [String] = []
+
+        init(_ results: [String: MarinaInterpretedSemanticRequest]) {
+            self.results = results
+        }
+
+        func interpretedSemanticRequest(
+            for prompt: String,
+            context: MarinaBrainContext
+        ) async throws -> MarinaInterpretedSemanticRequest {
+            prompts.append(prompt)
+            if let result = results[prompt] {
+                return result
+            }
+            return MarinaInterpretedSemanticRequest(
+                request: MarinaSemanticRequest(
+                    entity: .workspace,
+                    operation: .list,
+                    expectedAnswerShape: .unsupported,
+                    unsupportedReason: .unsupportedCombination
+                ),
+                confidence: .low,
+                source: .foundationModel,
+                diagnosticNotes: ["Missing mocked semantic request for prompt: \(prompt)"]
+            )
+        }
+    }
+
     private final class RecordingInsightNarrator: MarinaInsightNarrating {
         private let response: String?
         private(set) var contexts: [MarinaInsightContext] = []
@@ -3164,7 +3749,8 @@ struct MarinaSemanticPromptSuiteTests {
         includeAppleMerchantExpense: Bool = true,
         includeTransportationCategory: Bool = false,
         includeGroceryOutletExpense: Bool = false,
-        includeDebitCard: Bool = false
+        includeDebitCard: Bool = false,
+        includeStabilizationTargets: Bool = false
     ) throws -> Fixture {
         let context = try makeContext()
         let workspace = Workspace(name: "Personal", hexColor: "#3B82F6")
@@ -3180,6 +3766,9 @@ struct MarinaSemanticPromptSuiteTests {
         let bills = Category(name: "Bills", hexColor: "#2563EB", workspace: workspace)
         let transportation = includeTransportationCategory
             ? Category(name: "Transportation", hexColor: "#0F766E", workspace: workspace)
+            : nil
+        let foodAndDrink = includeStabilizationTargets
+            ? Category(name: "Food & Drink", hexColor: "#EA580C", workspace: workspace)
             : nil
 
         let currentBudget = Budget(
@@ -3334,6 +3923,36 @@ struct MarinaSemanticPromptSuiteTests {
             card: appleCard,
             category: groceries
         )
+        let uber = includeStabilizationTargets
+            ? VariableExpense(
+                descriptionText: "Uber",
+                amount: 18,
+                transactionDate: date(2026, 4, 18),
+                workspace: workspace,
+                card: chase,
+                category: transportation ?? dining
+            )
+            : nil
+        let burger = includeStabilizationTargets
+            ? VariableExpense(
+                descriptionText: "Burger Spot",
+                amount: 55,
+                transactionDate: date(2026, 3, 16),
+                workspace: workspace,
+                card: chase,
+                category: foodAndDrink
+            )
+            : nil
+        let cafe = includeStabilizationTargets
+            ? VariableExpense(
+                descriptionText: "Cafe Mocha",
+                amount: 12,
+                transactionDate: date(2026, 3, 17),
+                workspace: workspace,
+                card: debitCard ?? chase,
+                category: foodAndDrink
+            )
+            : nil
 
         let actualPaycheck = Income(source: "Paycheck", amount: 3_000, date: date(2026, 4, 1), isPlanned: false, workspace: workspace)
         let plannedPaycheck = Income(source: "Paycheck", amount: 3_200, date: date(2026, 4, 1), isPlanned: true, workspace: workspace)
@@ -3390,6 +4009,9 @@ struct MarinaSemanticPromptSuiteTests {
         if let transportation {
             context.insert(transportation)
         }
+        if let foodAndDrink {
+            context.insert(foodAndDrink)
+        }
         context.insert(currentBudget)
         context.insert(groceriesLimit)
         context.insert(previousBudget)
@@ -3417,6 +4039,15 @@ struct MarinaSemanticPromptSuiteTests {
             context.insert(debitCoffee)
         }
         context.insert(targetMarch)
+        if let uber {
+            context.insert(uber)
+        }
+        if let burger {
+            context.insert(burger)
+        }
+        if let cafe {
+            context.insert(cafe)
+        }
         context.insert(actualPaycheck)
         context.insert(plannedPaycheck)
         context.insert(previousPaycheck)

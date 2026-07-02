@@ -472,6 +472,96 @@ struct MarinaManualQAPromptMatrixTests {
                 )
             ),
             MarinaManualQACase(
+                id: "income.bySource.plannedOnly",
+                prompt: "Show planned income by source.",
+                category: .income,
+                expectedRouting: .universal,
+                expectedScenario: .rowBackedQuery,
+                expectedLayer: .universalRouting,
+                notes: "Phase 2 row-backed income state filter.",
+                request: incomeBySourceRequest(state: .planned)
+            ),
+            MarinaManualQACase(
+                id: "income.bySource.actualOnly",
+                prompt: "Show actual income by source.",
+                category: .income,
+                expectedRouting: .universal,
+                expectedScenario: .rowBackedQuery,
+                expectedLayer: .universalRouting,
+                notes: "Phase 2 row-backed income state filter.",
+                request: incomeBySourceRequest(state: .actual)
+            ),
+            MarinaManualQACase(
+                id: "income.bySource.allTime",
+                prompt: "Show income by source all time.",
+                category: .income,
+                expectedRouting: .universal,
+                expectedScenario: .rowBackedQuery,
+                expectedLayer: .universalRouting,
+                notes: "Phase 2 row-backed all-time source groups.",
+                request: semanticRequest(
+                    entity: .income,
+                    operation: .group,
+                    measure: .incomeAmount,
+                    dimensions: [.incomeSource],
+                    dateRangeToken: .allTime,
+                    incomeState: .all,
+                    expectedAnswerShape: .list
+                )
+            ),
+            MarinaManualQACase(
+                id: "expense.unifiedByCard.allTime",
+                prompt: "Show spending by card all time.",
+                category: .cards,
+                expectedRouting: .universal,
+                expectedScenario: .rowBackedQuery,
+                expectedLayer: .universalRouting,
+                notes: "Phase 2 row-backed all-time unified card grouping.",
+                request: semanticRequest(
+                    entity: .variableExpense,
+                    operation: .group,
+                    measure: .budgetImpact,
+                    dimensions: [.card],
+                    dateRangeToken: .allTime,
+                    expenseScope: .unified,
+                    expectedAnswerShape: .list
+                )
+            ),
+            MarinaManualQACase(
+                id: "category.metadata.list",
+                prompt: "List my categories.",
+                category: .categories,
+                expectedRouting: .universal,
+                expectedScenario: .rowBackedQuery,
+                expectedLayer: .universalRouting,
+                notes: "Phase 2 row-backed metadata list.",
+                request: semanticRequest(
+                    entity: .category,
+                    operation: .list,
+                    expectedAnswerShape: .list
+                )
+            ),
+            MarinaManualQACase(
+                id: "card.metadata.count",
+                prompt: "How many cards do I have?",
+                category: .cards,
+                expectedRouting: .universal,
+                expectedScenario: .rowBackedQuery,
+                expectedLayer: .universalRouting,
+                notes: "Phase 2 row-backed metadata count.",
+                request: semanticRequest(entity: .card, operation: .count)
+            ),
+            MarinaManualQACase(
+                id: "preset.plannedAmount.sum",
+                prompt: "How much do my presets add up to?",
+                category: .presets,
+                expectedRouting: .universal,
+                expectedScenario: .rowBackedQuery,
+                expectedLayer: .universalRouting,
+                notes: "Phase 2 row-backed preset planned amount sum.",
+                request: semanticRequest(entity: .preset, operation: .sum, measure: .plannedAmount)
+            ),
+            MarinaManualQACase(
                 id: "savings.explicitAccount.total",
                 prompt: "What is my Savings Account balance?",
                 category: .savings,
@@ -889,62 +979,6 @@ struct MarinaManualQAPromptMatrixTests {
                     operation: .sum,
                     measure: .recurringBurden,
                     sort: .amountDescending
-                )
-            ),
-            MarinaManualQACase(
-                id: "deferred.incomeBySource.plannedOnly",
-                prompt: "Show planned income by source.",
-                category: .income,
-                expectedRouting: .legacyFallback,
-                expectedScenario: nil,
-                expectedLayer: .deferred,
-                notes: "Narrowed planned-only source groups remain deferred.",
-                request: incomeBySourceRequest(state: .planned)
-            ),
-            MarinaManualQACase(
-                id: "deferred.incomeBySource.actualOnly",
-                prompt: "Show actual income by source.",
-                category: .income,
-                expectedRouting: .legacyFallback,
-                expectedScenario: nil,
-                expectedLayer: .deferred,
-                notes: "Narrowed actual-only source groups remain deferred.",
-                request: incomeBySourceRequest(state: .actual)
-            ),
-            MarinaManualQACase(
-                id: "deferred.incomeBySource.allTime",
-                prompt: "Show income by source all time.",
-                category: .income,
-                expectedRouting: .legacyFallback,
-                expectedScenario: nil,
-                expectedLayer: .deferred,
-                notes: "All-time source groups remain deferred.",
-                request: semanticRequest(
-                    entity: .income,
-                    operation: .group,
-                    measure: .incomeAmount,
-                    dimensions: [.incomeSource],
-                    dateRangeToken: .allTime,
-                    incomeState: .all,
-                    expectedAnswerShape: .list
-                )
-            ),
-            MarinaManualQACase(
-                id: "deferred.unifiedCardGroups.allTime",
-                prompt: "Show spending by card all time.",
-                category: .cards,
-                expectedRouting: .legacyFallback,
-                expectedScenario: nil,
-                expectedLayer: .deferred,
-                notes: "All-time unified card grouping remains deferred.",
-                request: semanticRequest(
-                    entity: .variableExpense,
-                    operation: .group,
-                    measure: .budgetImpact,
-                    dimensions: [.card],
-                    dateRangeToken: .allTime,
-                    expenseScope: .unified,
-                    expectedAnswerShape: .list
                 )
             ),
             MarinaManualQACase(

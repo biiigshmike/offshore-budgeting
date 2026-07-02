@@ -227,6 +227,40 @@ struct MarinaUniversalShadowParityTests {
         )
     }
 
+    @Test func actualIncomeTotalMatchesLegacyExecutor() {
+        let fixture = makeFixture()
+        let request = semanticRequest(
+            entity: .income,
+            operation: .sum,
+            measure: .incomeAmount,
+            dateRangeToken: .currentMonth,
+            incomeState: .actual
+        )
+
+        expectMoneyParity(
+            fixture.harness.legacyMoneyFact(from: fixture.harness.runLegacy(request: request, context: fixture.context())),
+            fixture.harness.universalMoneyFact(from: fixture.harness.runUniversal(request: request, context: fixture.context())),
+            scenario: "Actual income total"
+        )
+    }
+
+    @Test func plannedIncomeTotalMatchesLegacyExecutor() {
+        let fixture = makeFixture()
+        let request = semanticRequest(
+            entity: .income,
+            operation: .sum,
+            measure: .incomeAmount,
+            dateRangeToken: .currentMonth,
+            incomeState: .planned
+        )
+
+        expectMoneyParity(
+            fixture.harness.legacyMoneyFact(from: fixture.harness.runLegacy(request: request, context: fixture.context())),
+            fixture.harness.universalMoneyFact(from: fixture.harness.runUniversal(request: request, context: fixture.context())),
+            scenario: "Planned income total"
+        )
+    }
+
     @Test func explicitSavingsAccountTotalMatchesLegacyExecutor() {
         let fixture = makeFixture()
         let request = semanticRequest(

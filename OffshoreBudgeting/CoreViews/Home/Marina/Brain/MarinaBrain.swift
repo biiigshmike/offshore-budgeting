@@ -87,12 +87,18 @@ struct MarinaBrain {
 
         do {
             let interpreted: MarinaInterpretedSemanticRequest
+            var promptTreatment: MarinaAnswerDebugTrace.PromptTreatment = .standalone
+            var priorContextChangedRequest = false
             if let followUpResolution = followUpResolver.resolve(
                 prompt: trimmedPrompt,
                 conversationContext: conversationContext
             ) {
                 switch followUpResolution {
                 case .request(let followUpRequest, let diagnosticNote):
+                    promptTreatment = diagnosticNote.contains("recommended Marina follow-up")
+                        ? .recommendedFollowUpConfirmation
+                        : .contextualFollowUp
+                    priorContextChangedRequest = true
                     interpreted = MarinaInterpretedSemanticRequest(
                         request: followUpRequest,
                         confidence: .high,
@@ -100,6 +106,8 @@ struct MarinaBrain {
                         diagnosticNotes: [diagnosticNote]
                     )
                 case .prompt(let followUpPrompt, let diagnosticNote):
+                    promptTreatment = .recommendedFollowUpConfirmation
+                    priorContextChangedRequest = true
                     var promptInterpreted = try await interpreter.interpretedSemanticRequest(for: followUpPrompt, context: context)
                     promptInterpreted.diagnosticNotes.append(diagnosticNote)
                     interpreted = promptInterpreted
@@ -118,13 +126,27 @@ struct MarinaBrain {
                         answer: answer,
                         insightContext: nil,
                         finalExplanationSuffix: nil,
-                        scriptedNarration: narration
+                        scriptedNarration: narration,
+                        debugTrace: terminalDebugTrace(
+                            prompt: trimmedPrompt,
+                            treatment: .declinedFollowUp,
+                            result: result,
+                            now: context.now,
+                            narrationRequested: true
+                        )
                     )
                 }
             } else {
                 interpreted = try await interpreter.interpretedSemanticRequest(for: trimmedPrompt, context: context)
             }
-            return try answerSeed(interpreted: interpreted, prompt: trimmedPrompt, context: context)
+            return try answerSeed(
+                interpreted: interpreted,
+                prompt: trimmedPrompt,
+                context: context,
+                conversationContext: conversationContext,
+                promptTreatment: promptTreatment,
+                priorContextChangedRequest: priorContextChangedRequest
+            )
         } catch {
             let result = MarinaExecutionResult(
                 kind: .message,
@@ -186,7 +208,14 @@ struct MarinaBrain {
         )
 
         do {
-            return try answerSeed(interpreted: interpreted, prompt: trimmedPrompt, context: context)
+            return try answerSeed(
+                interpreted: interpreted,
+                prompt: trimmedPrompt,
+                context: context,
+                conversationContext: .empty,
+                promptTreatment: .standalone,
+                priorContextChangedRequest: false
+            )
         } catch {
             let result = MarinaExecutionResult(
                 kind: .message,
@@ -201,7 +230,10 @@ struct MarinaBrain {
     private func answerSeed(
         interpreted: MarinaInterpretedSemanticRequest,
         prompt: String,
-        context: MarinaBrainContext
+        context: MarinaBrainContext,
+        conversationContext: MarinaConversationContext,
+        promptTreatment: MarinaAnswerDebugTrace.PromptTreatment,
+        priorContextChangedRequest: Bool
     ) throws -> MarinaAnswerSeed {
         let snapshot = try snapshotProvider.snapshot(
             for: context.workspace,
@@ -209,7 +241,12 @@ struct MarinaBrain {
             homeContext: context.homeContext,
             now: context.now
         )
-        let validated = validator.validate(interpreted: interpreted, snapshot: snapshot)
+        let validationTrace = validator.validateWithTrace(
+            interpreted: interpreted,
+            snapshot: snapshot,
+            originalPrompt: prompt
+        )
+        let validated = validationTrace.interpreted
         let queryPlan = planner.plan(
             request: validated.request,
             ambientDateRange: context.ambientDateRange,
@@ -217,9 +254,20 @@ struct MarinaBrain {
             now: context.now,
             clarificationChoices: validated.clarificationChoices
         )
-        let result = execute(plan: queryPlan, snapshot: snapshot, context: context)
+        let execution = execute(plan: queryPlan, snapshot: snapshot, context: context)
+        let result = execution.result
         let analyzedBundle = insightAnalyzer.insightBundle(for: result, plan: queryPlan)
-        let insightBundle = analyzedBundle.isEmpty ? nil : analyzedBundle
+        let memory = conversationContext.followUpMemory
+        let memoryFilteredBundle = MarinaInsightBundle(
+            headlineFact: analyzedBundle.headlineFact,
+            meaning: analyzedBundle.meaning,
+            signals: analyzedBundle.signals,
+            followUps: MarinaRecommendedFollowUp.filteredFollowUps(
+                from: analyzedBundle.followUps,
+                memory: memory
+            )
+        )
+        let insightBundle = memoryFilteredBundle.isEmpty ? nil : memoryFilteredBundle
         let insightContext = MarinaInsightContext(
             prompt: prompt,
             result: result,
@@ -227,7 +275,33 @@ struct MarinaBrain {
             insightBundle: insightBundle
         )
         let narratableContext = insightContext.isNarratable ? insightContext : nil
-        let debugTrace = debugTraceIfNeeded(interpreted: validated, plan: queryPlan)
+        let structuredTrace = MarinaAnswerDebugTrace(
+            originalPrompt: prompt,
+            promptTreatment: promptTreatment,
+            priorContextChangedRequest: priorContextChangedRequest,
+            interpretedRequest: interpreted.request,
+            interpretedSource: interpreted.source,
+            interpretedConfidence: interpreted.confidence,
+            interpretedNotes: interpreted.diagnosticNotes,
+            explicitPromptTargets: validationTrace.explicitPromptTargets,
+            candidateSearches: validationTrace.candidateSearches,
+            resolverOutput: validationTrace.resolverOutput.request,
+            validatorOutput: validated.request,
+            validatorAccepted: validated.request.expectedAnswerShape != .unsupported && validated.request.expectedAnswerShape != .clarification,
+            validatorNotes: validated.diagnosticNotes,
+            queryPlan: MarinaQueryPlanTrace(plan: queryPlan),
+            executionRoute: execution.route,
+            universalScenario: execution.universalDiagnostics?.scenario,
+            universalFallbackReason: execution.universalDiagnostics?.fallbackReason,
+            universalNotes: execution.universalDiagnostics?.notes ?? [],
+            rowCount: result.rows.count,
+            evidenceRowSummaries: evidenceRowSummaries(from: result.rows),
+            answerKind: result.kind,
+            answerTitle: result.title,
+            answerPrimaryValue: result.primaryValue,
+            narrationRequested: narratableContext != nil
+        )
+        let debugTrace = debugTraceIfNeeded(trace: structuredTrace)
         let seedResult = narratableContext == nil
             ? result.withAppendingExplanation(debugTrace)
             : result
@@ -241,18 +315,29 @@ struct MarinaBrain {
         return MarinaAnswerSeed(
             answer: answer,
             insightContext: narratableContext,
-            finalExplanationSuffix: narratableContext == nil ? nil : debugTrace
+            finalExplanationSuffix: narratableContext == nil ? nil : debugTrace,
+            debugTrace: structuredTrace
         )
+    }
+
+    private struct MarinaBrainExecution {
+        let result: MarinaExecutionResult
+        let route: MarinaAnswerDebugTrace.ExecutionRoute
+        let universalDiagnostics: MarinaUniversalRoutingDiagnostics?
     }
 
     private func execute(
         plan: MarinaQueryPlan,
         snapshot: MarinaWorkspaceSnapshot,
         context: MarinaBrainContext
-    ) -> MarinaExecutionResult {
+    ) -> MarinaBrainExecution {
         let policy = universalRoutingPolicyProvider()
         guard policy.isEnabled else {
-            return executor.execute(plan: plan, snapshot: snapshot)
+            return MarinaBrainExecution(
+                result: executor.execute(plan: plan, snapshot: snapshot),
+                route: .legacy,
+                universalDiagnostics: nil
+            )
         }
 
         let calendar = Calendar.current
@@ -269,16 +354,31 @@ struct MarinaBrain {
             presenter: MarinaUniversalResultPresenter(),
             policy: policy
         )
-        return MarinaDualPathQueryExecutor(
+        let result = MarinaDualPathQueryExecutor(
             legacyExecutor: executor,
             universalHarness: harness,
             policy: policy
         )
-        .execute(
+        .executeResult(
             plan: plan,
             snapshot: snapshot,
             planningContext: planningContext
         )
+
+        switch result {
+        case let .legacy(executionResult, diagnostics):
+            return MarinaBrainExecution(
+                result: executionResult,
+                route: diagnostics == nil ? .legacy : .legacyFallback,
+                universalDiagnostics: diagnostics
+            )
+        case let .universal(executionResult, diagnostics):
+            return MarinaBrainExecution(
+                result: executionResult,
+                route: .universal,
+                universalDiagnostics: diagnostics
+            )
+        }
     }
 
     private func completedAnswer(from seed: MarinaAnswerSeed) async -> HomeAnswer {
@@ -312,24 +412,72 @@ struct MarinaBrain {
         }
     }
 
-    private func debugTraceIfNeeded(
-        interpreted: MarinaInterpretedSemanticRequest,
-        plan: MarinaQueryPlan
-    ) -> String? {
+    private func debugTraceIfNeeded(trace: MarinaAnswerDebugTrace) -> String? {
         guard DebugFeatureFlagResolver.isEnabled(key: Self.showSemanticTraceKey, fallback: false) else {
             return nil
         }
 
-        let trace = [
-            "source=\(interpreted.source.rawValue)",
-            "confidence=\(interpreted.confidence.rawValue)",
-            "entity=\(plan.entity.rawValue)",
-            "operation=\(plan.operation.rawValue)",
-            "measure=\(plan.measure?.rawValue ?? "none")",
-            "shape=\(plan.semanticRequest.expectedAnswerShape.rawValue)",
-            "notes=\(interpreted.diagnosticNotes.joined(separator: " | "))"
-        ].joined(separator: "\n")
-        return trace
+        return trace.debugDescription
+    }
+
+    private func terminalDebugTrace(
+        prompt: String,
+        treatment: MarinaAnswerDebugTrace.PromptTreatment,
+        result: MarinaExecutionResult,
+        now: Date,
+        narrationRequested: Bool
+    ) -> MarinaAnswerDebugTrace {
+        let request = MarinaSemanticRequest(
+            entity: .workspace,
+            operation: .list,
+            expectedAnswerShape: .unsupported,
+            unsupportedReason: .unsupportedCombination
+        )
+        let plan = MarinaQueryPlan(
+            id: UUID(),
+            semanticRequest: request,
+            dateRange: nil,
+            comparisonDateRange: nil,
+            now: now
+        )
+        return MarinaAnswerDebugTrace(
+            originalPrompt: prompt,
+            promptTreatment: treatment,
+            priorContextChangedRequest: treatment != .standalone,
+            interpretedRequest: request,
+            interpretedSource: .ruleBased,
+            interpretedConfidence: .high,
+            interpretedNotes: [],
+            explicitPromptTargets: [],
+            candidateSearches: [],
+            resolverOutput: request,
+            validatorOutput: request,
+            validatorAccepted: false,
+            validatorNotes: [],
+            queryPlan: MarinaQueryPlanTrace(plan: plan),
+            executionRoute: .legacy,
+            universalScenario: nil,
+            universalFallbackReason: nil,
+            universalNotes: [],
+            rowCount: result.rows.count,
+            evidenceRowSummaries: evidenceRowSummaries(from: result.rows),
+            answerKind: result.kind,
+            answerTitle: result.title,
+            answerPrimaryValue: result.primaryValue,
+            narrationRequested: narrationRequested
+        )
+    }
+
+    private func evidenceRowSummaries(from rows: [HomeAnswerRow]) -> [String] {
+        rows.prefix(8).map { row in
+            [
+                row.role.rawValue,
+                row.objectType?.rawValue ?? "unknown",
+                row.title,
+                row.value,
+                row.amount.map { "\($0)" } ?? "nil"
+            ].joined(separator: ":")
+        }
     }
 
     func completedAnswer(
@@ -447,6 +595,7 @@ struct MarinaFollowUpResolver {
             "summarize",
             "compare",
             "how much",
+            "what did",
             "what is",
             "what are",
             "which",
@@ -456,6 +605,9 @@ struct MarinaFollowUpResolver {
         let hasStandaloneDomain = containsAny(normalized, [
             "expense",
             "expenses",
+            "spend",
+            "spent",
+            "spending",
             "income",
             "card",
             "budget",

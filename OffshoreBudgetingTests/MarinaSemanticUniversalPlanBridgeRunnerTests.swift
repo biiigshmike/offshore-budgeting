@@ -85,6 +85,38 @@ struct MarinaSemanticUniversalPlanBridgeRunnerTests {
         ])
     }
 
+    @Test func plannedIncomeStateBridgesAndRunsThroughUniversalRunner() throws {
+        let fixture = makeFixture()
+        let plan = try requirePlan(bridge.makePlan(from: request(
+            entity: .income,
+            operation: .sum,
+            measure: .incomeAmount,
+            incomeState: .planned
+        )))
+        let metric = requireMetric(runner.run(plan: plan, snapshot: fixture.snapshot))
+
+        #expect(metric.value == .money(2_100))
+        #expect(rowNames(metric.evidenceRows) == ["Paycheck"])
+    }
+
+    @Test func actualIncomeStateBySourceBridgesAndRunsThroughUniversalRunner() throws {
+        let fixture = makeFixture()
+        let plan = try requirePlan(bridge.makePlan(from: request(
+            entity: .income,
+            operation: .group,
+            measure: .incomeAmount,
+            dimensions: [.incomeSource],
+            incomeState: .actual,
+            shape: .list
+        )))
+        let groups = requireGroups(runner.run(plan: plan, snapshot: fixture.snapshot))
+
+        #expect(groupSummaries(groups) == [
+            BridgeRunnerGroupSummary(name: "Freelance", aggregate: .money(650)),
+            BridgeRunnerGroupSummary(name: "Paycheck", aggregate: .money(2_000))
+        ])
+    }
+
     private func makeFixture() -> BridgeRunnerFixture {
         let firstDate = Date(timeIntervalSince1970: 1_780_300_800)
         let secondDate = Date(timeIntervalSince1970: 1_780_387_200)
@@ -239,6 +271,7 @@ struct MarinaSemanticUniversalPlanBridgeRunnerTests {
         textQuery: String? = nil,
         resultLimit: Int? = nil,
         sort: MarinaSemanticSort? = nil,
+        incomeState: MarinaSemanticIncomeState? = nil,
         shape: MarinaSemanticAnswerShape = .metric
     ) -> MarinaSemanticRequest {
         MarinaSemanticRequest(
@@ -250,6 +283,7 @@ struct MarinaSemanticUniversalPlanBridgeRunnerTests {
             textQuery: textQuery,
             resultLimit: resultLimit,
             sort: sort,
+            incomeState: incomeState,
             expectedAnswerShape: shape
         )
     }

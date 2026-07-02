@@ -83,7 +83,7 @@ struct MarinaUniversalOwnershipTests {
         }
     }
 
-    @Test func phase17DeferredGroupedShapesAreNotMarkedUniversalOwned() {
+    @Test func phase2RowBackedGroupedShapesAreMarkedUniversalOwned() {
         let requests = [
             semanticRequest(
                 entity: .income,
@@ -121,7 +121,7 @@ struct MarinaUniversalOwnershipTests {
         ]
 
         for request in requests {
-            expectNotUniversalOwned(request)
+            expectUniversalOwned(request, as: .rowBackedQuery)
         }
     }
 
@@ -162,6 +162,16 @@ struct MarinaUniversalOwnershipTests {
         if let scenario {
             #expect(registry.status(for: scenario) != .universalOwned)
         }
+    }
+
+    private func expectUniversalOwned(
+        _ request: MarinaSemanticRequest,
+        as expectedScenario: MarinaUniversalRoutingScenario
+    ) {
+        let scenario = policy.scenario(for: request)
+
+        #expect(scenario == expectedScenario)
+        #expect(scenario.map { registry.status(for: $0) } == .universalOwned)
     }
 
     private func semanticRequest(

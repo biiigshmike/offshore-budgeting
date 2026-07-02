@@ -165,6 +165,94 @@ struct MarinaUniversalRoutingPolicyTests {
         #expect(policy.allows(request))
     }
 
+    @Test func normalRowBackedExpenseShapesMapToGenericScenario() {
+        let requests = [
+            semanticRequest(
+                entity: .variableExpense,
+                operation: .count,
+                expenseScope: .variable
+            ),
+            semanticRequest(
+                entity: .variableExpense,
+                operation: .average,
+                measure: .budgetImpact,
+                expenseScope: .variable
+            ),
+            semanticRequest(
+                entity: .plannedExpense,
+                operation: .sum,
+                measure: .effectiveAmount,
+                expenseScope: .planned
+            ),
+            semanticRequest(
+                entity: .plannedExpense,
+                operation: .last,
+                measure: .effectiveAmount,
+                expenseScope: .planned
+            ),
+            semanticRequest(
+                entity: .variableExpense,
+                operation: .list,
+                measure: .budgetImpact,
+                dimensions: [.category],
+                targetName: "Groceries",
+                sort: .amountDescending,
+                expenseScope: .unified,
+                shape: .list
+            )
+        ]
+
+        for request in requests {
+            #expect(policy.scenario(for: request) == .rowBackedQuery)
+            #expect(policy.allows(request))
+        }
+    }
+
+    @Test func normalRowBackedMetadataAndPresetShapesMapToGenericScenario() {
+        let requests = [
+            semanticRequest(entity: .category, operation: .list, shape: .list),
+            semanticRequest(entity: .category, operation: .count),
+            semanticRequest(entity: .card, operation: .list, measure: .name, shape: .list),
+            semanticRequest(entity: .card, operation: .count),
+            semanticRequest(entity: .preset, operation: .list, shape: .list),
+            semanticRequest(entity: .preset, operation: .sum, measure: .plannedAmount),
+            semanticRequest(
+                entity: .preset,
+                operation: .group,
+                measure: .plannedAmount,
+                dimensions: [.category],
+                shape: .list
+            )
+        ]
+
+        for request in requests {
+            #expect(policy.scenario(for: request) == .rowBackedQuery)
+            #expect(policy.allows(request))
+        }
+    }
+
+    @Test func plannedAndActualIncomeRowBackedShapesMapToGenericScenario() {
+        let plannedTotal = semanticRequest(
+            entity: .income,
+            operation: .sum,
+            measure: .incomeAmount,
+            incomeState: .planned
+        )
+        let actualBySource = semanticRequest(
+            entity: .income,
+            operation: .group,
+            measure: .incomeAmount,
+            dimensions: [.incomeSource],
+            incomeState: .actual,
+            shape: .list
+        )
+
+        #expect(policy.scenario(for: plannedTotal) == .rowBackedQuery)
+        #expect(policy.scenario(for: actualBySource) == .rowBackedQuery)
+        #expect(policy.allows(plannedTotal))
+        #expect(policy.allows(actualBySource))
+    }
+
     @Test func savingsTotalRequiresExplicitAccountTarget() {
         let explicit = semanticRequest(
             entity: .savingsAccount,
@@ -377,12 +465,13 @@ struct MarinaUniversalRoutingPolicyTests {
         }
     }
 
-    @Test func compareShareAndWhatIfAreNotAllowlisted() {
-        for operation in [MarinaSemanticOperation.compare, .share, .whatIf] {
+    @Test func generalCompareShareForecastAndWhatIfAreNotAllowlisted() {
+        for operation in [MarinaSemanticOperation.compare, .share, .forecast, .whatIf] {
             let request = semanticRequest(
-                entity: .budget,
+                entity: .variableExpense,
                 operation: operation,
-                measure: .remainingRoom
+                measure: .budgetImpact,
+                expenseScope: .variable
             )
 
             #expect(policy.scenario(for: request) == nil)
@@ -404,16 +493,16 @@ struct MarinaUniversalRoutingPolicyTests {
         #expect(policy.allows(request) == false)
     }
 
-    @Test func narrowedIncomeStatesAreNotAllowlisted() {
+    @Test func unsupportedIncomeOperationsRemainNotAllowlisted() {
         let plannedOnly = semanticRequest(
             entity: .income,
-            operation: .sum,
+            operation: .forecast,
             measure: .incomeAmount,
             incomeState: .planned
         )
         let actualOnly = semanticRequest(
             entity: .income,
-            operation: .sum,
+            operation: .share,
             measure: .incomeAmount,
             incomeState: .actual
         )
@@ -422,23 +511,7 @@ struct MarinaUniversalRoutingPolicyTests {
         #expect(policy.scenario(for: actualOnly) == nil)
     }
 
-    @Test func narrowedIncomeBySourceStatesAreNotAllowlisted() {
-        for state in [MarinaSemanticIncomeState.planned, .actual] {
-            let request = semanticRequest(
-                entity: .income,
-                operation: .group,
-                measure: .incomeAmount,
-                dimensions: [.incomeSource],
-                incomeState: state,
-                shape: .list
-            )
-
-            #expect(policy.scenario(for: request) == nil)
-            #expect(policy.allows(request) == false)
-        }
-    }
-
-    @Test func phase17GroupedScenariosRejectAllTimeTargetsSortsAndExtraDimensions() {
+    @Test func groupedRowBackedScenariosRejectTargetsSortsAndExtraDimensions() {
         let incomeAllTime = semanticRequest(
             entity: .income,
             operation: .group,
@@ -490,13 +563,18 @@ struct MarinaUniversalRoutingPolicyTests {
             shape: .list
         )
 
-        for request in [incomeAllTime, incomeTarget, incomeSorted, unifiedAllTime, unifiedExtraDimension, unifiedTarget] {
+        for request in [incomeAllTime, unifiedAllTime] {
+            #expect(policy.scenario(for: request) == .rowBackedQuery)
+            #expect(policy.allows(request))
+        }
+
+        for request in [incomeTarget, incomeSorted, unifiedExtraDimension, unifiedTarget] {
             #expect(policy.scenario(for: request) == nil)
             #expect(policy.allows(request) == false)
         }
     }
 
-    @Test func plannedEffectiveAmountSumAndBudgetSumRemainingRoomAreNotAllowlisted() {
+    @Test func plannedEffectiveAmountSumIsGenericAndBudgetSumRemainingRoomIsNotAllowlisted() {
         let plannedEffectiveSum = semanticRequest(
             entity: .plannedExpense,
             operation: .sum,
@@ -509,7 +587,8 @@ struct MarinaUniversalRoutingPolicyTests {
             measure: .remainingRoom
         )
 
-        #expect(policy.scenario(for: plannedEffectiveSum) == nil)
+        #expect(policy.scenario(for: plannedEffectiveSum) == .rowBackedQuery)
+        #expect(policy.allows(plannedEffectiveSum))
         #expect(policy.scenario(for: budgetSumRemainingRoom) == nil)
     }
 

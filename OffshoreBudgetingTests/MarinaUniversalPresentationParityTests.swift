@@ -169,6 +169,28 @@ struct MarinaUniversalPresentationParityTests {
         )
     }
 
+    @Test func plannedAndActualIncomeTotalPresentationMatchesLegacyFacts() {
+        let fixture = makeFixture()
+        for state in [MarinaSemanticIncomeState.planned, .actual] {
+            let request = semanticRequest(
+                entity: .income,
+                operation: .sum,
+                measure: .incomeAmount,
+                dateRangeToken: .currentMonth,
+                incomeState: state
+            )
+            let legacy = fixture.harness.runLegacy(request: request, context: fixture.context())
+            let presented = fixture.presentedResult(request: request, context: fixture.context())
+
+            expectMoneyParity(
+                fixture.harness.legacyMoneyFact(from: legacy),
+                fixture.harness.legacyMoneyFact(from: presented),
+                scenario: "\(state.rawValue) income total presentation"
+            )
+            expectNoDebugText(in: presented)
+        }
+    }
+
     @Test func savingsTotalPresentationMatchesLegacyFacts() {
         let fixture = makeFixture()
         let request = semanticRequest(

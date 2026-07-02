@@ -1,70 +1,114 @@
 import Foundation
 
+struct MarinaSemanticCandidateResolution: Equatable, Sendable {
+    let interpreted: MarinaInterpretedSemanticRequest
+    let candidateSearches: [MarinaCandidateSearchTrace]
+}
+
 struct MarinaSemanticCandidateResolver {
-    private struct ExpenseTextCandidate {
-        let title: String
-        let kindLabel: String
+    private enum TargetSlot {
+        case primary
+        case comparison
+    }
+
+    private let candidateSearchService: MarinaCandidateSearchService
+
+    init(candidateSearchService: MarinaCandidateSearchService = MarinaCandidateSearchService()) {
+        self.candidateSearchService = candidateSearchService
     }
 
     func resolve(
         interpreted: MarinaInterpretedSemanticRequest,
         snapshot: MarinaWorkspaceSnapshot
     ) -> MarinaInterpretedSemanticRequest {
+        resolveWithTrace(interpreted: interpreted, snapshot: snapshot).interpreted
+    }
+
+    func resolveWithTrace(
+        interpreted: MarinaInterpretedSemanticRequest,
+        snapshot: MarinaWorkspaceSnapshot
+    ) -> MarinaSemanticCandidateResolution {
         var request = interpreted.request
         var notes = interpreted.diagnosticNotes
+        var candidateSearches: [MarinaCandidateSearchTrace] = []
 
         guard request.expectedAnswerShape != .clarification,
               request.expectedAnswerShape != .unsupported,
-              let target = targetText(from: request),
-              target.isEmpty == false else {
-            return interpreted
-        }
-
-        if let repaired = repairExplicitTarget(request, target: target, snapshot: snapshot) {
-            notes.append("Candidate resolver normalized explicit target \"\(target)\".")
-            return interpretedWith(
-                request: repaired,
+              hasResolvableTarget(request) else {
+            return MarinaSemanticCandidateResolution(
                 interpreted: interpreted,
-                notes: notes,
-                choices: interpreted.clarificationChoices
+                candidateSearches: candidateSearches
             )
         }
 
-        guard shouldResolveUntypedTarget(request) else {
-            return interpreted
-        }
+        if let target = primaryTargetText(from: request), target.isEmpty == false {
+            let searchResult = candidateSearchResult(target: target, request: request, snapshot: snapshot)
+            candidateSearches.append(MarinaCandidateSearchTrace(rawTargetText: target, slot: "primary", result: searchResult))
 
-        let candidates = candidateChoices(for: target, baseRequest: request, snapshot: snapshot)
-        if candidates.count > 1 {
-            request = clarificationRequest(
-                question: MarinaL10n.format("marina.clarification.targetMeaningFormat", defaultValue: "What should Marina use for \"%@\"?", comment: "Clarification question for resolving an ambiguous target.", target),
+            if let terminal = terminalInterpretedRequest(
+                searchResult: searchResult,
                 target: target,
-                dateRangeToken: request.dateRangeToken
-            )
-            notes.append("Candidate resolver found \(candidates.count) possible meanings for \"\(target)\".")
-            let choices = MarinaClarificationChoices(
-                question: MarinaL10n.format("marina.clarification.targetMeaningFormat", defaultValue: "What should Marina use for \"%@\"?", comment: "Clarification question for resolving an ambiguous target.", target),
-                choices: candidates
-            )
-            return interpretedWith(request: request, interpreted: interpreted, notes: notes, choices: choices)
+                slot: .primary,
+                request: request,
+                interpreted: interpreted,
+                notes: notes
+            ) {
+                return MarinaSemanticCandidateResolution(
+                    interpreted: terminal,
+                    candidateSearches: candidateSearches
+                )
+            }
+
+            if let recommendedMatch = searchResult.recommendedMatch {
+                request = semanticRequest(applying: recommendedMatch, to: .primary, target: target, baseRequest: request)
+                notes.append("Candidate resolver selected \(recommendedMatch.displayName) for \"\(target)\".")
+            } else if shouldResolveUntypedTarget(request) {
+                notes.append("Candidate resolver found no valid meanings for \"\(target)\".")
+                return MarinaSemanticCandidateResolution(
+                    interpreted: interpretedWith(
+                        request: unsupportedRequest(.unresolvedEntity),
+                        interpreted: interpreted,
+                        notes: notes,
+                        choices: interpreted.clarificationChoices
+                    ),
+                    candidateSearches: candidateSearches
+                )
+            }
         }
 
-        if let candidate = candidates.first {
-            notes.append("Candidate resolver selected \(candidate.title) for \"\(target)\".")
-            return interpretedWith(
-                request: candidate.request,
+        if let comparisonTargetName = request.comparisonTargetName,
+           comparisonTargetName.isEmpty == false {
+            let searchResult = candidateSearchResult(target: comparisonTargetName, request: request, snapshot: snapshot)
+            candidateSearches.append(MarinaCandidateSearchTrace(rawTargetText: comparisonTargetName, slot: "comparison", result: searchResult))
+
+            if let terminal = terminalInterpretedRequest(
+                searchResult: searchResult,
+                target: comparisonTargetName,
+                slot: .comparison,
+                request: request,
+                interpreted: interpreted,
+                notes: notes
+            ) {
+                return MarinaSemanticCandidateResolution(
+                    interpreted: terminal,
+                    candidateSearches: candidateSearches
+                )
+            }
+
+            if let recommendedMatch = searchResult.recommendedMatch {
+                request = semanticRequest(applying: recommendedMatch, to: .comparison, target: comparisonTargetName, baseRequest: request)
+                notes.append("Candidate resolver selected \(recommendedMatch.displayName) for comparison target \"\(comparisonTargetName)\".")
+            }
+        }
+
+        return MarinaSemanticCandidateResolution(
+            interpreted: interpretedWith(
+                request: request,
                 interpreted: interpreted,
                 notes: notes,
                 choices: interpreted.clarificationChoices
-            )
-        }
-
-        notes.append("Candidate resolver found no valid meanings for \"\(target)\".")
-        return interpretedWith(
-            request: unsupportedRequest(.unresolvedEntity),
-            interpreted: interpreted,
-            notes: notes,
-            choices: interpreted.clarificationChoices
+            ),
+            candidateSearches: candidateSearches
         )
     }
 
@@ -102,155 +146,203 @@ struct MarinaSemanticCandidateResolver {
         }
     }
 
-    private func candidateChoices(
-        for target: String,
-        baseRequest: MarinaSemanticRequest,
+    private func terminalInterpretedRequest(
+        searchResult: MarinaCandidateSearchResult,
+        target: String,
+        slot: TargetSlot,
+        request: MarinaSemanticRequest,
+        interpreted: MarinaInterpretedSemanticRequest,
+        notes: [String]
+    ) -> MarinaInterpretedSemanticRequest? {
+        let usefulMatches = searchResult.matches.filter(\.isStrongEnoughForAutomaticResolution)
+        guard usefulMatches.count > 1, searchResult.ambiguityStatus == .ambiguous else {
+            return nil
+        }
+
+        let choices = candidateChoices(from: usefulMatches, target: target, slot: slot, baseRequest: request)
+        guard choices.count > 1 else {
+            return nil
+        }
+
+        let question = MarinaL10n.format("marina.clarification.targetMeaningFormat", defaultValue: "What should Marina use for \"%@\"?", comment: "Clarification question for resolving an ambiguous target.", target)
+        var request = clarificationRequest(
+            question: question,
+            target: target,
+            dateRangeToken: request.dateRangeToken
+        )
+        request.comparisonTargetName = slot == .comparison ? target : nil
+        var notes = notes
+        notes.append("Candidate resolver found \(choices.count) possible meanings for \"\(target)\".")
+        return interpretedWith(
+            request: request,
+            interpreted: interpreted,
+            notes: notes,
+            choices: MarinaClarificationChoices(question: question, choices: choices)
+        )
+    }
+
+    private func candidateSearchResult(
+        target: String,
+        request: MarinaSemanticRequest,
         snapshot: MarinaWorkspaceSnapshot
+    ) -> MarinaCandidateSearchResult {
+        candidateSearchService.search(
+            MarinaCandidateSearchRequest(
+                rawTargetText: target,
+                semanticRequest: request,
+                snapshot: snapshot
+            )
+        )
+    }
+
+    private func candidateChoices(
+        from matches: [MarinaCandidateMatch],
+        target: String,
+        slot: TargetSlot,
+        baseRequest: MarinaSemanticRequest
     ) -> [MarinaClarificationChoice] {
-        var choices: [MarinaClarificationChoice] = []
-
-        for category in matchingCategories(target, snapshot: snapshot) {
-            choices.append(
-                MarinaClarificationChoice(
-                    title: category.name,
-                    kindLabel: MarinaL10n.common("category", defaultValue: "Category", comment: "Common label for category."),
-                    subtitle: MarinaL10n.format("marina.clarification.useCategoryFormat", defaultValue: "Use the %@ category.", comment: "Clarification choice subtitle for using a category.", category.name),
-                    aliases: aliases(for: category.name) + ["category"],
-                    request: categoryRequest(categoryName: category.name, baseRequest: baseRequest)
-                )
+        let expenseMatches = matches.filter(isExpenseTextMatch)
+        let hasMultipleExpenseTextMatches = expenseMatches.count > 1
+        var choices = matches.map {
+            clarificationChoice(
+                for: $0,
+                target: target,
+                slot: slot,
+                baseRequest: baseRequest,
+                includeGenericExpenseAliases: hasMultipleExpenseTextMatches == false
             )
         }
 
-        for incomeSource in matchingIncomeSources(target, snapshot: snapshot) {
-            choices.append(
-                MarinaClarificationChoice(
-                    title: incomeSource,
-                    kindLabel: MarinaL10n.string("marina.clarification.kind.incomeSource", defaultValue: "Income source", comment: "Kind label for an income source clarification choice."),
-                    subtitle: MarinaL10n.format("marina.clarification.useIncomeSourceFormat", defaultValue: "Use %@ as the income source.", comment: "Clarification choice subtitle for using an income source.", incomeSource),
-                    aliases: aliases(for: incomeSource) + ["income", "income source"],
-                    request: incomeSourceRequest(source: incomeSource, baseRequest: baseRequest)
-                )
-            )
-        }
-
-        choices.append(contentsOf: expenseTextChoices(for: target, baseRequest: baseRequest, snapshot: snapshot))
-
-        for card in matchingCards(target, snapshot: snapshot) {
-            choices.append(
-                MarinaClarificationChoice(
-                    title: card.name,
-                    kindLabel: MarinaL10n.common("card", defaultValue: "Card", comment: "Common label for card."),
-                    subtitle: MarinaL10n.format("marina.clarification.useAsCardFormat", defaultValue: "Use %@ as the card.", comment: "Clarification choice subtitle for using a card.", card.name),
-                    aliases: aliases(for: card.name) + ["card"],
-                    request: cardRequest(cardName: card.name, baseRequest: baseRequest)
-                )
-            )
-        }
-
-        for budget in matchingBudgets(target, snapshot: snapshot) {
-            choices.append(
-                MarinaClarificationChoice(
-                    title: budget.name,
-                    kindLabel: MarinaL10n.common("budget", defaultValue: "Budget", comment: "Common label for budget."),
-                    subtitle: MarinaL10n.format("marina.clarification.useBudgetFormat", defaultValue: "Use the %@ budget.", comment: "Clarification choice subtitle for using a budget.", budget.name),
-                    aliases: aliases(for: budget.name) + ["budget"],
-                    request: budgetRequest(budgetName: budget.name, baseRequest: baseRequest)
-                )
-            )
-        }
-
-        for preset in matchingPresets(target, snapshot: snapshot) {
-            choices.append(
-                MarinaClarificationChoice(
-                    title: preset.title,
-                    kindLabel: MarinaL10n.common("preset", defaultValue: "Preset", comment: "Common label for preset."),
-                    subtitle: MarinaL10n.format("marina.clarification.usePresetFormat", defaultValue: "Use the %@ preset.", comment: "Clarification choice subtitle for using a preset.", preset.title),
-                    aliases: aliases(for: preset.title) + ["preset"],
-                    request: presetRequest(presetName: preset.title, baseRequest: baseRequest)
-                )
-            )
-        }
-
-        for account in matchingSavingsAccounts(target, snapshot: snapshot) {
-            choices.append(
-                MarinaClarificationChoice(
-                    title: account.name,
-                    kindLabel: MarinaL10n.string("marina.clarification.kind.savingsAccount", defaultValue: "Savings account", comment: "Kind label for savings account clarification choice."),
-                    subtitle: MarinaL10n.format("marina.clarification.useSavingsAccountFormat", defaultValue: "Use %@ as the savings account.", comment: "Clarification choice subtitle for using a savings account.", account.name),
-                    aliases: aliases(for: account.name) + ["savings", "savings account"],
-                    request: savingsAccountRequest(accountName: account.name, baseRequest: baseRequest)
-                )
-            )
-        }
-
-        for account in matchingReconciliationAccounts(target, snapshot: snapshot) {
-            choices.append(
-                MarinaClarificationChoice(
-                    title: account.name,
-                    kindLabel: MarinaL10n.string("marina.clarification.kind.reconciliationAccount", defaultValue: "Reconciliation account", comment: "Kind label for reconciliation account clarification choice."),
-                    subtitle: MarinaL10n.format("marina.clarification.useReconciliationAccountFormat", defaultValue: "Use %@ as the reconciliation account.", comment: "Clarification choice subtitle for using a reconciliation account.", account.name),
-                    aliases: aliases(for: account.name) + ["balance", "reconciliation", "shared balance"],
-                    request: reconciliationAccountRequest(accountName: account.name, baseRequest: baseRequest)
-                )
-            )
+        if slot == .primary, hasMultipleExpenseTextMatches {
+            choices.append(aggregateExpenseTextChoice(for: target, baseRequest: baseRequest))
         }
 
         return deduped(choices)
     }
 
-    private func repairExplicitTarget(
-        _ request: MarinaSemanticRequest,
+    private func semanticRequest(
+        applying match: MarinaCandidateMatch,
+        to slot: TargetSlot,
         target: String,
-        snapshot: MarinaWorkspaceSnapshot
+        baseRequest request: MarinaSemanticRequest
+    ) -> MarinaSemanticRequest {
+        if slot == .comparison {
+            var repaired = request
+            repaired.comparisonTargetName = match.displayName
+            return repaired
+        }
+
+        if let repaired = requestPreservingExplicitShape(applying: match, to: request) {
+            return repaired
+        }
+
+        switch match.entity {
+        case .category:
+            return categoryRequest(categoryName: match.displayName, baseRequest: request)
+        case .income:
+            return incomeSourceRequest(source: match.displayName, baseRequest: request)
+        case .variableExpense, .plannedExpense:
+            return expenseTextRequest(textQuery: match.displayName, displayName: match.displayName, baseRequest: request)
+        case .card:
+            return cardRequest(cardName: match.displayName, baseRequest: request)
+        case .budget:
+            return budgetRequest(budgetName: match.displayName, baseRequest: request)
+        case .preset:
+            return presetRequest(presetName: match.displayName, baseRequest: request)
+        case .savingsAccount:
+            return savingsAccountRequest(accountName: match.displayName, baseRequest: request)
+        case .reconciliationAccount:
+            return reconciliationAccountRequest(accountName: match.displayName, baseRequest: request)
+        case .workspace:
+            return request
+        }
+    }
+
+    private func requestPreservingExplicitShape(
+        applying match: MarinaCandidateMatch,
+        to request: MarinaSemanticRequest
     ) -> MarinaSemanticRequest? {
         var repaired = request
 
-        if request.dimensions.contains(.category) || request.entity == .category {
-            guard let category = matchingCategories(target, snapshot: snapshot).first else { return nil }
-            repaired.targetName = category.name
+        switch match.entity {
+        case .card where request.entity == .card || request.dimensions.contains(.card):
+            repaired.targetName = match.displayName
+            repaired.targetDisplayName = match.displayName
+            return repaired
+        case .category where request.entity == .category || request.dimensions.contains(.category):
+            repaired.targetName = match.displayName
+            repaired.targetDisplayName = match.displayName
             if request.entity == .reconciliationAccount {
-                repaired.textQuery = category.name
+                repaired.textQuery = match.displayName
             }
             return repaired
-        }
-
-        if request.dimensions.contains(.card) || request.entity == .card {
-            guard let card = matchingCards(target, snapshot: snapshot).first else { return nil }
-            repaired.targetName = card.name
+        case .income where request.entity == .income || request.dimensions.contains(.incomeSource):
+            repaired.targetName = match.displayName
+            repaired.targetDisplayName = match.displayName
             return repaired
-        }
-
-        if request.dimensions.contains(.incomeSource) || request.entity == .income {
-            guard let source = matchingIncomeSources(target, snapshot: snapshot).first else { return nil }
-            repaired.targetName = source
+        case .preset where request.entity == .preset || request.dimensions.contains(.preset):
+            repaired.targetName = match.displayName
+            repaired.targetDisplayName = match.displayName
             return repaired
-        }
-
-        if request.dimensions.contains(.preset) || request.entity == .preset {
-            guard let preset = matchingPresets(target, snapshot: snapshot).first else { return nil }
-            repaired.targetName = preset.title
+        case .savingsAccount where request.entity == .savingsAccount || request.dimensions.contains(.savingsAccount):
+            repaired.targetName = match.displayName
+            repaired.targetDisplayName = match.displayName
             return repaired
-        }
-
-        if request.dimensions.contains(.savingsAccount) || request.entity == .savingsAccount {
-            guard let account = matchingSavingsAccounts(target, snapshot: snapshot).first else { return nil }
-            repaired.targetName = account.name
+        case .reconciliationAccount where request.entity == .reconciliationAccount || request.dimensions.contains(.reconciliationAccount):
+            repaired.targetName = match.displayName
+            repaired.targetDisplayName = match.displayName
             return repaired
-        }
-
-        if request.dimensions.contains(.reconciliationAccount) || request.entity == .reconciliationAccount {
-            guard let account = matchingReconciliationAccounts(target, snapshot: snapshot).first else { return nil }
-            repaired.targetName = account.name
+        case .budget where request.entity == .budget || request.dimensions.contains(.budget):
+            repaired.targetName = match.displayName
+            repaired.targetDisplayName = match.displayName
             return repaired
-        }
-
-        if request.dimensions.contains(.budget) || request.entity == .budget {
-            guard let budget = matchingBudgets(target, snapshot: snapshot).first else { return nil }
-            repaired.targetName = budget.name
+        case .variableExpense where request.dimensions.contains(.merchantText):
+            repaired.targetName = nil
+            repaired.textQuery = match.displayName
+            repaired.targetDisplayName = match.displayName
             return repaired
+        case .plannedExpense where request.dimensions.contains(.merchantText):
+            repaired.targetName = nil
+            repaired.textQuery = match.displayName
+            repaired.targetDisplayName = match.displayName
+            return repaired
+        default:
+            return nil
         }
+    }
 
-        return nil
+    private func clarificationChoice(
+        for match: MarinaCandidateMatch,
+        target: String,
+        slot: TargetSlot,
+        baseRequest: MarinaSemanticRequest,
+        includeGenericExpenseAliases: Bool
+    ) -> MarinaClarificationChoice {
+        MarinaClarificationChoice(
+            title: match.displayName,
+            kindLabel: kindLabel(for: match),
+            subtitle: subtitle(for: match),
+            aliases: aliases(for: match.displayName) + aliases(for: target) + aliases(for: match, includeGenericExpenseAliases: includeGenericExpenseAliases),
+            request: semanticRequest(applying: match, to: slot, target: target, baseRequest: baseRequest)
+        )
+    }
+
+    private func aggregateExpenseTextChoice(
+        for target: String,
+        baseRequest: MarinaSemanticRequest
+    ) -> MarinaClarificationChoice {
+        let displayName = MarinaL10n.format("marina.clarification.allExpenseMatchesFormat", defaultValue: "All expense matches for \"%@\"", comment: "Clarification choice title for all expense matches.", displayTarget(target))
+        return MarinaClarificationChoice(
+            title: displayName,
+            kindLabel: MarinaL10n.string("marina.clarification.kind.expenseSearch", defaultValue: "Expense search", comment: "Kind label for expense search."),
+            subtitle: MarinaL10n.format("marina.clarification.searchEveryExpenseTextFormat", defaultValue: "Search every expense title and description matching %@.", comment: "Clarification choice subtitle for searching every matching expense title and description.", displayTarget(target)),
+            aliases: aliases(for: target) + ["merchant", "store", "vendor", "expense", "expenses", "title", "description", "search"],
+            request: expenseTextRequest(
+                textQuery: target,
+                displayName: displayName,
+                baseRequest: baseRequest
+            )
+        )
     }
 
     private func categoryRequest(categoryName: String, baseRequest: MarinaSemanticRequest) -> MarinaSemanticRequest {
@@ -410,53 +502,24 @@ struct MarinaSemanticCandidateResolver {
         )
     }
 
-    private func expenseTextChoices(
-        for target: String,
-        baseRequest: MarinaSemanticRequest,
-        snapshot: MarinaWorkspaceSnapshot
-    ) -> [MarinaClarificationChoice] {
-        let candidates = matchingExpenseTextCandidates(target, snapshot: snapshot)
-        guard candidates.isEmpty == false else { return [] }
-
-        let maxSpecificChoices = 3
-        let genericAliases = ["merchant", "store", "vendor", "expense", "expenses", "title", "description", "search"]
-        var choices = candidates.prefix(maxSpecificChoices).map { candidate in
-            let aliases = aliases(for: candidate.title) + (candidates.count == 1 ? genericAliases : ["expense match"])
-            return MarinaClarificationChoice(
-                title: candidate.title,
-                kindLabel: candidate.kindLabel,
-                subtitle: MarinaL10n.format("marina.clarification.searchExpenseTextFormat", defaultValue: "Search expense titles and descriptions for %@.", comment: "Clarification choice subtitle for searching expense text.", candidate.title),
-                aliases: aliases,
-                request: expenseTextRequest(
-                    textQuery: candidate.title,
-                    displayName: candidate.title,
-                    baseRequest: baseRequest
-                )
-            )
-        }
-
-        if candidates.count > 1 {
-            let displayName = MarinaL10n.format("marina.clarification.allExpenseMatchesFormat", defaultValue: "All expense matches for \"%@\"", comment: "Clarification choice title for all expense matches.", displayTarget(target))
-            choices.append(
-                MarinaClarificationChoice(
-                    title: displayName,
-                    kindLabel: MarinaL10n.string("marina.clarification.kind.expenseSearch", defaultValue: "Expense search", comment: "Kind label for expense search."),
-                    subtitle: MarinaL10n.format("marina.clarification.searchEveryExpenseTextFormat", defaultValue: "Search every expense title and description matching %@.", comment: "Clarification choice subtitle for searching every matching expense title and description.", displayTarget(target)),
-                    aliases: aliases(for: target) + genericAliases,
-                    request: expenseTextRequest(
-                        textQuery: target,
-                        displayName: displayName,
-                        baseRequest: baseRequest
-                    )
-                )
-            )
-        }
-
-        return choices
+    private func primaryTargetText(from request: MarinaSemanticRequest) -> String? {
+        request.targetName ?? request.textQuery
     }
 
-    private func targetText(from request: MarinaSemanticRequest) -> String? {
-        request.targetName ?? request.textQuery
+    private func hasResolvableTarget(_ request: MarinaSemanticRequest) -> Bool {
+        if request.targetName == nil,
+           request.dimensions.contains(.merchantText),
+           request.textQuery?.isEmpty == false {
+            return false
+        }
+
+        if let target = primaryTargetText(from: request), target.isEmpty == false {
+            return true
+        }
+        if let comparisonTargetName = request.comparisonTargetName, comparisonTargetName.isEmpty == false {
+            return true
+        }
+        return false
     }
 
     private func clarificationRequest(
@@ -483,83 +546,6 @@ struct MarinaSemanticCandidateResolver {
             expectedAnswerShape: .unsupported,
             unsupportedReason: reason
         )
-    }
-
-    private func matchingCards(_ target: String, snapshot: MarinaWorkspaceSnapshot) -> [Card] {
-        snapshot.cards.filter { matches($0.name, target: target) }
-    }
-
-    private func matchingCategories(_ target: String, snapshot: MarinaWorkspaceSnapshot) -> [Category] {
-        snapshot.categories.filter { matches($0.name, target: target) }
-    }
-
-    private func matchingPresets(_ target: String, snapshot: MarinaWorkspaceSnapshot) -> [Preset] {
-        snapshot.presets.filter { matches($0.title, target: target) }
-    }
-
-    private func matchingBudgets(_ target: String, snapshot: MarinaWorkspaceSnapshot) -> [Budget] {
-        snapshot.budgets.filter { matches($0.name, target: target) }
-    }
-
-    private func matchingSavingsAccounts(_ target: String, snapshot: MarinaWorkspaceSnapshot) -> [SavingsAccount] {
-        snapshot.savingsAccounts.filter { matches($0.name, target: target) }
-    }
-
-    private func matchingReconciliationAccounts(_ target: String, snapshot: MarinaWorkspaceSnapshot) -> [AllocationAccount] {
-        snapshot.reconciliationAccounts.filter { matches($0.name, target: target) }
-    }
-
-    private func matchingIncomeSources(_ target: String, snapshot: MarinaWorkspaceSnapshot) -> [String] {
-        Array(Set(snapshot.incomes.map(\.source)))
-            .filter { matches($0, target: target) }
-            .sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
-    }
-
-    private func matchingExpenseTextCandidates(
-        _ target: String,
-        snapshot: MarinaWorkspaceSnapshot
-    ) -> [ExpenseTextCandidate] {
-        var candidates: [ExpenseTextCandidate] = []
-        var seen: Set<String> = []
-
-        func append(_ title: String, kindLabel: String) {
-            let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard trimmed.isEmpty == false, matches(trimmed, target: target) else { return }
-            let key = canonical(trimmed)
-            guard seen.contains(key) == false else { return }
-            seen.insert(key)
-            candidates.append(ExpenseTextCandidate(title: trimmed, kindLabel: kindLabel))
-        }
-
-        for expense in snapshot.variableExpenses {
-            append(expense.descriptionText, kindLabel: MarinaL10n.string("marina.clarification.kind.expenseMatch", defaultValue: "Expense match", comment: "Kind label for a matching expense."))
-        }
-        for expense in snapshot.plannedExpenses {
-            append(expense.title, kindLabel: MarinaL10n.string("marina.clarification.kind.plannedExpenseMatch", defaultValue: "Planned expense match", comment: "Kind label for a matching planned expense."))
-        }
-
-        return candidates.sorted { left, right in
-            let leftRank = matchRank(left.title, target: target)
-            let rightRank = matchRank(right.title, target: target)
-            if leftRank != rightRank { return leftRank < rightRank }
-            return left.title.localizedCaseInsensitiveCompare(right.title) == .orderedAscending
-        }
-    }
-
-    private func matches(_ candidate: String, target: String) -> Bool {
-        let candidate = canonical(candidate)
-        let target = canonical(target)
-        return candidate == target || candidate.contains(target) || target.contains(candidate)
-    }
-
-    private func matchRank(_ candidate: String, target: String) -> Int {
-        let candidate = canonical(candidate)
-        let target = canonical(target)
-        if candidate == target { return 0 }
-        if candidate.hasPrefix(target) { return 1 }
-        if candidate.contains(target) { return 2 }
-        if target.contains(candidate) { return 3 }
-        return 4
     }
 
     private func canonical(_ value: String) -> String {
@@ -601,6 +587,85 @@ struct MarinaSemanticCandidateResolver {
         return Array(Set([value, displayValue, canonicalValue]))
     }
 
+    private func aliases(
+        for match: MarinaCandidateMatch,
+        includeGenericExpenseAliases: Bool
+    ) -> [String] {
+        switch match.entity {
+        case .category:
+            return ["category"]
+        case .income:
+            return ["income", "income source"]
+        case .variableExpense:
+            return includeGenericExpenseAliases ? ["merchant", "store", "vendor", "expense", "expenses", "description", "search"] : ["expense match"]
+        case .plannedExpense:
+            return includeGenericExpenseAliases ? ["planned", "planned expense", "title", "expense", "search"] : ["planned expense match"]
+        case .card:
+            return ["card"]
+        case .budget:
+            return ["budget"]
+        case .preset:
+            return ["preset"]
+        case .savingsAccount:
+            return ["savings", "savings account"]
+        case .reconciliationAccount:
+            return ["balance", "reconciliation", "shared balance"]
+        case .workspace:
+            return ["workspace"]
+        }
+    }
+
+    private func kindLabel(for match: MarinaCandidateMatch) -> String {
+        switch match.entity {
+        case .category:
+            return MarinaL10n.common("category", defaultValue: "Category", comment: "Common label for category.")
+        case .income:
+            return MarinaL10n.string("marina.clarification.kind.incomeSource", defaultValue: "Income source", comment: "Kind label for an income source clarification choice.")
+        case .variableExpense:
+            return MarinaL10n.string("marina.clarification.kind.expenseMatch", defaultValue: "Expense match", comment: "Kind label for a matching expense.")
+        case .plannedExpense:
+            return MarinaL10n.string("marina.clarification.kind.plannedExpenseMatch", defaultValue: "Planned expense match", comment: "Kind label for a matching planned expense.")
+        case .card:
+            return MarinaL10n.common("card", defaultValue: "Card", comment: "Common label for card.")
+        case .budget:
+            return MarinaL10n.common("budget", defaultValue: "Budget", comment: "Common label for budget.")
+        case .preset:
+            return MarinaL10n.common("preset", defaultValue: "Preset", comment: "Common label for preset.")
+        case .savingsAccount:
+            return MarinaL10n.string("marina.clarification.kind.savingsAccount", defaultValue: "Savings account", comment: "Kind label for savings account clarification choice.")
+        case .reconciliationAccount:
+            return MarinaL10n.string("marina.clarification.kind.reconciliationAccount", defaultValue: "Reconciliation account", comment: "Kind label for reconciliation account clarification choice.")
+        case .workspace:
+            return MarinaL10n.common("workspace", defaultValue: "Workspace", comment: "Common label for workspace.")
+        }
+    }
+
+    private func subtitle(for match: MarinaCandidateMatch) -> String {
+        switch match.entity {
+        case .category:
+            return MarinaL10n.format("marina.clarification.useCategoryFormat", defaultValue: "Use the %@ category.", comment: "Clarification choice subtitle for using a category.", match.displayName)
+        case .income:
+            return MarinaL10n.format("marina.clarification.useIncomeSourceFormat", defaultValue: "Use %@ as the income source.", comment: "Clarification choice subtitle for using an income source.", match.displayName)
+        case .variableExpense, .plannedExpense:
+            if match.occurrenceCount > 1 {
+                return MarinaL10n.format("marina.clarification.searchExpenseTextCountFormat", defaultValue: "Search %@ matching expense rows.", comment: "Clarification choice subtitle for searching matching expense text rows.", "\(match.occurrenceCount)")
+            }
+            return MarinaL10n.format("marina.clarification.searchExpenseTextFormat", defaultValue: "Search expense titles and descriptions for %@.", comment: "Clarification choice subtitle for searching expense text.", match.displayName)
+        case .card:
+            return MarinaL10n.format("marina.clarification.useAsCardFormat", defaultValue: "Use %@ as the card.", comment: "Clarification choice subtitle for using a card.", match.displayName)
+        case .budget:
+            return MarinaL10n.format("marina.clarification.useBudgetFormat", defaultValue: "Use the %@ budget.", comment: "Clarification choice subtitle for using a budget.", match.displayName)
+        case .preset:
+            return MarinaL10n.format("marina.clarification.usePresetFormat", defaultValue: "Use the %@ preset.", comment: "Clarification choice subtitle for using a preset.", match.displayName)
+        case .savingsAccount:
+            return MarinaL10n.format("marina.clarification.useSavingsAccountFormat", defaultValue: "Use %@ as the savings account.", comment: "Clarification choice subtitle for using a savings account.", match.displayName)
+        case .reconciliationAccount:
+            return MarinaL10n.format("marina.clarification.useReconciliationAccountFormat", defaultValue: "Use %@ as the reconciliation account.", comment: "Clarification choice subtitle for using a reconciliation account.", match.displayName)
+        case .workspace:
+            return match.displayName
+        }
+    }
+
     private func deduped(_ choices: [MarinaClarificationChoice]) -> [MarinaClarificationChoice] {
         var seen: Set<String> = []
         var result: [MarinaClarificationChoice] = []
@@ -611,5 +676,9 @@ struct MarinaSemanticCandidateResolver {
             result.append(choice)
         }
         return result
+    }
+
+    private func isExpenseTextMatch(_ match: MarinaCandidateMatch) -> Bool {
+        match.entity == .variableExpense || match.entity == .plannedExpense
     }
 }

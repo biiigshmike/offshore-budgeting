@@ -35440,6 +35440,7 @@
     },
     "marina.clarification.searchEveryExpenseTextFormat" : {
       "comment" : "Marina localized string.",
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {

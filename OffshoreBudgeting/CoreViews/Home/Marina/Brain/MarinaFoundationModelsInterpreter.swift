@@ -279,17 +279,14 @@ struct MarinaFoundationModelRuntime {
 #endif
 
 enum MarinaModelInterpreterFactory {
-    private static let forceRuleBasedInterpreterKey = "debug_marinaForceRuleBasedInterpreter"
-
     @MainActor
     static func makeDefault() -> any MarinaModelInterpreting {
-        #if DEBUG
-        if DebugFeatureFlagResolver.isEnabled(key: forceRuleBasedInterpreterKey, fallback: false) {
-            return MarinaRuleBasedInterpreter()
-        }
-        #endif
+        makeDefault(modelBackedInterpreter: makeModelBackedInterpreter())
+    }
 
-        return MarinaHybridInterpreter(modelBackedInterpreter: makeModelBackedInterpreter())
+    @MainActor
+    static func makeDefault(modelBackedInterpreter: (any MarinaModelInterpreting)?) -> any MarinaModelInterpreting {
+        modelBackedInterpreter ?? MarinaUnavailableModelInterpreter()
     }
 
     @MainActor

@@ -1,5 +1,12 @@
 import Foundation
 
+struct MarinaSemanticValidationTrace: Equatable, Sendable {
+    let interpreted: MarinaInterpretedSemanticRequest
+    let resolverOutput: MarinaInterpretedSemanticRequest
+    let candidateSearches: [MarinaCandidateSearchTrace]
+    let explicitPromptTargets: [String]
+}
+
 struct MarinaSemanticRequestValidator {
     private let candidateResolver: MarinaSemanticCandidateResolver
     private let capabilityRegistry: MarinaQueryCapabilityRegistry
@@ -14,11 +21,26 @@ struct MarinaSemanticRequestValidator {
 
     func validate(
         interpreted: MarinaInterpretedSemanticRequest,
-        snapshot: MarinaWorkspaceSnapshot
+        snapshot: MarinaWorkspaceSnapshot,
+        originalPrompt: String? = nil
     ) -> MarinaInterpretedSemanticRequest {
+        validateWithTrace(
+            interpreted: interpreted,
+            snapshot: snapshot,
+            originalPrompt: originalPrompt
+        )
+        .interpreted
+    }
+
+    func validateWithTrace(
+        interpreted: MarinaInterpretedSemanticRequest,
+        snapshot: MarinaWorkspaceSnapshot,
+        originalPrompt: String? = nil
+    ) -> MarinaSemanticValidationTrace {
         var request = interpreted.request
         var notes = interpreted.diagnosticNotes
         var source = interpreted.source
+        let explicitTargets = explicitPromptTargets(in: originalPrompt, snapshot: snapshot)
 
         if request.expectedAnswerShape == .unsupported && request.unsupportedReason == nil {
             request.unsupportedReason = .unsupportedCombination
@@ -27,22 +49,35 @@ struct MarinaSemanticRequestValidator {
 
         if request.expectedAnswerShape == .clarification || request.expectedAnswerShape == .unsupported {
             notes.append("Validation skipped for terminal semantic shape.")
-            return interpretedWith(request: request, interpreted: interpreted, source: source, notes: notes)
+            let terminal = interpretedWith(request: request, interpreted: interpreted, source: source, notes: notes)
+            return MarinaSemanticValidationTrace(
+                interpreted: terminal,
+                resolverOutput: terminal,
+                candidateSearches: [],
+                explicitPromptTargets: explicitTargets
+            )
         }
 
-        let resolved = candidateResolver.resolve(interpreted: interpreted, snapshot: snapshot)
+        let resolution = candidateResolver.resolveWithTrace(interpreted: interpreted, snapshot: snapshot)
+        let resolved = resolution.interpreted
         request = resolved.request
         notes = resolved.diagnosticNotes
         source = resolved.source
 
         if request.expectedAnswerShape == .clarification || request.expectedAnswerShape == .unsupported {
             notes.append("Validation accepted resolver terminal semantic shape.")
-            return interpretedWith(
+            let terminal = interpretedWith(
                 request: request,
                 interpreted: resolved,
                 source: source,
                 notes: notes,
                 clarificationChoices: resolved.clarificationChoices
+            )
+            return MarinaSemanticValidationTrace(
+                interpreted: terminal,
+                resolverOutput: resolved,
+                candidateSearches: resolution.candidateSearches,
+                explicitPromptTargets: explicitTargets
             )
         }
 
@@ -54,19 +89,55 @@ struct MarinaSemanticRequestValidator {
             }
         }
 
+        if shouldEnforcePromptTargetRetention(source: source),
+           let targetLoss = targetLossRejection(for: request, explicitTargets: explicitTargets) {
+            notes.append("Validation rejected semantic request because prompt target(s) were not retained: \(targetLoss.joined(separator: ", ")).")
+            let rejected = interpretedWith(
+                request: unsupported(.unresolvedEntity),
+                interpreted: resolved,
+                source: source,
+                notes: notes,
+                clarificationChoices: resolved.clarificationChoices
+            )
+            return MarinaSemanticValidationTrace(
+                interpreted: rejected,
+                resolverOutput: resolved,
+                candidateSearches: resolution.candidateSearches,
+                explicitPromptTargets: explicitTargets
+            )
+        }
+
         guard capabilityRegistry.supports(entity: request.entity, operation: request.operation) else {
             request = unsupported(.unsupportedCombination)
             notes.append("Validation rejected unsupported entity/operation capability.")
-            return interpretedWith(request: request, interpreted: resolved, source: source, notes: notes)
+            let rejected = interpretedWith(request: request, interpreted: resolved, source: source, notes: notes)
+            return MarinaSemanticValidationTrace(
+                interpreted: rejected,
+                resolverOutput: resolved,
+                candidateSearches: resolution.candidateSearches,
+                explicitPromptTargets: explicitTargets
+            )
         }
 
         if let rejected = rejectedRequest(for: request, snapshot: snapshot) {
             notes.append("Validation rejected semantic request: \(rejected.unsupportedReason?.rawValue ?? rejected.expectedAnswerShape.rawValue).")
-            return interpretedWith(request: rejected, interpreted: interpreted, source: source, notes: notes)
+            let rejectedInterpreted = interpretedWith(request: rejected, interpreted: resolved, source: source, notes: notes)
+            return MarinaSemanticValidationTrace(
+                interpreted: rejectedInterpreted,
+                resolverOutput: resolved,
+                candidateSearches: resolution.candidateSearches,
+                explicitPromptTargets: explicitTargets
+            )
         }
 
         notes.append("Validation accepted semantic request.")
-        return interpretedWith(request: request, interpreted: interpreted, source: source, notes: notes)
+        let accepted = interpretedWith(request: request, interpreted: resolved, source: source, notes: notes)
+        return MarinaSemanticValidationTrace(
+            interpreted: accepted,
+            resolverOutput: resolved,
+            candidateSearches: resolution.candidateSearches,
+            explicitPromptTargets: explicitTargets
+        )
     }
 
     private func interpretedWith(
@@ -259,6 +330,73 @@ struct MarinaSemanticRequestValidator {
         Array(Set(snapshot.incomes.map(\.source)))
     }
 
+    private func explicitPromptTargets(
+        in prompt: String?,
+        snapshot: MarinaWorkspaceSnapshot
+    ) -> [String] {
+        guard let prompt, prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false else {
+            return []
+        }
+
+        let normalizedPrompt = targetNormalized(prompt)
+        let names = snapshot.cards.map(\.name)
+            + snapshot.categories.map(\.name)
+            + snapshot.presets.map(\.title)
+            + Array(Set(snapshot.incomes.map(\.source)))
+            + snapshot.savingsAccounts.map(\.name)
+            + snapshot.reconciliationAccounts.map(\.name)
+            + snapshot.budgets.map(\.name)
+            + snapshot.variableExpenses.map(\.descriptionText)
+            + snapshot.plannedExpenses.map(\.title)
+
+        var seen: Set<String> = []
+        var result: [String] = []
+        for name in names {
+            let normalizedName = targetNormalized(name)
+            guard normalizedName.isEmpty == false,
+                  normalizedPrompt.contains(normalizedName),
+                  seen.contains(normalizedName) == false else {
+                continue
+            }
+            seen.insert(normalizedName)
+            result.append(name)
+        }
+        return result
+    }
+
+    private func targetLossRejection(
+        for request: MarinaSemanticRequest,
+        explicitTargets: [String]
+    ) -> [String]? {
+        guard explicitTargets.isEmpty == false,
+              request.expectedAnswerShape != .clarification,
+              request.expectedAnswerShape != .unsupported else {
+            return nil
+        }
+
+        let retainedText = [
+            request.targetName,
+            request.comparisonTargetName,
+            request.textQuery,
+            request.targetDisplayName
+        ]
+        .compactMap { $0 }
+        .map(targetNormalized)
+        .joined(separator: " ")
+
+        let missing = explicitTargets.filter { target in
+            let normalizedTarget = targetNormalized(target)
+            guard normalizedTarget.isEmpty == false else { return false }
+            return retainedText.contains(normalizedTarget) == false
+        }
+
+        return missing.isEmpty ? nil : missing
+    }
+
+    private func shouldEnforcePromptTargetRetention(source: MarinaSemanticSource) -> Bool {
+        source == .foundationModel || source == .repairedFoundationModel
+    }
+
     private func unique(_ dimensions: [MarinaSemanticDimension]) -> [MarinaSemanticDimension] {
         var result: [MarinaSemanticDimension] = []
         for dimension in dimensions where result.contains(dimension) == false {
@@ -272,5 +410,15 @@ struct MarinaSemanticRequestValidator {
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
             .uppercased()
+    }
+
+    private func targetNormalized(_ value: String) -> String {
+        value
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: "’", with: "'")
+            .folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
+            .replacingOccurrences(of: "[^A-Za-z0-9 ]", with: " ", options: .regularExpression)
+            .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+            .lowercased()
     }
 }
