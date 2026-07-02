@@ -10,13 +10,16 @@ struct MarinaSemanticValidationTrace: Equatable, Sendable {
 struct MarinaSemanticRequestValidator {
     private let candidateResolver: MarinaSemanticCandidateResolver
     private let capabilityRegistry: MarinaQueryCapabilityRegistry
+    private let formulaRepair: MarinaSemanticFormulaRepair
 
     init(
         candidateResolver: MarinaSemanticCandidateResolver = MarinaSemanticCandidateResolver(),
-        capabilityRegistry: MarinaQueryCapabilityRegistry = MarinaQueryCapabilityRegistry()
+        capabilityRegistry: MarinaQueryCapabilityRegistry = MarinaQueryCapabilityRegistry(),
+        formulaRepair: MarinaSemanticFormulaRepair = MarinaSemanticFormulaRepair()
     ) {
         self.candidateResolver = candidateResolver
         self.capabilityRegistry = capabilityRegistry
+        self.formulaRepair = formulaRepair
     }
 
     func validate(
@@ -148,6 +151,19 @@ struct MarinaSemanticRequestValidator {
             if let normalized = categoryExpenseListRequestIfNeeded(request) {
                 request = normalized
                 notes.append("Validation normalized explicit prompt target fallback category list semantics.")
+            }
+        }
+
+        if shouldAttemptKnownFormulaRepair(source: source),
+           let repaired = formulaRepair.repairedRequest(
+            request,
+            originalPrompt: originalPrompt,
+            explicitPromptTargets: explicitTargets
+           ) {
+            request = repaired
+            notes.append("Validation repaired known formula-backed concept semantic shape.")
+            if source == .foundationModel {
+                source = .repairedFoundationModel
             }
         }
 
@@ -593,6 +609,10 @@ struct MarinaSemanticRequestValidator {
         source == .foundationModel || source == .repairedFoundationModel
     }
 
+    private func shouldAttemptKnownFormulaRepair(source: MarinaSemanticSource) -> Bool {
+        source == .foundationModel || source == .repairedFoundationModel
+    }
+
     private func shouldAttemptExplicitPromptTargetFallback(
         source: MarinaSemanticSource,
         request: MarinaSemanticRequest,
@@ -631,5 +651,216 @@ struct MarinaSemanticRequestValidator {
             .replacingOccurrences(of: "[^A-Za-z0-9 ]", with: " ", options: .regularExpression)
             .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
             .lowercased()
+    }
+}
+
+struct MarinaSemanticFormulaRepair {
+    func repairedRequest(
+        _ request: MarinaSemanticRequest,
+        originalPrompt: String?,
+        explicitPromptTargets: [String]
+    ) -> MarinaSemanticRequest? {
+        guard let prompt = originalPrompt,
+              hasConcreteTarget(in: request) == false,
+              explicitPromptTargets.isEmpty,
+              isWhatIf(prompt, request: request) == false,
+              let concept = concept(in: prompt),
+              shouldRepair(request, for: concept) else {
+            return nil
+        }
+
+        var repaired = request
+        repaired.entity = concept.entity
+        repaired.operation = concept.operation
+        repaired.measure = concept.measure
+        repaired.dimensions = concept.dimensions
+        repaired.targetName = nil
+        repaired.comparisonTargetName = nil
+        repaired.textQuery = nil
+        repaired.targetDisplayName = nil
+        repaired.resultLimit = nil
+        repaired.sort = nil
+        repaired.expenseScope = concept.expenseScope
+        repaired.incomeState = nil
+        repaired.whatIfAmount = nil
+        repaired.categoryAvailabilityFilter = nil
+        repaired.expectedAnswerShape = concept.answerShape
+        repaired.clarificationQuestion = nil
+        repaired.unsupportedReason = nil
+        return repaired
+    }
+
+    private func hasConcreteTarget(in request: MarinaSemanticRequest) -> Bool {
+        trimmed(request.targetName).isEmpty == false
+            || trimmed(request.comparisonTargetName).isEmpty == false
+            || trimmed(request.textQuery).isEmpty == false
+    }
+
+    private func shouldRepair(
+        _ request: MarinaSemanticRequest,
+        for concept: Concept
+    ) -> Bool {
+        if request.entity == concept.entity,
+           request.operation == concept.operation,
+           request.measure == concept.measure,
+           request.expectedAnswerShape == concept.answerShape {
+            return false
+        }
+
+        return true
+    }
+
+    private func concept(in prompt: String) -> Concept? {
+        let normalized = normalize(prompt)
+
+        if containsAny(normalized, [
+            "safe spend",
+            "what can i spend today",
+            "safe daily spend",
+            "safe per day",
+            "daily allowance",
+            "what can i spend per day"
+        ]) {
+            return .safeSpend
+        }
+
+        if containsAny(normalized, [
+            "room left",
+            "left in my budget",
+            "remaining room",
+            "how much room"
+        ]) {
+            return .remainingRoom
+        }
+
+        if containsAny(normalized, [
+            "projected spend",
+            "where will i end up",
+            "on track to spend"
+        ]) {
+            return .projectedSpend
+        }
+
+        if containsAny(normalized, [
+            "spending too fast",
+            "am i on track",
+            "ahead or behind",
+            "pace"
+        ]) {
+            return .pace
+        }
+
+        if containsAny(normalized, [
+            "eating my budget",
+            "biggest share",
+            "taking the biggest share",
+            "biggest spending categories",
+            "top spending categories"
+        ]) {
+            return .categoryConcentration
+        }
+
+        return nil
+    }
+
+    private func isWhatIf(_ prompt: String, request: MarinaSemanticRequest) -> Bool {
+        guard request.operation != .whatIf,
+              request.whatIfAmount == nil else {
+            return true
+        }
+
+        let normalized = normalize(prompt)
+        return normalized.contains("what if")
+            || normalized.contains("if i ")
+            || normalized.contains("if we ")
+            || normalized.contains("happens if")
+    }
+
+    private func containsAny(_ value: String, _ needles: [String]) -> Bool {
+        needles.contains { value.contains($0) }
+    }
+
+    private func trimmed(_ value: String?) -> String {
+        value?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+    }
+
+    private func normalize(_ value: String) -> String {
+        value
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: "’", with: "'")
+            .folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
+            .replacingOccurrences(of: "[^A-Za-z0-9 ]", with: " ", options: .regularExpression)
+            .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+            .lowercased()
+    }
+
+    private enum Concept {
+        case safeSpend
+        case remainingRoom
+        case projectedSpend
+        case pace
+        case categoryConcentration
+
+        var entity: MarinaSemanticEntity {
+            switch self {
+            case .safeSpend, .remainingRoom, .projectedSpend, .pace:
+                return .budget
+            case .categoryConcentration:
+                return .category
+            }
+        }
+
+        var operation: MarinaSemanticOperation {
+            switch self {
+            case .safeSpend, .remainingRoom, .projectedSpend:
+                return .forecast
+            case .pace:
+                return .compare
+            case .categoryConcentration:
+                return .share
+            }
+        }
+
+        var measure: MarinaSemanticMeasure {
+            switch self {
+            case .safeSpend:
+                return .safeDailySpend
+            case .remainingRoom:
+                return .remainingRoom
+            case .projectedSpend:
+                return .projectedSpend
+            case .pace:
+                return .paceDifference
+            case .categoryConcentration:
+                return .concentration
+            }
+        }
+
+        var dimensions: [MarinaSemanticDimension] {
+            switch self {
+            case .safeSpend, .remainingRoom, .projectedSpend, .pace:
+                return []
+            case .categoryConcentration:
+                return [.category]
+            }
+        }
+
+        var expenseScope: MarinaSemanticExpenseScope? {
+            switch self {
+            case .safeSpend, .remainingRoom, .projectedSpend, .pace:
+                return nil
+            case .categoryConcentration:
+                return nil
+            }
+        }
+
+        var answerShape: MarinaSemanticAnswerShape {
+            switch self {
+            case .safeSpend, .remainingRoom, .projectedSpend, .categoryConcentration:
+                return .metric
+            case .pace:
+                return .comparison
+            }
+        }
     }
 }

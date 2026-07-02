@@ -2900,6 +2900,124 @@ struct MarinaSemanticPromptSuiteTests {
         #expect(groceriesAfterComparison.answer.title != "Card Spend Comparison")
     }
 
+    @Test func stabilization_formulaConceptsRepairGenericFoundationModelShapes() async throws {
+        let fixture = try makeFixture(includeStabilizationTargets: true)
+        let interpreter = PromptMappedInterpreter([
+            "What is my safe spend today?": interpreted(.foundationModel, request: genericBudgetList(shape: .metric)),
+            "What is my projected spend this month?": interpreted(.foundationModel, request: genericBudgetList(dateRangeToken: .currentMonth, shape: .metric)),
+            "Am I spending too fast this month?": interpreted(.foundationModel, request: genericBudgetCompare(dateRangeToken: .currentMonth)),
+            "What is eating my budget?": interpreted(.foundationModel, request: genericCategoryList())
+        ])
+        let brain = modelBackedBrain(interpreter: interpreter, policy: .internalParityProven)
+
+        let safeSpend = await seed("What is my safe spend today?", using: brain, fixture: fixture)
+        #expect(safeSpend.debugTrace?.validatorOutput.entity == .budget)
+        #expect(safeSpend.debugTrace?.validatorOutput.operation == .forecast)
+        #expect(safeSpend.debugTrace?.validatorOutput.measure == .safeDailySpend)
+        #expect(safeSpend.debugTrace?.validatorOutput.expectedAnswerShape == .metric)
+        #expect(safeSpend.debugTrace?.interpretedSource == .foundationModel)
+        #expect(safeSpend.debugTrace?.validatorNotes.contains("Validation repaired known formula-backed concept semantic shape.") == true)
+        #expect(safeSpend.answer.kind == .metric)
+        #expect(safeSpend.answer.title == "Safe Daily Spend")
+        #expect(safeSpend.answer.title != "Budget Overview")
+
+        let projected = await seed(
+            "What is my projected spend this month?",
+            using: brain,
+            fixture: fixture,
+            conversationContext: MarinaConversationContext(recentAnswers: [safeSpend.answer])
+        )
+        #expect(projected.debugTrace?.promptTreatment == .standalone)
+        #expect(projected.debugTrace?.priorContextChangedRequest == false)
+        #expect(projected.debugTrace?.validatorOutput.entity == .budget)
+        #expect(projected.debugTrace?.validatorOutput.operation == .forecast)
+        #expect(projected.debugTrace?.validatorOutput.measure == .projectedSpend)
+        #expect(projected.debugTrace?.validatorOutput.dateRangeToken == .currentMonth)
+        #expect(projected.answer.kind == .metric)
+        #expect(projected.answer.title == "Projected Spend")
+        #expect(projected.answer.title != "Budget Overview")
+
+        let pace = await seed("Am I spending too fast this month?", using: brain, fixture: fixture)
+        #expect(pace.debugTrace?.validatorOutput.entity == .budget)
+        #expect(pace.debugTrace?.validatorOutput.operation == .compare)
+        #expect(pace.debugTrace?.validatorOutput.measure == .paceDifference)
+        #expect(pace.debugTrace?.validatorOutput.expectedAnswerShape == .comparison)
+        #expect(pace.answer.kind == .comparison)
+        #expect(pace.answer.title == "Pace Difference")
+
+        let concentration = await seed("What is eating my budget?", using: brain, fixture: fixture)
+        #expect(concentration.debugTrace?.validatorOutput.entity == .category)
+        #expect(concentration.debugTrace?.validatorOutput.operation == .share)
+        #expect(concentration.debugTrace?.validatorOutput.measure == .concentration)
+        #expect(concentration.debugTrace?.validatorOutput.expectedAnswerShape == .metric)
+        #expect(concentration.answer.kind == .metric)
+        #expect(concentration.answer.title == "Budget Concentration")
+        #expect(concentration.answer.rows.contains { $0.title == "Category spend" })
+        #expect(concentration.answer.rows.contains { $0.title == "Total spend" })
+        #expect(concentration.answer.rows.contains { $0.title == "Concentration" })
+    }
+
+    @Test func stabilization_formulaRepairDoesNotOverrideExplicitExpenseTargets() async throws {
+        let fixture = try makeFixture(includeDebitCard: true, includeStabilizationTargets: true)
+        let badCardList = MarinaSemanticRequest(
+            entity: .card,
+            operation: .list,
+            measure: .budgetImpact,
+            dimensions: [.card],
+            resultLimit: 10,
+            sort: .dateDescending,
+            expectedAnswerShape: .list
+        )
+        let badCardMetric = MarinaSemanticRequest(
+            entity: .card,
+            operation: .sum,
+            measure: .budgetImpact,
+            dimensions: [.card],
+            expectedAnswerShape: .metric
+        )
+        let interpreter = PromptMappedInterpreter([
+            "Show my Hair Care expenses": interpreted(.foundationModel, request: categoryExpenseListAsCategory("Hair Care")),
+            "What did I spend at Uber": interpreted(.foundationModel, request: badCardMetric),
+            "Compare Apple Card to Debit Card": interpreted(.foundationModel, request: genericCardComparison()),
+            "Show my Apple Card expenses": interpreted(.foundationModel, request: badCardList)
+        ])
+        let brain = modelBackedBrain(interpreter: interpreter, policy: .internalParityProven)
+
+        let hairCare = await seed("Show my Hair Care expenses", using: brain, fixture: fixture)
+        assertCategoryExpenseListContract(
+            hairCare.debugTrace?.validatorOutput,
+            targetName: "Hair Care",
+            dateRangeToken: .currentPeriod
+        )
+        #expect(hairCare.answer.rows.contains { $0.title == "Salon Visit" })
+        #expect(hairCare.debugTrace?.validatorOutput.measure != .concentration)
+
+        let uber = await seed("What did I spend at Uber", using: brain, fixture: fixture)
+        #expect(uber.debugTrace?.validatorOutput.entity == .variableExpense)
+        #expect(uber.debugTrace?.validatorOutput.dimensions == [.merchantText])
+        #expect(uber.debugTrace?.validatorOutput.textQuery == "Uber")
+        #expect(uber.debugTrace?.validatorOutput.measure == .budgetImpact)
+        #expect(uber.answer.title != "Budget Overview")
+        #expect(uber.answer.title != "Safe Daily Spend")
+
+        let comparison = await seed("Compare Apple Card to Debit Card", using: brain, fixture: fixture)
+        #expect(comparison.debugTrace?.validatorOutput.entity == .card)
+        #expect(comparison.debugTrace?.validatorOutput.operation == .compare)
+        #expect(comparison.debugTrace?.validatorOutput.measure == .budgetImpact)
+        #expect(comparison.debugTrace?.validatorOutput.targetName == "Apple Card")
+        #expect(comparison.debugTrace?.validatorOutput.comparisonTargetName == "Debit Card")
+        #expect(comparison.answer.kind == .comparison)
+        #expect(comparison.answer.title == "Card Spend Comparison")
+
+        let appleCard = await seed("Show my Apple Card expenses", using: brain, fixture: fixture)
+        #expect(appleCard.debugTrace?.validatorOutput.entity == .variableExpense)
+        #expect(appleCard.debugTrace?.validatorOutput.dimensions == [.card])
+        #expect(appleCard.debugTrace?.validatorOutput.targetName == "Apple Card")
+        #expect(appleCard.debugTrace?.validatorOutput.measure == .budgetImpact)
+        #expect(appleCard.answer.kind == .list)
+        #expect(appleCard.answer.title != "Budget Concentration")
+    }
+
     @Test func semanticContracts_categoryExpenseListsValidateToUnifiedExpenseRows() async throws {
         let fixture = try makeFixture(includeDebitCard: true, includeStabilizationTargets: true)
         let interpreter = PromptMappedInterpreter([
@@ -4001,6 +4119,54 @@ struct MarinaSemanticPromptSuiteTests {
             operation: .share,
             measure: .concentration,
             expectedAnswerShape: .metric
+        )
+    }
+
+    private func genericBudgetList(
+        dateRangeToken: MarinaSemanticDateRangeToken = .currentPeriod,
+        shape: MarinaSemanticAnswerShape = .list
+    ) -> MarinaSemanticRequest {
+        MarinaSemanticRequest(
+            entity: .budget,
+            operation: .list,
+            measure: nil,
+            dateRangeToken: dateRangeToken,
+            expectedAnswerShape: shape
+        )
+    }
+
+    private func genericBudgetCompare(
+        dateRangeToken: MarinaSemanticDateRangeToken = .currentPeriod
+    ) -> MarinaSemanticRequest {
+        MarinaSemanticRequest(
+            entity: .budget,
+            operation: .compare,
+            measure: nil,
+            dateRangeToken: dateRangeToken,
+            expectedAnswerShape: .comparison
+        )
+    }
+
+    private func genericCategoryList(
+        dateRangeToken: MarinaSemanticDateRangeToken = .currentPeriod
+    ) -> MarinaSemanticRequest {
+        MarinaSemanticRequest(
+            entity: .category,
+            operation: .list,
+            measure: nil,
+            dimensions: [.category],
+            dateRangeToken: dateRangeToken,
+            expectedAnswerShape: .list
+        )
+    }
+
+    private func genericCardComparison() -> MarinaSemanticRequest {
+        MarinaSemanticRequest(
+            entity: .card,
+            operation: .compare,
+            measure: .budgetImpact,
+            dimensions: [.card],
+            expectedAnswerShape: .comparison
         )
     }
 
