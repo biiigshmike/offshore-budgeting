@@ -2842,10 +2842,11 @@ struct MarinaSemanticPromptSuiteTests {
         #expect(groceries.answer.title != "Budget Overview")
 
         let comparison = await seed("Compare Apple Card to Debit Card.", using: brain, fixture: fixture)
-        #expect(comparison.answer.kind == .message)
-        #expect(comparison.debugTrace?.validatorOutput.expectedAnswerShape == .clarification)
-        #expect(comparison.debugTrace?.validatorOutput.unsupportedReason == .ambiguousEntity)
-        #expect(comparison.answer.title != "Card Spend Comparison")
+        #expect(comparison.answer.kind == .comparison)
+        #expect(comparison.debugTrace?.validatorOutput.targetName == "Apple Card")
+        #expect(comparison.debugTrace?.validatorOutput.comparisonTargetName == "Debit Card")
+        #expect(comparison.debugTrace?.validatorOutput.expectedAnswerShape == .comparison)
+        #expect(comparison.answer.title == "Card Spend Comparison")
     }
 
     @Test func stabilization_standalonePromptsDoNotInheritPreviousContextWithMockedModelOutput() async throws {
@@ -2983,6 +2984,81 @@ struct MarinaSemanticPromptSuiteTests {
         #expect(request.expectedAnswerShape == .comparison)
         #expect(comparison.answer.kind == .comparison)
         #expect(comparison.answer.title != "I can't answer that yet.")
+    }
+
+    @Test func semanticContracts_explicitTargetStabilizationRecoversManualQAPrompts() async throws {
+        let fixture = try makeFixture(includeDebitCard: true, includeStabilizationTargets: true)
+        let droppedCardComparison = MarinaSemanticRequest(
+            entity: .card,
+            operation: .compare,
+            measure: .budgetImpact,
+            dimensions: [.card],
+            dateRangeToken: .previousMonth,
+            expectedAnswerShape: .comparison
+        )
+        let badCardList = MarinaSemanticRequest(
+            entity: .card,
+            operation: .list,
+            measure: .budgetImpact,
+            dimensions: [.card],
+            resultLimit: 10,
+            sort: .dateDescending,
+            expectedAnswerShape: .list
+        )
+        let badCardMetric = MarinaSemanticRequest(
+            entity: .card,
+            operation: .sum,
+            measure: .budgetImpact,
+            dimensions: [.card],
+            expectedAnswerShape: .metric
+        )
+        let interpreter = PromptMappedInterpreter([
+            "Compare Apple Card to Debit Card last month.": interpreted(.foundationModel, request: droppedCardComparison),
+            "Which was higher last month, Apple Card or Debit Card?": interpreted(.foundationModel, request: droppedCardComparison),
+            "Show my Apple Card expenses.": interpreted(.foundationModel, request: badCardList),
+            "Show my Uber expenses.": interpreted(.foundationModel, request: badCardList),
+            "Show me my Uber expenses.": interpreted(.foundationModel, request: badCardList),
+            "What did I spend at Uber?": interpreted(.foundationModel, request: badCardMetric)
+        ])
+        let brain = modelBackedBrain(interpreter: interpreter, policy: .internalParityProven)
+
+        let comparison = await seed("Compare Apple Card to Debit Card last month.", using: brain, fixture: fixture)
+        #expect(comparison.answer.kind == .comparison)
+        #expect(comparison.debugTrace?.validatorOutput.targetName == "Apple Card")
+        #expect(comparison.debugTrace?.validatorOutput.comparisonTargetName == "Debit Card")
+        #expect(comparison.debugTrace?.validatorOutput.dateRangeToken == .previousMonth)
+
+        let higher = await seed("Which was higher last month, Apple Card or Debit Card?", using: brain, fixture: fixture)
+        #expect(higher.answer.kind == .comparison)
+        #expect(higher.debugTrace?.validatorOutput.targetName == "Apple Card")
+        #expect(higher.debugTrace?.validatorOutput.comparisonTargetName == "Debit Card")
+        #expect(higher.debugTrace?.validatorOutput.expectedAnswerShape == .comparison)
+
+        let appleCardList = await seed("Show my Apple Card expenses.", using: brain, fixture: fixture)
+        #expect(appleCardList.answer.kind == .list)
+        #expect(appleCardList.debugTrace?.validatorOutput.entity == .variableExpense)
+        #expect(appleCardList.debugTrace?.validatorOutput.dimensions == [.card])
+        #expect(appleCardList.debugTrace?.validatorOutput.targetName == "Apple Card")
+        #expect(appleCardList.debugTrace?.validatorOutput.expenseScope == .unified)
+
+        let uberList = await seed("Show my Uber expenses.", using: brain, fixture: fixture)
+        #expect(uberList.answer.kind == .list)
+        #expect(uberList.debugTrace?.validatorOutput.entity == .variableExpense)
+        #expect(uberList.debugTrace?.validatorOutput.dimensions == [.merchantText])
+        #expect(uberList.debugTrace?.validatorOutput.textQuery == "Uber")
+        #expect(uberList.debugTrace?.validatorOutput.expenseScope == .unified)
+
+        let uberListWithMe = await seed("Show me my Uber expenses.", using: brain, fixture: fixture)
+        #expect(uberListWithMe.answer.kind == .list)
+        #expect(uberListWithMe.debugTrace?.validatorOutput.textQuery == "Uber")
+        #expect(uberListWithMe.debugTrace?.validatorOutput.expectedAnswerShape == .list)
+
+        let uberMetric = await seed("What did I spend at Uber?", using: brain, fixture: fixture)
+        #expect(uberMetric.answer.kind == .metric)
+        #expect(uberMetric.debugTrace?.validatorOutput.entity == .variableExpense)
+        #expect(uberMetric.debugTrace?.validatorOutput.dimensions == [.merchantText])
+        #expect(uberMetric.debugTrace?.validatorOutput.textQuery == "Uber")
+        #expect(uberMetric.debugTrace?.validatorOutput.expectedAnswerShape == .metric)
     }
 
     @Test func semanticContracts_standalonePromptsMatchFreshChatAfterUnrelatedContext() async throws {

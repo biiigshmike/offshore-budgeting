@@ -135,6 +135,16 @@ struct MarinaSemanticCandidateResolver {
             )
         }
 
+        if let recoveredComparison = recoverExplicitCardComparison(
+            interpreted: interpreted,
+            snapshot: snapshot,
+            explicitPromptTargets: explicitPromptTargets,
+            notes: &notes,
+            candidateSearches: &candidateSearches
+        ) {
+            return recoveredComparison
+        }
+
         if explicitPromptTargets.count > 1 {
             let choices = explicitPromptTargets.flatMap { target -> [MarinaClarificationChoice] in
                 let searchResult = candidateSearchResult(target: target, request: interpreted.request, snapshot: snapshot)
@@ -192,6 +202,16 @@ struct MarinaSemanticCandidateResolver {
             )
         }
 
+        if let expenseTextRecovery = recoverExactExpenseTextForBadCardHint(
+            searchResult: searchResult,
+            target: target,
+            interpreted: interpreted,
+            notes: notes,
+            candidateSearches: candidateSearches
+        ) {
+            return expenseTextRecovery
+        }
+
         let match = explicitDimensionMatch(in: searchResult, request: interpreted.request)
             ?? searchResult.recommendedMatch
         guard let match else {
@@ -206,6 +226,90 @@ struct MarinaSemanticCandidateResolver {
         return MarinaSemanticCandidateResolution(
             interpreted: interpretedWith(
                 request: request,
+                interpreted: interpreted,
+                notes: notes,
+                choices: interpreted.clarificationChoices
+            ),
+            candidateSearches: candidateSearches
+        )
+    }
+
+    private func recoverExplicitCardComparison(
+        interpreted: MarinaInterpretedSemanticRequest,
+        snapshot: MarinaWorkspaceSnapshot,
+        explicitPromptTargets: [String],
+        notes: inout [String],
+        candidateSearches: inout [MarinaCandidateSearchTrace]
+    ) -> MarinaSemanticCandidateResolution? {
+        let request = interpreted.request
+        guard request.operation == .compare,
+              request.entity == .card || request.dimensions.contains(.card),
+              explicitPromptTargets.count == 2 else {
+            return nil
+        }
+
+        let searches = explicitPromptTargets.map {
+            candidateSearchResult(target: $0, request: request, snapshot: snapshot)
+        }
+        candidateSearches.append(contentsOf: zip(explicitPromptTargets, searches).map {
+            MarinaCandidateSearchTrace(rawTargetText: $0.0, slot: "explicitPromptTarget", result: $0.1)
+        })
+
+        let cardMatches = searches.compactMap(exactCardMatch)
+        guard cardMatches.count == 2 else {
+            return nil
+        }
+
+        var recovered = request
+        recovered.entity = .card
+        recovered.operation = .compare
+        recovered.measure = recovered.measure ?? .budgetImpact
+        recovered.dimensions = [.card]
+        recovered.targetName = cardMatches[0].displayName
+        recovered.comparisonTargetName = cardMatches[1].displayName
+        recovered.textQuery = nil
+        recovered.expectedAnswerShape = .comparison
+        recovered.unsupportedReason = nil
+        notes.append("Candidate resolver recovered explicit card comparison targets \(cardMatches[0].displayName) and \(cardMatches[1].displayName).")
+
+        return MarinaSemanticCandidateResolution(
+            interpreted: interpretedWith(
+                request: recovered,
+                interpreted: interpreted,
+                notes: notes,
+                choices: interpreted.clarificationChoices
+            ),
+            candidateSearches: candidateSearches
+        )
+    }
+
+    private func recoverExactExpenseTextForBadCardHint(
+        searchResult: MarinaCandidateSearchResult,
+        target: String,
+        interpreted: MarinaInterpretedSemanticRequest,
+        notes: [String],
+        candidateSearches: [MarinaCandidateSearchTrace]
+    ) -> MarinaSemanticCandidateResolution? {
+        let request = interpreted.request
+        guard request.entity == .card || request.dimensions.contains(.card),
+              request.targetName?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty != false,
+              request.textQuery?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty != false,
+              request.comparisonTargetName?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty != false,
+              exactCardMatch(in: searchResult) == nil,
+              let expenseTextMatch = exactExpenseTextMatch(in: searchResult) else {
+            return nil
+        }
+
+        let recovered = expenseTextRequest(
+            textQuery: expenseTextMatch.displayName,
+            displayName: expenseTextMatch.displayName,
+            baseRequest: request
+        )
+        var notes = notes
+        notes.append("Candidate resolver recovered exact expense text \(expenseTextMatch.displayName) from bad card hint for \"\(target)\".")
+        return MarinaSemanticCandidateResolution(
+            interpreted: interpretedWith(
+                request: recovered,
                 interpreted: interpreted,
                 notes: notes,
                 choices: interpreted.clarificationChoices
@@ -244,6 +348,24 @@ struct MarinaSemanticCandidateResolver {
             return nil
         }
         return matches[0]
+    }
+
+    private func exactCardMatch(in searchResult: MarinaCandidateSearchResult) -> MarinaCandidateMatch? {
+        let matches = searchResult.matches.filter {
+            $0.entity == .card && isExactMatchStrength($0.matchStrength)
+        }
+        return matches.count == 1 ? matches[0] : nil
+    }
+
+    private func exactExpenseTextMatch(in searchResult: MarinaCandidateSearchResult) -> MarinaCandidateMatch? {
+        let matches = searchResult.matches.filter {
+            isExpenseTextMatch($0) && isExactMatchStrength($0.matchStrength)
+        }
+        return matches.count == 1 ? matches[0] : nil
+    }
+
+    private func isExactMatchStrength(_ strength: MarinaCandidateMatchStrength) -> Bool {
+        strength == .exact || strength == .normalizedExact
     }
 
     private func explicitlyTargetedEntity(in request: MarinaSemanticRequest) -> MarinaSemanticEntity? {

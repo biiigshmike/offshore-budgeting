@@ -431,6 +431,13 @@ struct MarinaSemanticRequestValidator {
         case ambiguous
     }
 
+    private struct ExplicitPromptTargetSpan {
+        let displayName: String
+        let normalizedName: String
+        let start: Int
+        let end: Int
+    }
+
     private func resolutionStatus<T>(
         named name: String,
         in values: [T],
@@ -476,19 +483,81 @@ struct MarinaSemanticRequestValidator {
             + snapshot.variableExpenses.map(\.descriptionText)
             + snapshot.plannedExpenses.map(\.title)
 
-        var seen: Set<String> = []
-        var result: [String] = []
-        for name in names {
+        var seenNames: Set<String> = []
+        let candidates = names.flatMap { name -> [ExplicitPromptTargetSpan] in
             let normalizedName = targetNormalized(name)
             guard normalizedName.isEmpty == false,
-                  normalizedPrompt.contains(normalizedName),
-                  seen.contains(normalizedName) == false else {
+                  seenNames.contains(normalizedName) == false else {
+                return []
+            }
+            seenNames.insert(normalizedName)
+            return targetSpans(
+                displayName: name,
+                normalizedName: normalizedName,
+                normalizedPrompt: normalizedPrompt
+            )
+        }
+
+        var accepted: [ExplicitPromptTargetSpan] = []
+        for candidate in candidates.sorted(by: isBetterExplicitPromptTargetSpan) {
+            guard accepted.contains(where: { spansOverlap(candidate, $0) }) == false else {
                 continue
             }
-            seen.insert(normalizedName)
-            result.append(name)
+            accepted.append(candidate)
         }
-        return result
+
+        return accepted
+            .sorted { $0.start == $1.start ? $0.end < $1.end : $0.start < $1.start }
+            .map(\.displayName)
+    }
+
+    private func targetSpans(
+        displayName: String,
+        normalizedName: String,
+        normalizedPrompt: String
+    ) -> [ExplicitPromptTargetSpan] {
+        var spans: [ExplicitPromptTargetSpan] = []
+        var searchRange = normalizedPrompt.startIndex..<normalizedPrompt.endIndex
+
+        while let range = normalizedPrompt.range(of: normalizedName, range: searchRange) {
+            let start = normalizedPrompt.distance(from: normalizedPrompt.startIndex, to: range.lowerBound)
+            let end = normalizedPrompt.distance(from: normalizedPrompt.startIndex, to: range.upperBound)
+            spans.append(ExplicitPromptTargetSpan(
+                displayName: displayName,
+                normalizedName: normalizedName,
+                start: start,
+                end: end
+            ))
+
+            guard range.upperBound < normalizedPrompt.endIndex else {
+                break
+            }
+            searchRange = range.upperBound..<normalizedPrompt.endIndex
+        }
+
+        return spans
+    }
+
+    private func isBetterExplicitPromptTargetSpan(
+        _ left: ExplicitPromptTargetSpan,
+        _ right: ExplicitPromptTargetSpan
+    ) -> Bool {
+        let leftLength = left.end - left.start
+        let rightLength = right.end - right.start
+        if leftLength != rightLength {
+            return leftLength > rightLength
+        }
+        if left.start != right.start {
+            return left.start < right.start
+        }
+        return left.normalizedName < right.normalizedName
+    }
+
+    private func spansOverlap(
+        _ left: ExplicitPromptTargetSpan,
+        _ right: ExplicitPromptTargetSpan
+    ) -> Bool {
+        left.start < right.end && right.start < left.end
     }
 
     private func targetLossRejection(

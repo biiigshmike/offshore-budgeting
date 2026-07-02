@@ -292,6 +292,164 @@ struct MarinaSemanticCandidateResolverTests {
         #expect(resolved.request.expectedAnswerShape == .list)
     }
 
+    @Test func explicitPromptTargetsPreferLongestNonOverlappingCardMatch() {
+        let fixture = makeFixture(includeNestedAppleText: true)
+        let trace = validate(
+            MarinaSemanticRequest(
+                entity: .card,
+                operation: .list,
+                measure: .budgetImpact,
+                dimensions: [.card],
+                expectedAnswerShape: .list
+            ),
+            snapshot: fixture.snapshot,
+            originalPrompt: "Show my Apple Card expenses."
+        )
+
+        #expect(trace.explicitPromptTargets == ["Apple Card"])
+        #expect(trace.explicitPromptTargets.contains("Apple") == false)
+    }
+
+    @Test func explicitPromptTargetsKeepTwoPromptOrderedCardTargetsForComparison() {
+        let fixture = makeFixture(includeDebitCard: true, includeNestedAppleText: true)
+        let trace = validate(
+            MarinaSemanticRequest(
+                entity: .card,
+                operation: .compare,
+                measure: .budgetImpact,
+                dimensions: [.card],
+                dateRangeToken: .previousMonth,
+                expectedAnswerShape: .comparison
+            ),
+            snapshot: fixture.snapshot,
+            originalPrompt: "Compare Apple Card to Debit Card last month."
+        )
+
+        #expect(trace.explicitPromptTargets == ["Apple Card", "Debit Card"])
+        #expect(trace.explicitPromptTargets.contains("Apple") == false)
+    }
+
+    @Test func explicitPromptTargetFallbackRecoversDroppedCardComparisonTargets() {
+        let fixture = makeFixture(includeDebitCard: true, includeNestedAppleText: true)
+        let trace = validate(
+            MarinaSemanticRequest(
+                entity: .card,
+                operation: .compare,
+                dimensions: [.card],
+                dateRangeToken: .previousMonth,
+                expectedAnswerShape: .comparison
+            ),
+            snapshot: fixture.snapshot,
+            originalPrompt: "Which was higher last month, Apple Card or Debit Card?"
+        )
+
+        #expect(trace.interpreted.request.entity == .card)
+        #expect(trace.interpreted.request.operation == .compare)
+        #expect(trace.interpreted.request.measure == .budgetImpact)
+        #expect(trace.interpreted.request.dimensions == [.card])
+        #expect(trace.interpreted.request.dateRangeToken == .previousMonth)
+        #expect(trace.interpreted.request.targetName == "Apple Card")
+        #expect(trace.interpreted.request.comparisonTargetName == "Debit Card")
+        #expect(trace.interpreted.request.expectedAnswerShape == .comparison)
+        #expect(trace.candidateSearches.contains { $0.rawTargetText == "Apple Card" && $0.slot == "explicitPromptTarget" })
+        #expect(trace.candidateSearches.contains { $0.rawTargetText == "Debit Card" && $0.slot == "explicitPromptTarget" })
+    }
+
+    @Test func explicitPromptTargetFallbackRecoversAppleCardExpenseList() {
+        let fixture = makeFixture(includeNestedAppleText: true)
+        let trace = validate(
+            MarinaSemanticRequest(
+                entity: .card,
+                operation: .list,
+                measure: .budgetImpact,
+                dimensions: [.card],
+                resultLimit: 20,
+                expectedAnswerShape: .list
+            ),
+            snapshot: fixture.snapshot,
+            originalPrompt: "Show my Apple Card expenses."
+        )
+
+        #expect(trace.interpreted.request.entity == .variableExpense)
+        #expect(trace.interpreted.request.operation == .list)
+        #expect(trace.interpreted.request.measure == .budgetImpact)
+        #expect(trace.interpreted.request.dimensions == [.card])
+        #expect(trace.interpreted.request.targetName == "Apple Card")
+        #expect(trace.interpreted.request.targetDisplayName == "Apple Card")
+        #expect(trace.interpreted.request.resultLimit == 20)
+        #expect(trace.interpreted.request.expenseScope == .unified)
+        #expect(trace.interpreted.request.expectedAnswerShape == .list)
+    }
+
+    @Test func explicitPromptTargetFallbackRecoversUberListFromBadCardHint() {
+        let fixture = makeFixture(includeUberMerchant: true)
+        let trace = validate(
+            MarinaSemanticRequest(
+                entity: .card,
+                operation: .list,
+                measure: .budgetImpact,
+                dimensions: [.card],
+                expectedAnswerShape: .list
+            ),
+            snapshot: fixture.snapshot,
+            originalPrompt: "Show my Uber expenses."
+        )
+
+        #expect(trace.interpreted.request.entity == .variableExpense)
+        #expect(trace.interpreted.request.operation == .list)
+        #expect(trace.interpreted.request.measure == .budgetImpact)
+        #expect(trace.interpreted.request.dimensions == [.merchantText])
+        #expect(trace.interpreted.request.textQuery == "Uber")
+        #expect(trace.interpreted.request.targetDisplayName == "Uber")
+        #expect(trace.interpreted.request.targetName == nil)
+        #expect(trace.interpreted.request.expenseScope == .unified)
+        #expect(trace.interpreted.request.expectedAnswerShape == .list)
+        #expect(trace.candidateSearches.contains { $0.rawTargetText == "Uber" && $0.slot == "explicitPromptTarget" })
+    }
+
+    @Test func explicitPromptTargetFallbackRecoversUberMetricFromBadCardHint() {
+        let fixture = makeFixture(includeUberMerchant: true)
+        let trace = validate(
+            MarinaSemanticRequest(
+                entity: .card,
+                operation: .sum,
+                measure: .budgetImpact,
+                dimensions: [.card],
+                expectedAnswerShape: .metric
+            ),
+            snapshot: fixture.snapshot,
+            originalPrompt: "What did I spend at Uber?"
+        )
+
+        #expect(trace.interpreted.request.entity == .variableExpense)
+        #expect(trace.interpreted.request.operation == .sum)
+        #expect(trace.interpreted.request.measure == .budgetImpact)
+        #expect(trace.interpreted.request.dimensions == [.merchantText])
+        #expect(trace.interpreted.request.textQuery == "Uber")
+        #expect(trace.interpreted.request.targetDisplayName == "Uber")
+        #expect(trace.interpreted.request.expenseScope == .unified)
+        #expect(trace.interpreted.request.expectedAnswerShape == .metric)
+    }
+
+    @Test func explicitPromptTargetFallbackClarifiesExactCardAndExpenseTextWhenUntyped() {
+        let fixture = makeFixture(includeUberMerchant: true, includeUberCard: true)
+        let trace = validate(
+            MarinaSemanticRequest(
+                entity: .variableExpense,
+                operation: .sum,
+                measure: .budgetImpact,
+                expectedAnswerShape: .metric
+            ),
+            snapshot: fixture.snapshot,
+            originalPrompt: "Show my Uber expenses."
+        )
+
+        #expect(trace.interpreted.request.expectedAnswerShape == .clarification)
+        #expect(trace.interpreted.request.unsupportedReason == .ambiguousEntity)
+        #expect(trace.interpreted.clarificationChoices?.choices.contains { $0.title == "Uber" && $0.kindLabel == "Card" } == true)
+        #expect(trace.interpreted.clarificationChoices?.choices.contains { $0.title == "Uber" && $0.kindLabel == "Expense match" } == true)
+    }
+
     private func resolve(
         _ request: MarinaSemanticRequest,
         snapshot: MarinaWorkspaceSnapshot
@@ -306,14 +464,41 @@ struct MarinaSemanticCandidateResolverTests {
         )
     }
 
+    private func validate(
+        _ request: MarinaSemanticRequest,
+        snapshot: MarinaWorkspaceSnapshot,
+        originalPrompt: String
+    ) -> MarinaSemanticValidationTrace {
+        let validator = MarinaSemanticRequestValidator()
+        return validator.validateWithTrace(
+            interpreted: MarinaInterpretedSemanticRequest(
+                request: request,
+                confidence: .medium,
+                source: .foundationModel
+            ),
+            snapshot: snapshot,
+            originalPrompt: originalPrompt
+        )
+    }
+
     private func makeFixture(
         includeTargetCategory: Bool = false,
         includeAppleMerchant: Bool = false,
-        includeHairCareCategory: Bool = false
+        includeHairCareCategory: Bool = false,
+        includeDebitCard: Bool = false,
+        includeNestedAppleText: Bool = false,
+        includeUberMerchant: Bool = false,
+        includeUberCard: Bool = false
     ) -> ResolverFixture {
         let workspace = Workspace(name: "Personal", hexColor: "#3B82F6")
         let appleCard = Card(name: "Apple Card", workspace: workspace)
         let chaseCard = Card(name: "Chase Card", workspace: workspace)
+        let debitCard = includeDebitCard
+            ? Card(name: "Debit Card", workspace: workspace)
+            : nil
+        let uberCard = includeUberCard
+            ? Card(name: "Uber", workspace: workspace)
+            : nil
         let groceries = Offshore.Category(name: "Groceries", hexColor: "#22C55E", workspace: workspace)
         let hairCare = includeHairCareCategory
             ? Offshore.Category(name: "Hair Care", hexColor: "#DB2777", workspace: workspace)
@@ -330,13 +515,24 @@ struct MarinaSemanticCandidateResolverTests {
         let appleStore = includeAppleMerchant
             ? VariableExpense(descriptionText: "Apple Store", amount: 120, transactionDate: date(2026, 7, 9), workspace: workspace, card: appleCard, category: groceries)
             : nil
+        let apple = includeNestedAppleText
+            ? VariableExpense(descriptionText: "Apple", amount: 9, transactionDate: date(2026, 7, 11), workspace: workspace, card: appleCard, category: groceries)
+            : nil
+        let uberExpenses = includeUberMerchant
+            ? [
+                VariableExpense(descriptionText: "Uber", amount: 18, transactionDate: date(2026, 7, 12), workspace: workspace, card: chaseCard, category: groceries),
+                VariableExpense(descriptionText: "Uber", amount: 21, transactionDate: date(2026, 7, 13), workspace: workspace, card: chaseCard, category: groceries),
+                VariableExpense(descriptionText: "Uber", amount: 16, transactionDate: date(2026, 7, 14), workspace: workspace, card: chaseCard, category: groceries)
+            ]
+            : []
         let planned = PlannedExpense(title: "Grocery Envelope", plannedAmount: 200, expenseDate: date(2026, 7, 10), workspace: workspace, card: chaseCard, category: groceries)
         let categories = [groceries] + [targetCategory, hairCare].compactMap { $0 }
-        let variableExpenses = [target, groceryOutlet] + [appleStore].compactMap { $0 }
+        let cards = [appleCard, chaseCard] + [debitCard, uberCard].compactMap { $0 }
+        let variableExpenses = [target, groceryOutlet] + [appleStore, apple].compactMap { $0 } + uberExpenses
         let snapshot = MarinaWorkspaceSnapshot(
             workspace: workspace,
             budgets: [budget],
-            cards: [appleCard, chaseCard],
+            cards: cards,
             categories: categories,
             presets: [preset],
             plannedExpenses: [planned],
