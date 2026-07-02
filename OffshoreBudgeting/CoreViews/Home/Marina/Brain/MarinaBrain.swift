@@ -739,6 +739,11 @@ struct MarinaFollowUpResolver {
             "this period",
             "previous period",
             "current period",
+            "this year",
+            "so far this year",
+            "year to date",
+            "year-to-date",
+            "ytd",
             "all time",
             "today"
         ].contains(normalized)
@@ -753,6 +758,11 @@ struct MarinaFollowUpResolver {
             "current period",
             "last period",
             "previous period",
+            "this year",
+            "so far this year",
+            "year to date",
+            "year-to-date",
+            "ytd",
             "today"
         ])
     }
@@ -849,6 +859,10 @@ struct MarinaFollowUpResolver {
         guard context.request.expectedAnswerShape != .unsupported,
               context.request.unsupportedReason == nil else {
             return nil
+        }
+
+        if let incomeSavingsWhatIf = MarinaSemanticPromptHeuristics.incomeSavingsReplacementWhatIfRequest(in: prompt) {
+            return incomeSavingsWhatIf
         }
 
         if let expenseDrivers = expenseDriverRequest(normalized: normalized, context: context) {
@@ -1359,6 +1373,11 @@ struct MarinaFollowUpResolver {
             "last period",
             "previous period",
             "current period",
+            "this year",
+            "so far this year",
+            "year to date",
+            "year-to-date",
+            "ytd",
             "all time",
             "largest",
             "smallest",
@@ -1397,6 +1416,9 @@ struct MarinaFollowUpResolver {
     }
 
     private func explicitDateToken(in normalized: String) -> MarinaSemanticDateRangeToken? {
+        if let yearToken = MarinaSemanticPromptHeuristics.explicitDateToken(in: normalized) {
+            return yearToken
+        }
         if normalized.contains("this month") {
             return .currentMonth
         }
@@ -1531,6 +1553,11 @@ struct MarinaFollowUpResolver {
             " current month",
             " last month",
             " previous month",
+            " this year",
+            " so far this year",
+            " year to date",
+            " year-to-date",
+            " ytd",
             " this period",
             " current period",
             " last period",

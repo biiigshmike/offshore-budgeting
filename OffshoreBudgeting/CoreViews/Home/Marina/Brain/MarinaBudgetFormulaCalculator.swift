@@ -25,6 +25,14 @@ nonisolated enum MarinaFormulaMetricComponent: String, Codable, Equatable, Senda
     case actualSavings
     case gapToProjected
     case forecastStatus
+    case period
+    case remainingDays
+    case plannedSpending
+    case plannedSpendingRemaining
+    case actualSpendSoFar
+    case periodRemainingRoom
+    case safePerDay
+    case clampedToZero
 }
 
 nonisolated enum MarinaFormulaValueStyle: String, Codable, Equatable, Sendable {

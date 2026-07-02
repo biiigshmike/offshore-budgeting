@@ -988,6 +988,8 @@ struct MarinaQueryExecutor {
             subtitle = MarinaL10n.string("marina.unsupported.modelGenerationFailed", defaultValue: "My on-device language model could not produce a usable budgeting request. I did not guess.", comment: "Unsupported message when model generation fails.")
         case .unsupportedLanguageOrLocale:
             subtitle = MarinaL10n.string("marina.unsupported.languageOrLocale", defaultValue: "My on-device language model does not support that language or locale yet.", comment: "Unsupported message when model language or locale is unsupported.")
+        case .incomeSavingsWhatIfUnsupported:
+            subtitle = MarinaL10n.string("marina.unsupported.incomeSavingsWhatIf", defaultValue: "I captured the scenario amount, but income and savings replacement what-if scenarios are not implemented yet.", comment: "Unsupported message for income or savings replacement what-if scenarios.")
         }
         return MarinaExecutionResult(
             kind: .message,

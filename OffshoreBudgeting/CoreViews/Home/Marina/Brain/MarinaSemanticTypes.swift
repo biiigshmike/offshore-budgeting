@@ -75,6 +75,7 @@ nonisolated enum MarinaSemanticDateRangeToken: String, Codable, CaseIterable, Eq
     case previousPeriod
     case currentMonth
     case previousMonth
+    case yearToDate
     case nextSevenDays
     case allTime
 }
@@ -117,6 +118,101 @@ nonisolated enum MarinaSemanticUnsupportedReason: String, Codable, Equatable, Se
     case modelGuardrail
     case modelGenerationFailed
     case unsupportedLanguageOrLocale
+    case incomeSavingsWhatIfUnsupported
+}
+
+nonisolated enum MarinaSemanticPromptHeuristics {
+    static func explicitDateToken(in prompt: String) -> MarinaSemanticDateRangeToken? {
+        let normalized = normalize(prompt)
+        if containsAny(normalized, ["so far this year", "year to date", "year-to-date", "this year", "ytd"]) {
+            return .yearToDate
+        }
+        return nil
+    }
+
+    static func incomeSavingsReplacementWhatIfRequest(in prompt: String) -> MarinaSemanticRequest? {
+        let normalized = normalize(prompt)
+        guard containsAny(normalized, ["what if", "if i ", "if we "]),
+              let amount = firstMoneyAmount(in: normalized) else {
+            return nil
+        }
+
+        if containsAny(normalized, ["saved", "save ", "savings was", "savings were", "savings is"]) {
+            return unsupportedWhatIfRequest(
+                entity: .savingsAccount,
+                measure: .savingsTotal,
+                amount: amount,
+                dateRangeToken: explicitDateToken(in: prompt) ?? dateScope(in: normalized)
+            )
+        }
+
+        if containsAny(normalized, ["earned", "earn ", "income was", "income were", "income is", "only earned"]) {
+            return unsupportedWhatIfRequest(
+                entity: .income,
+                measure: .incomeAmount,
+                amount: amount,
+                dateRangeToken: explicitDateToken(in: prompt) ?? dateScope(in: normalized)
+            )
+        }
+
+        return nil
+    }
+
+    static func firstMoneyAmount(in prompt: String) -> Double? {
+        let pattern = #"[$]?\s*([0-9]{1,3}(?:,[0-9]{3})+(?:[.][0-9]+)?|[0-9]+(?:[.][0-9]+)?)"#
+        guard let regex = try? NSRegularExpression(pattern: pattern) else { return nil }
+        let ns = prompt as NSString
+        let range = NSRange(location: 0, length: ns.length)
+        guard let match = regex.firstMatch(in: prompt, range: range),
+              match.numberOfRanges > 1 else {
+            return nil
+        }
+        let raw = ns.substring(with: match.range(at: 1)).replacingOccurrences(of: ",", with: "")
+        return Double(raw)
+    }
+
+    private static func unsupportedWhatIfRequest(
+        entity: MarinaSemanticEntity,
+        measure: MarinaSemanticMeasure,
+        amount: Double,
+        dateRangeToken: MarinaSemanticDateRangeToken
+    ) -> MarinaSemanticRequest {
+        MarinaSemanticRequest(
+            entity: entity,
+            operation: .whatIf,
+            measure: measure,
+            dateRangeToken: dateRangeToken,
+            whatIfAmount: amount,
+            expectedAnswerShape: .unsupported,
+            unsupportedReason: .incomeSavingsWhatIfUnsupported
+        )
+    }
+
+    private static func dateScope(in normalized: String) -> MarinaSemanticDateRangeToken {
+        if containsAny(normalized, ["this month", "current month"]) {
+            return .currentMonth
+        }
+        if containsAny(normalized, ["last month", "previous month"]) {
+            return .previousMonth
+        }
+        if containsAny(normalized, ["last period", "previous period"]) {
+            return .previousPeriod
+        }
+        return .currentPeriod
+    }
+
+    private static func normalize(_ value: String) -> String {
+        value
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: "’", with: "'")
+            .folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
+            .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+            .lowercased()
+    }
+
+    private static func containsAny(_ value: String, _ needles: [String]) -> Bool {
+        needles.contains { value.contains($0) }
+    }
 }
 
 nonisolated struct MarinaSemanticRequest: Codable, Equatable, Sendable {

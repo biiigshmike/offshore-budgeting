@@ -341,7 +341,18 @@ struct MarinaFollowUpBuilder {
         allTimeRequest.dateRangeToken = .allTime
         allTimeRequest.expectedAnswerShape = .list
 
+        var previousRequest = context.request
+        previousRequest.dateRangeToken = .previousPeriod
+        previousRequest.expectedAnswerShape = .list
+
         return [
+            suggestion(
+                title: MarinaL10n.string("marina.followUp.emptyList.previous.title", defaultValue: "Check last period", comment: "Follow-up title for a previous-period empty list search."),
+                prompt: MarinaL10n.string("marina.followUp.emptyList.previous.prompt", defaultValue: "Check last period.", comment: "Follow-up prompt for previous-period empty expense search."),
+                reason: .comparePreviousPeriod,
+                executionMode: .executable,
+                request: previousRequest
+            ),
             suggestion(
                 title: MarinaL10n.string("marina.followUp.emptyList.allTime.title", defaultValue: "Search all time", comment: "Follow-up title for an all-time empty list search."),
                 prompt: MarinaL10n.format("marina.followUp.emptyList.allTime.promptFormat", defaultValue: "Search all %@ expenses.", comment: "Follow-up prompt for all-time expense search.", target),
@@ -465,7 +476,7 @@ struct MarinaFollowUpBuilder {
         switch context.request.dateRangeToken {
         case .previousPeriod, .previousMonth:
             return false
-        case .currentPeriod, .currentMonth, .nextSevenDays, .allTime:
+        case .currentPeriod, .currentMonth, .yearToDate, .nextSevenDays, .allTime:
             return true
         }
     }

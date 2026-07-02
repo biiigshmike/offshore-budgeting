@@ -69,6 +69,11 @@ struct MarinaQueryPlanner {
             let previousEnd = calendar.date(byAdding: .day, value: -1, to: current.start) ?? current.start
             let previous = BudgetingPeriod.monthly.defaultRange(containing: previousEnd, calendar: calendar)
             return HomeQueryDateRange(startDate: previous.start, endDate: previous.end)
+        case .yearToDate:
+            let today = calendar.startOfDay(for: now)
+            let components = calendar.dateComponents([.year], from: today)
+            let start = calendar.date(from: components) ?? today
+            return HomeQueryDateRange(startDate: start, endDate: today)
         case .nextSevenDays:
             let start = calendar.startOfDay(for: now)
             let end = calendar.date(byAdding: .day, value: 6, to: start) ?? start
@@ -96,7 +101,7 @@ struct MarinaQueryPlanner {
             return primaryRange.map(previousEquivalentRange)
         case .currentMonth:
             return primaryRange.map(previousEquivalentRange)
-        case .nextSevenDays, .allTime:
+        case .yearToDate, .nextSevenDays, .allTime:
             return primaryRange.map(previousEquivalentRange)
         }
     }

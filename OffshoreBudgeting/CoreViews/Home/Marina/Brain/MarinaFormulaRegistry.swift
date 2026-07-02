@@ -289,9 +289,76 @@ struct MarinaFormulaRegistry: Sendable {
                 value: .money(value),
                 evidenceRows: evidenceRows(surface: .semantic(.budget), request: request, snapshot: snapshot),
                 measure: request.measure,
-                source: .safeSpendTodayCalculator
+                source: .safeSpendTodayCalculator,
+                details: safeSpendDetails(summary),
+                presentationRows: safeSpendPresentationRows(summary, measure: request.measure)
             )
         )
+    }
+
+    private func safeSpendPresentationRows(
+        _ summary: SafeSpendTodayCalculator.Summary,
+        measure: MarinaSemanticMeasure
+    ) -> [MarinaFormulaPresentationRow] {
+        switch measure {
+        case .remainingRoom:
+            return [
+                MarinaFormulaPresentationRow(
+                    title: "Remaining room",
+                    primaryValue: .money(summary.periodRemainingRoom),
+                    primaryStyle: .money,
+                    amount: summary.periodRemainingRoom
+                )
+            ]
+        case .safeDailySpend:
+            return [
+                MarinaFormulaPresentationRow(
+                    title: "Safe per day",
+                    primaryValue: .money(summary.safeToSpendToday),
+                    primaryStyle: .money,
+                    amount: summary.safeToSpendToday
+                )
+            ]
+        case .amount,
+             .plannedAmount,
+             .actualAmount,
+             .effectiveAmount,
+             .budgetImpact,
+             .savingsTotal,
+             .incomeAmount,
+             .reconciliationBalance,
+             .categoryAvailability,
+             .burnRate,
+             .projectedSpend,
+             .paceDifference,
+             .coverageRatio,
+             .recurringBurden,
+             .concentration,
+             .color,
+             .name:
+            return []
+        }
+    }
+
+    private func safeSpendDetails(_ summary: SafeSpendTodayCalculator.Summary) -> [MarinaFormulaMetricDetail] {
+        [
+            .init(.period, value: .text(periodLabel(start: summary.rangeStart, end: summary.rangeEnd))),
+            .init(.remainingDays, value: .integer(summary.daysLeftInPeriod), style: .integer),
+            .init(.plannedSpending, value: .money(summary.plannedSpendingForPeriod), style: .money),
+            .init(.plannedSpendingRemaining, value: .money(summary.plannedSpendingRemaining), style: .money),
+            .init(.actualSpendSoFar, value: .money(summary.actualSpendSoFar), style: .money),
+            .init(.periodRemainingRoom, value: .money(summary.periodRemainingRoom), style: .money),
+            .init(.safePerDay, value: .money(summary.safeToSpendToday), style: .money),
+            .init(.clampedToZero, value: .boolean(summary.wasClampedToZero))
+        ]
+    }
+
+    private func periodLabel(start: Date, end: Date) -> String {
+        "\(shortDate(start)) - \(shortDate(end))"
+    }
+
+    private func shortDate(_ date: Date) -> String {
+        date.formatted(.dateTime.month(.abbreviated).day().year())
     }
 
     private func budgetPaceMetric(

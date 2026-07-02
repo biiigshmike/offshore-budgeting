@@ -53,6 +53,10 @@ struct MarinaRuleBasedInterpreter: MarinaModelInterpreting {
             return categoryAvailabilityRequest
         }
 
+        if let incomeSavingsWhatIf = MarinaSemanticPromptHeuristics.incomeSavingsReplacementWhatIfRequest(in: normalized) {
+            return incomeSavingsWhatIf
+        }
+
         if containsAny(normalized, ["daily spend", "burn rate", "spending rate"]) {
             return MarinaSemanticRequest(
                 entity: .budget,
@@ -720,6 +724,9 @@ struct MarinaRuleBasedInterpreter: MarinaModelInterpreting {
     }
 
     private func dateToken(for normalized: String) -> MarinaSemanticDateRangeToken {
+        if let yearToken = MarinaSemanticPromptHeuristics.explicitDateToken(in: normalized) {
+            return yearToken
+        }
         if normalized.contains("this month") {
             return .currentMonth
         }
@@ -758,6 +765,11 @@ struct MarinaRuleBasedInterpreter: MarinaModelInterpreting {
             "current month",
             "last month",
             "previous month",
+            "this year",
+            "so far this year",
+            "year to date",
+            "year-to-date",
+            "ytd",
             "next 7 days",
             "next seven days",
             "all time",
@@ -1242,16 +1254,7 @@ struct MarinaRuleBasedInterpreter: MarinaModelInterpreting {
     }
 
     private func firstCurrencyAmount(in normalized: String) -> Double? {
-        let pattern = #"[$]?\s*([0-9]+(?:[.][0-9]+)?)"#
-        guard let regex = try? NSRegularExpression(pattern: pattern) else { return nil }
-        let ns = normalized as NSString
-        let range = NSRange(location: 0, length: ns.length)
-        guard let match = regex.firstMatch(in: normalized, range: range),
-              match.numberOfRanges > 1 else {
-            return nil
-        }
-        let raw = ns.substring(with: match.range(at: 1))
-        return Double(raw)
+        MarinaSemanticPromptHeuristics.firstMoneyAmount(in: normalized)
     }
 
     private func firstInteger(in normalized: String) -> Int? {

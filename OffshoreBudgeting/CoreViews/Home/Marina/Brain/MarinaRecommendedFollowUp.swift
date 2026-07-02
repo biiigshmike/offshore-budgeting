@@ -212,6 +212,10 @@ enum MarinaRecommendedFollowUp {
 
     private static func comparisonQuestion(for followUp: MarinaFollowUpSuggestion) -> String {
         let target = targetName(in: followUp)
+        if followUp.semanticRequest?.operation == .list,
+           followUp.semanticRequest?.dateRangeToken == .previousPeriod {
+            return MarinaL10n.string("marina.followUp.confirmation.checkLastPeriod", defaultValue: "Want me to check last period?", comment: "Confirmation question for checking last period after an empty list.")
+        }
         switch followUp.semanticRequest?.entity {
         case .some(.income):
             if let target {

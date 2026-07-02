@@ -18,7 +18,7 @@ fileprivate struct MarinaGeneratedSemanticRequest {
     @Guide(description: "Dimensions such as category, card, merchantText, incomeSource, preset, reconciliationAccount, date. Use a dimension only when the user's wording explicitly identifies that kind of target.")
     var dimensions: [String]
 
-    @Guide(description: "One of: currentPeriod, previousPeriod, currentMonth, previousMonth, nextSevenDays, allTime.")
+    @Guide(description: "One of: currentPeriod, previousPeriod, currentMonth, previousMonth, yearToDate, nextSevenDays, allTime.")
     var dateRangeToken: String
 
     @Guide(description: "The raw primary target text, like Apple, Apple Card, Grocery, Groceries, Salary, or Alejandro. Preserve the user's target wording when the type is unclear.")
@@ -54,7 +54,7 @@ fileprivate struct MarinaGeneratedSemanticRequest {
     @Guide(description: "A clarification question only when required information is missing. Leave empty for target-type ambiguity; Marina's resolver will create executable choices.")
     var clarificationQuestion: String?
 
-    @Guide(description: "Unsupported reason: readOnly, unavailableModel, unsupportedCombination, unresolvedEntity, ambiguousEntity. Leave empty otherwise.")
+    @Guide(description: "Unsupported reason: readOnly, unavailableModel, unsupportedCombination, unresolvedEntity, ambiguousEntity, incomeSavingsWhatIfUnsupported. Leave empty otherwise.")
     var unsupportedReason: String?
 }
 
@@ -111,7 +111,7 @@ struct MarinaFoundationModelsInterpreter: MarinaModelInterpreting {
         Preserve raw target words and let Marina resolve aliases, singular/plural forms, workspace records, and ambiguity.
         Marina may resolve short follow-up phrases from deterministic local conversation context before this model interpreter runs; if a follow-up reaches you, interpret only the visible prompt and do not assume hidden financial state.
         Use currentPeriod when the user says this period, current period, or gives no date.
-        Use currentMonth when the user says this month. Use previousMonth when the user says last month.
+        Use currentMonth when the user says this month. Use previousMonth when the user says last month. Use yearToDate when the user says this year, so far this year, or year to date.
         Treat merchant/store/vendor wording as expense title/description text, not a separate stored entity.
         Treat Home metric terms as semantic requests: safe spend means remainingRoom; savings outlook or projected savings means savingsTotal forecast; actual savings means savings status for the current period; income progress means actual-to-planned income share; category availability means categoryAvailability; category spotlight means grouped category spend; spend trends means grouped category spend over date buckets; next planned expense means plannedExpense next; card summary means card budgetImpact.
         If the user asks for expenses, transactions, or rows behind/driving spend trends, return a variableExpense list request with budgetImpact, amountDescending, unified expense scope, and do not return the grouped spend trends summary.
@@ -120,6 +120,7 @@ struct MarinaFoundationModelsInterpreter: MarinaModelInterpreting {
         For "which/list/show categories are over/near/under limit" requests, use entity category, operation list, measure categoryAvailability, expectedAnswerShape list, and set categoryAvailabilityFilter to over, near, or underLimit. Preserve requested list limits.
         For safe spend, can I spend, remaining room, or budget room, use entity budget and measure remainingRoom.
         For "what if I spend $X" safe-spend questions, use operation whatIf, measure remainingRoom, expectedAnswerShape comparison, and set whatIfAmount.
+        For income or savings replacement what-if prompts such as "what if I earned $X" or "what if I saved $X", preserve whatIfAmount and use unsupported with unsupportedCombination; deterministic Marina validation will return the typed unsupported response.
         Do not calculate safe spend, category cap room, split ownership, or category availability; deterministic Home calculators handle those details.
         For generic spend/list/average/count expense requests such as "spend on Grocery", put the raw target in targetName, leave dimensions empty, use variableExpense, and let Marina clarify category/card/expense text if needed.
         Use dimensions only when the user explicitly names the target type, such as category, card, income source, preset, savings account, reconciliation account, merchant, store, vendor, title, or description.

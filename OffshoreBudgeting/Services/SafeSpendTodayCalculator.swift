@@ -10,6 +10,10 @@ enum SafeSpendTodayCalculator {
         let periodRemainingRoom: Double
         let safeToSpendToday: Double
         let daysLeftInPeriod: Int
+        let plannedSpendingForPeriod: Double
+        let plannedSpendingRemaining: Double
+        let actualSpendSoFar: Double
+        let wasClampedToZero: Bool
         let categoryCapRemainingRoom: Double?
         let hasActivity: Bool
 
@@ -125,10 +129,13 @@ enum SafeSpendTodayCalculator {
         }
 
         let clampedRoom = max(0, constrainedRoom)
+        let wasClampedToZero = constrainedRoom < 0
         let daysLeftInPeriod = max(
             1,
             (calendar.dateComponents([.day], from: todayStart, to: rangeEndDayStart).day ?? 0) + 1
         )
+        let plannedSpendingForPeriod = plannedExpensesAlreadyConsumed + remainingPlannedExpenses
+        let actualSpendSoFar = plannedExpensesAlreadyConsumed + actualVariableExpensesToDate
 
         let safeToSpendToday: Double
         if budgetingPeriod == .daily {
@@ -154,6 +161,10 @@ enum SafeSpendTodayCalculator {
             periodRemainingRoom: clampedRoom,
             safeToSpendToday: safeToSpendToday,
             daysLeftInPeriod: daysLeftInPeriod,
+            plannedSpendingForPeriod: plannedSpendingForPeriod,
+            plannedSpendingRemaining: remainingPlannedExpenses,
+            actualSpendSoFar: actualSpendSoFar,
+            wasClampedToZero: wasClampedToZero,
             categoryCapRemainingRoom: categoryCapRemainingRoom,
             hasActivity: hasActivity
         )

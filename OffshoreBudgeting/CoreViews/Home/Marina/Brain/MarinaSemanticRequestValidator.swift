@@ -45,6 +45,19 @@ struct MarinaSemanticRequestValidator {
         var source = interpreted.source
         let explicitTargets = explicitPromptTargets(in: originalPrompt, snapshot: snapshot)
 
+        if let prompt = originalPrompt,
+           let incomeSavingsWhatIf = MarinaSemanticPromptHeuristics.incomeSavingsReplacementWhatIfRequest(in: prompt) {
+            request = incomeSavingsWhatIf
+            notes.append("Validation converted income/savings replacement what-if to typed unsupported while preserving amount.")
+            let terminal = interpretedWith(request: request, interpreted: interpreted, source: source, notes: notes)
+            return MarinaSemanticValidationTrace(
+                interpreted: terminal,
+                resolverOutput: terminal,
+                candidateSearches: [],
+                explicitPromptTargets: explicitTargets
+            )
+        }
+
         if request.expectedAnswerShape == .unsupported && request.unsupportedReason == nil {
             request.unsupportedReason = .unsupportedCombination
             notes.append("Validation added missing unsupported reason.")
@@ -156,6 +169,16 @@ struct MarinaSemanticRequestValidator {
             if let normalized = categoryExpenseListRequestIfNeeded(request) {
                 request = normalized
                 notes.append("Validation normalized explicit prompt target fallback category list semantics.")
+            }
+        }
+
+        if let prompt = originalPrompt,
+           let dateToken = MarinaSemanticPromptHeuristics.explicitDateToken(in: prompt),
+           request.dateRangeToken != dateToken {
+            request.dateRangeToken = dateToken
+            notes.append("Validation repaired explicit prompt date wording to \(dateToken.rawValue).")
+            if source == .foundationModel {
+                source = .repairedFoundationModel
             }
         }
 

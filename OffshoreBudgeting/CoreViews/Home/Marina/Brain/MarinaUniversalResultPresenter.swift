@@ -483,6 +483,8 @@ struct MarinaUniversalResultPresenter {
             label = "this month"
         case .previousPeriod:
             label = "last budgeting period"
+        case .yearToDate:
+            label = "year to date"
         case .nextSevenDays:
             label = "the next seven days"
         case .allTime:
@@ -512,6 +514,8 @@ struct MarinaUniversalResultPresenter {
             return "this month"
         case .previousMonth:
             return "last month"
+        case .yearToDate:
+            return "year to date"
         case .nextSevenDays:
             return "in the next seven days"
         case .allTime:
@@ -815,6 +819,22 @@ struct MarinaUniversalResultPresenter {
             return "Gap to projected"
         case .forecastStatus:
             return "Status"
+        case .period:
+            return "Period"
+        case .remainingDays:
+            return "Remaining days"
+        case .plannedSpending:
+            return "Planned spending"
+        case .plannedSpendingRemaining:
+            return "Planned spending remaining"
+        case .actualSpendSoFar:
+            return "Actual spend so far"
+        case .periodRemainingRoom:
+            return "Period remaining room"
+        case .safePerDay:
+            return "Safe per day"
+        case .clampedToZero:
+            return "Clamped to zero"
         }
     }
 

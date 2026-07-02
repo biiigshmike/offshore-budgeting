@@ -43,14 +43,15 @@ struct MarinaUniversalQueryRunnerFormulaTests {
         let fixture = makeFixture()
         let runner = formulaRunner()
         let range = HomeQueryDateRange(startDate: date(2026, 6, 1), endDate: date(2026, 6, 30))
+        let plan = MarinaUniversalQueryPlan(
+            entity: .budget,
+            operation: .forecast,
+            measure: .safeDailySpend,
+            dateRange: range
+        )
 
         let metric = requireMetric(runner.runFormulaAware(
-            plan: MarinaUniversalQueryPlan(
-                entity: .budget,
-                operation: .forecast,
-                measure: .safeDailySpend,
-                dateRange: range
-            ),
+            plan: plan,
             snapshot: fixture.snapshot
         ))
         let expected = SafeSpendTodayCalculator.calculate(
@@ -69,6 +70,55 @@ struct MarinaUniversalQueryRunnerFormulaTests {
 
         #expect(metric.value == .money(expected.safeToSpendToday))
         #expect(metric.evidenceRows.map(\.displayName) == ["June"])
+        #expect(metric.details.map(\.component).contains(.period))
+        #expect(metric.details.map(\.component).contains(.remainingDays))
+        #expect(metric.details.map(\.component).contains(.plannedSpending))
+        #expect(metric.details.map(\.component).contains(.plannedSpendingRemaining))
+        #expect(metric.details.map(\.component).contains(.actualSpendSoFar))
+        #expect(metric.details.map(\.component).contains(.periodRemainingRoom))
+        #expect(metric.details.map(\.component).contains(.safePerDay))
+        #expect(metric.details.map(\.component).contains(.clampedToZero))
+    }
+
+    @Test func safeDailySpendPresentationExplainsZeroClamp() {
+        let fixture = makeFixture(extraVariableExpenseAmount: 5_000)
+        let runner = formulaRunner()
+        let presenter = MarinaUniversalResultPresenter()
+        let range = HomeQueryDateRange(startDate: date(2026, 6, 1), endDate: date(2026, 6, 30))
+        let plan = MarinaUniversalQueryPlan(
+            entity: .budget,
+            operation: .forecast,
+            measure: .safeDailySpend,
+            dateRange: range
+        )
+        let result = runner.runFormulaAware(plan: plan, snapshot: fixture.snapshot)
+        let presented = presenter.presentationResult(
+            for: result,
+            plan: plan,
+            context: MarinaUniversalPresentationContext(
+                dateRange: range,
+                semanticRequest: MarinaSemanticRequest(
+                    entity: .budget,
+                    operation: .forecast,
+                    measure: .safeDailySpend,
+                    dateRangeToken: .currentMonth,
+                    expectedAnswerShape: .metric
+                ),
+                now: date(2026, 6, 15),
+                calendar: calendar
+            )
+        )
+
+        #expect(presented.title == "Safe Daily Spend")
+        #expect(presented.primaryValue == CurrencyFormatter.string(from: 0))
+        #expect(presented.rows.first(where: { $0.title == "Period" }) != nil)
+        #expect(presented.rows.first(where: { $0.title == "Remaining days" })?.amount == 16)
+        #expect(presented.rows.first(where: { $0.title == "Planned spending" }) != nil)
+        #expect(presented.rows.first(where: { $0.title == "Planned spending remaining" })?.amount == 200)
+        #expect(presented.rows.first(where: { $0.title == "Actual spend so far" }) != nil)
+        #expect(presented.rows.first(where: { $0.title == "Period remaining room" })?.amount == 0)
+        #expect(presented.rows.first(where: { $0.title == "Safe per day" })?.amount == 0)
+        #expect(presented.rows.first(where: { $0.title == "Clamped to zero" })?.value == "Yes")
     }
 
     @Test func budgetPaceFormulaMeasuresRouteThroughRegistry() {
@@ -326,7 +376,7 @@ struct MarinaUniversalQueryRunnerFormulaTests {
         }
     }
 
-    private func makeFixture() -> FormulaRunnerFixture {
+    private func makeFixture(extraVariableExpenseAmount: Double? = nil) -> FormulaRunnerFixture {
         let workspace = Workspace(name: "Personal", hexColor: "#3B82F6")
         let budget = Budget(name: "June", startDate: date(2026, 6, 1), endDate: date(2026, 6, 30), workspace: workspace)
         let card = Card(name: "Apple Card", theme: "ruby", effect: "plastic", workspace: workspace)
@@ -334,6 +384,9 @@ struct MarinaUniversalQueryRunnerFormulaTests {
         let emergency = SavingsAccount(name: "Emergency Fund", total: 300, createdAt: date(2026, 1, 1), updatedAt: date(2026, 6, 1), workspace: workspace)
         let internetPreset = Preset(title: "Internet", plannedAmount: 200, workspace: workspace, defaultCard: card, defaultCategory: category)
         let variableExpense = VariableExpense(descriptionText: "Groceries", amount: 150, transactionDate: date(2026, 6, 14), workspace: workspace, card: card, category: category)
+        let extraVariableExpense = extraVariableExpenseAmount.map {
+            VariableExpense(descriptionText: "Large adjustment", amount: $0, transactionDate: date(2026, 6, 15), workspace: workspace, card: card, category: category)
+        }
         let incomeActual = Income(source: "Paycheck", amount: 1_000, date: date(2026, 6, 1), isPlanned: false, workspace: workspace)
         let incomePlanned = Income(source: "Bonus", amount: 500, date: date(2026, 6, 20), isPlanned: true, workspace: workspace)
         let consumedPlanned = PlannedExpense(title: "Rent", plannedAmount: 100, expenseDate: date(2026, 6, 10), workspace: workspace, card: card, category: category)
@@ -354,10 +407,10 @@ struct MarinaUniversalQueryRunnerFormulaTests {
             categories: [category],
             presets: [internetPreset],
             plannedExpenses: [consumedPlanned, remainingPlanned],
-            variableExpenses: [variableExpense],
+            variableExpenses: [variableExpense] + [extraVariableExpense].compactMap { $0 },
             homePlannedExpenses: [consumedPlanned, remainingPlanned],
             homeCalculationPlannedExpenses: [consumedPlanned, remainingPlanned],
-            homeCalculationVariableExpenses: [variableExpense],
+            homeCalculationVariableExpenses: [variableExpense] + [extraVariableExpense].compactMap { $0 },
             reconciliationAccounts: [],
             expenseAllocations: [],
             allocationSettlements: [],
