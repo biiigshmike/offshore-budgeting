@@ -282,6 +282,9 @@ struct MarinaSemanticCandidateResolver {
         guard cardMatches.count == 2 else {
             return nil
         }
+        guard canonical(cardMatches[0].displayName) != canonical(cardMatches[1].displayName) else {
+            return nil
+        }
 
         var recovered = request
         recovered.entity = .card

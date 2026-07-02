@@ -381,6 +381,123 @@ struct MarinaSemanticCandidateResolverTests {
         #expect(trace.interpreted.clarificationChoices == nil)
     }
 
+    @Test func explicitPromptTargetFallbackRepairsWhichCardHadMoreSpendComparison() {
+        let fixture = makeFixture(includeDebitCard: true)
+        let trace = validate(
+            MarinaSemanticRequest(
+                entity: .card,
+                operation: .list,
+                dimensions: [.card],
+                dateRangeToken: .previousPeriod,
+                expectedAnswerShape: .list
+            ),
+            snapshot: fixture.snapshot,
+            originalPrompt: "Which card had more spend last month, my debit card or Apple Card?"
+        )
+
+        #expect(trace.interpreted.request.entity == .card)
+        #expect(trace.interpreted.request.operation == .compare)
+        #expect(trace.interpreted.request.measure == .budgetImpact)
+        #expect(trace.interpreted.request.dimensions == [.card])
+        #expect(trace.interpreted.request.dateRangeToken == .previousPeriod)
+        #expect(trace.interpreted.request.targetName == "Debit Card")
+        #expect(trace.interpreted.request.comparisonTargetName == "Apple Card")
+        #expect(trace.interpreted.request.expectedAnswerShape == .comparison)
+        #expect(trace.interpreted.clarificationChoices == nil)
+    }
+
+    @Test func explicitPromptTargetFallbackRepairsWhichCardHadLessSpendComparison() {
+        let fixture = makeFixture(includeDebitCard: true)
+        let trace = validate(
+            MarinaSemanticRequest(
+                entity: .card,
+                operation: .list,
+                dimensions: [.card],
+                dateRangeToken: .previousPeriod,
+                expectedAnswerShape: .list
+            ),
+            snapshot: fixture.snapshot,
+            originalPrompt: "Which card had less spend last month, my debit card or Apple Card?"
+        )
+
+        #expect(trace.interpreted.request.entity == .card)
+        #expect(trace.interpreted.request.operation == .compare)
+        #expect(trace.interpreted.request.measure == .budgetImpact)
+        #expect(trace.interpreted.request.dimensions == [.card])
+        #expect(trace.interpreted.request.dateRangeToken == .previousPeriod)
+        #expect(trace.interpreted.request.targetName == "Debit Card")
+        #expect(trace.interpreted.request.comparisonTargetName == "Apple Card")
+        #expect(trace.interpreted.request.expectedAnswerShape == .comparison)
+        #expect(trace.interpreted.clarificationChoices == nil)
+    }
+
+    @Test func explicitPromptTargetFallbackDoesNotRepairMoreWithoutComparisonIntent() {
+        let fixture = makeFixture(includeDebitCard: true)
+        let trace = validate(
+            MarinaSemanticRequest(
+                entity: .card,
+                operation: .list,
+                dimensions: [.card],
+                dateRangeToken: .previousPeriod,
+                expectedAnswerShape: .list
+            ),
+            snapshot: fixture.snapshot,
+            originalPrompt: "Show me more card expenses."
+        )
+
+        #expect(trace.explicitPromptTargets.isEmpty)
+        #expect(trace.interpreted.request.operation == .list)
+        #expect(trace.interpreted.request.expectedAnswerShape == .list)
+        #expect(trace.interpreted.request.targetName == nil)
+        #expect(trace.interpreted.request.comparisonTargetName == nil)
+    }
+
+    @Test func explicitPromptTargetFallbackDoesNotRepairComparisonIntentWithoutTwoTargets() {
+        let fixture = makeFixture(includeDebitCard: true)
+        let trace = validate(
+            MarinaSemanticRequest(
+                entity: .card,
+                operation: .list,
+                dimensions: [.card],
+                dateRangeToken: .previousPeriod,
+                expectedAnswerShape: .list
+            ),
+            snapshot: fixture.snapshot,
+            originalPrompt: "Which card had more spend last month?"
+        )
+
+        #expect(trace.explicitPromptTargets.isEmpty)
+        #expect(trace.interpreted.request.operation == .list)
+        #expect(trace.interpreted.request.expectedAnswerShape == .list)
+        #expect(trace.interpreted.request.targetName == nil)
+        #expect(trace.interpreted.request.comparisonTargetName == nil)
+    }
+
+    @Test func explicitPromptTargetFallbackDoesNotRepairDuplicateExactCardTargets() {
+        let fixture = makeFixture(includeDebitCard: true)
+        let interpreted = MarinaInterpretedSemanticRequest(
+            request: MarinaSemanticRequest(
+                entity: .card,
+                operation: .list,
+                dimensions: [.card],
+                dateRangeToken: .previousPeriod,
+                expectedAnswerShape: .list
+            ),
+            confidence: .medium,
+            source: .foundationModel
+        )
+
+        let resolved = resolver.resolveExplicitPromptTargetsWithTrace(
+            interpreted: interpreted,
+            snapshot: fixture.snapshot,
+            explicitPromptTargets: ["Apple Card", "Apple Card"],
+            hasExplicitCardComparisonIntent: true
+        )
+
+        #expect(resolved.interpreted.request.expectedAnswerShape != .comparison)
+        #expect(resolved.interpreted.request.comparisonTargetName == nil)
+    }
+
     @Test func explicitPromptTargetFallbackKeepsSimplerCardComparisonRecovery() {
         let fixture = makeFixture(includeDebitCard: true)
         let trace = validate(

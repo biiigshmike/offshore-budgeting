@@ -3134,6 +3134,8 @@ struct MarinaSemanticPromptSuiteTests {
             "Compare Apple Card to Debit Card last month.": interpreted(.foundationModel, request: droppedCardComparison),
             "Which was higher last month, Apple Card or Debit Card?": interpreted(.foundationModel, request: droppedCardComparison),
             "Compare my debit card and Apple Card spend last month.": interpreted(.foundationModel, request: badCardList),
+            "Which card had more spend last month, my debit card or Apple Card?": interpreted(.foundationModel, request: badCardList),
+            "Which card had less spend last month, my debit card or Apple Card?": interpreted(.foundationModel, request: badCardList),
             "Show my Apple Card expenses.": interpreted(.foundationModel, request: badCardList),
             "Show my Uber expenses.": interpreted(.foundationModel, request: badCardList),
             "Show me my Uber expenses.": interpreted(.foundationModel, request: badCardList),
@@ -3163,6 +3165,26 @@ struct MarinaSemanticPromptSuiteTests {
         #expect(naturalComparison.debugTrace?.validatorOutput.targetName == "Debit Card")
         #expect(naturalComparison.debugTrace?.validatorOutput.comparisonTargetName == "Apple Card")
         #expect(naturalComparison.debugTrace?.validatorOutput.expectedAnswerShape == .comparison)
+
+        let moreSpendComparison = await seed("Which card had more spend last month, my debit card or Apple Card?", using: brain, fixture: fixture)
+        #expect(moreSpendComparison.answer.kind == .comparison)
+        #expect(moreSpendComparison.answer.title == "Card Spend Comparison")
+        #expect(moreSpendComparison.debugTrace?.validatorOutput.entity == .card)
+        #expect(moreSpendComparison.debugTrace?.validatorOutput.operation == .compare)
+        #expect(moreSpendComparison.debugTrace?.validatorOutput.measure == .budgetImpact)
+        #expect(moreSpendComparison.debugTrace?.validatorOutput.targetName == "Debit Card")
+        #expect(moreSpendComparison.debugTrace?.validatorOutput.comparisonTargetName == "Apple Card")
+        #expect(moreSpendComparison.debugTrace?.validatorOutput.expectedAnswerShape == .comparison)
+
+        let lessSpendComparison = await seed("Which card had less spend last month, my debit card or Apple Card?", using: brain, fixture: fixture)
+        #expect(lessSpendComparison.answer.kind == .comparison)
+        #expect(lessSpendComparison.answer.title == "Card Spend Comparison")
+        #expect(lessSpendComparison.debugTrace?.validatorOutput.entity == .card)
+        #expect(lessSpendComparison.debugTrace?.validatorOutput.operation == .compare)
+        #expect(lessSpendComparison.debugTrace?.validatorOutput.measure == .budgetImpact)
+        #expect(lessSpendComparison.debugTrace?.validatorOutput.targetName == "Debit Card")
+        #expect(lessSpendComparison.debugTrace?.validatorOutput.comparisonTargetName == "Apple Card")
+        #expect(lessSpendComparison.debugTrace?.validatorOutput.expectedAnswerShape == .comparison)
 
         let appleCardList = await seed("Show my Apple Card expenses.", using: brain, fixture: fixture)
         #expect(appleCardList.answer.kind == .list)

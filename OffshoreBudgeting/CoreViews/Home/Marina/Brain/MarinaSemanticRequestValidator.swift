@@ -654,8 +654,21 @@ struct MarinaSemanticRequestValidator {
             return true
         }
 
-        return normalized.contains("which was higher")
-            || normalized.contains("which was lower")
+        let comparisonPhrases = [
+            "which card had more",
+            "which card had less",
+            "which had more",
+            "which had less",
+            "which was higher",
+            "which was lower",
+            "had more spend",
+            "had less spend",
+            "spent more",
+            "spent less",
+            "more spend",
+            "less spend"
+        ]
+        return comparisonPhrases.contains { normalized.contains($0) }
     }
 
     private func unique(_ dimensions: [MarinaSemanticDimension]) -> [MarinaSemanticDimension] {
