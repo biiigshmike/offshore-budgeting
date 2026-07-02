@@ -81,6 +81,20 @@ struct MarinaSemanticRequestValidator {
             )
         }
 
+        if let restored = restoreExplicitCategoryTargetIfNeeded(
+            request,
+            originalRequest: interpreted.request,
+            snapshot: snapshot
+        ) {
+            request = restored
+            notes.append("Validation restored explicit category target after candidate resolution.")
+        }
+
+        if let normalized = categoryExpenseListRequestIfNeeded(request) {
+            request = normalized
+            notes.append("Validation normalized category expense list semantics into an expense row list.")
+        }
+
         if let repaired = repairMerchantSpendIfNeeded(request, snapshot: snapshot) {
             request = repaired
             notes.append("Validation repaired unresolved card target into merchant text spend.")
@@ -154,6 +168,71 @@ struct MarinaSemanticRequestValidator {
             diagnosticNotes: notes,
             clarificationChoices: clarificationChoices ?? interpreted.clarificationChoices
         )
+    }
+
+    private func restoreExplicitCategoryTargetIfNeeded(
+        _ request: MarinaSemanticRequest,
+        originalRequest: MarinaSemanticRequest,
+        snapshot: MarinaWorkspaceSnapshot
+    ) -> MarinaSemanticRequest? {
+        guard originalRequest.dimensions.contains(.category),
+              let originalTarget = originalRequest.targetName?.trimmingCharacters(in: .whitespacesAndNewlines),
+              originalTarget.isEmpty == false,
+              let categoryName = resolvedCategoryName(named: originalTarget, snapshot: snapshot),
+              request.targetName != categoryName || request.dimensions.contains(.category) == false || request.textQuery != nil else {
+            return nil
+        }
+
+        var restored = originalRequest
+        restored.targetName = categoryName
+        restored.targetDisplayName = originalRequest.targetDisplayName ?? categoryName
+        restored.textQuery = nil
+        restored.dimensions = unique(restored.dimensions + [.category])
+        restored.unsupportedReason = nil
+        return restored
+    }
+
+    private func resolvedCategoryName(
+        named name: String,
+        snapshot: MarinaWorkspaceSnapshot
+    ) -> String? {
+        let normalized = normalize(name)
+        let exactMatches = snapshot.categories.filter { normalize($0.name) == normalized }
+        if exactMatches.count == 1 {
+            return exactMatches[0].name
+        }
+
+        let containingMatches = snapshot.categories.filter { normalize($0.name).contains(normalized) }
+        return containingMatches.count == 1 ? containingMatches[0].name : nil
+    }
+
+    private func categoryExpenseListRequestIfNeeded(
+        _ request: MarinaSemanticRequest
+    ) -> MarinaSemanticRequest? {
+        guard request.entity == .category,
+              request.operation == .list,
+              request.measure == .budgetImpact,
+              request.expectedAnswerShape == .list,
+              request.dimensions.contains(.category),
+              let targetName = request.targetName?.trimmingCharacters(in: .whitespacesAndNewlines),
+              targetName.isEmpty == false else {
+            return nil
+        }
+
+        var normalized = request
+        normalized.entity = .variableExpense
+        normalized.operation = .list
+        normalized.measure = .budgetImpact
+        normalized.dimensions = [.category]
+        normalized.targetName = targetName
+        normalized.targetDisplayName = request.targetDisplayName ?? targetName
+        normalized.textQuery = nil
+        normalized.resultLimit = request.resultLimit
+        normalized.sort = request.sort ?? .dateDescending
+        normalized.expenseScope = .unified
+        normalized.expectedAnswerShape = .list
+        normalized.unsupportedReason = nil
+        return normalized
     }
 
     private func repairMerchantSpendIfNeeded(

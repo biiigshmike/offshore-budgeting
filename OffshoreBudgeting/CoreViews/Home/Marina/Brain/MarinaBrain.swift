@@ -417,7 +417,11 @@ struct MarinaBrain {
             return nil
         }
 
-        return trace.debugDescription
+        let description = trace.debugDescription
+        let consoleMessage = "Marina QA Trace\n\(description)\n"
+        FileHandle.standardError.write(Data(consoleMessage.utf8))
+        NSLog("%@", consoleMessage)
+        return nil
     }
 
     private func terminalDebugTrace(

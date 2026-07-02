@@ -69,20 +69,22 @@ struct MarinaAnswerDebugTrace: Equatable, Sendable {
             "source=\(interpretedSource.rawValue)",
             "confidence=\(interpretedConfidence.rawValue)",
             "interpreted=\(Self.summary(interpretedRequest))",
+            "interpretedNotes=\(Self.list(interpretedNotes))",
             "explicitPromptTargets=\(explicitPromptTargets.joined(separator: ", "))",
             "candidateSearches=\(candidateSearches.map(\.debugDescription).joined(separator: " || "))",
             "resolverOutput=\(Self.summary(resolverOutput))",
             "validatorOutput=\(Self.summary(validatorOutput))",
             "validatorAccepted=\(validatorAccepted)",
+            "validatorNotes=\(Self.list(validatorNotes))",
             "queryPlan=\(queryPlan.debugDescription)",
             "executionRoute=\(executionRoute.rawValue)",
             "universalScenario=\(universalScenario?.rawValue ?? "none")",
             "universalFallbackReason=\(universalFallbackReason?.rawValue ?? "none")",
+            "universalNotes=\(Self.list(universalNotes))",
             "rowCount=\(rowCount)",
             "evidenceRows=\(evidenceRowSummaries.joined(separator: " | "))",
             "answer=\(answerKind.rawValue) title=\(answerTitle) value=\(answerPrimaryValue ?? "none")",
-            "narrationRequested=\(narrationRequested)",
-            "notes=\(validatorNotes.joined(separator: " | "))"
+            "narrationRequested=\(narrationRequested)"
         ].joined(separator: "\n")
     }
 
@@ -96,9 +98,16 @@ struct MarinaAnswerDebugTrace: Equatable, Sendable {
             "target=\(request.targetName ?? "none")",
             "comparison=\(request.comparisonTargetName ?? "none")",
             "textQuery=\(request.textQuery ?? "none")",
+            "targetDisplay=\(request.targetDisplayName ?? "none")",
+            "expenseScope=\(request.expenseScope?.rawValue ?? "none")",
+            "whatIfAmount=\(request.whatIfAmount.map { "\($0)" } ?? "none")",
             "shape=\(request.expectedAnswerShape.rawValue)",
             "unsupported=\(request.unsupportedReason?.rawValue ?? "none")"
         ].joined(separator: " ")
+    }
+
+    private static func list(_ values: [String]) -> String {
+        values.isEmpty ? "none" : values.joined(separator: " | ")
     }
 }
 
@@ -113,6 +122,9 @@ struct MarinaQueryPlanTrace: Equatable, Sendable {
     let targetName: String?
     let comparisonTargetName: String?
     let textQuery: String?
+    let targetDisplayName: String?
+    let expenseScope: MarinaSemanticExpenseScope?
+    let whatIfAmount: Double?
     let expectedAnswerShape: MarinaSemanticAnswerShape
 
     init(plan: MarinaQueryPlan) {
@@ -126,6 +138,9 @@ struct MarinaQueryPlanTrace: Equatable, Sendable {
         targetName = plan.targetName
         comparisonTargetName = plan.comparisonTargetName
         textQuery = plan.semanticRequest.textQuery
+        targetDisplayName = plan.semanticRequest.targetDisplayName
+        expenseScope = plan.semanticRequest.expenseScope
+        whatIfAmount = plan.semanticRequest.whatIfAmount
         expectedAnswerShape = plan.semanticRequest.expectedAnswerShape
     }
 
@@ -141,6 +156,9 @@ struct MarinaQueryPlanTrace: Equatable, Sendable {
             "target=\(targetName ?? "none")",
             "comparison=\(comparisonTargetName ?? "none")",
             "textQuery=\(textQuery ?? "none")",
+            "targetDisplay=\(targetDisplayName ?? "none")",
+            "expenseScope=\(expenseScope?.rawValue ?? "none")",
+            "whatIfAmount=\(whatIfAmount.map { "\($0)" } ?? "none")",
             "shape=\(expectedAnswerShape.rawValue)"
         ].joined(separator: " ")
     }

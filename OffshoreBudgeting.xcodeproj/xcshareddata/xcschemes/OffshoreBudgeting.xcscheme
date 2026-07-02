@@ -84,6 +84,11 @@
             value = "yes"
             isEnabled = "NO">
          </EnvironmentVariable>
+         <EnvironmentVariable
+            key = "debug_marinaShowSemanticTrace"
+            value = "yes"
+            isEnabled = "YES">
+         </EnvironmentVariable>
       </EnvironmentVariables>
    </LaunchAction>
    <ProfileAction

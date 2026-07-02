@@ -59,7 +59,10 @@ struct MarinaSemanticCandidateResolver {
                 )
             }
 
-            if let recommendedMatch = searchResult.recommendedMatch {
+            if let explicitMatch = explicitDimensionMatch(in: searchResult, request: request) {
+                request = semanticRequest(applying: explicitMatch, to: .primary, target: target, baseRequest: request)
+                notes.append("Candidate resolver selected explicit \(explicitMatch.entity.rawValue) match \(explicitMatch.displayName) for \"\(target)\".")
+            } else if let recommendedMatch = searchResult.recommendedMatch {
                 request = semanticRequest(applying: recommendedMatch, to: .primary, target: target, baseRequest: request)
                 notes.append("Candidate resolver selected \(recommendedMatch.displayName) for \"\(target)\".")
             } else if shouldResolveUntypedTarget(request) {
@@ -95,7 +98,10 @@ struct MarinaSemanticCandidateResolver {
                 )
             }
 
-            if let recommendedMatch = searchResult.recommendedMatch {
+            if let explicitMatch = explicitDimensionMatch(in: searchResult, request: request) {
+                request = semanticRequest(applying: explicitMatch, to: .comparison, target: comparisonTargetName, baseRequest: request)
+                notes.append("Candidate resolver selected explicit \(explicitMatch.entity.rawValue) match \(explicitMatch.displayName) for comparison target \"\(comparisonTargetName)\".")
+            } else if let recommendedMatch = searchResult.recommendedMatch {
                 request = semanticRequest(applying: recommendedMatch, to: .comparison, target: comparisonTargetName, baseRequest: request)
                 notes.append("Candidate resolver selected \(recommendedMatch.displayName) for comparison target \"\(comparisonTargetName)\".")
             }
@@ -125,6 +131,34 @@ struct MarinaSemanticCandidateResolver {
             diagnosticNotes: notes,
             clarificationChoices: choices
         )
+    }
+
+    private func explicitDimensionMatch(
+        in searchResult: MarinaCandidateSearchResult,
+        request: MarinaSemanticRequest
+    ) -> MarinaCandidateMatch? {
+        guard let entity = explicitlyTargetedEntity(in: request) else {
+            return nil
+        }
+
+        let matches = searchResult.matches.filter {
+            $0.entity == entity && $0.isStrongEnoughForAutomaticResolution
+        }
+        guard matches.count == 1 else {
+            return nil
+        }
+        return matches[0]
+    }
+
+    private func explicitlyTargetedEntity(in request: MarinaSemanticRequest) -> MarinaSemanticEntity? {
+        if request.dimensions.contains(.card) { return .card }
+        if request.dimensions.contains(.category) { return .category }
+        if request.dimensions.contains(.incomeSource) { return .income }
+        if request.dimensions.contains(.preset) { return .preset }
+        if request.dimensions.contains(.savingsAccount) { return .savingsAccount }
+        if request.dimensions.contains(.reconciliationAccount) { return .reconciliationAccount }
+        if request.dimensions.contains(.budget) { return .budget }
+        return nil
     }
 
     private func shouldResolveUntypedTarget(_ request: MarinaSemanticRequest) -> Bool {

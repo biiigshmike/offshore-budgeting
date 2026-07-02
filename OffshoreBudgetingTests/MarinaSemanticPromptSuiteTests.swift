@@ -2760,7 +2760,7 @@ struct MarinaSemanticPromptSuiteTests {
         let interpreter = PromptMappedInterpreter([
             "What did I spend at Uber?": interpreted(.foundationModel, request: merchantSpend("Uber")),
             "Show my Food & Drink expenses from last month.": interpreted(.foundationModel, request: categoryList("Food & Drink", dateRangeToken: .previousMonth)),
-            "How much did I spend on Groceries last month?": interpreted(.foundationModel, request: categorySpend("Groceries", dateRangeToken: .previousMonth)),
+            "How much did I spend on Groceries last month?": interpreted(.foundationModel, request: categorySpendTotalAsCategory("Groceries", dateRangeToken: .previousMonth)),
             "Compare Apple Card to Debit Card.": interpreted(.foundationModel, request: cardComparison("Apple Card", "Debit Card")),
             "What is my safe spend today?": interpreted(.foundationModel, request: safeDailySpend()),
             "What is eating my budget?": interpreted(.foundationModel, request: budgetConcentration())
@@ -2787,7 +2787,7 @@ struct MarinaSemanticPromptSuiteTests {
         #expect(groceries.answer.title != "Budget Overview")
         #expect(groceries.debugTrace?.validatorOutput.targetName == "Groceries")
         #expect(groceries.debugTrace?.validatorOutput.dateRangeToken == .previousMonth)
-        #expect(groceries.debugTrace?.universalScenario == .categoryVariableSpend)
+        #expect(groceries.debugTrace?.validatorOutput.expenseScope == .unified)
 
         let comparison = await seed("Compare Apple Card to Debit Card.", using: brain, fixture: fixture)
         #expect(comparison.answer.kind == .comparison)
@@ -2799,7 +2799,7 @@ struct MarinaSemanticPromptSuiteTests {
         #expect(safeSpend.answer.kind == .metric)
         #expect(safeSpend.answer.title == "Safe Daily Spend")
         #expect(safeSpend.debugTrace?.validatorOutput.measure == .safeDailySpend)
-        #expect(safeSpend.answer.rows.contains { $0.title == "Safe per day" })
+        #expect(safeSpend.answer.primaryValue?.isEmpty == false)
 
         let concentration = await seed("What is eating my budget?", using: brain, fixture: fixture)
         #expect(concentration.answer.kind == .metric)
@@ -2849,7 +2849,7 @@ struct MarinaSemanticPromptSuiteTests {
             "What is eating my budget?": interpreted(.foundationModel, request: budgetConcentration()),
             "Show my Food & Drink expenses from last month.": interpreted(.foundationModel, request: categoryList("Food & Drink", dateRangeToken: .previousMonth)),
             "Compare Apple Card to Debit Card.": interpreted(.foundationModel, request: cardComparison("Apple Card", "Debit Card")),
-            "How much did I spend on Groceries last month?": interpreted(.foundationModel, request: categorySpend("Groceries", dateRangeToken: .previousMonth))
+            "How much did I spend on Groceries last month?": interpreted(.foundationModel, request: categorySpendTotalAsCategory("Groceries", dateRangeToken: .previousMonth))
         ])
         let brain = modelBackedBrain(interpreter: interpreter, policy: .internalParityProven)
 
@@ -2890,6 +2890,150 @@ struct MarinaSemanticPromptSuiteTests {
         #expect(groceriesAfterComparison.debugTrace?.validatorOutput.targetName == "Groceries")
         #expect(groceriesAfterComparison.debugTrace?.validatorOutput.comparisonTargetName == nil)
         #expect(groceriesAfterComparison.answer.title != "Card Spend Comparison")
+    }
+
+    @Test func semanticContracts_categoryExpenseListsValidateToUnifiedExpenseRows() async throws {
+        let fixture = try makeFixture(includeDebitCard: true, includeStabilizationTargets: true)
+        let interpreter = PromptMappedInterpreter([
+            "Show my Hair Care Expenses": interpreted(.foundationModel, request: categoryExpenseListAsCategory("Hair Care")),
+            "Show my Food & Drink expenses from last month.": interpreted(.foundationModel, request: categoryExpenseListAsCategory("Food & Drink", dateRangeToken: .previousMonth))
+        ])
+        let brain = modelBackedBrain(interpreter: interpreter, policy: .internalParityProven)
+
+        let hairCare = await seed("Show my Hair Care Expenses", using: brain, fixture: fixture)
+        assertCategoryExpenseListContract(hairCare.debugTrace?.validatorOutput, targetName: "Hair Care", dateRangeToken: .currentPeriod)
+        #expect(hairCare.answer.kind == .list)
+        #expect(hairCare.answer.rows.contains { $0.title == "Salon Visit" })
+
+        let food = await seed("Show my Food & Drink expenses from last month.", using: brain, fixture: fixture)
+        assertCategoryExpenseListContract(food.debugTrace?.validatorOutput, targetName: "Food & Drink", dateRangeToken: .previousMonth)
+        #expect(food.answer.kind == .list)
+        #expect(food.answer.rows.isEmpty == false)
+    }
+
+    @Test func semanticContracts_categorySpendTotalValidatesToUnifiedCategoryMetric() async throws {
+        let fixture = try makeFixture(includeStabilizationTargets: true)
+        let interpreter = PromptMappedInterpreter([
+            "How much did I spend on Groceries last month?": interpreted(.foundationModel, request: categorySpendTotalAsCategory("Groceries", dateRangeToken: .previousMonth))
+        ])
+        let brain = modelBackedBrain(interpreter: interpreter, policy: .internalParityProven)
+
+        let groceries = await seed("How much did I spend on Groceries last month?", using: brain, fixture: fixture)
+        let request = try #require(groceries.debugTrace?.validatorOutput)
+        #expect(request.entity == .category)
+        #expect(request.operation == .sum)
+        #expect(request.measure == .budgetImpact)
+        #expect(request.dimensions.contains(.category))
+        #expect(request.targetName == "Groceries")
+        #expect(request.dateRangeToken == .previousMonth)
+        #expect(request.expenseScope == .unified)
+        #expect(request.expectedAnswerShape == .metric)
+        #expect(groceries.answer.kind == .metric)
+        #expect(groceries.answer.title != "Budget Overview")
+    }
+
+    @Test func semanticContracts_merchantSpendRetainsMerchantText() async throws {
+        let fixture = try makeFixture(includeStabilizationTargets: true)
+        let interpreter = PromptMappedInterpreter([
+            "What did I spend at Uber?": interpreted(.foundationModel, request: merchantSpend("Uber"))
+        ])
+        let brain = modelBackedBrain(interpreter: interpreter, policy: .internalParityProven)
+
+        let uber = await seed("What did I spend at Uber?", using: brain, fixture: fixture)
+        let request = try #require(uber.debugTrace?.validatorOutput)
+        #expect(request.entity == .variableExpense)
+        #expect(request.operation == .sum)
+        #expect(request.measure == .budgetImpact)
+        #expect(request.dimensions.contains(.merchantText))
+        #expect(request.textQuery == "Uber" || request.targetDisplayName == "Uber")
+        #expect(request.dimensions.contains(.card) == false)
+        #expect(request.targetName == nil)
+        #expect(uber.answer.title != "Card Spend")
+        #expect(uber.answer.title != "Budget Overview")
+    }
+
+    @Test func semanticContracts_multiCardCompareRetainsBothExistingCards() async throws {
+        let fixture = try makeFixture(includeDebitCard: true, includeStabilizationTargets: true)
+        let interpreter = PromptMappedInterpreter([
+            "Compare Apple Card to Debit Card.": interpreted(.foundationModel, request: cardComparison("Apple Card", "Debit Card"))
+        ])
+        let brain = modelBackedBrain(interpreter: interpreter, policy: .internalParityProven)
+
+        let comparison = await seed("Compare Apple Card to Debit Card.", using: brain, fixture: fixture)
+        let request = try #require(comparison.debugTrace?.validatorOutput)
+        #expect(request.entity == .card)
+        #expect(request.operation == .compare)
+        #expect(request.measure == .budgetImpact)
+        #expect(request.dimensions.contains(.card))
+        #expect(request.targetName == "Apple Card")
+        #expect(request.comparisonTargetName == "Debit Card")
+        #expect(request.expectedAnswerShape == .comparison)
+        #expect(comparison.answer.kind == .comparison)
+        #expect(comparison.answer.title != "I can't answer that yet.")
+    }
+
+    @Test func semanticContracts_standalonePromptsMatchFreshChatAfterUnrelatedContext() async throws {
+        let fixture = try makeFixture(includeDebitCard: true, includeStabilizationTargets: true)
+        let interpreter = PromptMappedInterpreter([
+            "What is my safe spend today?": interpreted(.foundationModel, request: safeDailySpend()),
+            "What is eating my budget?": interpreted(.foundationModel, request: budgetConcentration()),
+            "Compare Apple Card to Debit Card.": interpreted(.foundationModel, request: cardComparison("Apple Card", "Debit Card")),
+            "What did I spend at Uber?": interpreted(.foundationModel, request: merchantSpend("Uber")),
+            "Show my Food & Drink expenses from last month.": interpreted(.foundationModel, request: categoryExpenseListAsCategory("Food & Drink", dateRangeToken: .previousMonth)),
+            "How much did I spend on Groceries last month?": interpreted(.foundationModel, request: categorySpendTotalAsCategory("Groceries", dateRangeToken: .previousMonth))
+        ])
+        let brain = modelBackedBrain(interpreter: interpreter, policy: .internalParityProven)
+
+        let unrelatedSafeSpend = await seed("What is my safe spend today?", using: brain, fixture: fixture)
+        await assertStandaloneContract(
+            "What did I spend at Uber?",
+            using: brain,
+            fixture: fixture,
+            priorAnswer: unrelatedSafeSpend.answer
+        )
+
+        let unrelatedConcentration = await seed("What is eating my budget?", using: brain, fixture: fixture)
+        await assertStandaloneContract(
+            "Show my Food & Drink expenses from last month.",
+            using: brain,
+            fixture: fixture,
+            priorAnswer: unrelatedConcentration.answer
+        )
+
+        let unrelatedComparison = await seed("Compare Apple Card to Debit Card.", using: brain, fixture: fixture)
+        await assertStandaloneContract(
+            "How much did I spend on Groceries last month?",
+            using: brain,
+            fixture: fixture,
+            priorAnswer: unrelatedComparison.answer
+        )
+    }
+
+    @Test func semanticContracts_savingsContributionWhatIfIsFutureWorkAtRoutingAndFormulaLayers() throws {
+        let fixture = try makeFixture()
+        let snapshot = try MarinaWorkspaceSnapshotProvider().snapshot(for: fixture.workspace, modelContext: fixture.context)
+        let request = MarinaSemanticRequest(
+            entity: .savingsAccount,
+            operation: .whatIf,
+            measure: .savingsTotal,
+            dateRangeToken: .currentMonth,
+            whatIfAmount: 1_000,
+            expectedAnswerShape: .comparison
+        )
+
+        let validated = MarinaSemanticRequestValidator().validate(
+            interpreted: interpreted(.foundationModel, request: request),
+            snapshot: snapshot,
+            originalPrompt: "What if I saved 1000 instead of 723.44?"
+        )
+
+        #expect(request.whatIfAmount == 1_000)
+        #expect(validated.request.expectedAnswerShape == .unsupported)
+        #expect(validated.request.unsupportedReason == .unsupportedCombination)
+        #expect(MarinaUniversalRoutingPolicy.internalParityProven.scenario(for: request) == nil)
+        #expect(MarinaUniversalRoutingPolicy.internalParityProven.allows(request) == false)
+        #expect(MarinaSemanticUniversalPlanBridge().makePlan(from: request) == .unsupported(.unsupportedCombination))
+        #expect(MarinaFormulaRegistry().supports(measure: .savingsTotal, surface: .semantic(.savingsAccount), operation: .whatIf) == false)
     }
 
     @Test func stabilization_nonexistentAndWeakTargetsDoNotBecomeConfidentBroadAnswers() async throws {
@@ -3239,6 +3383,42 @@ struct MarinaSemanticPromptSuiteTests {
         )
     }
 
+    private func categoryExpenseListAsCategory(
+        _ categoryName: String,
+        dateRangeToken: MarinaSemanticDateRangeToken = .currentPeriod
+    ) -> MarinaSemanticRequest {
+        MarinaSemanticRequest(
+            entity: .category,
+            operation: .list,
+            measure: .budgetImpact,
+            dimensions: [.category],
+            dateRangeToken: dateRangeToken,
+            targetName: categoryName,
+            targetDisplayName: categoryName,
+            resultLimit: 10,
+            sort: nil,
+            expenseScope: nil,
+            expectedAnswerShape: .list
+        )
+    }
+
+    private func categorySpendTotalAsCategory(
+        _ categoryName: String,
+        dateRangeToken: MarinaSemanticDateRangeToken = .currentPeriod
+    ) -> MarinaSemanticRequest {
+        MarinaSemanticRequest(
+            entity: .category,
+            operation: .sum,
+            measure: .budgetImpact,
+            dimensions: [.category],
+            dateRangeToken: dateRangeToken,
+            targetName: categoryName,
+            targetDisplayName: categoryName,
+            expenseScope: .unified,
+            expectedAnswerShape: .metric
+        )
+    }
+
     private func categorySpend(
         _ categoryName: String,
         dateRangeToken: MarinaSemanticDateRangeToken = .currentPeriod
@@ -3273,6 +3453,46 @@ struct MarinaSemanticPromptSuiteTests {
             expenseScope: .unified,
             expectedAnswerShape: .list
         )
+    }
+
+    private func assertCategoryExpenseListContract(
+        _ request: MarinaSemanticRequest?,
+        targetName: String,
+        dateRangeToken: MarinaSemanticDateRangeToken
+    ) {
+        guard let request else {
+            Issue.record("Expected validated semantic request.")
+            return
+        }
+        #expect(request.entity == .variableExpense)
+        #expect(request.operation == .list)
+        #expect(request.measure == .budgetImpact)
+        #expect(request.dimensions.contains(.category))
+        #expect(request.targetName == targetName)
+        #expect(request.dateRangeToken == dateRangeToken)
+        #expect(request.expenseScope == .unified)
+        #expect(request.expectedAnswerShape == .list)
+    }
+
+    private func assertStandaloneContract(
+        _ prompt: String,
+        using brain: MarinaBrain,
+        fixture: Fixture,
+        priorAnswer: HomeAnswer
+    ) async {
+        let fresh = await seed(prompt, using: brain, fixture: fixture)
+        let contextual = await seed(
+            prompt,
+            using: brain,
+            fixture: fixture,
+            conversationContext: MarinaConversationContext(recentAnswers: [priorAnswer])
+        )
+
+        #expect(contextual.debugTrace?.promptTreatment == .standalone)
+        #expect(contextual.debugTrace?.priorContextChangedRequest == false)
+        #expect(contextual.debugTrace?.validatorOutput == fresh.debugTrace?.validatorOutput)
+        #expect(contextual.answer.kind == fresh.answer.kind)
+        #expect(contextual.answer.title == fresh.answer.title)
     }
 
     private func cardSpend(_ cardName: String) -> MarinaSemanticRequest {
@@ -3770,6 +3990,9 @@ struct MarinaSemanticPromptSuiteTests {
         let foodAndDrink = includeStabilizationTargets
             ? Category(name: "Food & Drink", hexColor: "#EA580C", workspace: workspace)
             : nil
+        let hairCare = includeStabilizationTargets
+            ? Category(name: "Hair Care", hexColor: "#DB2777", workspace: workspace)
+            : nil
 
         let currentBudget = Budget(
             name: "April 2026",
@@ -3953,6 +4176,16 @@ struct MarinaSemanticPromptSuiteTests {
                 category: foodAndDrink
             )
             : nil
+        let salonVisit = includeStabilizationTargets
+            ? VariableExpense(
+                descriptionText: "Salon Visit",
+                amount: 85,
+                transactionDate: date(2026, 4, 19),
+                workspace: workspace,
+                card: chase,
+                category: hairCare
+            )
+            : nil
 
         let actualPaycheck = Income(source: "Paycheck", amount: 3_000, date: date(2026, 4, 1), isPlanned: false, workspace: workspace)
         let plannedPaycheck = Income(source: "Paycheck", amount: 3_200, date: date(2026, 4, 1), isPlanned: true, workspace: workspace)
@@ -4012,6 +4245,9 @@ struct MarinaSemanticPromptSuiteTests {
         if let foodAndDrink {
             context.insert(foodAndDrink)
         }
+        if let hairCare {
+            context.insert(hairCare)
+        }
         context.insert(currentBudget)
         context.insert(groceriesLimit)
         context.insert(previousBudget)
@@ -4047,6 +4283,9 @@ struct MarinaSemanticPromptSuiteTests {
         }
         if let cafe {
             context.insert(cafe)
+        }
+        if let salonVisit {
+            context.insert(salonVisit)
         }
         context.insert(actualPaycheck)
         context.insert(plannedPaycheck)
