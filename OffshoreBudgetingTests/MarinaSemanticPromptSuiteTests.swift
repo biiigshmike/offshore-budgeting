@@ -3232,6 +3232,144 @@ struct MarinaSemanticPromptSuiteTests {
         #expect(hairCare.answer.title != "Income Comparison")
     }
 
+    @Test func showMeMoreAfterVisibleShowMore_executesRecommendedFollowUp() async throws {
+        let fixture = try makeFixture(includeStabilizationTargets: true)
+        let interpreter = PromptMappedInterpreter([
+            "Show my Food & Drink expenses from last month.": interpreted(.foundationModel, request: categoryExpenseListAsCategory("Food & Drink", dateRangeToken: .previousMonth)),
+            "Show me more.": interpreted(.foundationModel, request: budgetOverview())
+        ])
+        let brain = modelBackedBrain(interpreter: interpreter, policy: .internalParityProven)
+        let context = await foodDrinkShowMoreContext(using: brain, fixture: fixture)
+
+        let more = await seed("Show me more.", using: brain, fixture: fixture, conversationContext: context)
+
+        #expect(more.debugTrace?.promptTreatment == .recommendedFollowUpConfirmation)
+        #expect(more.debugTrace?.priorContextChangedRequest == true)
+        #expect(more.debugTrace?.interpretedSource == .ruleBased)
+        #expect(more.debugTrace?.validatorOutput.targetName == "Food & Drink")
+        #expect(more.debugTrace?.validatorOutput.dateRangeToken == .previousMonth)
+        #expect(more.debugTrace?.validatorOutput.resultLimit == 15)
+        #expect(more.answer.title != "Budget Overview")
+        #expect(interpreter.prompts.contains("Show me more.") == false)
+    }
+
+    @Test func yesAfterVisibleShowMore_executesRecommendedFollowUp() async throws {
+        let fixture = try makeFixture(includeStabilizationTargets: true)
+        let interpreter = PromptMappedInterpreter([
+            "Show my Food & Drink expenses from last month.": interpreted(.foundationModel, request: categoryExpenseListAsCategory("Food & Drink", dateRangeToken: .previousMonth)),
+            "Yes.": interpreted(.foundationModel, request: budgetOverview())
+        ])
+        let brain = modelBackedBrain(interpreter: interpreter, policy: .internalParityProven)
+        let context = await foodDrinkShowMoreContext(using: brain, fixture: fixture)
+
+        let yes = await seed("Yes.", using: brain, fixture: fixture, conversationContext: context)
+
+        #expect(yes.debugTrace?.promptTreatment == .recommendedFollowUpConfirmation)
+        #expect(yes.debugTrace?.priorContextChangedRequest == true)
+        #expect(yes.debugTrace?.interpretedSource == .ruleBased)
+        #expect(yes.debugTrace?.validatorOutput.targetName == "Food & Drink")
+        #expect(yes.debugTrace?.validatorOutput.dateRangeToken == .previousMonth)
+        #expect(yes.debugTrace?.validatorOutput.resultLimit == 15)
+        #expect(yes.answer.title != "Budget Overview")
+        #expect(interpreter.prompts.contains("Yes.") == false)
+    }
+
+    @Test func noAfterVisibleShowMore_declinesWithoutModelCall() async throws {
+        let fixture = try makeFixture(includeStabilizationTargets: true)
+        let interpreter = PromptMappedInterpreter([
+            "Show my Food & Drink expenses from last month.": interpreted(.foundationModel, request: categoryExpenseListAsCategory("Food & Drink", dateRangeToken: .previousMonth)),
+            "No.": interpreted(.foundationModel, request: budgetOverview())
+        ])
+        let brain = modelBackedBrain(interpreter: interpreter, policy: .internalParityProven)
+        let context = await foodDrinkShowMoreContext(using: brain, fixture: fixture)
+
+        let no = await seed("No.", using: brain, fixture: fixture, conversationContext: context)
+
+        #expect(no.debugTrace?.promptTreatment == .declinedFollowUp)
+        #expect(no.answer.kind == .message)
+        #expect(no.answer.title == "")
+        #expect(no.scriptedNarration == "No problem. I’m here whenever you want to dig into something else.")
+        #expect(interpreter.prompts.contains("No.") == false)
+    }
+
+    @Test func fullPromptAfterVisibleShowMore_remainsStandalone() async throws {
+        let fixture = try makeFixture(includeStabilizationTargets: true)
+        let interpreter = PromptMappedInterpreter([
+            "Show my Food & Drink expenses from last month.": interpreted(.foundationModel, request: categoryExpenseListAsCategory("Food & Drink", dateRangeToken: .previousMonth)),
+            "Show my Hair Care expenses.": interpreted(.foundationModel, request: categoryExpenseListAsCategory("Hair Care"))
+        ])
+        let brain = modelBackedBrain(interpreter: interpreter, policy: .internalParityProven)
+        let context = await foodDrinkShowMoreContext(using: brain, fixture: fixture)
+
+        let hairCare = await seed(
+            "Show my Hair Care expenses.",
+            using: brain,
+            fixture: fixture,
+            conversationContext: context
+        )
+
+        #expect(hairCare.debugTrace?.promptTreatment == .standalone)
+        #expect(hairCare.debugTrace?.priorContextChangedRequest == false)
+        assertCategoryExpenseListContract(
+            hairCare.debugTrace?.validatorOutput,
+            targetName: "Hair Care",
+            dateRangeToken: .currentPeriod
+        )
+        #expect(hairCare.answer.rows.contains { $0.title == "Salon Visit" })
+        #expect(hairCare.answer.title != "Budget Overview")
+        #expect(hairCare.debugTrace?.validatorOutput.resultLimit != 15)
+    }
+
+    @Test func showMeMoreWithoutVisibleFollowUp_usesListContextOrTypedUnsupported() async throws {
+        let fixture = try makeFixture(includeStabilizationTargets: true)
+        let interpreter = PromptMappedInterpreter([
+            "Show me more.": interpreted(.foundationModel, request: budgetOverview())
+        ])
+        let brain = modelBackedBrain(interpreter: interpreter, policy: .internalParityProven)
+        var listRequest = categoryExpenseListAsCategory("Food & Drink", dateRangeToken: .previousMonth)
+        listRequest.resultLimit = 5
+        let listContext = MarinaAnswerSemanticContext(
+            request: listRequest,
+            dateRange: fixture.currentRange,
+            comparisonDateRange: nil,
+            answerKind: .list,
+            answerTitle: "Food & Drink Expenses",
+            answerSubtitle: nil,
+            primaryValue: nil,
+            rowReferences: []
+        )
+        let listAnswer = HomeAnswer(
+            queryID: UUID(),
+            kind: .list,
+            userPrompt: "Show my Food & Drink expenses from last month.",
+            title: "Food & Drink Expenses",
+            semanticContext: listContext
+        )
+        let contextual = await seed(
+            "Show me more.",
+            using: brain,
+            fixture: fixture,
+            conversationContext: MarinaConversationContext(recentAnswers: [listAnswer])
+        )
+
+        #expect(contextual.debugTrace?.promptTreatment == .contextualFollowUp)
+        #expect(contextual.debugTrace?.priorContextChangedRequest == true)
+        #expect(contextual.debugTrace?.interpretedSource == .ruleBased)
+        #expect(contextual.debugTrace?.validatorOutput.targetName == "Food & Drink")
+        #expect(contextual.debugTrace?.validatorOutput.resultLimit == 10)
+        #expect(contextual.answer.title != "Budget Overview")
+
+        let unsupported = await seed("Show me more.", using: brain, fixture: fixture)
+
+        #expect(unsupported.debugTrace?.promptTreatment == .contextualFollowUp)
+        #expect(unsupported.debugTrace?.priorContextChangedRequest == true)
+        #expect(unsupported.debugTrace?.interpretedSource == .ruleBased)
+        #expect(unsupported.debugTrace?.validatorOutput.expectedAnswerShape == .unsupported)
+        #expect(unsupported.debugTrace?.validatorOutput.unsupportedReason == .unsupportedCombination)
+        #expect(unsupported.answer.title != "Budget Overview")
+        #expect(interpreter.prompts.contains("Show me more.") == false)
+    }
+
     @Test func showMoreAfterList_stillUsesContext() async throws {
         let fixture = try makeFixture()
         let brain = legacyRuleBasedBrain()
@@ -3262,7 +3400,7 @@ struct MarinaSemanticPromptSuiteTests {
 
         let more = await seed("Show more.", using: brain, fixture: fixture, conversationContext: context)
 
-        #expect(more.debugTrace?.promptTreatment == .contextualFollowUp)
+        #expect(more.debugTrace?.promptTreatment == .recommendedFollowUpConfirmation)
         #expect(more.debugTrace?.priorContextChangedRequest == true)
         #expect(more.debugTrace?.validatorOutput.resultLimit == 10)
     }
@@ -3611,6 +3749,20 @@ struct MarinaSemanticPromptSuiteTests {
             conversationContext: conversationContext,
             now: fixture.now
         )
+    }
+
+    private func foodDrinkShowMoreContext(
+        using brain: MarinaBrain,
+        fixture: Fixture
+    ) async -> MarinaConversationContext {
+        let food = await seed("Show my Food & Drink expenses from last month.", using: brain, fixture: fixture)
+        let context = MarinaConversationContext(recentAnswers: [food.answer])
+        #expect(food.debugTrace?.promptTreatment == .standalone)
+        #expect(food.debugTrace?.validatorOutput.targetName == "Food & Drink")
+        #expect(context.lastRecommendedFollowUp?.reason == .showMore)
+        #expect(context.lastRecommendedFollowUp?.semanticRequest?.resultLimit == 15)
+        #expect(context.lastRecommendedFollowUp.map { MarinaRecommendedFollowUp.confirmationQuestion(for: $0) } == "Want to see more rows?")
+        return context
     }
 
     private func legacyRuleBasedBrain(

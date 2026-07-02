@@ -560,6 +560,15 @@ struct MarinaFollowUpResolver {
             return visibleFollowUp
         }
 
+        if isShowMoreConfirmationPrompt(normalized) {
+            if let semanticContext = conversationContext.lastSemanticContext,
+               let request = showMoreRequest(from: semanticContext) {
+                return .request(request, diagnosticNote: "Resolved from recent Marina conversation context.")
+            }
+
+            return .request(unsupportedDependentFollowUpRequest(), diagnosticNote: "Resolved dependent Marina follow-up without usable recent context.")
+        }
+
         if let semanticContext = conversationContext.lastSemanticContext,
            let request = request(from: prompt, normalized: normalized, context: semanticContext) {
             return .request(request, diagnosticNote: "Resolved from recent Marina conversation context.")
@@ -756,13 +765,17 @@ struct MarinaFollowUpResolver {
         normalized: String,
         conversationContext: MarinaConversationContext
     ) -> MarinaFollowUpResolution? {
-        guard MarinaRecommendedFollowUp.isAffirmative(normalized) || MarinaRecommendedFollowUp.isNegative(normalized),
-              let followUp = conversationContext.lastRecommendedFollowUp else {
+        guard let followUp = conversationContext.lastRecommendedFollowUp else {
             return nil
         }
 
         if MarinaRecommendedFollowUp.isNegative(normalized) {
             return .declined
+        }
+
+        guard MarinaRecommendedFollowUp.isAffirmative(normalized)
+                || isShowMoreConfirmationPrompt(normalized, for: followUp) else {
+            return nil
         }
 
         if let request = followUp.semanticRequest {
@@ -791,6 +804,37 @@ struct MarinaFollowUpResolver {
         }
 
         return .request(request, diagnosticNote: "Resolved from recent Marina conversation context.")
+    }
+
+    private func isShowMoreConfirmationPrompt(
+        _ normalized: String,
+        for followUp: MarinaFollowUpSuggestion
+    ) -> Bool {
+        followUp.reason == .showMore && isShowMoreConfirmationPrompt(normalized)
+    }
+
+    private func isShowMoreConfirmationPrompt(_ normalized: String) -> Bool {
+        normalized == "more"
+            || normalized == "show more"
+            || normalized == "show me more"
+    }
+
+    private func showMoreRequest(from context: MarinaAnswerSemanticContext) -> MarinaSemanticRequest? {
+        guard context.answerKind == .list else { return nil }
+
+        var request = context.request
+        request.expectedAnswerShape = .list
+        request.resultLimit = min(max((context.request.resultLimit ?? context.rowReferences.count) + 5, 10), HomeQuery.maxResultLimit)
+        return request
+    }
+
+    private func unsupportedDependentFollowUpRequest() -> MarinaSemanticRequest {
+        MarinaSemanticRequest(
+            entity: .workspace,
+            operation: .list,
+            expectedAnswerShape: .unsupported,
+            unsupportedReason: .unsupportedCombination
+        )
     }
 
     private func request(
