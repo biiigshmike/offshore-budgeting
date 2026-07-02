@@ -257,6 +257,9 @@ struct MarinaExecutionResult: Equatable {
     let rows: [HomeAnswerRow]
     let attachment: MarinaAttachment?
     let explanation: String?
+    let displayedRowCount: Int?
+    let totalRowCount: Int?
+    let fullTotalAmount: Double?
 
     init(
         kind: HomeAnswerKind,
@@ -265,7 +268,10 @@ struct MarinaExecutionResult: Equatable {
         primaryValue: String? = nil,
         rows: [HomeAnswerRow] = [],
         attachment: MarinaAttachment? = nil,
-        explanation: String? = nil
+        explanation: String? = nil,
+        displayedRowCount: Int? = nil,
+        totalRowCount: Int? = nil,
+        fullTotalAmount: Double? = nil
     ) {
         self.kind = kind
         self.title = title
@@ -274,6 +280,9 @@ struct MarinaExecutionResult: Equatable {
         self.rows = rows
         self.attachment = attachment
         self.explanation = explanation
+        self.displayedRowCount = displayedRowCount
+        self.totalRowCount = totalRowCount
+        self.fullTotalAmount = fullTotalAmount
     }
 }
 
@@ -308,6 +317,9 @@ struct MarinaAnswerSemanticContext: Codable, Equatable, Sendable {
     let answerSubtitle: String?
     let primaryValue: String?
     let rowReferences: [MarinaAnswerSemanticRowReference]
+    let displayedRowCount: Int?
+    let totalRowCount: Int?
+    let fullTotalAmount: Double?
 
     init(
         request: MarinaSemanticRequest,
@@ -317,7 +329,10 @@ struct MarinaAnswerSemanticContext: Codable, Equatable, Sendable {
         answerTitle: String,
         answerSubtitle: String?,
         primaryValue: String?,
-        rowReferences: [MarinaAnswerSemanticRowReference]
+        rowReferences: [MarinaAnswerSemanticRowReference],
+        displayedRowCount: Int? = nil,
+        totalRowCount: Int? = nil,
+        fullTotalAmount: Double? = nil
     ) {
         self.request = request
         self.dateRange = dateRange
@@ -327,6 +342,9 @@ struct MarinaAnswerSemanticContext: Codable, Equatable, Sendable {
         self.answerSubtitle = answerSubtitle
         self.primaryValue = primaryValue
         self.rowReferences = Array(rowReferences.prefix(Self.maxRowReferences))
+        self.displayedRowCount = displayedRowCount
+        self.totalRowCount = totalRowCount
+        self.fullTotalAmount = fullTotalAmount
     }
 
     init(plan: MarinaQueryPlan, result: MarinaExecutionResult) {
@@ -338,7 +356,10 @@ struct MarinaAnswerSemanticContext: Codable, Equatable, Sendable {
             answerTitle: result.title,
             answerSubtitle: result.subtitle,
             primaryValue: result.primaryValue,
-            rowReferences: result.rows.map(MarinaAnswerSemanticRowReference.init(row:))
+            rowReferences: result.rows.map(MarinaAnswerSemanticRowReference.init(row:)),
+            displayedRowCount: result.displayedRowCount,
+            totalRowCount: result.totalRowCount,
+            fullTotalAmount: result.fullTotalAmount
         )
     }
 }

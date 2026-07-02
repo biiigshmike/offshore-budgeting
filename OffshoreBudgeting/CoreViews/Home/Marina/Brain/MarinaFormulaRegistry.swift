@@ -26,19 +26,22 @@ struct MarinaFormulaMetric: Equatable, Sendable {
     let measure: MarinaSemanticMeasure
     let source: MarinaFormulaSource
     let details: [MarinaFormulaMetricDetail]
+    let presentationRows: [MarinaFormulaPresentationRow]
 
     init(
         value: MarinaValue,
         evidenceRows: [MarinaQueryableRow],
         measure: MarinaSemanticMeasure,
         source: MarinaFormulaSource,
-        details: [MarinaFormulaMetricDetail] = []
+        details: [MarinaFormulaMetricDetail] = [],
+        presentationRows: [MarinaFormulaPresentationRow] = []
     ) {
         self.value = value
         self.evidenceRows = evidenceRows
         self.measure = measure
         self.source = source
         self.details = details
+        self.presentationRows = presentationRows
     }
 }
 
@@ -412,7 +415,8 @@ struct MarinaFormulaRegistry: Sendable {
         request: MarinaFormulaRequest,
         evidenceRows: [MarinaQueryableRow],
         details: [MarinaFormulaMetricDetail],
-        source: MarinaFormulaSource = .marinaBudgetFormulaCalculator
+        source: MarinaFormulaSource = .marinaBudgetFormulaCalculator,
+        presentationRows: [MarinaFormulaPresentationRow] = []
     ) -> MarinaFormulaResult {
         .metric(
             MarinaFormulaMetric(
@@ -420,7 +424,8 @@ struct MarinaFormulaRegistry: Sendable {
                 evidenceRows: evidenceRows,
                 measure: request.measure,
                 source: source,
-                details: details
+                details: details,
+                presentationRows: presentationRows
             )
         )
     }
@@ -531,6 +536,18 @@ struct MarinaFormulaRegistry: Sendable {
             return .unsupported(.unsupportedCombination)
         }
 
+        let rowLimit = request.limit.map { max($0, 0) } ?? 5
+        let presentationRows = result.metrics.prefix(rowLimit).map { metric in
+            MarinaFormulaPresentationRow(
+                title: metric.categoryName,
+                primaryValue: .money(metric.totalSpent),
+                primaryStyle: .money,
+                secondaryValue: .number(metric.percentOfTotal),
+                secondaryStyle: .percent,
+                amount: metric.totalSpent
+            )
+        }
+
         return metric(
             value: .number(concentration),
             request: request,
@@ -541,7 +558,8 @@ struct MarinaFormulaRegistry: Sendable {
                 .init(.totalSpend, value: .money(result.totalSpent), style: .money),
                 .init(.concentration, value: .number(concentration), style: .percent)
             ],
-            source: .homeCategoryMetricsCalculator
+            source: .homeCategoryMetricsCalculator,
+            presentationRows: presentationRows
         )
     }
 

@@ -64,6 +64,7 @@ struct MarinaFollowUpSuggestion: Codable, Equatable, Sendable, Identifiable {
         case nextDue
         case safeDailySpend
         case showMore
+        case searchAllTime
     }
 
     let id: UUID
@@ -72,6 +73,7 @@ struct MarinaFollowUpSuggestion: Codable, Equatable, Sendable, Identifiable {
     let reason: Reason
     let executionMode: MarinaFollowUpExecutionMode
     let semanticRequest: MarinaSemanticRequest?
+    let remainingResultCount: Int?
 
     init(
         id: UUID = UUID(),
@@ -79,7 +81,8 @@ struct MarinaFollowUpSuggestion: Codable, Equatable, Sendable, Identifiable {
         prompt: String,
         reason: Reason,
         executionMode: MarinaFollowUpExecutionMode? = nil,
-        semanticRequest: MarinaSemanticRequest? = nil
+        semanticRequest: MarinaSemanticRequest? = nil,
+        remainingResultCount: Int? = nil
     ) {
         self.id = id
         self.title = title
@@ -87,6 +90,7 @@ struct MarinaFollowUpSuggestion: Codable, Equatable, Sendable, Identifiable {
         self.reason = reason
         self.executionMode = executionMode ?? (semanticRequest == nil ? .clarificationRequired : .executable)
         self.semanticRequest = semanticRequest
+        self.remainingResultCount = remainingResultCount
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -96,6 +100,7 @@ struct MarinaFollowUpSuggestion: Codable, Equatable, Sendable, Identifiable {
         case reason
         case executionMode
         case semanticRequest
+        case remainingResultCount
     }
 
     init(from decoder: Decoder) throws {
@@ -105,6 +110,7 @@ struct MarinaFollowUpSuggestion: Codable, Equatable, Sendable, Identifiable {
         prompt = try container.decode(String.self, forKey: .prompt)
         reason = try container.decode(Reason.self, forKey: .reason)
         semanticRequest = try container.decodeIfPresent(MarinaSemanticRequest.self, forKey: .semanticRequest)
+        remainingResultCount = try container.decodeIfPresent(Int.self, forKey: .remainingResultCount)
         executionMode = try container.decodeIfPresent(MarinaFollowUpExecutionMode.self, forKey: .executionMode)
             ?? (semanticRequest == nil ? .clarificationRequired : .executable)
     }

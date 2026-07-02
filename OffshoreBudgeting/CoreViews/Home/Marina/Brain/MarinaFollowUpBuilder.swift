@@ -4,10 +4,13 @@ struct MarinaFollowUpBuilder {
     func followUps(
         for context: MarinaAnswerSemanticContext
     ) -> [MarinaFollowUpSuggestion] {
-        guard context.answerKind != .message,
-              context.request.expectedAnswerShape != .clarification,
+        guard context.request.expectedAnswerShape != .clarification,
               context.request.expectedAnswerShape != .unsupported else {
             return []
+        }
+
+        if context.answerKind == .message {
+            return emptyMessageFollowUps(for: context)
         }
 
         var suggestions: [MarinaFollowUpSuggestion] = []
@@ -255,18 +258,23 @@ struct MarinaFollowUpBuilder {
 
     private func listFollowUps(for context: MarinaAnswerSemanticContext) -> [MarinaFollowUpSuggestion] {
         var suggestions: [MarinaFollowUpSuggestion] = []
-        var moreRequest = context.request
-        moreRequest.expectedAnswerShape = .list
-        moreRequest.resultLimit = min(max((context.request.resultLimit ?? context.rowReferences.count) + 5, 10), HomeQuery.maxResultLimit)
-        suggestions.append(
-            suggestion(
-                title: MarinaL10n.string("marina.followUp.list.more.title", defaultValue: "Show more", comment: "Follow-up title for showing more rows."),
-                prompt: MarinaL10n.string("marina.followUp.list.more.prompt", defaultValue: "Show more.", comment: "Follow-up prompt for showing more rows."),
-                reason: .showMore,
-                executionMode: .executable,
-                request: moreRequest
+        let displayedCount = context.displayedRowCount ?? context.rowReferences.count
+        let remainingCount = context.totalRowCount.map { max($0 - displayedCount, 0) }
+        if remainingCount == nil || (remainingCount ?? 0) > 0 {
+            var moreRequest = context.request
+            moreRequest.expectedAnswerShape = .list
+            moreRequest.resultLimit = min(max((context.request.resultLimit ?? displayedCount) + 5, 10), HomeQuery.maxResultLimit)
+            suggestions.append(
+                suggestion(
+                    title: MarinaL10n.string("marina.followUp.list.more.title", defaultValue: "Show more", comment: "Follow-up title for showing more rows."),
+                    prompt: MarinaL10n.string("marina.followUp.list.more.prompt", defaultValue: "Show more.", comment: "Follow-up prompt for showing more rows."),
+                    reason: .showMore,
+                    executionMode: .executable,
+                    request: moreRequest,
+                    remainingResultCount: remainingCount
+                )
             )
-        )
+        }
 
         if shouldOfferPreviousPeriodComparison(for: context) {
             var previousRequest = context.request
@@ -321,6 +329,29 @@ struct MarinaFollowUpBuilder {
         return suggestions
     }
 
+    private func emptyMessageFollowUps(for context: MarinaAnswerSemanticContext) -> [MarinaFollowUpSuggestion] {
+        guard context.request.expectedAnswerShape == .list,
+              context.request.dateRangeToken != .allTime,
+              let target = displayTarget(in: context),
+              isExpenseRequest(context.request) else {
+            return []
+        }
+
+        var allTimeRequest = context.request
+        allTimeRequest.dateRangeToken = .allTime
+        allTimeRequest.expectedAnswerShape = .list
+
+        return [
+            suggestion(
+                title: MarinaL10n.string("marina.followUp.emptyList.allTime.title", defaultValue: "Search all time", comment: "Follow-up title for an all-time empty list search."),
+                prompt: MarinaL10n.format("marina.followUp.emptyList.allTime.promptFormat", defaultValue: "Search all %@ expenses.", comment: "Follow-up prompt for all-time expense search.", target),
+                reason: .searchAllTime,
+                executionMode: .executable,
+                request: allTimeRequest
+            )
+        ]
+    }
+
     // MARK: - Helpers
 
     private func suggestion(
@@ -328,19 +359,30 @@ struct MarinaFollowUpBuilder {
         prompt: String,
         reason: MarinaFollowUpSuggestion.Reason,
         executionMode: MarinaFollowUpExecutionMode,
-        request: MarinaSemanticRequest? = nil
+        request: MarinaSemanticRequest? = nil,
+        remainingResultCount: Int? = nil
     ) -> MarinaFollowUpSuggestion {
         MarinaFollowUpSuggestion(
             title: title,
             prompt: prompt,
             reason: reason,
             executionMode: executionMode,
-            semanticRequest: request
+            semanticRequest: request,
+            remainingResultCount: remainingResultCount
         )
     }
 
     private func displayTarget(in context: MarinaAnswerSemanticContext) -> String? {
-        trimmed(context.request.targetDisplayName) ?? trimmed(context.request.targetName)
+        trimmed(context.request.targetDisplayName) ?? trimmed(context.request.targetName) ?? trimmed(context.request.textQuery)
+    }
+
+    private func isExpenseRequest(_ request: MarinaSemanticRequest) -> Bool {
+        switch request.entity {
+        case .variableExpense, .plannedExpense:
+            return true
+        case .workspace, .budget, .card, .reconciliationAccount, .savingsAccount, .income, .category, .preset:
+            return false
+        }
     }
 
     private func trimmed(_ value: String?) -> String? {

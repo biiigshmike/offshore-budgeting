@@ -52,7 +52,14 @@ struct MarinaUniversalQueryRunner {
 
         switch plan.operation {
         case .list:
-            return .rows(rowEngine.limit(rows, to: plan.limit))
+            return .rowsPage(
+                MarinaUniversalRowsPage(
+                    rows: rowEngine.limit(rows, to: plan.limit),
+                    totalRowCount: rows.count,
+                    fullTotalAmount: fullTotalAmount(for: rows, plan: plan),
+                    displayLimit: plan.limit
+                )
+            )
         case .count:
             return .metric(
                 MarinaUniversalMetricResult(
@@ -146,7 +153,8 @@ struct MarinaUniversalQueryRunner {
                 MarinaUniversalMetricResult(
                     value: metric.value,
                     evidenceRows: metric.evidenceRows,
-                    details: metric.details
+                    details: metric.details,
+                    presentationRows: metric.presentationRows
                 )
             )
         case let .rows(rows):
@@ -203,6 +211,35 @@ struct MarinaUniversalQueryRunner {
             )
         case let .failure(reason):
             return .unsupported(reason)
+        }
+    }
+
+    private func fullTotalAmount(
+        for rows: [MarinaQueryableRow],
+        plan: MarinaUniversalQueryPlan
+    ) -> Double? {
+        guard isExpenseList(plan),
+              let measure = plan.measure,
+              let field = field(for: measure, surface: plan.surface) else {
+            return nil
+        }
+
+        return rows.reduce(0) { partial, row in
+            partial + numericValue(row.fields[field])
+        }
+    }
+
+    private func isExpenseList(_ plan: MarinaUniversalQueryPlan) -> Bool {
+        guard plan.operation == .list else { return false }
+        switch plan.surface {
+        case .unifiedExpenses,
+             .semantic(.variableExpense),
+             .semantic(.plannedExpense):
+            return true
+        case .semantic,
+             .savingsLedgerEntries,
+             .reconciliationLedgerEntries:
+            return false
         }
     }
 
@@ -506,6 +543,19 @@ struct MarinaUniversalQueryRunner {
             }
             return nil
         })
+    }
+
+    private func numericValue(_ value: MarinaValue?) -> Double {
+        switch value {
+        case let .money(value)?:
+            return value
+        case let .number(value)?:
+            return value
+        case let .integer(value)?:
+            return Double(value)
+        case .text, .date, .boolean, .colorHex, .empty, nil:
+            return 0
+        }
     }
 }
 

@@ -98,24 +98,47 @@ nonisolated struct MarinaUniversalQueryPlan: Equatable, Sendable {
 
 nonisolated enum MarinaUniversalQueryResult: Equatable, Sendable {
     case rows([MarinaQueryableRow])
+    case rowsPage(MarinaUniversalRowsPage)
     case metric(MarinaUniversalMetricResult)
     case groups([MarinaUniversalGroupResult])
     case unsupported(MarinaCapabilityFailureReason)
+}
+
+nonisolated struct MarinaUniversalRowsPage: Equatable, Sendable {
+    let rows: [MarinaQueryableRow]
+    let totalRowCount: Int
+    let fullTotalAmount: Double?
+    let displayLimit: Int?
+
+    init(
+        rows: [MarinaQueryableRow],
+        totalRowCount: Int,
+        fullTotalAmount: Double? = nil,
+        displayLimit: Int? = nil
+    ) {
+        self.rows = rows
+        self.totalRowCount = totalRowCount
+        self.fullTotalAmount = fullTotalAmount
+        self.displayLimit = displayLimit
+    }
 }
 
 nonisolated struct MarinaUniversalMetricResult: Equatable, Sendable {
     let value: MarinaValue
     let evidenceRows: [MarinaQueryableRow]
     let details: [MarinaFormulaMetricDetail]
+    let presentationRows: [MarinaFormulaPresentationRow]
 
     init(
         value: MarinaValue,
         evidenceRows: [MarinaQueryableRow],
-        details: [MarinaFormulaMetricDetail] = []
+        details: [MarinaFormulaMetricDetail] = [],
+        presentationRows: [MarinaFormulaPresentationRow] = []
     ) {
         self.value = value
         self.evidenceRows = evidenceRows
         self.details = details
+        self.presentationRows = presentationRows
     }
 }
 

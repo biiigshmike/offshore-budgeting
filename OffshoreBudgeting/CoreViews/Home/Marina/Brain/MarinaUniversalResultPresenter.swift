@@ -3,17 +3,20 @@ import Foundation
 struct MarinaUniversalPresentationContext: Equatable, Sendable {
     let dateRange: HomeQueryDateRange?
     let comparisonDateRange: HomeQueryDateRange?
+    let semanticRequest: MarinaSemanticRequest?
     let now: Date
     let calendar: Calendar
 
     init(
         dateRange: HomeQueryDateRange? = nil,
         comparisonDateRange: HomeQueryDateRange? = nil,
+        semanticRequest: MarinaSemanticRequest? = nil,
         now: Date = Date(),
         calendar: Calendar = .current
     ) {
         self.dateRange = dateRange
         self.comparisonDateRange = comparisonDateRange
+        self.semanticRequest = semanticRequest
         self.now = now
         self.calendar = calendar
     }
@@ -56,6 +59,8 @@ struct MarinaUniversalResultPresenter {
             return .init(executionResult: metricResult(metric, plan: plan, context: context))
         case let .rows(rows):
             return .init(executionResult: rowsResult(rows, plan: plan, context: context))
+        case let .rowsPage(page):
+            return .init(executionResult: rowsPageResult(page, plan: plan, context: context))
         case let .groups(groups):
             return .init(executionResult: groupsResult(groups, plan: plan, context: context))
         case let .unsupported(reason):
@@ -88,7 +93,8 @@ struct MarinaUniversalResultPresenter {
                     MarinaUniversalMetricResult(
                         value: metric.value,
                         evidenceRows: metric.evidenceRows,
-                        details: metric.details
+                        details: metric.details,
+                        presentationRows: metric.presentationRows
                     ),
                     plan: plan,
                     context: context
@@ -109,6 +115,13 @@ struct MarinaUniversalResultPresenter {
         context: MarinaUniversalPresentationContext
     ) -> MarinaExecutionResult {
         let value = formattedMetricValue(metric.value, measure: plan.measure, details: metric.details)
+        let presentationRows = metric.presentationRows.map { presentationRow in
+            HomeAnswerRow(
+                title: presentationRow.title,
+                value: formattedPresentationRowValue(presentationRow),
+                amount: presentationRow.amount
+            )
+        }
         let detailRows = metric.details.map { detail in
             HomeAnswerRow(
                 title: title(for: detail.component),
@@ -116,7 +129,7 @@ struct MarinaUniversalResultPresenter {
                 amount: numericValue(detail.value)
             )
         }
-        let rows = (detailRows.isEmpty ? [
+        let rows = presentationRows + (presentationRows.isEmpty && detailRows.isEmpty ? [
             HomeAnswerRow(
                 title: "Value",
                 value: value,
@@ -128,7 +141,7 @@ struct MarinaUniversalResultPresenter {
 
         return MarinaExecutionResult(
             kind: kind(for: plan),
-            title: title(for: plan),
+            title: title(for: plan, context: context),
             subtitle: subtitle(for: context),
             primaryValue: value,
             rows: rows
@@ -141,14 +154,35 @@ struct MarinaUniversalResultPresenter {
         context: MarinaUniversalPresentationContext
     ) -> MarinaExecutionResult {
         guard rows.isEmpty == false else {
-            return emptyResult(title: title(for: plan), context: context)
+            return emptyResult(plan: plan, context: context)
         }
 
         return MarinaExecutionResult(
             kind: .list,
-            title: title(for: plan),
+            title: title(for: plan, context: context),
             subtitle: subtitle(for: context),
             rows: rows.map { homeAnswerRow(from: $0, plan: plan, role: .result) }
+        )
+    }
+
+    private func rowsPageResult(
+        _ page: MarinaUniversalRowsPage,
+        plan: MarinaUniversalQueryPlan,
+        context: MarinaUniversalPresentationContext
+    ) -> MarinaExecutionResult {
+        guard page.rows.isEmpty == false else {
+            return emptyResult(plan: plan, context: context)
+        }
+
+        return MarinaExecutionResult(
+            kind: .list,
+            title: title(for: plan, context: context),
+            subtitle: listSubtitle(for: page, plan: plan, context: context),
+            primaryValue: page.fullTotalAmount.map(CurrencyFormatter.string(from:)),
+            rows: page.rows.map { homeAnswerRow(from: $0, plan: plan, role: .result) },
+            displayedRowCount: page.rows.count,
+            totalRowCount: page.totalRowCount,
+            fullTotalAmount: page.fullTotalAmount
         )
     }
 
@@ -158,12 +192,12 @@ struct MarinaUniversalResultPresenter {
         context: MarinaUniversalPresentationContext
     ) -> MarinaExecutionResult {
         guard groups.isEmpty == false else {
-            return emptyResult(title: title(for: plan), context: context)
+            return emptyResult(plan: plan, context: context)
         }
 
         return MarinaExecutionResult(
             kind: .list,
-            title: title(for: plan),
+            title: title(for: plan, context: context),
             subtitle: subtitle(for: context),
             rows: groups.map { group in
                 groupRow(
@@ -181,12 +215,12 @@ struct MarinaUniversalResultPresenter {
         context: MarinaUniversalPresentationContext
     ) -> MarinaExecutionResult {
         guard groups.isEmpty == false else {
-            return emptyResult(title: title(for: plan), context: context)
+            return emptyResult(plan: plan, context: context)
         }
 
         return MarinaExecutionResult(
             kind: .list,
-            title: title(for: plan),
+            title: title(for: plan, context: context),
             subtitle: subtitle(for: context),
             rows: groups.map { group in
                 groupRow(
@@ -212,13 +246,13 @@ struct MarinaUniversalResultPresenter {
     }
 
     private func emptyResult(
-        title: String,
+        plan: MarinaUniversalQueryPlan,
         context: MarinaUniversalPresentationContext
     ) -> MarinaExecutionResult {
         MarinaExecutionResult(
             kind: .message,
-            title: title,
-            subtitle: subtitle(for: context) ?? "No results found."
+            title: emptyTitle(for: plan, context: context),
+            subtitle: genericEmptySubtitle(for: plan, context: context)
         )
     }
 
@@ -255,7 +289,15 @@ struct MarinaUniversalResultPresenter {
         )
     }
 
-    private func title(for plan: MarinaUniversalQueryPlan) -> String {
+    private func title(
+        for plan: MarinaUniversalQueryPlan,
+        context: MarinaUniversalPresentationContext
+    ) -> String {
+        if isExpenseList(plan),
+           let target = displayTarget(in: context) {
+            return "\(target) Expenses"
+        }
+
         if let groupBy = plan.groupBy {
             switch groupBy {
             case .relationship(.category):
@@ -280,7 +322,7 @@ struct MarinaUniversalResultPresenter {
         case .remainingRoom:
             return "Remaining Room"
         case .burnRate:
-            return "Burn Rate"
+            return "Budget Pace"
         case .projectedSpend:
             return "Projected Spend"
         case .safeDailySpend:
@@ -299,7 +341,7 @@ struct MarinaUniversalResultPresenter {
         case .categoryAvailability:
             return "Category Availability"
         case .concentration:
-            return "Budget Concentration"
+            return "Category Spend Share"
         case .recurringBurden:
             return "Recurring Burden"
         case .incomeAmount:
@@ -344,10 +386,145 @@ struct MarinaUniversalResultPresenter {
     }
 
     private func subtitle(for context: MarinaUniversalPresentationContext) -> String? {
+        if let label = dateLabel(for: context, capitalization: .title) {
+            return label
+        }
         guard let dateRange = context.dateRange else {
             return nil
         }
         return "\(shortDate(dateRange.startDate)) - \(shortDate(dateRange.endDate))"
+    }
+
+    private func listSubtitle(
+        for page: MarinaUniversalRowsPage,
+        plan: MarinaUniversalQueryPlan,
+        context: MarinaUniversalPresentationContext
+    ) -> String? {
+        guard page.totalRowCount > page.rows.count else {
+            return subtitle(for: context)
+        }
+
+        let noun = expenseNoun(for: context)
+        let date = dateLabel(for: context, capitalization: .sentence).map { " from \($0)" } ?? ""
+        return "Showing \(page.rows.count) of \(page.totalRowCount) \(noun)\(date)."
+    }
+
+    private func emptyTitle(
+        for plan: MarinaUniversalQueryPlan,
+        context: MarinaUniversalPresentationContext
+    ) -> String {
+        guard isExpenseList(plan),
+              let target = displayTarget(in: context) else {
+            return "No results found."
+        }
+
+        let date = emptyDatePhrase(for: context).map { " \($0)" } ?? ""
+        return "I didn't find any \(target) expenses\(date)."
+    }
+
+    private func genericEmptySubtitle(
+        for plan: MarinaUniversalQueryPlan,
+        context: MarinaUniversalPresentationContext
+    ) -> String? {
+        guard isExpenseList(plan),
+              displayTarget(in: context) != nil else {
+            return subtitle(for: context)
+        }
+        return nil
+    }
+
+    private func isExpenseList(_ plan: MarinaUniversalQueryPlan) -> Bool {
+        guard plan.operation == .list else { return false }
+        switch plan.surface {
+        case .unifiedExpenses,
+             .semantic(.variableExpense),
+             .semantic(.plannedExpense):
+            return true
+        case .semantic,
+             .savingsLedgerEntries,
+             .reconciliationLedgerEntries:
+            return false
+        }
+    }
+
+    private func displayTarget(in context: MarinaUniversalPresentationContext) -> String? {
+        trimmed(context.semanticRequest?.targetDisplayName)
+            ?? trimmed(context.semanticRequest?.targetName)
+            ?? trimmed(context.semanticRequest?.textQuery)
+    }
+
+    private func expenseNoun(for context: MarinaUniversalPresentationContext) -> String {
+        guard let target = displayTarget(in: context) else {
+            return "expenses"
+        }
+        return "\(target) expenses"
+    }
+
+    private enum DateLabelCapitalization {
+        case title
+        case sentence
+    }
+
+    private func dateLabel(
+        for context: MarinaUniversalPresentationContext,
+        capitalization: DateLabelCapitalization
+    ) -> String? {
+        guard let token = context.semanticRequest?.dateRangeToken else {
+            return nil
+        }
+
+        let label: String?
+        switch token {
+        case .currentPeriod:
+            label = "this budgeting period"
+        case .previousMonth:
+            label = "last month"
+        case .currentMonth:
+            label = "this month"
+        case .previousPeriod:
+            label = "last budgeting period"
+        case .nextSevenDays:
+            label = "the next seven days"
+        case .allTime:
+            label = "all time"
+        }
+
+        guard let label else { return nil }
+        switch capitalization {
+        case .title:
+            return label.prefix(1).uppercased() + String(label.dropFirst())
+        case .sentence:
+            return label
+        }
+    }
+
+    private func emptyDatePhrase(for context: MarinaUniversalPresentationContext) -> String? {
+        guard let token = context.semanticRequest?.dateRangeToken else {
+            return nil
+        }
+
+        switch token {
+        case .currentPeriod:
+            return "in this budgeting period"
+        case .previousPeriod:
+            return "in last budgeting period"
+        case .currentMonth:
+            return "this month"
+        case .previousMonth:
+            return "last month"
+        case .nextSevenDays:
+            return "in the next seven days"
+        case .allTime:
+            return "all time"
+        }
+    }
+
+    private func trimmed(_ value: String?) -> String? {
+        guard let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines),
+              trimmed.isEmpty == false else {
+            return nil
+        }
+        return trimmed
     }
 
     private func preferredDisplayValue(
@@ -533,6 +710,14 @@ struct MarinaUniversalResultPresenter {
 
     private func formattedDetailValue(_ detail: MarinaFormulaMetricDetail) -> String {
         formattedValue(detail.value, style: detail.style)
+    }
+
+    private func formattedPresentationRowValue(_ row: MarinaFormulaPresentationRow) -> String {
+        let primary = formattedValue(row.primaryValue, style: row.primaryStyle)
+        guard let secondaryValue = row.secondaryValue else {
+            return primary
+        }
+        return "\(primary) - \(formattedValue(secondaryValue, style: row.secondaryStyle))"
     }
 
     private func formattedValue(_ value: MarinaValue, style: MarinaFormulaValueStyle) -> String {

@@ -51,6 +51,31 @@ nonisolated struct MarinaFormulaMetricDetail: Equatable, Sendable {
     }
 }
 
+nonisolated struct MarinaFormulaPresentationRow: Equatable, Sendable {
+    let title: String
+    let primaryValue: MarinaValue
+    let primaryStyle: MarinaFormulaValueStyle
+    let secondaryValue: MarinaValue?
+    let secondaryStyle: MarinaFormulaValueStyle
+    let amount: Double?
+
+    init(
+        title: String,
+        primaryValue: MarinaValue,
+        primaryStyle: MarinaFormulaValueStyle = .automatic,
+        secondaryValue: MarinaValue? = nil,
+        secondaryStyle: MarinaFormulaValueStyle = .automatic,
+        amount: Double? = nil
+    ) {
+        self.title = title
+        self.primaryValue = primaryValue
+        self.primaryStyle = primaryStyle
+        self.secondaryValue = secondaryValue
+        self.secondaryStyle = secondaryStyle
+        self.amount = amount
+    }
+}
+
 struct MarinaBudgetFormulaProgress: Equatable, Sendable {
     let elapsedDays: Int
     let totalDays: Int

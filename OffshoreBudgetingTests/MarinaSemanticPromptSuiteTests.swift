@@ -346,7 +346,7 @@ struct MarinaSemanticPromptSuiteTests {
 
         let burnRate = await answer("What is my burn rate?", using: brain, fixture: fixture)
         #expect(burnRate.kind == .metric)
-        #expect(burnRate.title == "Burn Rate")
+        #expect(burnRate.title == "Budget Pace")
         #expect(burnRate.primaryValue == CurrencyFormatter.string(from: 85.75))
         #expect(burnRate.rows.first(where: { $0.title == "Spent so far" })?.amount == 1_715)
         #expect(burnRate.rows.first(where: { $0.title == "Elapsed days" })?.amount == 20)
@@ -398,7 +398,7 @@ struct MarinaSemanticPromptSuiteTests {
 
         let concentration = await answer("What is eating my budget?", using: brain, fixture: fixture)
         #expect(concentration.kind == .metric)
-        #expect(concentration.title == "Budget Concentration")
+        #expect(concentration.title == "Category Spend Share")
         #expect(concentration.primaryValue == (1_590.0 / 1_805.0).formatted(.percent.precision(.fractionLength(1))))
         #expect(concentration.rows.first(where: { $0.title == "Category" })?.value == "Bills")
         #expect(concentration.rows.first(where: { $0.title == "Category spend" })?.amount == 1_590)
@@ -1748,7 +1748,7 @@ struct MarinaSemanticPromptSuiteTests {
         let concentration = analyzer.insightBundle(
             for: MarinaExecutionResult(
                 kind: .metric,
-                title: "Budget Concentration",
+                title: "Category Spend Share",
                 rows: [
                     HomeAnswerRow(title: "Category", value: "Bills"),
                     HomeAnswerRow(title: "Category spend", value: "$400.00", amount: 400),
@@ -2803,7 +2803,7 @@ struct MarinaSemanticPromptSuiteTests {
 
         let concentration = await seed("What is eating my budget?", using: brain, fixture: fixture)
         #expect(concentration.answer.kind == .metric)
-        #expect(concentration.answer.title == "Budget Concentration")
+        #expect(concentration.answer.title == "Category Spend Share")
         #expect(concentration.answer.rows.contains { $0.title == "Category spend" })
         #expect(concentration.answer.rows.contains { $0.title == "Total spend" })
         #expect(concentration.answer.rows.contains { $0.title == "Concentration" })
@@ -2951,7 +2951,7 @@ struct MarinaSemanticPromptSuiteTests {
         #expect(concentration.debugTrace?.validatorOutput.measure == .concentration)
         #expect(concentration.debugTrace?.validatorOutput.expectedAnswerShape == .metric)
         #expect(concentration.answer.kind == .metric)
-        #expect(concentration.answer.title == "Budget Concentration")
+        #expect(concentration.answer.title == "Category Spend Share")
         #expect(concentration.answer.rows.contains { $0.title == "Category spend" })
         #expect(concentration.answer.rows.contains { $0.title == "Total spend" })
         #expect(concentration.answer.rows.contains { $0.title == "Concentration" })
@@ -3015,7 +3015,7 @@ struct MarinaSemanticPromptSuiteTests {
         #expect(appleCard.debugTrace?.validatorOutput.targetName == "Apple Card")
         #expect(appleCard.debugTrace?.validatorOutput.measure == .budgetImpact)
         #expect(appleCard.answer.kind == .list)
-        #expect(appleCard.answer.title != "Budget Concentration")
+        #expect(appleCard.answer.title != "Category Spend Share")
     }
 
     @Test func semanticContracts_categoryExpenseListsValidateToUnifiedExpenseRows() async throws {
@@ -3366,7 +3366,7 @@ struct MarinaSemanticPromptSuiteTests {
         #expect(more.debugTrace?.interpretedSource == .ruleBased)
         #expect(more.debugTrace?.validatorOutput.targetName == "Food & Drink")
         #expect(more.debugTrace?.validatorOutput.dateRangeToken == .previousMonth)
-        #expect(more.debugTrace?.validatorOutput.resultLimit == 15)
+        #expect(more.debugTrace?.validatorOutput.resultLimit == 13)
         #expect(more.answer.title != "Budget Overview")
         #expect(interpreter.prompts.contains("Show me more.") == false)
     }
@@ -3387,9 +3387,63 @@ struct MarinaSemanticPromptSuiteTests {
         #expect(yes.debugTrace?.interpretedSource == .ruleBased)
         #expect(yes.debugTrace?.validatorOutput.targetName == "Food & Drink")
         #expect(yes.debugTrace?.validatorOutput.dateRangeToken == .previousMonth)
-        #expect(yes.debugTrace?.validatorOutput.resultLimit == 15)
+        #expect(yes.debugTrace?.validatorOutput.resultLimit == 13)
         #expect(yes.answer.title != "Budget Overview")
         #expect(interpreter.prompts.contains("Yes.") == false)
+    }
+
+    @Test func limitedFoodDrinkListKeepsFullTotalStableThroughShowMoreAndSure() async throws {
+        let fixture = try makeFixture(includeStabilizationTargets: true)
+        let interpreter = PromptMappedInterpreter([
+            "Show my Food & Drink expenses from last month.": interpreted(.foundationModel, request: categoryExpenseListAsCategory("Food & Drink", dateRangeToken: .previousMonth)),
+            "Show me more.": interpreted(.foundationModel, request: budgetOverview()),
+            "Sure.": interpreted(.foundationModel, request: budgetOverview())
+        ])
+        let brain = modelBackedBrain(interpreter: interpreter, policy: .internalParityProven)
+
+        let first = await seed("Show my Food & Drink expenses from last month.", using: brain, fixture: fixture)
+        let firstAnswer = first.answer
+        let firstContext = try #require(firstAnswer.semanticContext)
+        let firstFollowUp = try #require(firstAnswer.insightBundle?.followUps.first(where: { $0.reason == .showMore }))
+
+        #expect(firstAnswer.title == "Food & Drink Expenses")
+        #expect(firstAnswer.rows.count == 8)
+        #expect(firstContext.displayedRowCount == 8)
+        #expect(firstContext.totalRowCount == 11)
+        #expect(firstAnswer.subtitle == "Showing 8 of 11 Food & Drink expenses from last month.")
+        #expect(firstAnswer.primaryValue == CurrencyFormatter.string(from: 112))
+        #expect(MarinaRecommendedFollowUp.confirmationQuestion(for: firstFollowUp) == "Want to see the remaining 3?")
+
+        let more = await seed(
+            "Show me more.",
+            using: brain,
+            fixture: fixture,
+            conversationContext: MarinaConversationContext(recentAnswers: [firstAnswer])
+        )
+        let moreAnswer = more.answer
+        let moreIDs = moreAnswer.rows.compactMap(\.sourceID)
+
+        #expect(more.debugTrace?.promptTreatment == .recommendedFollowUpConfirmation)
+        #expect(more.debugTrace?.validatorOutput.resultLimit == 13)
+        #expect(moreAnswer.rows.count == 11)
+        #expect(moreAnswer.primaryValue == firstAnswer.primaryValue)
+        #expect(Set(moreIDs).count == moreIDs.count)
+        #expect(moreAnswer.rows.contains { $0.title == "Burger Spot" })
+        #expect(moreAnswer.rows.contains { $0.title == "Food & Drink Extra 9" })
+
+        let sure = await seed(
+            "Sure.",
+            using: brain,
+            fixture: fixture,
+            conversationContext: MarinaConversationContext(recentAnswers: [firstAnswer])
+        )
+
+        #expect(sure.debugTrace?.promptTreatment == .recommendedFollowUpConfirmation)
+        #expect(sure.debugTrace?.validatorOutput.targetName == "Food & Drink")
+        #expect(sure.debugTrace?.validatorOutput.resultLimit == 13)
+        #expect(sure.answer.primaryValue == firstAnswer.primaryValue)
+        #expect(interpreter.prompts.contains("Show me more.") == false)
+        #expect(interpreter.prompts.contains("Sure.") == false)
     }
 
     @Test func noAfterVisibleShowMore_declinesWithoutModelCall() async throws {
@@ -3878,8 +3932,8 @@ struct MarinaSemanticPromptSuiteTests {
         #expect(food.debugTrace?.promptTreatment == .standalone)
         #expect(food.debugTrace?.validatorOutput.targetName == "Food & Drink")
         #expect(context.lastRecommendedFollowUp?.reason == .showMore)
-        #expect(context.lastRecommendedFollowUp?.semanticRequest?.resultLimit == 15)
-        #expect(context.lastRecommendedFollowUp.map { MarinaRecommendedFollowUp.confirmationQuestion(for: $0) } == "Want to see more rows?")
+        #expect(context.lastRecommendedFollowUp?.semanticRequest?.resultLimit == 13)
+        #expect(context.lastRecommendedFollowUp.map { MarinaRecommendedFollowUp.confirmationQuestion(for: $0) } == "Want to see the remaining 3?")
         return context
     }
 
@@ -3941,7 +3995,7 @@ struct MarinaSemanticPromptSuiteTests {
             dateRangeToken: dateRangeToken,
             targetName: categoryName,
             targetDisplayName: categoryName,
-            resultLimit: 10,
+            resultLimit: 8,
             sort: nil,
             expenseScope: nil,
             expectedAnswerShape: .list
@@ -4395,7 +4449,7 @@ struct MarinaSemanticPromptSuiteTests {
                 return .whatIf
             case .comparePreviousPeriod:
                 return .compare
-            case .showMore, .inspectRows:
+            case .showMore, .inspectRows, .searchAllTime:
                 return .list
             case .breakdown:
                 return .group
@@ -4407,7 +4461,7 @@ struct MarinaSemanticPromptSuiteTests {
             switch reason {
             case .safeDailySpend:
                 return MarinaSemanticMeasure.safeDailySpend
-            case .whatIf, .breakdown, .inspectRows, .showMore:
+            case .whatIf, .breakdown, .inspectRows, .showMore, .searchAllTime:
                 return .budgetImpact
             case .comparePreviousPeriod, .forecast, .nextDue:
                 return .incomeAmount
@@ -4811,6 +4865,18 @@ struct MarinaSemanticPromptSuiteTests {
                 category: foodAndDrink
             )
             : nil
+        let extraFoodAndDrinkRows: [VariableExpense] = includeStabilizationTargets
+            ? (1...9).map { index in
+                VariableExpense(
+                    descriptionText: "Food & Drink Extra \(index)",
+                    amount: Double(index),
+                    transactionDate: date(2026, 3, 17 + index),
+                    workspace: workspace,
+                    card: index.isMultiple(of: 2) ? (debitCard ?? chase) : chase,
+                    category: foodAndDrink
+                )
+            }
+            : []
         let salonVisit = includeStabilizationTargets
             ? VariableExpense(
                 descriptionText: "Salon Visit",
@@ -4931,6 +4997,9 @@ struct MarinaSemanticPromptSuiteTests {
         }
         if let cafe {
             context.insert(cafe)
+        }
+        for row in extraFoodAndDrinkRows {
+            context.insert(row)
         }
         if let salonVisit {
             context.insert(salonVisit)

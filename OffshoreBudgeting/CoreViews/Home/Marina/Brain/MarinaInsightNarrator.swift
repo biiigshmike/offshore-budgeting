@@ -599,7 +599,10 @@ extension MarinaExecutionResult {
             primaryValue: primaryValue,
             rows: rows,
             attachment: attachment,
-            explanation: combined
+            explanation: combined,
+            displayedRowCount: displayedRowCount,
+            totalRowCount: totalRowCount,
+            fullTotalAmount: fullTotalAmount
         )
     }
 }

@@ -196,6 +196,158 @@ struct MarinaUniversalResultPresenterTests {
         #expect(result.executionResult.kind == .message)
     }
 
+    @Test func emptyCategoryListUsesHelpfulMessage() {
+        let request = expenseListRequest(target: "Hair Care", dimensions: [.category])
+        let plan = MarinaUniversalQueryPlan(entity: .variableExpense, operation: .list, measure: .budgetImpact)
+        let result = presenter.presentationResult(
+            for: .rowsPage(MarinaUniversalRowsPage(rows: [], totalRowCount: 0, displayLimit: 8)),
+            plan: plan,
+            context: context(request: request)
+        )
+
+        #expect(result.kind == .message)
+        #expect(result.title == "I didn't find any Hair Care expenses in this budgeting period.")
+    }
+
+    @Test func emptyMerchantListUsesHelpfulMessage() {
+        let request = expenseListRequest(
+            target: "Uber",
+            dimensions: [.merchantText],
+            dateRangeToken: .previousMonth,
+            textQuery: "Uber"
+        )
+        let plan = MarinaUniversalQueryPlan(entity: .variableExpense, operation: .list, measure: .budgetImpact)
+        let result = presenter.presentationResult(
+            for: .rowsPage(MarinaUniversalRowsPage(rows: [], totalRowCount: 0, displayLimit: 8)),
+            plan: plan,
+            context: context(request: request)
+        )
+
+        #expect(result.kind == .message)
+        #expect(result.title == "I didn't find any Uber expenses last month.")
+    }
+
+    @Test func targetListTitlesAreSpecific() {
+        let row = variableExpenseRow(displayName: "Cafe", amount: 12, date: date(2026, 6, 5))
+        let plan = MarinaUniversalQueryPlan(entity: .variableExpense, operation: .list, measure: .budgetImpact)
+
+        let category = presenter.presentationResult(
+            for: .rowsPage(MarinaUniversalRowsPage(rows: [row], totalRowCount: 1, fullTotalAmount: 12, displayLimit: 8)),
+            plan: plan,
+            context: context(request: expenseListRequest(target: "Food & Drink", dimensions: [.category]))
+        )
+        let merchant = presenter.presentationResult(
+            for: .rowsPage(MarinaUniversalRowsPage(rows: [row], totalRowCount: 1, fullTotalAmount: 12, displayLimit: 8)),
+            plan: plan,
+            context: context(request: expenseListRequest(target: "Uber", dimensions: [.merchantText], textQuery: "Uber"))
+        )
+        let card = presenter.presentationResult(
+            for: .rowsPage(MarinaUniversalRowsPage(rows: [row], totalRowCount: 1, fullTotalAmount: 12, displayLimit: 8)),
+            plan: plan,
+            context: context(request: expenseListRequest(target: "Apple Card", dimensions: [.card]))
+        )
+
+        #expect(category.title == "Food & Drink Expenses")
+        #expect(merchant.title == "Uber Expenses")
+        #expect(card.title == "Apple Card Expenses")
+    }
+
+    @Test func limitedListExplainsShownAndTotalCounts() {
+        let rows = (1...8).map { index in
+            variableExpenseRow(displayName: "Cafe \(index)", amount: Double(index), date: date(2026, 6, index))
+        }
+        let plan = MarinaUniversalQueryPlan(entity: .variableExpense, operation: .list, measure: .budgetImpact)
+        let result = presenter.presentationResult(
+            for: .rowsPage(
+                MarinaUniversalRowsPage(
+                    rows: rows,
+                    totalRowCount: 11,
+                    fullTotalAmount: 66,
+                    displayLimit: 8
+                )
+            ),
+            plan: plan,
+            context: context(request: expenseListRequest(target: "Food & Drink", dimensions: [.category], dateRangeToken: .previousMonth))
+        )
+
+        #expect(result.title == "Food & Drink Expenses")
+        #expect(result.subtitle == "Showing 8 of 11 Food & Drink expenses from last month.")
+        #expect(result.primaryValue == CurrencyFormatter.string(from: 66))
+        #expect(result.displayedRowCount == 8)
+        #expect(result.totalRowCount == 11)
+    }
+
+    @Test func formulaTitlesAreSpecific() {
+        let safeDailySpend = presenter.presentationResult(
+            for: .metric(MarinaUniversalMetricResult(value: .money(42), evidenceRows: [])),
+            plan: MarinaUniversalQueryPlan(entity: .budget, operation: .forecast, measure: .safeDailySpend),
+            context: context()
+        )
+        let projectedSpend = presenter.presentationResult(
+            for: .metric(MarinaUniversalMetricResult(value: .money(420), evidenceRows: [])),
+            plan: MarinaUniversalQueryPlan(entity: .budget, operation: .forecast, measure: .projectedSpend),
+            context: context()
+        )
+        let budgetPace = presenter.presentationResult(
+            for: .metric(MarinaUniversalMetricResult(value: .money(14), evidenceRows: [])),
+            plan: MarinaUniversalQueryPlan(entity: .budget, operation: .average, measure: .burnRate),
+            context: context()
+        )
+        let categoryShare = presenter.presentationResult(
+            for: .metric(MarinaUniversalMetricResult(value: .number(0.9), evidenceRows: [])),
+            plan: MarinaUniversalQueryPlan(entity: .category, operation: .share, measure: .concentration),
+            context: context()
+        )
+        let remainingRoom = presenter.presentationResult(
+            for: .metric(MarinaUniversalMetricResult(value: .money(100), evidenceRows: [])),
+            plan: MarinaUniversalQueryPlan(entity: .budget, operation: .forecast, measure: .remainingRoom),
+            context: context()
+        )
+
+        #expect(safeDailySpend.title == "Safe Daily Spend")
+        #expect(projectedSpend.title == "Projected Spend")
+        #expect(budgetPace.title == "Budget Pace")
+        #expect(categoryShare.title == "Category Spend Share")
+        #expect(remainingRoom.title == "Remaining Room")
+    }
+
+    @Test func categorySpendShareIncludesRankedAmountAndPercentRows() {
+        let plan = MarinaUniversalQueryPlan(entity: .category, operation: .share, measure: .concentration)
+        let result = presenter.presentationResult(
+            for: .metric(
+                MarinaUniversalMetricResult(
+                    value: .number(0.907),
+                    evidenceRows: [],
+                    presentationRows: [
+                        MarinaFormulaPresentationRow(
+                            title: "Bills & Utilities",
+                            primaryValue: .money(2_410.94),
+                            primaryStyle: .money,
+                            secondaryValue: .number(0.907),
+                            secondaryStyle: .percent,
+                            amount: 2_410.94
+                        ),
+                        MarinaFormulaPresentationRow(
+                            title: "Shopping",
+                            primaryValue: .money(140.13),
+                            primaryStyle: .money,
+                            secondaryValue: .number(0.053),
+                            secondaryStyle: .percent,
+                            amount: 140.13
+                        )
+                    ]
+                )
+            ),
+            plan: plan,
+            context: context()
+        )
+
+        #expect(result.title == "Category Spend Share")
+        #expect(Array(result.rows.map(\.title).prefix(2)) == ["Bills & Utilities", "Shopping"])
+        #expect(result.rows.first?.value == "\(CurrencyFormatter.string(from: 2_410.94)) - \(0.907.formatted(.percent.precision(.fractionLength(1))))")
+        #expect(result.rows.dropFirst().first?.value == "\(CurrencyFormatter.string(from: 140.13)) - \(0.053.formatted(.percent.precision(.fractionLength(1))))")
+    }
+
     private func variableExpenseRow(displayName: String, amount: Double, date: Date) -> MarinaQueryableRow {
         MarinaQueryableRow(
             id: UUID(),
@@ -233,6 +385,36 @@ struct MarinaUniversalResultPresenterTests {
             dateRange: HomeQueryDateRange(startDate: date(2026, 6, 1), endDate: date(2026, 6, 30)),
             now: date(2026, 6, 15),
             calendar: calendar
+        )
+    }
+
+    private func context(request: MarinaSemanticRequest) -> MarinaUniversalPresentationContext {
+        MarinaUniversalPresentationContext(
+            dateRange: HomeQueryDateRange(startDate: date(2026, 6, 1), endDate: date(2026, 6, 30)),
+            semanticRequest: request,
+            now: date(2026, 6, 15),
+            calendar: calendar
+        )
+    }
+
+    private func expenseListRequest(
+        target: String,
+        dimensions: [MarinaSemanticDimension],
+        dateRangeToken: MarinaSemanticDateRangeToken = .currentPeriod,
+        textQuery: String? = nil
+    ) -> MarinaSemanticRequest {
+        MarinaSemanticRequest(
+            entity: .variableExpense,
+            operation: .list,
+            measure: .budgetImpact,
+            dimensions: dimensions,
+            dateRangeToken: dateRangeToken,
+            targetName: textQuery == nil ? target : nil,
+            textQuery: textQuery,
+            targetDisplayName: target,
+            resultLimit: 8,
+            expenseScope: .unified,
+            expectedAnswerShape: .list
         )
     }
 

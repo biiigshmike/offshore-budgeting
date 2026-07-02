@@ -110,6 +110,7 @@ struct MarinaUniversalRoutingHarness {
             context: MarinaUniversalPresentationContext(
                 dateRange: universalPlan.dateRange ?? plan.dateRange,
                 comparisonDateRange: universalPlan.comparisonDateRange ?? plan.comparisonDateRange,
+                semanticRequest: request,
                 now: context.now,
                 calendar: context.calendar
             )

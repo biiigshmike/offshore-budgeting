@@ -50,7 +50,13 @@ enum MarinaRecommendedFollowUp {
         case .inspectRows:
             return MarinaL10n.string("marina.followUp.confirmation.inspectRows", defaultValue: "Want to see the biggest expenses behind this?", comment: "Confirmation question for expense row follow-up.")
         case .showMore:
+            if let remaining = followUp.remainingResultCount, remaining > 0 {
+                return MarinaL10n.format("marina.followUp.confirmation.showRemainingFormat", defaultValue: "Want to see the remaining %d?", comment: "Confirmation question for showing remaining rows.", remaining)
+            }
             return MarinaL10n.string("marina.followUp.confirmation.showMore", defaultValue: "Want to see more rows?", comment: "Confirmation question for showing more rows.")
+        case .searchAllTime:
+            let target = targetName(in: followUp) ?? MarinaL10n.string("marina.followUp.confirmation.allExpensesFallback", defaultValue: "these", comment: "Fallback target for all-time expense search follow-up.")
+            return MarinaL10n.format("marina.followUp.confirmation.searchAllTimeFormat", defaultValue: "Want me to search all %@ expenses instead?", comment: "Confirmation question for all-time expense search follow-up.", target)
         case .forecast:
             return forecastQuestion(for: followUp)
         case .nextDue:
@@ -199,6 +205,8 @@ enum MarinaRecommendedFollowUp {
             return 6
         case .nextDue:
             return 7
+        case .searchAllTime:
+            return 8
         }
     }
 

@@ -285,7 +285,7 @@ struct MarinaUniversalRoutingHarnessTests {
         let universal = try fixture.requireUniversalAttempt(for: request)
 
         #expect(universal.result.kind == .metric)
-        #expect(universal.result.title == "Burn Rate")
+        #expect(universal.result.title == "Budget Pace")
         #expect(universal.diagnostics.scenario == .budgetBurnRate)
         try expectRowAmount(universal.result, title: "Average per day", equals: 440.0 / 15.0)
     }
@@ -346,7 +346,7 @@ struct MarinaUniversalRoutingHarnessTests {
         try expectRowAmount(availability.result, title: "Categories", equals: 2)
 
         #expect(concentration.result.kind == .metric)
-        #expect(concentration.result.title == "Budget Concentration")
+        #expect(concentration.result.title == "Category Spend Share")
         #expect(concentration.diagnostics.scenario == .categoryConcentration)
         try expectRowAmount(concentration.result, title: "Concentration", equals: 1_200.0 / 1_738.0)
     }

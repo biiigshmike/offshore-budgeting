@@ -587,11 +587,11 @@ struct MarinaQueryExecutor {
         switch measure {
         case .burnRate:
             guard let burnRate = MarinaBudgetFormulaCalculator.burnRate(actualSpend: actualSpend, elapsedDays: progress.elapsedDays) else {
-                return noFormulaResult(title: MarinaL10n.string("marina.answer.burnRate.title", defaultValue: "Burn Rate", comment: "Marina answer title for burn rate."))
+                return noFormulaResult(title: MarinaL10n.string("marina.answer.burnRate.title", defaultValue: "Budget Pace", comment: "Marina answer title for budget pace."))
             }
             return MarinaExecutionResult(
                 kind: .metric,
-                title: MarinaL10n.string("marina.answer.burnRate.title", defaultValue: "Burn Rate", comment: "Marina answer title for burn rate."),
+                title: MarinaL10n.string("marina.answer.burnRate.title", defaultValue: "Budget Pace", comment: "Marina answer title for budget pace."),
                 subtitle: rangeLabel(range),
                 primaryValue: currency(burnRate),
                 rows: [
@@ -741,15 +741,32 @@ struct MarinaQueryExecutor {
                 partTotal: selected.total,
                 wholeTotal: wholeTotal
               ) else {
-            return noFormulaResult(title: MarinaL10n.string("marina.answer.concentration.title", defaultValue: "Budget Concentration", comment: "Marina answer title for budget concentration."))
+            return noFormulaResult(title: MarinaL10n.string("marina.answer.concentration.title", defaultValue: "Category Spend Share", comment: "Marina answer title for category spend share."))
         }
+
+        let rankedRows = totals
+            .sorted { left, right in left.value > right.value }
+            .prefix(plan.resultLimit)
+            .compactMap { name, total -> HomeAnswerRow? in
+                guard let share = MarinaBudgetFormulaCalculator.concentration(
+                    partTotal: total,
+                    wholeTotal: wholeTotal
+                ) else {
+                    return nil
+                }
+                return HomeAnswerRow(
+                    title: name,
+                    value: "\(currency(total)) - \(percent(share))",
+                    amount: total
+                )
+            }
 
         return MarinaExecutionResult(
             kind: .metric,
-            title: MarinaL10n.string("marina.answer.concentration.title", defaultValue: "Budget Concentration", comment: "Marina answer title for budget concentration."),
+            title: MarinaL10n.string("marina.answer.concentration.title", defaultValue: "Category Spend Share", comment: "Marina answer title for category spend share."),
             subtitle: rangeLabel(plan.dateRange),
             primaryValue: percent(concentration),
-            rows: [
+            rows: rankedRows + [
                 HomeAnswerRow(title: MarinaL10n.common("category", defaultValue: "Category", comment: "Common label for category."), value: selected.name),
                 HomeAnswerRow(title: MarinaL10n.string("marina.answer.row.categorySpend", defaultValue: "Category spend", comment: "Row label for category spend."), value: currency(selected.total), amount: selected.total),
                 HomeAnswerRow(title: MarinaL10n.string("marina.answer.row.totalSpend", defaultValue: "Total spend", comment: "Row label for total spend."), value: currency(wholeTotal), amount: wholeTotal),
