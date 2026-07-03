@@ -268,9 +268,10 @@ struct MarinaBrain {
             )
         )
         let insightBundle = memoryFilteredBundle.isEmpty ? nil : memoryFilteredBundle
+        let displayResult = resultWithTypedRecommendedFollowUp(result, insightBundle: insightBundle)
         let insightContext = MarinaInsightContext(
             prompt: prompt,
-            result: result,
+            result: displayResult,
             plan: queryPlan,
             insightBundle: insightBundle
         )
@@ -294,17 +295,17 @@ struct MarinaBrain {
             universalScenario: execution.universalDiagnostics?.scenario,
             universalFallbackReason: execution.universalDiagnostics?.fallbackReason,
             universalNotes: execution.universalDiagnostics?.notes ?? [],
-            rowCount: result.rows.count,
-            evidenceRowSummaries: evidenceRowSummaries(from: result.rows),
-            answerKind: result.kind,
-            answerTitle: result.title,
-            answerPrimaryValue: result.primaryValue,
+            rowCount: displayResult.rows.count,
+            evidenceRowSummaries: evidenceRowSummaries(from: displayResult.rows),
+            answerKind: displayResult.kind,
+            answerTitle: displayResult.title,
+            answerPrimaryValue: displayResult.primaryValue,
             narrationRequested: narratableContext != nil
         )
         let debugTrace = debugTraceIfNeeded(trace: structuredTrace)
         let seedResult = narratableContext == nil
-            ? result.withAppendingExplanation(debugTrace)
-            : result
+            ? displayResult.withAppendingExplanation(debugTrace)
+            : displayResult
         let answer = presenter.present(
             result: seedResult,
             prompt: prompt,
@@ -317,6 +318,41 @@ struct MarinaBrain {
             insightContext: narratableContext,
             finalExplanationSuffix: narratableContext == nil ? nil : debugTrace,
             debugTrace: structuredTrace
+        )
+    }
+
+    private func resultWithTypedRecommendedFollowUp(
+        _ result: MarinaExecutionResult,
+        insightBundle: MarinaInsightBundle?
+    ) -> MarinaExecutionResult {
+        guard result.kind == .message,
+              let followUp = MarinaRecommendedFollowUp.suggestion(from: insightBundle?.followUps ?? []) else {
+            return result
+        }
+
+        let question = MarinaRecommendedFollowUp.confirmationQuestion(for: followUp)
+        let existingExplanation = result.explanation?.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard question.isEmpty == false,
+              existingExplanation?.range(of: question, options: [.caseInsensitive, .diacriticInsensitive]) == nil else {
+            return result
+        }
+
+        let explanation = [existingExplanation, question]
+            .compactMap { $0 }
+            .filter { $0.isEmpty == false }
+            .joined(separator: " ")
+
+        return MarinaExecutionResult(
+            kind: result.kind,
+            title: result.title,
+            subtitle: result.subtitle,
+            primaryValue: result.primaryValue,
+            rows: result.rows,
+            attachment: result.attachment,
+            explanation: explanation.isEmpty ? result.explanation : explanation,
+            displayedRowCount: result.displayedRowCount,
+            totalRowCount: result.totalRowCount,
+            fullTotalAmount: result.fullTotalAmount
         )
     }
 

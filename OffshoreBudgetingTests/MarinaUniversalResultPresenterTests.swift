@@ -206,7 +206,11 @@ struct MarinaUniversalResultPresenterTests {
         )
 
         #expect(result.kind == .message)
-        #expect(result.title == "I didn't find any Hair Care expenses in this budgeting period.")
+        #expect(result.title == "Hair Care Expenses")
+        #expect(result.subtitle == "This budgeting period")
+        #expect(result.primaryValue == "No expenses found")
+        #expect(result.explanation == "I didn't find any Hair Care expenses in this budgeting period.")
+        #expect(result.rows.isEmpty)
     }
 
     @Test func emptyMerchantListUsesHelpfulMessage() {
@@ -224,7 +228,11 @@ struct MarinaUniversalResultPresenterTests {
         )
 
         #expect(result.kind == .message)
-        #expect(result.title == "I didn't find any Uber expenses last month.")
+        #expect(result.title == "Uber Expenses")
+        #expect(result.subtitle == "Last month")
+        #expect(result.primaryValue == "No expenses found")
+        #expect(result.explanation == "I didn't find any Uber expenses last month.")
+        #expect(result.rows.isEmpty)
     }
 
     @Test func targetListTitlesAreSpecific() {
@@ -397,16 +405,16 @@ struct MarinaUniversalResultPresenterTests {
         #expect(result.rows.contains { $0.title == "April 2026" } == false)
     }
 
-    @Test func projectedSpendFormulaCardShowsPaceProjectionRowsOnly() {
+    @Test func projectedSpendFormulaCardShowsBudgetAwareRowsOnly() {
         let result = presenter.presentationResult(
             for: .metric(
                 MarinaUniversalMetricResult(
-                    value: .money(15_717.72),
+                    value: .money(1_611.07),
                     evidenceRows: [budgetEvidenceRow(displayName: "March 2026")],
                     details: [
-                        .init(.spentSoFar, value: .money(1_521.07), style: .money),
-                        .init(.averagePerDay, value: .money(507.02), style: .money),
-                        .init(.projectedTotal, value: .money(15_717.72), style: .money)
+                        .init(.actualSpendSoFar, value: .money(1_521.07), style: .money),
+                        .init(.plannedSpendingRemaining, value: .money(90), style: .money),
+                        .init(.projectedSpend, value: .money(1_611.07), style: .money)
                     ]
                 )
             ),
@@ -414,8 +422,10 @@ struct MarinaUniversalResultPresenterTests {
             context: context()
         )
 
-        #expect(result.rows.map(\.title) == ["Spent so far", "Average per day", "Projected total"])
+        #expect(result.rows.map(\.title) == ["Actual spend so far", "Planned spending remaining", "Projected spend"])
         #expect(result.rows.contains { $0.title == "March 2026" } == false)
+        #expect(result.rows.contains { $0.title == "Average per day" } == false)
+        #expect(result.rows.contains { $0.title == "Projected total" } == false)
     }
 
     @Test func categorySpendShareIncludesRankedAmountAndPercentRows() {

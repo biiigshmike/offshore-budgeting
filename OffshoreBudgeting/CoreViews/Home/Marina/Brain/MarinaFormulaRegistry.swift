@@ -245,19 +245,7 @@ struct MarinaFormulaRegistry: Sendable {
             return .unsupported(.missingDateField)
         }
 
-        let summary = SafeSpendTodayCalculator.calculate(
-            budgetingPeriod: budgetingPeriod(for: dateRange),
-            rangeStart: dateRange.startDate,
-            rangeEnd: dateRange.endDate,
-            budgets: snapshot.budgets,
-            categories: snapshot.categories,
-            incomes: snapshot.incomes,
-            plannedExpenses: snapshot.homeCalculationPlannedExpenses,
-            variableExpenses: snapshot.homeCalculationVariableExpenses,
-            savingsEntries: snapshot.savingsEntries,
-            now: now,
-            calendar: calendar
-        )
+        let summary = safeSpendSummary(dateRange: dateRange, snapshot: snapshot)
         let value: Double
         switch request.measure {
         case .remainingRoom:
@@ -293,6 +281,25 @@ struct MarinaFormulaRegistry: Sendable {
                 details: safeSpendDetails(summary),
                 presentationRows: safeSpendPresentationRows(summary, measure: request.measure)
             )
+        )
+    }
+
+    private func safeSpendSummary(
+        dateRange: HomeQueryDateRange,
+        snapshot: MarinaWorkspaceSnapshot
+    ) -> SafeSpendTodayCalculator.Summary {
+        SafeSpendTodayCalculator.calculate(
+            budgetingPeriod: budgetingPeriod(for: dateRange),
+            rangeStart: dateRange.startDate,
+            rangeEnd: dateRange.endDate,
+            budgets: snapshot.budgets,
+            categories: snapshot.categories,
+            incomes: snapshot.incomes,
+            plannedExpenses: snapshot.homeCalculationPlannedExpenses,
+            variableExpenses: snapshot.homeCalculationVariableExpenses,
+            savingsEntries: snapshot.savingsEntries,
+            now: now,
+            calendar: calendar
         )
     }
 
@@ -397,25 +404,19 @@ struct MarinaFormulaRegistry: Sendable {
             )
 
         case .projectedSpend:
-            guard let burnRate = MarinaBudgetFormulaCalculator.burnRate(
-                actualSpend: inputs.actualSpendToDate,
-                elapsedDays: inputs.progress.elapsedDays
-            ),
-                  let projectedSpend = MarinaBudgetFormulaCalculator.projectedSpend(
-                    burnRate: burnRate,
-                    totalDays: inputs.progress.totalDays
-                  ) else {
-                return .unsupported(.unsupportedCombination)
-            }
+            let summary = safeSpendSummary(dateRange: dateRange, snapshot: snapshot)
+            let projectedSpend = summary.actualSpendSoFar + summary.plannedSpendingRemaining
             return metric(
                 value: .money(projectedSpend),
                 request: request,
                 evidenceRows: evidenceRows,
                 details: [
-                    .init(.spentSoFar, value: .money(inputs.actualSpendToDate), style: .money),
-                    .init(.averagePerDay, value: .money(burnRate), style: .money),
-                    .init(.projectedTotal, value: .money(projectedSpend), style: .money)
-                ]
+                    .init(.period, value: .text(periodLabel(start: summary.rangeStart, end: summary.rangeEnd))),
+                    .init(.actualSpendSoFar, value: .money(summary.actualSpendSoFar), style: .money),
+                    .init(.plannedSpendingRemaining, value: .money(summary.plannedSpendingRemaining), style: .money),
+                    .init(.projectedSpend, value: .money(projectedSpend), style: .money)
+                ],
+                source: .safeSpendTodayCalculator
             )
 
         case .paceDifference:

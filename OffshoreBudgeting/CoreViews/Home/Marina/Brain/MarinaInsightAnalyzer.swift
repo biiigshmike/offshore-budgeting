@@ -164,24 +164,13 @@ struct MarinaInsightAnalyzer {
                 )
             ]
         case .projectedSpend:
-            var signals: [MarinaInsightSignal] = []
-            if elapsedDays(for: plan) <= 3 {
-                signals.append(
-                    MarinaInsightSignal(
-                        kind: .caution,
-                        title: MarinaL10n.string("marina.insight.signal.projectedSpend.early.title", defaultValue: "Projection is early", comment: "Insight signal title for early-period projected spend."),
-                        detail: MarinaL10n.string("marina.insight.signal.projectedSpend.early.detail", defaultValue: "This projection is based on only the first few elapsed days, so it can swing a lot.", comment: "Insight signal detail for early-period projected spend.")
-                    )
-                )
-            }
-            signals.append(
+            return [
                 MarinaInsightSignal(
                     kind: .context,
-                    title: MarinaL10n.string("marina.insight.signal.projectedSpend.title", defaultValue: "Projection uses current pace", comment: "Insight signal title for projected spend."),
-                    detail: MarinaL10n.string("marina.insight.signal.projectedSpend.detail", defaultValue: "This projection is based on the average daily spend from the selected period so far.", comment: "Insight signal detail for projected spend.")
+                    title: MarinaL10n.string("marina.insight.signal.projectedSpend.title", defaultValue: "Projection uses planned remaining spend", comment: "Insight signal title for projected spend."),
+                    detail: MarinaL10n.string("marina.insight.signal.projectedSpend.detail", defaultValue: "This adds actual spend so far to planned spending still remaining in the selected period.", comment: "Insight signal detail for projected spend.")
                 )
-            )
-            return signals
+            ]
         case .burnRate:
             return [
                 MarinaInsightSignal(
@@ -317,7 +306,7 @@ struct MarinaInsightAnalyzer {
         case .concentration:
             return MarinaL10n.string("marina.insight.meaning.concentration", defaultValue: "This shows how much of total spending is concentrated in one category.", comment: "Meaning sentence for category concentration.")
         case .projectedSpend:
-            return MarinaL10n.string("marina.insight.meaning.projectedSpend", defaultValue: "This projects total spending from the current daily pace in the selected period.", comment: "Meaning sentence for projected spend.")
+            return MarinaL10n.string("marina.insight.meaning.projectedSpend", defaultValue: "This projects total spending from actual spend so far plus planned spending still remaining in the selected period.", comment: "Meaning sentence for projected spend.")
         case .burnRate:
             return MarinaL10n.string("marina.insight.meaning.burnRate", defaultValue: "This shows average daily spending based on the selected period so far.", comment: "Meaning sentence for burn rate.")
         case .amount, .plannedAmount, .actualAmount, .effectiveAmount, .budgetImpact, .savingsTotal, .incomeAmount, .reconciliationBalance, .categoryAvailability, .remainingRoom, .color, .name:
@@ -329,17 +318,6 @@ struct MarinaInsightAnalyzer {
         result.rows.first { row in
             row.title.localizedCaseInsensitiveCompare(title) == .orderedSame
         }?.amount
-    }
-
-    private func elapsedDays(for plan: MarinaQueryPlan) -> Int {
-        guard let range = plan.dateRange else { return Int.max }
-        let calendar = Calendar.current
-        let rangeStart = calendar.startOfDay(for: range.startDate)
-        let rangeEnd = calendar.startOfDay(for: range.endDate)
-        let today = calendar.startOfDay(for: plan.now)
-        guard today >= rangeStart else { return 0 }
-        let clampedToday = min(today, rangeEnd)
-        return max(1, (calendar.dateComponents([.day], from: rangeStart, to: clampedToday).day ?? 0) + 1)
     }
 
     private func uniqued(_ signals: [MarinaInsightSignal]) -> [MarinaInsightSignal] {

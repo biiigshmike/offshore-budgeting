@@ -334,7 +334,7 @@ struct MarinaFollowUpBuilder {
 
     private func emptyMessageFollowUps(for context: MarinaAnswerSemanticContext) -> [MarinaFollowUpSuggestion] {
         guard context.request.expectedAnswerShape == .list,
-              context.request.dateRangeToken != .allTime,
+              context.request.dateRangeToken == .currentPeriod || context.request.dateRangeToken == .currentMonth,
               let target = displayTarget(in: context),
               isExpenseRequest(context.request) else {
             return []

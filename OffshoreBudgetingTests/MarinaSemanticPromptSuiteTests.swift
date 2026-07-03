@@ -341,8 +341,8 @@ struct MarinaSemanticPromptSuiteTests {
         #expect(MarinaBudgetFormulaCalculator.burnRate(actualSpend: 1_715, elapsedDays: 20) == 85.75)
         #expect(MarinaBudgetFormulaCalculator.burnRate(actualSpend: 1_715, elapsedDays: 0) == nil)
 
-        #expect(MarinaBudgetFormulaCalculator.projectedSpend(burnRate: 85.75, totalDays: 30) == 2_572.5)
-        #expect(MarinaBudgetFormulaCalculator.projectedSpend(burnRate: 85.75, totalDays: 0) == nil)
+        #expect(MarinaBudgetFormulaCalculator.currentPaceProjection(burnRate: 85.75, totalDays: 30) == 2_572.5)
+        #expect(MarinaBudgetFormulaCalculator.currentPaceProjection(burnRate: 85.75, totalDays: 0) == nil)
 
         let safeDailySpend = try #require(MarinaBudgetFormulaCalculator.safeDailySpend(remainingRoom: 1_295, remainingDays: 11))
         #expect(abs(safeDailySpend - 117.72727272727273) < 0.0001)
@@ -379,10 +379,12 @@ struct MarinaSemanticPromptSuiteTests {
         let projectedSpend = await answer("Where will I end up on projected spend?", using: brain, fixture: fixture)
         #expect(projectedSpend.kind == .metric)
         #expect(projectedSpend.title == "Projected Spend")
-        #expect(projectedSpend.primaryValue == CurrencyFormatter.string(from: 2_572.5))
-        #expect(projectedSpend.rows.first(where: { $0.title == "Spent so far" })?.amount == 1_715)
-        #expect(projectedSpend.rows.first(where: { $0.title == "Average per day" })?.amount == 85.75)
-        #expect(projectedSpend.rows.first(where: { $0.title == "Projected total" })?.amount == 2_572.5)
+        #expect(projectedSpend.primaryValue == CurrencyFormatter.string(from: 1_805))
+        #expect(projectedSpend.rows.first(where: { $0.title == "Actual spend so far" })?.amount == 1_715)
+        #expect(projectedSpend.rows.first(where: { $0.title == "Planned spending remaining" })?.amount == 90)
+        #expect(projectedSpend.rows.first(where: { $0.title == "Projected spend" })?.amount == 1_805)
+        #expect(projectedSpend.rows.contains { $0.title == "Average per day" } == false)
+        #expect(projectedSpend.rows.contains { $0.title == "Projected total" } == false)
 
         let safeDailySpend = await answer("What can I spend per day?", using: brain, fixture: fixture)
         #expect(safeDailySpend.kind == .metric)
@@ -1331,6 +1333,67 @@ struct MarinaSemanticPromptSuiteTests {
         #expect(comparisonFollowUps.contains { $0.title == "Show more" })
     }
 
+    @Test func followUpBuilder_emptyMessageRequiresCurrentPeriodExpenseTargetForPreviousPeriodSuggestion() throws {
+        let noTargetContext = MarinaAnswerSemanticContext(
+            request: MarinaSemanticRequest(
+                entity: .variableExpense,
+                operation: .list,
+                measure: .budgetImpact,
+                dateRangeToken: .currentPeriod,
+                expectedAnswerShape: .list
+            ),
+            dateRange: HomeQueryDateRange(startDate: date(2026, 4, 1), endDate: date(2026, 4, 30)),
+            comparisonDateRange: nil,
+            answerKind: .message,
+            answerTitle: "No results found.",
+            answerSubtitle: nil,
+            primaryValue: nil,
+            rowReferences: []
+        )
+        let previousMonthContext = MarinaAnswerSemanticContext(
+            request: MarinaSemanticRequest(
+                entity: .variableExpense,
+                operation: .list,
+                measure: .budgetImpact,
+                dimensions: [.category],
+                dateRangeToken: .previousMonth,
+                targetName: "Hair Care",
+                expenseScope: .unified,
+                expectedAnswerShape: .list
+            ),
+            dateRange: HomeQueryDateRange(startDate: date(2026, 3, 1), endDate: date(2026, 3, 31)),
+            comparisonDateRange: nil,
+            answerKind: .message,
+            answerTitle: "I didn't find any Hair Care expenses last month.",
+            answerSubtitle: nil,
+            primaryValue: nil,
+            rowReferences: []
+        )
+        let allTimeContext = MarinaAnswerSemanticContext(
+            request: MarinaSemanticRequest(
+                entity: .variableExpense,
+                operation: .list,
+                measure: .budgetImpact,
+                dimensions: [.merchantText],
+                dateRangeToken: .allTime,
+                textQuery: "Uber",
+                expenseScope: .unified,
+                expectedAnswerShape: .list
+            ),
+            dateRange: nil,
+            comparisonDateRange: nil,
+            answerKind: .message,
+            answerTitle: "I didn't find any Uber expenses.",
+            answerSubtitle: nil,
+            primaryValue: nil,
+            rowReferences: []
+        )
+
+        #expect(MarinaFollowUpBuilder().followUps(for: noTargetContext).isEmpty)
+        #expect(MarinaFollowUpBuilder().followUps(for: previousMonthContext).contains { $0.reason == .comparePreviousPeriod } == false)
+        #expect(MarinaFollowUpBuilder().followUps(for: allTimeContext).contains { $0.reason == .comparePreviousPeriod } == false)
+    }
+
     @Test func followUpBuilder_groupedSpendListsSeparateShowMoreFromExpenseDrillDown() throws {
         let context = MarinaAnswerSemanticContext(
             request: MarinaSemanticRequest(
@@ -1775,17 +1838,17 @@ struct MarinaSemanticPromptSuiteTests {
                 kind: .metric,
                 title: "Projected Spend",
                 rows: [
-                    HomeAnswerRow(title: "Spent so far", value: "$1,521.07", amount: 1_521.07),
-                    HomeAnswerRow(title: "Average per day", value: "$507.02", amount: 507.02),
-                    HomeAnswerRow(title: "Projected total", value: "$15,717.72", amount: 15_717.72)
+                    HomeAnswerRow(title: "Actual spend so far", value: "$1,521.07", amount: 1_521.07),
+                    HomeAnswerRow(title: "Planned spending remaining", value: "$90.00", amount: 90),
+                    HomeAnswerRow(title: "Projected spend", value: "$1,611.07", amount: 1_611.07)
                 ]
             ),
             plan: formulaPlan(entity: .budget, operation: .forecast, measure: .projectedSpend, now: date(2026, 4, 3))
         )
-        #expect(earlyProjectedSpend.meaning == "This projects total spending from the current daily pace in the selected period.")
-        #expect(earlyProjectedSpend.signals.contains(where: { $0.kind == .caution && $0.title == "Projection is early" }))
-        #expect(earlyProjectedSpend.signals.contains(where: { $0.detail == "This projection is based on only the first few elapsed days, so it can swing a lot." }))
-        #expect(earlyProjectedSpend.signals.contains(where: { $0.title == "Projection uses current pace" }))
+        #expect(earlyProjectedSpend.meaning == "This projects total spending from actual spend so far plus planned spending still remaining in the selected period.")
+        #expect(earlyProjectedSpend.signals.contains(where: { $0.kind == .caution && $0.title == "Projection is early" }) == false)
+        #expect(earlyProjectedSpend.signals.contains(where: { $0.title == "Projection uses planned remaining spend" }))
+        #expect(earlyProjectedSpend.signals.contains(where: { $0.detail == "This adds actual spend so far to planned spending still remaining in the selected period." }))
 
         let coverageShort = analyzer.insightBundle(
             for: MarinaExecutionResult(
@@ -3147,7 +3210,14 @@ struct MarinaSemanticPromptSuiteTests {
         let followUp = try #require(empty.answer.insightBundle?.followUps.first)
 
         #expect(empty.answer.kind == .message)
-        #expect(empty.answer.title == "I didn't find any Hair Care expenses in this budgeting period.")
+        #expect(empty.answer.title == "Hair Care Expenses")
+        #expect(empty.answer.subtitle == "This budgeting period")
+        #expect(empty.answer.primaryValue == "No expenses found")
+        #expect(empty.answer.rows.isEmpty)
+        #expect(empty.answer.explanation == "I didn't find any Hair Care expenses in this budgeting period. Want me to check last period?")
+        #expect(empty.answer.title.contains("Want me") == false)
+        #expect(empty.answer.subtitle?.contains("Want me") != true)
+        #expect(empty.answer.primaryValue?.contains("Want me") != true)
         #expect(followUp.reason == .comparePreviousPeriod)
         #expect(followUp.executionMode == .executable)
         #expect(followUp.semanticRequest?.dateRangeToken == .previousPeriod)
@@ -3165,7 +3235,10 @@ struct MarinaSemanticPromptSuiteTests {
         #expect(confirmed.debugTrace?.validatorOutput.dateRangeToken == .previousPeriod)
         #expect(confirmed.debugTrace?.validatorOutput.targetName == "Hair Care")
         #expect(confirmed.answer.kind == .message)
-        #expect(confirmed.answer.title == "I didn't find any Hair Care expenses in last budgeting period.")
+        #expect(confirmed.answer.title == "Hair Care Expenses")
+        #expect(confirmed.answer.subtitle == "Last budgeting period")
+        #expect(confirmed.answer.primaryValue == "No expenses found")
+        #expect(confirmed.answer.explanation == "I didn't find any Hair Care expenses in last budgeting period.")
 
         let sure = await seed(
             "Sure",
@@ -3179,6 +3252,19 @@ struct MarinaSemanticPromptSuiteTests {
         #expect(sure.debugTrace?.validatorOutput.targetName == "Hair Care")
         #expect(sure.debugTrace?.interpretedSource == .ruleBased)
         #expect(interpreter.prompts.contains("Sure") == false)
+
+        let checkLastPeriod = await seed(
+            "Check last period",
+            using: brain,
+            fixture: fixture,
+            conversationContext: MarinaConversationContext(recentAnswers: [empty.answer])
+        )
+
+        #expect(checkLastPeriod.debugTrace?.promptTreatment == .contextualFollowUp)
+        #expect(checkLastPeriod.debugTrace?.validatorOutput.dateRangeToken == .previousPeriod)
+        #expect(checkLastPeriod.debugTrace?.validatorOutput.targetName == "Hair Care")
+        #expect(checkLastPeriod.debugTrace?.interpretedSource == .ruleBased)
+        #expect(interpreter.prompts.contains("Check last period") == false)
 
         let checkForMe = await seed(
             "Can you check last period for me?",

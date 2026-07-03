@@ -285,7 +285,7 @@ struct MarinaUniversalPresentationParityTests {
                 measure: .projectedSpend,
                 dateRangeToken: .currentMonth
             ),
-            rowTitle: "Projected total"
+            rowTitle: "Projected spend"
         )
     }
 

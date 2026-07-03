@@ -5,6 +5,7 @@ nonisolated enum MarinaFormulaMetricComponent: String, Codable, Equatable, Senda
     case elapsedDays
     case averagePerDay
     case projectedTotal
+    case projectedSpend
     case expectedByNow
     case paceDifference
     case income
@@ -104,11 +105,8 @@ enum MarinaBudgetFormulaCalculator {
         return actualSpend / Double(elapsedDays)
     }
 
-    static func projectedSpend(burnRate: Double, totalDays: Int) -> Double? {
+    static func currentPaceProjection(burnRate: Double, totalDays: Int) -> Double? {
         guard totalDays > 0 else { return nil }
-        // Projected Spend is intentionally a current-pace projection:
-        // spent so far / elapsed days * total days. A budget-aware forecast
-        // that adds planned remaining spend should be designed separately.
         return burnRate * Double(totalDays)
     }
 

@@ -162,7 +162,7 @@ struct MarinaUniversalResultPresenter {
         case .remainingRoom:
             components = [.period, .plannedSpending, .plannedSpendingRemaining, .actualSpendSoFar, .periodRemainingRoom]
         case .projectedSpend:
-            components = [.spentSoFar, .averagePerDay, .projectedTotal]
+            components = [.actualSpendSoFar, .plannedSpendingRemaining, .projectedSpend]
         case .amount,
              .plannedAmount,
              .actualAmount,
@@ -311,7 +311,9 @@ struct MarinaUniversalResultPresenter {
         MarinaExecutionResult(
             kind: .message,
             title: emptyTitle(for: plan, context: context),
-            subtitle: genericEmptySubtitle(for: plan, context: context)
+            subtitle: genericEmptySubtitle(for: plan, context: context),
+            primaryValue: emptyPrimaryValue(for: plan, context: context),
+            explanation: emptyExplanation(for: plan, context: context)
         )
     }
 
@@ -477,19 +479,41 @@ struct MarinaUniversalResultPresenter {
             return "No results found."
         }
 
-        let date = emptyDatePhrase(for: context).map { " \($0)" } ?? ""
-        return "I didn't find any \(target) expenses\(date)."
+        return "\(target) Expenses"
     }
 
     private func genericEmptySubtitle(
         for plan: MarinaUniversalQueryPlan,
         context: MarinaUniversalPresentationContext
     ) -> String? {
-        guard isExpenseList(plan),
-              displayTarget(in: context) != nil else {
+        guard isExpenseList(plan) else {
             return subtitle(for: context)
         }
-        return nil
+        return dateLabel(for: context, capitalization: .title) ?? subtitle(for: context)
+    }
+
+    private func emptyPrimaryValue(
+        for plan: MarinaUniversalQueryPlan,
+        context: MarinaUniversalPresentationContext
+    ) -> String? {
+        guard isExpenseList(plan),
+              displayTarget(in: context) != nil else {
+            return nil
+        }
+        return "No expenses found"
+    }
+
+    private func emptyExplanation(
+        for plan: MarinaUniversalQueryPlan,
+        context: MarinaUniversalPresentationContext
+    ) -> String? {
+        guard isExpenseList(plan),
+              let target = displayTarget(in: context) else {
+            return nil
+        }
+
+        let date = emptyDatePhrase(for: context).map { " \($0)" } ?? ""
+        return "I didn't find any \(target) expenses\(date)."
     }
 
     private func isExpenseList(_ plan: MarinaUniversalQueryPlan) -> Bool {
@@ -837,7 +861,9 @@ struct MarinaUniversalResultPresenter {
         case .averagePerDay:
             return "Average per day"
         case .projectedTotal:
-            return "Projected total"
+            return "Current pace projection"
+        case .projectedSpend:
+            return "Projected spend"
         case .expectedByNow:
             return "Expected by now"
         case .paceDifference:

@@ -154,9 +154,13 @@ struct MarinaFormulaRegistryTests {
             ),
             snapshot: fixture.snapshot
         ))
-        #expect(abs((numericValue(projectedSpend.value) ?? 0) - 500) < 0.0001)
-        #expect(detailValue(.averagePerDay, in: projectedSpend) == .money(250.0 / 15.0))
-        #expect(abs((numericValue(detailValue(.projectedTotal, in: projectedSpend)) ?? 0) - 500) < 0.0001)
+        #expect(projectedSpend.value == .money(450))
+        #expect(projectedSpend.source == .safeSpendTodayCalculator)
+        #expect(detailValue(.actualSpendSoFar, in: projectedSpend) == .money(250))
+        #expect(detailValue(.plannedSpendingRemaining, in: projectedSpend) == .money(200))
+        #expect(detailValue(.projectedSpend, in: projectedSpend) == .money(450))
+        #expect(detailValue(.averagePerDay, in: projectedSpend) == nil)
+        #expect(detailValue(.projectedTotal, in: projectedSpend) == nil)
 
         let paceDifference = requireMetric(registry.evaluate(
             request: formulaRequest(

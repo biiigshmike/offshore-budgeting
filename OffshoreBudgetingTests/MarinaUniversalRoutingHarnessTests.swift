@@ -298,7 +298,11 @@ struct MarinaUniversalRoutingHarnessTests {
         #expect(universal.result.kind == .metric)
         #expect(universal.result.title == "Projected Spend")
         #expect(universal.diagnostics.scenario == .budgetProjectedSpend)
-        try expectRowAmount(universal.result, title: "Projected total", equals: 880)
+        try expectRowAmount(universal.result, title: "Actual spend so far", equals: 440)
+        try expectRowAmount(universal.result, title: "Planned spending remaining", equals: 1_280)
+        try expectRowAmount(universal.result, title: "Projected spend", equals: 1_720)
+        #expect(universal.result.rows.contains { $0.title == "Average per day" } == false)
+        #expect(universal.result.rows.contains { $0.title == "Projected total" } == false)
     }
 
     @Test func allowlistedBudgetPaceDifferenceReturnsUniversalResult() throws {

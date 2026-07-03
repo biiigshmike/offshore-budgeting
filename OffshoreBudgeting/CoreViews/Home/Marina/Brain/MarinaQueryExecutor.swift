@@ -601,19 +601,17 @@ struct MarinaQueryExecutor {
                 ]
             )
         case .projectedSpend:
-            guard let burnRate = MarinaBudgetFormulaCalculator.burnRate(actualSpend: actualSpend, elapsedDays: progress.elapsedDays),
-                  let projectedSpend = MarinaBudgetFormulaCalculator.projectedSpend(burnRate: burnRate, totalDays: progress.totalDays) else {
-                return noFormulaResult(title: MarinaL10n.string("marina.answer.projectedSpend.title", defaultValue: "Projected Spend", comment: "Marina answer title for projected spend."))
-            }
+            let summary = safeSpendSummary(snapshot: snapshot, plan: plan, rangeOverride: range)
+            let projectedSpend = summary.actualSpendSoFar + summary.plannedSpendingRemaining
             return MarinaExecutionResult(
                 kind: .metric,
                 title: MarinaL10n.string("marina.answer.projectedSpend.title", defaultValue: "Projected Spend", comment: "Marina answer title for projected spend."),
                 subtitle: rangeLabel(range),
                 primaryValue: currency(projectedSpend),
                 rows: [
-                    HomeAnswerRow(title: MarinaL10n.string("marina.answer.row.spentSoFar", defaultValue: "Spent so far", comment: "Row label for spend to date."), value: currency(actualSpend), amount: actualSpend),
-                    HomeAnswerRow(title: MarinaL10n.string("marina.answer.row.averagePerDay", defaultValue: "Average per day", comment: "Row label for average spend per day."), value: currency(burnRate), amount: burnRate),
-                    HomeAnswerRow(title: MarinaL10n.string("marina.answer.row.projectedTotal", defaultValue: "Projected total", comment: "Row label for projected spend total."), value: currency(projectedSpend), amount: projectedSpend)
+                    HomeAnswerRow(title: MarinaL10n.string("marina.answer.row.actualSpendSoFar", defaultValue: "Actual spend so far", comment: "Row label for actual spend to date."), value: currency(summary.actualSpendSoFar), amount: summary.actualSpendSoFar),
+                    HomeAnswerRow(title: MarinaL10n.string("marina.answer.row.plannedSpendingRemaining", defaultValue: "Planned spending remaining", comment: "Row label for remaining planned spending."), value: currency(summary.plannedSpendingRemaining), amount: summary.plannedSpendingRemaining),
+                    HomeAnswerRow(title: MarinaL10n.string("marina.answer.row.projectedSpend", defaultValue: "Projected spend", comment: "Row label for budget-aware projected spend."), value: currency(projectedSpend), amount: projectedSpend)
                 ]
             )
         case .safeDailySpend:
