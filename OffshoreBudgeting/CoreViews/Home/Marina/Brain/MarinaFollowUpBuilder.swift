@@ -260,6 +260,9 @@ struct MarinaFollowUpBuilder {
         var suggestions: [MarinaFollowUpSuggestion] = []
         let displayedCount = context.displayedRowCount ?? context.rowReferences.count
         let remainingCount = context.totalRowCount.map { max($0 - displayedCount, 0) }
+        // TODO(Marina pagination): future long-result cards should show the first
+        // 8-10 rows, keep the full total visible, include "Showing 10 of 22",
+        // support Show more, avoid duplicate rows, and keep totals stable.
         if remainingCount == nil || (remainingCount ?? 0) > 0 {
             var moreRequest = context.request
             moreRequest.expectedAnswerShape = .list

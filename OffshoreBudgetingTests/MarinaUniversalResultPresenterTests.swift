@@ -311,6 +311,113 @@ struct MarinaUniversalResultPresenterTests {
         #expect(remainingRoom.title == "Remaining Room")
     }
 
+    @Test func safeDailySpendFormulaCardUsesCuratedRowsAndPlainClampCopy() {
+        let result = presenter.presentationResult(
+            for: .metric(
+                MarinaUniversalMetricResult(
+                    value: .money(0),
+                    evidenceRows: [budgetEvidenceRow(displayName: "May 2026")],
+                    details: [
+                        .init(.period, value: .text("Jun 1, 2026 - Jun 30, 2026")),
+                        .init(.remainingDays, value: .integer(12), style: .integer),
+                        .init(.plannedSpending, value: .money(1_500), style: .money),
+                        .init(.plannedSpendingRemaining, value: .money(900), style: .money),
+                        .init(.actualSpendSoFar, value: .money(1_200), style: .money),
+                        .init(.periodRemainingRoom, value: .money(0), style: .money),
+                        .init(.safePerDay, value: .money(0), style: .money),
+                        .init(.clampedToZero, value: .boolean(true))
+                    ],
+                    presentationRows: [
+                        MarinaFormulaPresentationRow(
+                            title: "Safe per day",
+                            primaryValue: .money(0),
+                            primaryStyle: .money,
+                            amount: 0
+                        )
+                    ]
+                )
+            ),
+            plan: MarinaUniversalQueryPlan(entity: .budget, operation: .forecast, measure: .safeDailySpend),
+            context: context()
+        )
+
+        #expect(result.rows.map(\.title) == [
+            "Period",
+            "Remaining days",
+            "Planned spending remaining",
+            "Actual spend so far",
+            "Remaining room",
+            "Safe per day"
+        ])
+        #expect(result.rows.contains { $0.title == "Clamped to zero" } == false)
+        #expect(result.rows.contains { $0.title == "May 2026" } == false)
+        #expect(result.rows.filter { $0.title == "Safe per day" }.count == 1)
+        #expect(result.explanation == "Your safe daily spend is $0.00 because there is no remaining room left in this budgeting period.")
+    }
+
+    @Test func remainingRoomFormulaCardUsesCuratedRowsOnly() {
+        let result = presenter.presentationResult(
+            for: .metric(
+                MarinaUniversalMetricResult(
+                    value: .money(450),
+                    evidenceRows: [budgetEvidenceRow(displayName: "April 2026")],
+                    details: [
+                        .init(.period, value: .text("Jun 1, 2026 - Jun 30, 2026")),
+                        .init(.remainingDays, value: .integer(12), style: .integer),
+                        .init(.plannedSpending, value: .money(1_500), style: .money),
+                        .init(.plannedSpendingRemaining, value: .money(900), style: .money),
+                        .init(.actualSpendSoFar, value: .money(1_200), style: .money),
+                        .init(.periodRemainingRoom, value: .money(450), style: .money),
+                        .init(.safePerDay, value: .money(37.50), style: .money),
+                        .init(.clampedToZero, value: .boolean(false))
+                    ],
+                    presentationRows: [
+                        MarinaFormulaPresentationRow(
+                            title: "Remaining room",
+                            primaryValue: .money(450),
+                            primaryStyle: .money,
+                            amount: 450
+                        )
+                    ]
+                )
+            ),
+            plan: MarinaUniversalQueryPlan(entity: .budget, operation: .forecast, measure: .remainingRoom),
+            context: context()
+        )
+
+        #expect(result.rows.map(\.title) == [
+            "Period",
+            "Planned spending",
+            "Planned spending remaining",
+            "Actual spend so far",
+            "Remaining room"
+        ])
+        #expect(result.rows.contains { $0.title == "Clamped to zero" } == false)
+        #expect(result.rows.contains { $0.title == "Safe per day" } == false)
+        #expect(result.rows.contains { $0.title == "April 2026" } == false)
+    }
+
+    @Test func projectedSpendFormulaCardShowsPaceProjectionRowsOnly() {
+        let result = presenter.presentationResult(
+            for: .metric(
+                MarinaUniversalMetricResult(
+                    value: .money(15_717.72),
+                    evidenceRows: [budgetEvidenceRow(displayName: "March 2026")],
+                    details: [
+                        .init(.spentSoFar, value: .money(1_521.07), style: .money),
+                        .init(.averagePerDay, value: .money(507.02), style: .money),
+                        .init(.projectedTotal, value: .money(15_717.72), style: .money)
+                    ]
+                )
+            ),
+            plan: MarinaUniversalQueryPlan(entity: .budget, operation: .forecast, measure: .projectedSpend),
+            context: context()
+        )
+
+        #expect(result.rows.map(\.title) == ["Spent so far", "Average per day", "Projected total"])
+        #expect(result.rows.contains { $0.title == "March 2026" } == false)
+    }
+
     @Test func categorySpendShareIncludesRankedAmountAndPercentRows() {
         let plan = MarinaUniversalQueryPlan(entity: .category, operation: .share, measure: .concentration)
         let result = presenter.presentationResult(
@@ -346,6 +453,19 @@ struct MarinaUniversalResultPresenterTests {
         #expect(Array(result.rows.map(\.title).prefix(2)) == ["Bills & Utilities", "Shopping"])
         #expect(result.rows.first?.value == "\(CurrencyFormatter.string(from: 2_410.94)) - \(0.907.formatted(.percent.precision(.fractionLength(1))))")
         #expect(result.rows.dropFirst().first?.value == "\(CurrencyFormatter.string(from: 140.13)) - \(0.053.formatted(.percent.precision(.fractionLength(1))))")
+    }
+
+    private func budgetEvidenceRow(displayName: String) -> MarinaQueryableRow {
+        MarinaQueryableRow(
+            id: UUID(),
+            entity: .budget,
+            displayName: displayName,
+            fields: [
+                .name: .text(displayName),
+                .startDate: .date(date(2026, 6, 1))
+            ],
+            relationships: [:]
+        )
     }
 
     private func variableExpenseRow(displayName: String, amount: Double, date: Date) -> MarinaQueryableRow {

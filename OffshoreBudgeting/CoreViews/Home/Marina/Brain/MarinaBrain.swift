@@ -847,6 +847,42 @@ struct MarinaFollowUpResolver {
         )
     }
 
+    private func emptyResultPreviousPeriodRequest(
+        from prompt: String,
+        normalized: String,
+        context: MarinaAnswerSemanticContext
+    ) -> MarinaSemanticRequest? {
+        guard explicitDateToken(in: normalized) == .previousPeriod,
+              context.answerKind == .message,
+              context.request.expectedAnswerShape == .list,
+              context.rowReferences.isEmpty,
+              context.request.unsupportedReason == nil,
+              hasExpenseTarget(context.request) else {
+            return nil
+        }
+
+        var request = context.request
+        request.dateRangeToken = .previousPeriod
+        request.expectedAnswerShape = .list
+
+        guard let target = correctionTarget(from: prompt, normalized: normalized),
+              isGenericFollowUpTarget(target) == false else {
+            return request
+        }
+
+        return requestByApplying(target: target, to: request, normalized: normalized)
+    }
+
+    private func hasExpenseTarget(_ request: MarinaSemanticRequest) -> Bool {
+        request.targetName?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
+            || request.textQuery?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
+            || request.targetDisplayName?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
+    }
+
+    private func isGenericFollowUpTarget(_ target: String) -> Bool {
+        ["me", "myself", "please"].contains(target.trimmingCharacters(in: .whitespacesAndNewlines).lowercased())
+    }
+
     private func request(
         from prompt: String,
         normalized: String,
@@ -863,6 +899,10 @@ struct MarinaFollowUpResolver {
 
         if let incomeSavingsWhatIf = MarinaSemanticPromptHeuristics.incomeSavingsReplacementWhatIfRequest(in: prompt) {
             return incomeSavingsWhatIf
+        }
+
+        if let emptyPreviousPeriod = emptyResultPreviousPeriodRequest(from: prompt, normalized: normalized, context: context) {
+            return emptyPreviousPeriod
         }
 
         if let expenseDrivers = expenseDriverRequest(normalized: normalized, context: context) {

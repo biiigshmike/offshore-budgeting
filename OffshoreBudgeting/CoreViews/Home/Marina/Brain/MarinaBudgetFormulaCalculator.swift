@@ -106,6 +106,9 @@ enum MarinaBudgetFormulaCalculator {
 
     static func projectedSpend(burnRate: Double, totalDays: Int) -> Double? {
         guard totalDays > 0 else { return nil }
+        // Projected Spend is intentionally a current-pace projection:
+        // spent so far / elapsed days * total days. A budget-aware forecast
+        // that adds planned remaining spend should be designed separately.
         return burnRate * Double(totalDays)
     }
 

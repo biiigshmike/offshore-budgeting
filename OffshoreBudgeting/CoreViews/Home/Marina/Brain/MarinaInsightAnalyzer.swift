@@ -164,13 +164,24 @@ struct MarinaInsightAnalyzer {
                 )
             ]
         case .projectedSpend:
-            return [
+            var signals: [MarinaInsightSignal] = []
+            if elapsedDays(for: plan) <= 3 {
+                signals.append(
+                    MarinaInsightSignal(
+                        kind: .caution,
+                        title: MarinaL10n.string("marina.insight.signal.projectedSpend.early.title", defaultValue: "Projection is early", comment: "Insight signal title for early-period projected spend."),
+                        detail: MarinaL10n.string("marina.insight.signal.projectedSpend.early.detail", defaultValue: "This projection is based on only the first few elapsed days, so it can swing a lot.", comment: "Insight signal detail for early-period projected spend.")
+                    )
+                )
+            }
+            signals.append(
                 MarinaInsightSignal(
                     kind: .context,
                     title: MarinaL10n.string("marina.insight.signal.projectedSpend.title", defaultValue: "Projection uses current pace", comment: "Insight signal title for projected spend."),
                     detail: MarinaL10n.string("marina.insight.signal.projectedSpend.detail", defaultValue: "This projection is based on the average daily spend from the selected period so far.", comment: "Insight signal detail for projected spend.")
                 )
-            ]
+            )
+            return signals
         case .burnRate:
             return [
                 MarinaInsightSignal(
@@ -318,6 +329,17 @@ struct MarinaInsightAnalyzer {
         result.rows.first { row in
             row.title.localizedCaseInsensitiveCompare(title) == .orderedSame
         }?.amount
+    }
+
+    private func elapsedDays(for plan: MarinaQueryPlan) -> Int {
+        guard let range = plan.dateRange else { return Int.max }
+        let calendar = Calendar.current
+        let rangeStart = calendar.startOfDay(for: range.startDate)
+        let rangeEnd = calendar.startOfDay(for: range.endDate)
+        let today = calendar.startOfDay(for: plan.now)
+        guard today >= rangeStart else { return 0 }
+        let clampedToday = min(today, rangeEnd)
+        return max(1, (calendar.dateComponents([.day], from: rangeStart, to: clampedToday).day ?? 0) + 1)
     }
 
     private func uniqued(_ signals: [MarinaInsightSignal]) -> [MarinaInsightSignal] {

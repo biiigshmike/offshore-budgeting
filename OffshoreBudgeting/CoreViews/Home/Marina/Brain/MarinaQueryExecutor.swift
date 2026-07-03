@@ -968,32 +968,43 @@ struct MarinaQueryExecutor {
     }
 
     private func unsupported(_ reason: MarinaSemanticUnsupportedReason) -> MarinaExecutionResult {
-        let subtitle: String
+        let title: String
+        let subtitle: String?
         switch reason {
         case .readOnly:
+            title = MarinaL10n.string("marina.unsupported.title", defaultValue: "I can't answer that yet", comment: "Marina unsupported answer title.")
             subtitle = MarinaL10n.string("marina.unsupported.readOnly", defaultValue: "I'm read-only in this rebuild. I can answer questions, but I will not edit, move, or delete records from free text.", comment: "Unsupported message for read-only Marina free-text mutations.")
         case .unavailableModel:
+            title = MarinaL10n.string("marina.unsupported.title", defaultValue: "I can't answer that yet", comment: "Marina unsupported answer title.")
             subtitle = MarinaL10n.string("marina.unsupported.unavailableModel", defaultValue: "My on-device language model is not available on this device or OS yet. The create menu still works.", comment: "Unsupported message when Foundation Models are unavailable.")
         case .unsupportedCombination:
+            title = MarinaL10n.string("marina.unsupported.title", defaultValue: "I can't answer that yet", comment: "Marina unsupported answer title.")
             subtitle = MarinaL10n.string("marina.unsupported.unsupportedCombination", defaultValue: "I do not know how to answer that shape of budgeting question yet.", comment: "Unsupported message for an unsupported Marina query shape.")
         case .unresolvedEntity:
+            title = MarinaL10n.string("marina.unsupported.title", defaultValue: "I can't answer that yet", comment: "Marina unsupported answer title.")
             subtitle = MarinaL10n.string("marina.unsupported.unresolvedEntity", defaultValue: "I could not find a matching record in this workspace.", comment: "Unsupported message when no matching workspace record is found.")
         case .ambiguousEntity:
+            title = MarinaL10n.string("marina.unsupported.title", defaultValue: "I can't answer that yet", comment: "Marina unsupported answer title.")
             subtitle = MarinaL10n.string("marina.unsupported.ambiguousEntity", defaultValue: "That request could mean more than one thing.", comment: "Unsupported message for ambiguous Marina request.")
         case .modelContextLimit:
+            title = MarinaL10n.string("marina.unsupported.title", defaultValue: "I can't answer that yet", comment: "Marina unsupported answer title.")
             subtitle = MarinaL10n.string("marina.unsupported.modelContextLimit", defaultValue: "That request was too large for the on-device language model. Try asking a shorter question.", comment: "Unsupported message for model context limit.")
         case .modelGuardrail:
+            title = MarinaL10n.string("marina.unsupported.title", defaultValue: "I can't answer that yet", comment: "Marina unsupported answer title.")
             subtitle = MarinaL10n.string("marina.unsupported.modelGuardrail", defaultValue: "My on-device language model declined that request. I can still answer ordinary read-only budgeting questions.", comment: "Unsupported message when model guardrails decline.")
         case .modelGenerationFailed:
+            title = MarinaL10n.string("marina.unsupported.title", defaultValue: "I can't answer that yet", comment: "Marina unsupported answer title.")
             subtitle = MarinaL10n.string("marina.unsupported.modelGenerationFailed", defaultValue: "My on-device language model could not produce a usable budgeting request. I did not guess.", comment: "Unsupported message when model generation fails.")
         case .unsupportedLanguageOrLocale:
+            title = MarinaL10n.string("marina.unsupported.title", defaultValue: "I can't answer that yet", comment: "Marina unsupported answer title.")
             subtitle = MarinaL10n.string("marina.unsupported.languageOrLocale", defaultValue: "My on-device language model does not support that language or locale yet.", comment: "Unsupported message when model language or locale is unsupported.")
         case .incomeSavingsWhatIfUnsupported:
-            subtitle = MarinaL10n.string("marina.unsupported.incomeSavingsWhatIf", defaultValue: "I captured the scenario amount, but income and savings replacement what-if scenarios are not implemented yet.", comment: "Unsupported message for income or savings replacement what-if scenarios.")
+            title = MarinaL10n.string("marina.unsupported.incomeSavingsWhatIf.title", defaultValue: "I can see the scenario amount, but I don't support income or savings replacement what-if calculations yet.", comment: "Unsupported title for income or savings replacement what-if scenarios.")
+            subtitle = nil
         }
         return MarinaExecutionResult(
             kind: .message,
-            title: MarinaL10n.string("marina.unsupported.title", defaultValue: "I can't answer that yet", comment: "Marina unsupported answer title."),
+            title: title,
             subtitle: subtitle
         )
     }

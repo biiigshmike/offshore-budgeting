@@ -129,23 +129,82 @@ struct MarinaUniversalResultPresenter {
                 amount: numericValue(detail.value)
             )
         }
-        let rows = presentationRows + (presentationRows.isEmpty && detailRows.isEmpty ? [
-            HomeAnswerRow(
-                title: "Value",
-                value: value,
-                amount: numericValue(metric.value)
-            )
-        ] : detailRows) + metric.evidenceRows.map { row in
-            homeAnswerRow(from: row, plan: plan, role: .evidence)
-        }
+        let rows = curatedMetricRows(metric, plan: plan) ?? (
+            presentationRows + (presentationRows.isEmpty && detailRows.isEmpty ? [
+                HomeAnswerRow(
+                    title: "Value",
+                    value: value,
+                    amount: numericValue(metric.value)
+                )
+            ] : detailRows) + metric.evidenceRows.map { row in
+                homeAnswerRow(from: row, plan: plan, role: .evidence)
+            }
+        )
 
         return MarinaExecutionResult(
             kind: kind(for: plan),
             title: title(for: plan, context: context),
             subtitle: subtitle(for: context),
             primaryValue: value,
-            rows: rows
+            rows: rows,
+            explanation: metricExplanation(metric, plan: plan)
         )
+    }
+
+    private func curatedMetricRows(
+        _ metric: MarinaUniversalMetricResult,
+        plan: MarinaUniversalQueryPlan
+    ) -> [HomeAnswerRow]? {
+        let components: [MarinaFormulaMetricComponent]
+        switch plan.measure {
+        case .safeDailySpend:
+            components = [.period, .remainingDays, .plannedSpendingRemaining, .actualSpendSoFar, .periodRemainingRoom, .safePerDay]
+        case .remainingRoom:
+            components = [.period, .plannedSpending, .plannedSpendingRemaining, .actualSpendSoFar, .periodRemainingRoom]
+        case .projectedSpend:
+            components = [.spentSoFar, .averagePerDay, .projectedTotal]
+        case .amount,
+             .plannedAmount,
+             .actualAmount,
+             .effectiveAmount,
+             .budgetImpact,
+             .savingsTotal,
+             .incomeAmount,
+             .reconciliationBalance,
+             .categoryAvailability,
+             .burnRate,
+             .paceDifference,
+             .coverageRatio,
+             .recurringBurden,
+             .concentration,
+             .color,
+             .name,
+             nil:
+            return nil
+        }
+
+        return components.compactMap { component in
+            guard let detail = metric.details.first(where: { $0.component == component }) else {
+                return nil
+            }
+            return HomeAnswerRow(
+                title: presentationTitle(for: component, measure: plan.measure),
+                value: formattedDetailValue(detail),
+                amount: numericValue(detail.value)
+            )
+        }
+    }
+
+    private func metricExplanation(
+        _ metric: MarinaUniversalMetricResult,
+        plan: MarinaUniversalQueryPlan
+    ) -> String? {
+        guard plan.measure == .safeDailySpend,
+              booleanDetail(.clampedToZero, in: metric.details) == true else {
+            return nil
+        }
+
+        return "Your safe daily spend is $0.00 because there is no remaining room left in this budgeting period."
     }
 
     private func rowsResult(
@@ -838,6 +897,17 @@ struct MarinaUniversalResultPresenter {
         }
     }
 
+    private func presentationTitle(
+        for component: MarinaFormulaMetricComponent,
+        measure: MarinaSemanticMeasure?
+    ) -> String {
+        if component == .periodRemainingRoom,
+           measure == .remainingRoom || measure == .safeDailySpend {
+            return "Remaining room"
+        }
+        return title(for: component)
+    }
+
     private func integerDetail(
         _ component: MarinaFormulaMetricComponent,
         in details: [MarinaFormulaMetricDetail]
@@ -856,6 +926,16 @@ struct MarinaUniversalResultPresenter {
         case .text, .date, .boolean, .colorHex, .empty:
             return nil
         }
+    }
+
+    private func booleanDetail(
+        _ component: MarinaFormulaMetricComponent,
+        in details: [MarinaFormulaMetricDetail]
+    ) -> Bool? {
+        guard case let .boolean(value)? = details.first(where: { $0.component == component })?.value else {
+            return nil
+        }
+        return value
     }
 
     private func deltaSummary(_ delta: Double) -> String {

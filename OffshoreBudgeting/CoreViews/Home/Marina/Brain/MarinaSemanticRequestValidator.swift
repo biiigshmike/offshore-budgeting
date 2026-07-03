@@ -647,13 +647,39 @@ struct MarinaSemanticRequestValidator {
         explicitTargets: [String]
     ) -> Bool {
         guard shouldEnforcePromptTargetRetention(source: source),
-              explicitTargets.isEmpty == false,
-              request.targetName?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty != false,
-              request.textQuery?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty != false,
-              request.comparisonTargetName?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty != false else {
+              explicitTargets.isEmpty == false else {
             return false
         }
-        return true
+
+        if request.targetName?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty != false,
+           request.textQuery?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty != false,
+           request.comparisonTargetName?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty != false {
+            return true
+        }
+
+        return hasOverbroadPromptTarget(request: request, explicitTargets: explicitTargets)
+    }
+
+    private func hasOverbroadPromptTarget(
+        request: MarinaSemanticRequest,
+        explicitTargets: [String]
+    ) -> Bool {
+        guard explicitTargets.count == 1,
+              let explicitTarget = explicitTargets.first.map(targetNormalized),
+              explicitTarget.isEmpty == false else {
+            return false
+        }
+
+        return [
+            request.targetName,
+            request.textQuery,
+            request.targetDisplayName
+        ]
+        .compactMap { $0 }
+        .map(targetNormalized)
+        .contains { retained in
+            retained != explicitTarget && retained.contains(explicitTarget)
+        }
     }
 
     private func hasClearCardComparisonIntent(
