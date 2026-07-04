@@ -229,7 +229,7 @@ struct MarinaUniversalPresentationParityTests {
         )
     }
 
-    @Test func remainingRoomPresentationMatchesLegacyTypedRowFact() {
+    @Test func remainingRoomPresentationMatchesLegacyTypedRowFact() throws {
         let fixture = makeFixture()
         let request = semanticRequest(
             entity: .budget,
@@ -239,29 +239,24 @@ struct MarinaUniversalPresentationParityTests {
         )
         let legacy = fixture.harness.runLegacy(request: request, context: fixture.context())
         let presented = fixture.presentedResult(request: request, context: fixture.context())
+        let presentedRemainingRoom = presented.rows.first(where: { $0.title == "Remaining room" })?.amount
 
         expectMoneyParity(
             fixture.harness.legacyMoneyFact(from: legacy, selection: .first),
-            fixture.harness.legacyMoneyFact(from: presented),
+            presentedRemainingRoom.map { .money($0) },
             scenario: "Remaining room presentation"
         )
     }
 
-    @Test func safeDailySpendPresentationMatchesLegacyTypedRowFact() {
-        let fixture = makeFixture()
-        let request = semanticRequest(
-            entity: .budget,
-            operation: .forecast,
-            measure: .safeDailySpend,
-            dateRangeToken: .currentMonth
-        )
-        let legacy = fixture.harness.runLegacy(request: request, context: fixture.context())
-        let presented = fixture.presentedResult(request: request, context: fixture.context())
-
-        expectMoneyParity(
-            fixture.harness.legacyMoneyFact(from: legacy, selection: .last),
-            fixture.harness.legacyMoneyFact(from: presented),
-            scenario: "Safe daily spend presentation"
+    @Test func safeDailySpendPresentationMatchesLegacyTypedRowFact() throws {
+        try expectFormulaPresentationParity(
+            request: semanticRequest(
+                entity: .budget,
+                operation: .forecast,
+                measure: .safeDailySpend,
+                dateRangeToken: .currentMonth
+            ),
+            rowTitle: "Safe per day"
         )
     }
 
@@ -343,6 +338,31 @@ struct MarinaUniversalPresentationParityTests {
         #expect(presented.rows.first(where: { $0.title == "Over" })?.value == legacy.rows.first(where: { $0.title == "Over" })?.value)
         #expect(presented.rows.first(where: { $0.title == "Near" })?.value == legacy.rows.first(where: { $0.title == "Near" })?.value)
         #expect(presented.rows.first(where: { $0.title == "Categories" })?.value == legacy.rows.first(where: { $0.title == "Categories" })?.value)
+        expectNoDebugText(in: presented)
+    }
+
+    @Test func filteredCategoryAvailabilityListPresentationMatchesLegacyRows() {
+        let fixture = makeFixture()
+        addCategoryAvailabilityLimits(to: fixture)
+        let request = semanticRequest(
+            entity: .category,
+            operation: .list,
+            measure: .categoryAvailability,
+            dateRangeToken: .currentMonth,
+            categoryAvailabilityFilter: .over,
+            shape: .list
+        )
+        let legacy = fixture.harness.runLegacy(request: request, context: fixture.context())
+        let presented = fixture.presentedResult(request: request, context: fixture.context())
+
+        #expect(presented.kind == legacy.kind)
+        #expect(presented.title == legacy.title)
+        #expect(presented.subtitle == legacy.subtitle)
+        #expect(presented.rows.map(\.title) == legacy.rows.map(\.title))
+        #expect(presented.rows.map(\.value) == legacy.rows.map(\.value))
+        #expect(presented.rows.map(\.amount) == legacy.rows.map(\.amount))
+        #expect(presented.rows.map(\.sourceID) == legacy.rows.map(\.sourceID))
+        #expect(presented.rows.map(\.objectType) == legacy.rows.map(\.objectType))
         expectNoDebugText(in: presented)
     }
 
@@ -634,6 +654,7 @@ struct MarinaUniversalPresentationParityTests {
         sort: MarinaSemanticSort? = nil,
         expenseScope: MarinaSemanticExpenseScope? = nil,
         incomeState: MarinaSemanticIncomeState? = nil,
+        categoryAvailabilityFilter: MarinaCategoryAvailabilityFilter? = nil,
         shape: MarinaSemanticAnswerShape = .metric
     ) -> MarinaSemanticRequest {
         MarinaSemanticRequest(
@@ -648,8 +669,24 @@ struct MarinaUniversalPresentationParityTests {
             sort: sort,
             expenseScope: expenseScope,
             incomeState: incomeState,
+            categoryAvailabilityFilter: categoryAvailabilityFilter,
             expectedAnswerShape: shape
         )
+    }
+
+    private func addCategoryAvailabilityLimits(
+        to fixture: MarinaUniversalPresentationParityFixture
+    ) {
+        guard let budget = fixture.snapshot.budgets.first,
+              let groceries = fixture.snapshot.categories.first(where: { $0.name == "Groceries" }),
+              let electronics = fixture.snapshot.categories.first(where: { $0.name == "Electronics" }) else {
+            return
+        }
+
+        budget.categoryLimits = [
+            BudgetCategoryLimit(minAmount: 0, maxAmount: 35, budget: budget, category: groceries),
+            BudgetCategoryLimit(minAmount: 0, maxAmount: 600, budget: budget, category: electronics)
+        ]
     }
 
     private var calendar: Calendar {

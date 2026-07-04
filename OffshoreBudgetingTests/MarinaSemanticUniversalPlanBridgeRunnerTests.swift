@@ -299,11 +299,15 @@ struct MarinaSemanticUniversalPlanBridgeRunnerTests {
     }
 
     private func requireRows(_ result: MarinaUniversalQueryResult) -> [MarinaQueryableRow] {
-        guard case let .rows(rows) = result else {
+        switch result {
+        case let .rows(rows):
+            return rows
+        case let .rowsPage(page):
+            return page.rows
+        default:
             Issue.record("Expected row result, got \(result).")
             return []
         }
-        return rows
     }
 
     private func requireMetric(_ result: MarinaUniversalQueryResult) -> MarinaUniversalMetricResult {

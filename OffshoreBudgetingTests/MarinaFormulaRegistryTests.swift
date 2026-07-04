@@ -17,11 +17,11 @@ struct MarinaFormulaRegistryTests {
         #expect(registry.supports(measure: .coverageRatio, surface: .semantic(.budget), operation: .forecast))
         #expect(registry.supports(measure: .coverageRatio, surface: .semantic(.income), operation: .share))
         #expect(registry.supports(measure: .categoryAvailability, surface: .semantic(.category), operation: .forecast))
+        #expect(registry.supports(measure: .categoryAvailability, surface: .semantic(.category), operation: .list))
         #expect(registry.supports(measure: .concentration, surface: .semantic(.category), operation: .share))
         #expect(registry.supports(measure: .recurringBurden, surface: .semantic(.preset), operation: .sum))
         #expect(registry.supports(measure: .savingsTotal, surface: .semantic(.savingsAccount), operation: .forecast))
 
-        #expect(registry.supports(measure: .categoryAvailability, surface: .semantic(.category), operation: .list) == false)
         #expect(registry.supports(measure: .concentration, surface: .semantic(.category), operation: .forecast) == false)
         #expect(registry.supports(measure: .recurringBurden, surface: .semantic(.preset), operation: .forecast) == false)
         #expect(registry.supports(measure: .savingsTotal, surface: .semantic(.savingsAccount), operation: .share) == false)
@@ -231,6 +231,25 @@ struct MarinaFormulaRegistryTests {
         #expect(detailValue(.overCount, in: availability) == .integer(availabilityResult.overCount))
         #expect(detailValue(.nearCount, in: availability) == .integer(availabilityResult.nearCount))
         #expect(detailValue(.categoryCount, in: availability) == .integer(availabilityResult.metrics.count))
+
+        let overList = registry.evaluate(
+            request: formulaRequest(
+                surface: .semantic(.category),
+                operation: .list,
+                measure: .categoryAvailability,
+                dateRange: range,
+                categoryAvailabilityFilter: .over
+            ),
+            snapshot: fixture.snapshot
+        )
+        guard case let .rows(overRows) = overList else {
+            Issue.record("Expected category availability over-limit rows, got \(overList).")
+            throw FormulaTestFailure()
+        }
+        #expect(overRows.map(\.displayName) == ["Groceries"])
+        #expect(overRows.first?.fields[.amount] == .money(150))
+        #expect(overRows.first?.fields[.plannedAmount] == .money(100))
+        #expect(overRows.first?.fields[.actualAmount] == .money(-50))
 
         let concentration = requireMetric(registry.evaluate(
             request: formulaRequest(
@@ -509,7 +528,8 @@ struct MarinaFormulaRegistryTests {
         operation: MarinaSemanticOperation,
         measure: MarinaSemanticMeasure,
         dateRange: HomeQueryDateRange? = nil,
-        filters: [MarinaRowFilter] = []
+        filters: [MarinaRowFilter] = [],
+        categoryAvailabilityFilter: MarinaCategoryAvailabilityFilter? = nil
     ) -> MarinaFormulaRequest {
         MarinaFormulaRequest(
             surface: surface,
@@ -521,7 +541,8 @@ struct MarinaFormulaRegistryTests {
             search: nil,
             groupBy: nil,
             limit: nil,
-            whatIfAmount: nil
+            whatIfAmount: nil,
+            categoryAvailabilityFilter: categoryAvailabilityFilter
         )
     }
 
@@ -717,3 +738,5 @@ private struct FormulaFixture {
     let emergency: SavingsAccount
     let roommate: AllocationAccount
 }
+
+private struct FormulaTestFailure: Error {}

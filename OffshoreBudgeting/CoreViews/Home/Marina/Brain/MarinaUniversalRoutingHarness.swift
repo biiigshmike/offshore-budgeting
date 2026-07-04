@@ -184,6 +184,7 @@ struct MarinaUniversalRoutingHarness {
              .budgetCoverageRatio,
              .incomeCoverageRatio,
              .categoryAvailability,
+             .categoryAvailabilityFilteredList,
              .categoryConcentration,
              .presetRecurringBurden,
              .forecastSavings:

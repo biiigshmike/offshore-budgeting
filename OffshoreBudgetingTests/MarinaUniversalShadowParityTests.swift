@@ -429,6 +429,62 @@ struct MarinaUniversalShadowParityTests {
         #expect(detailValue(.categoryCount, in: metric) == rowInteger("Categories", in: legacy))
     }
 
+    @Test func filteredCategoryAvailabilityLegacyResultShapeIsPreserved() {
+        let fixture = makeFixture()
+        let requests: [(filter: MarinaCategoryAvailabilityFilter, title: String, expectedRows: [String])] = [
+            (.over, "Categories Over Limit", ["Groceries"]),
+            (.near, "Categories Near Limit", ["Electronics"]),
+            (.underLimit, "Categories Under Limit", ["Electronics"])
+        ]
+
+        for testCase in requests {
+            let request = semanticRequest(
+                entity: .category,
+                operation: .list,
+                measure: .categoryAvailability,
+                dateRangeToken: .currentMonth,
+                resultLimit: 5,
+                categoryAvailabilityFilter: testCase.filter,
+                shape: .list
+            )
+            let legacy = fixture.harness.runLegacy(request: request, context: fixture.context())
+
+            #expect(legacy.kind == .list)
+            #expect(legacy.title == testCase.title)
+            #expect(legacy.subtitle?.isEmpty == false)
+            #expect(legacy.rows.map(\.title) == testCase.expectedRows)
+            #expect(legacy.rows.allSatisfy { $0.objectType == .category })
+            #expect(legacy.rows.allSatisfy { $0.sourceID != nil })
+            #expect(legacy.rows.allSatisfy { $0.amount != nil })
+            #expect(legacy.rows.allSatisfy { $0.value.contains("Spent") && $0.value.contains(" of ") })
+        }
+    }
+
+    @Test func filteredCategoryAvailabilityListsMatchLegacyExecutorRows() {
+        let fixture = makeFixture()
+        let filters: [MarinaCategoryAvailabilityFilter] = [.over, .near, .underLimit]
+
+        for filter in filters {
+            let request = semanticRequest(
+                entity: .category,
+                operation: .list,
+                measure: .categoryAvailability,
+                dateRangeToken: .currentMonth,
+                resultLimit: 5,
+                categoryAvailabilityFilter: filter,
+                shape: .list
+            )
+            let legacy = fixture.harness.runLegacy(request: request, context: fixture.context())
+            let universal = fixture.harness.runUniversal(request: request, context: fixture.context())
+
+            expectRowParity(
+                fixture.harness.legacyRowsFact(from: legacy),
+                fixture.harness.universalRowsFact(from: universal, request: request),
+                scenario: "Filtered category availability \(filter.rawValue) list"
+            )
+        }
+    }
+
     @Test func categoryConcentrationFormulaMatchesLegacyExecutorTypedRows() {
         let fixture = makeFixture()
         let request = semanticRequest(
@@ -511,6 +567,10 @@ struct MarinaUniversalShadowParityTests {
         let electronics = Offshore.Category(name: "Electronics", hexColor: "#0EA5E9", workspace: workspace)
         let budget = Budget(name: "June", startDate: date(2026, 6, 1), endDate: date(2026, 6, 30), workspace: workspace)
         let phonePreset = Preset(title: "Phone", plannedAmount: 80, workspace: workspace, defaultCard: appleCard, defaultCategory: electronics)
+        budget.categoryLimits = [
+            BudgetCategoryLimit(minAmount: 0, maxAmount: 35, budget: budget, category: groceries),
+            BudgetCategoryLimit(minAmount: 0, maxAmount: 600, budget: budget, category: electronics)
+        ]
 
         let appleStoreJune = VariableExpense(
             descriptionText: "Apple Store",
@@ -701,6 +761,7 @@ struct MarinaUniversalShadowParityTests {
         sort: MarinaSemanticSort? = nil,
         expenseScope: MarinaSemanticExpenseScope? = nil,
         incomeState: MarinaSemanticIncomeState? = nil,
+        categoryAvailabilityFilter: MarinaCategoryAvailabilityFilter? = nil,
         shape: MarinaSemanticAnswerShape = .metric
     ) -> MarinaSemanticRequest {
         MarinaSemanticRequest(
@@ -715,6 +776,7 @@ struct MarinaUniversalShadowParityTests {
             sort: sort,
             expenseScope: expenseScope,
             incomeState: incomeState,
+            categoryAvailabilityFilter: categoryAvailabilityFilter,
             expectedAnswerShape: shape
         )
     }

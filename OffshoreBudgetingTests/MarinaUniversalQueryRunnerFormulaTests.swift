@@ -111,14 +111,22 @@ struct MarinaUniversalQueryRunnerFormulaTests {
 
         #expect(presented.title == "Safe Daily Spend")
         #expect(presented.primaryValue == CurrencyFormatter.string(from: 0))
-        #expect(presented.rows.first(where: { $0.title == "Period" }) != nil)
+        #expect(presented.rows.map(\.title) == [
+            "Period",
+            "Remaining days",
+            "Planned spending remaining",
+            "Actual spend so far",
+            "Remaining room",
+            "Safe per day"
+        ])
         #expect(presented.rows.first(where: { $0.title == "Remaining days" })?.amount == 16)
-        #expect(presented.rows.first(where: { $0.title == "Planned spending" }) != nil)
         #expect(presented.rows.first(where: { $0.title == "Planned spending remaining" })?.amount == 200)
         #expect(presented.rows.first(where: { $0.title == "Actual spend so far" }) != nil)
-        #expect(presented.rows.first(where: { $0.title == "Period remaining room" })?.amount == 0)
+        #expect(presented.rows.first(where: { $0.title == "Remaining room" })?.amount == 0)
         #expect(presented.rows.first(where: { $0.title == "Safe per day" })?.amount == 0)
-        #expect(presented.rows.first(where: { $0.title == "Clamped to zero" })?.value == "Yes")
+        #expect(presented.rows.contains { $0.title == "Planned spending" } == false)
+        #expect(presented.rows.contains { $0.title == "Clamped to zero" } == false)
+        #expect(presented.explanation == "Your safe daily spend is $0.00 because there is no remaining room left in this budgeting period.")
     }
 
     @Test func budgetPaceFormulaMeasuresRouteThroughRegistry() {
@@ -147,7 +155,21 @@ struct MarinaUniversalQueryRunnerFormulaTests {
             ),
             snapshot: fixture.snapshot
         ))
-        #expect(abs((numericValue(projectedSpend.value) ?? 0) - 500) < 0.0001)
+        let safeSpendSummary = SafeSpendTodayCalculator.calculate(
+            budgetingPeriod: .monthly,
+            rangeStart: range.startDate,
+            rangeEnd: range.endDate,
+            budgets: fixture.snapshot.budgets,
+            categories: fixture.snapshot.categories,
+            incomes: fixture.snapshot.incomes,
+            plannedExpenses: fixture.snapshot.homeCalculationPlannedExpenses,
+            variableExpenses: fixture.snapshot.homeCalculationVariableExpenses,
+            savingsEntries: fixture.snapshot.savingsEntries,
+            now: date(2026, 6, 15),
+            calendar: calendar
+        )
+        let expectedProjectedSpend = safeSpendSummary.actualSpendSoFar + safeSpendSummary.plannedSpendingRemaining
+        #expect(abs((numericValue(projectedSpend.value) ?? 0) - expectedProjectedSpend) < 0.0001)
 
         let paceDifference = requireMetric(runner.runFormulaAware(
             plan: MarinaUniversalQueryPlan(

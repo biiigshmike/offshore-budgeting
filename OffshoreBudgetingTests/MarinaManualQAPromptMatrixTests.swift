@@ -663,8 +663,38 @@ struct MarinaManualQAPromptMatrixTests {
                 expectedRouting: .universal,
                 expectedScenario: .categoryAvailability,
                 expectedLayer: .universalRouting,
-                notes: "Metric summary only; filtered lists remain deferred.",
+                notes: "Metric summary shape.",
                 request: semanticRequest(entity: .category, operation: .forecast, measure: .categoryAvailability)
+            ),
+            MarinaManualQACase(
+                id: "categoryAvailability.overList",
+                prompt: "Which categories are over limit?",
+                category: .categories,
+                expectedRouting: .universal,
+                expectedScenario: .categoryAvailabilityFilteredList,
+                expectedLayer: .universalRouting,
+                notes: "Filtered category availability over-limit list.",
+                request: categoryAvailabilityListRequest(filter: .over)
+            ),
+            MarinaManualQACase(
+                id: "categoryAvailability.nearList",
+                prompt: "Which categories are near limit?",
+                category: .categories,
+                expectedRouting: .universal,
+                expectedScenario: .categoryAvailabilityFilteredList,
+                expectedLayer: .universalRouting,
+                notes: "Filtered category availability near-limit list.",
+                request: categoryAvailabilityListRequest(filter: .near)
+            ),
+            MarinaManualQACase(
+                id: "categoryAvailability.underList",
+                prompt: "List categories under limit.",
+                category: .categories,
+                expectedRouting: .universal,
+                expectedScenario: .categoryAvailabilityFilteredList,
+                expectedLayer: .universalRouting,
+                notes: "Filtered category availability under-limit list.",
+                request: categoryAvailabilityListRequest(filter: .underLimit)
             ),
             MarinaManualQACase(
                 id: "category.concentration.currentMonth",
@@ -751,36 +781,6 @@ struct MarinaManualQAPromptMatrixTests {
                     whatIfAmount: 50,
                     expectedAnswerShape: .comparison
                 )
-            ),
-            MarinaManualQACase(
-                id: "deferred.categoryAvailability.overList",
-                prompt: "Which categories are over limit?",
-                category: .categories,
-                expectedRouting: .legacyFallback,
-                expectedScenario: nil,
-                expectedLayer: .deferred,
-                notes: "Filtered category availability lists are not allowlisted.",
-                request: categoryAvailabilityListRequest(filter: .over)
-            ),
-            MarinaManualQACase(
-                id: "deferred.categoryAvailability.nearList",
-                prompt: "Which categories are near limit?",
-                category: .categories,
-                expectedRouting: .legacyFallback,
-                expectedScenario: nil,
-                expectedLayer: .deferred,
-                notes: "Filtered category availability lists are not allowlisted.",
-                request: categoryAvailabilityListRequest(filter: .near)
-            ),
-            MarinaManualQACase(
-                id: "deferred.categoryAvailability.underList",
-                prompt: "List categories under limit.",
-                category: .categories,
-                expectedRouting: .legacyFallback,
-                expectedScenario: nil,
-                expectedLayer: .deferred,
-                notes: "Filtered category availability lists are not allowlisted.",
-                request: categoryAvailabilityListRequest(filter: .underLimit)
             ),
             MarinaManualQACase(
                 id: "deferred.forecastSavings.allTime",
@@ -1206,7 +1206,6 @@ struct MarinaManualQAPromptMatrixTests {
             entity: .category,
             operation: .list,
             measure: .categoryAvailability,
-            dimensions: [.category],
             categoryAvailabilityFilter: filter,
             expectedAnswerShape: .list
         )
@@ -1339,6 +1338,10 @@ struct MarinaManualQAPromptMatrixTests {
         let electronics = Offshore.Category(name: "Electronics", hexColor: "#0EA5E9", workspace: workspace)
         let budget = Budget(name: "June", startDate: date(2026, 6, 1), endDate: date(2026, 6, 30), workspace: workspace)
         let phonePreset = Preset(title: "Phone", plannedAmount: 80, workspace: workspace, defaultCard: appleCard, defaultCategory: electronics)
+        budget.categoryLimits = [
+            BudgetCategoryLimit(minAmount: 0, maxAmount: 35, budget: budget, category: groceries),
+            BudgetCategoryLimit(minAmount: 0, maxAmount: 520, budget: budget, category: electronics)
+        ]
 
         let appleStoreJune = VariableExpense(descriptionText: "Apple Store", amount: 120, transactionDate: date(2026, 6, 5), workspace: workspace, card: appleCard, category: electronics)
         let appleMarketJune = VariableExpense(descriptionText: "Apple Market", amount: 18, transactionDate: date(2026, 6, 20), workspace: workspace, card: appleCard, category: groceries)

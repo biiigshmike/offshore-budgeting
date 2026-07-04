@@ -11,6 +11,7 @@ struct MarinaFormulaRequest: Equatable, Sendable {
     let groupBy: MarinaRowGroupTarget?
     let limit: Int?
     let whatIfAmount: Double?
+    let categoryAvailabilityFilter: MarinaCategoryAvailabilityFilter?
 }
 
 enum MarinaFormulaResult: Equatable, Sendable {
@@ -163,7 +164,7 @@ struct MarinaFormulaRegistry: Sendable {
         case (.semantic(.income), .coverageRatio):
             return [.share]
         case (.semantic(.category), .categoryAvailability):
-            return [.forecast]
+            return [.forecast, .list]
         case (.semantic(.category), .concentration):
             return [.share]
         case (.semantic(.preset), .recurringBurden):
@@ -508,6 +509,9 @@ struct MarinaFormulaRegistry: Sendable {
 
         switch request.measure {
         case .categoryAvailability:
+            if request.operation == .list {
+                return categoryAvailabilityList(request: request, snapshot: snapshot, dateRange: dateRange)
+            }
             return categoryAvailabilityMetric(request: request, snapshot: snapshot, dateRange: dateRange)
         case .concentration:
             return categoryConcentrationMetric(request: request, snapshot: snapshot, dateRange: dateRange)
@@ -563,6 +567,83 @@ struct MarinaFormulaRegistry: Sendable {
                 .init(.categoryCount, value: .integer(result.metrics.count), style: .integer)
             ],
             source: .homeCategoryLimitsAggregator
+        )
+    }
+
+    private func categoryAvailabilityList(
+        request: MarinaFormulaRequest,
+        snapshot: MarinaWorkspaceSnapshot,
+        dateRange: HomeQueryDateRange
+    ) -> MarinaFormulaResult {
+        guard let filter = request.categoryAvailabilityFilter,
+              filter != .all else {
+            return .unsupported(.unsupportedCombination)
+        }
+
+        let result = HomeCategoryLimitsAggregator.build(
+            budgets: snapshot.budgets,
+            categories: snapshot.categories,
+            plannedExpenses: snapshot.homeCalculationPlannedExpenses,
+            variableExpenses: snapshot.homeCalculationVariableExpenses,
+            rangeStart: dateRange.startDate,
+            rangeEnd: dateRange.endDate,
+            calendar: calendar
+        )
+
+        guard result.activeBudget != nil,
+              result.metrics.isEmpty == false else {
+            return .unsupported(.unsupportedCombination)
+        }
+
+        let rowLimit = request.limit.map { max($0, 0) } ?? 5
+        let rows = result.metrics
+            .filter { categoryAvailabilityMetric($0, matches: filter) }
+            .prefix(rowLimit)
+            .map { categoryAvailabilityRow(from: $0) }
+
+        guard rows.isEmpty == false else {
+            return .unsupported(.unsupportedCombination)
+        }
+
+        return .rows(Array(rows))
+    }
+
+    private func categoryAvailabilityMetric(
+        _ metric: CategoryAvailabilityMetric,
+        matches filter: MarinaCategoryAvailabilityFilter
+    ) -> Bool {
+        let status = metric.status(for: .all, nearThreshold: HomeCategoryLimitsAggregator.defaultNearThreshold)
+        switch filter {
+        case .all:
+            return true
+        case .over:
+            return metric.isLimited && status == .over
+        case .near:
+            return metric.isLimited && status == .near
+        case .underLimit:
+            return metric.isLimited && status != .over
+        }
+    }
+
+    private func categoryAvailabilityRow(from metric: CategoryAvailabilityMetric) -> MarinaQueryableRow {
+        var fields: [MarinaFieldKey: MarinaValue] = [
+            .id: .text(metric.categoryID.uuidString),
+            .name: .text(metric.name),
+            .amount: .money(metric.spentTotal),
+            .color: .colorHex(metric.colorHex)
+        ]
+
+        if let maxAmount = metric.maxAmount {
+            fields[.plannedAmount] = .money(maxAmount)
+            fields[.actualAmount] = .money(metric.availableRaw(for: .all) ?? 0)
+        }
+
+        return MarinaQueryableRow(
+            id: metric.categoryID,
+            entity: .category,
+            displayName: metric.name,
+            fields: fields,
+            relationships: [:]
         )
     }
 

@@ -112,7 +112,8 @@ struct MarinaUniversalQueryRunner {
                         search: plan.search,
                         groupBy: plan.groupBy,
                         limit: plan.limit,
-                        whatIfAmount: plan.whatIfAmount
+                        whatIfAmount: plan.whatIfAmount,
+                        categoryAvailabilityFilter: plan.categoryAvailabilityFilter
                     ),
                     snapshot: snapshot
                 )

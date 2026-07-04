@@ -131,7 +131,13 @@ extension MarinaShadowParityHarness {
         from result: MarinaUniversalQueryResult,
         request: MarinaSemanticRequest
     ) -> MarinaComparableFact? {
-        guard case let .rows(rows) = result else {
+        let rows: [MarinaQueryableRow]
+        switch result {
+        case let .rows(resultRows):
+            rows = resultRows
+        case let .rowsPage(page):
+            rows = page.rows
+        case .metric, .groups, .unsupported:
             Issue.record("Expected universal rows, got \(result).")
             return nil
         }

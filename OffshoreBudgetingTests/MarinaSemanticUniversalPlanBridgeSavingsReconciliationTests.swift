@@ -270,6 +270,24 @@ struct MarinaSemanticUniversalPlanBridgeSavingsReconciliationTests {
             #expect(plan.measure == testCase.1)
             #expect(plan.dateRange == expectedRange)
         }
+
+        let filteredListPlan = try requirePlan(formulaBridge.makePlan(
+            from: request(
+                entity: .category,
+                operation: .list,
+                measure: .categoryAvailability,
+                dateRangeToken: .currentMonth,
+                categoryAvailabilityFilter: .over,
+                shape: .list
+            ),
+            planningContext: context
+        ))
+
+        #expect(filteredListPlan.surface == .semantic(.category))
+        #expect(filteredListPlan.operation == .list)
+        #expect(filteredListPlan.measure == .categoryAvailability)
+        #expect(filteredListPlan.categoryAvailabilityFilter == .over)
+        #expect(filteredListPlan.dateRange == expectedRange)
     }
 
     @Test func formulaBridgeMapsPresetRecurringBurdenWithDateContext() throws {
@@ -296,7 +314,7 @@ struct MarinaSemanticUniversalPlanBridgeSavingsReconciliationTests {
             operation: .list,
             measure: .categoryAvailability,
             shape: .list
-        )) == .unsupported(.measureNotAvailable))
+        )) == .unsupported(.unsupportedCombination))
 
         #expect(formulaBridge.makePlan(from: request(
             entity: .preset,
@@ -328,6 +346,7 @@ struct MarinaSemanticUniversalPlanBridgeSavingsReconciliationTests {
         targetName: String? = nil,
         textQuery: String? = nil,
         dateRangeToken: MarinaSemanticDateRangeToken = .allTime,
+        categoryAvailabilityFilter: MarinaCategoryAvailabilityFilter? = nil,
         shape: MarinaSemanticAnswerShape
     ) -> MarinaSemanticRequest {
         MarinaSemanticRequest(
@@ -337,6 +356,7 @@ struct MarinaSemanticUniversalPlanBridgeSavingsReconciliationTests {
             dateRangeToken: dateRangeToken,
             targetName: targetName,
             textQuery: textQuery,
+            categoryAvailabilityFilter: categoryAvailabilityFilter,
             expectedAnswerShape: shape
         )
     }

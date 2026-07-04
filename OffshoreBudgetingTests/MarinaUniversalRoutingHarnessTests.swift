@@ -355,6 +355,35 @@ struct MarinaUniversalRoutingHarnessTests {
         try expectRowAmount(concentration.result, title: "Concentration", equals: 1_200.0 / 1_738.0)
     }
 
+    @Test func allowlistedFilteredCategoryAvailabilityListsReturnUniversalResults() throws {
+        let fixture = makeFixture()
+        addCategoryAvailabilityLimits(to: fixture)
+        let cases: [(filter: MarinaCategoryAvailabilityFilter, title: String, rows: [String])] = [
+            (.over, "Categories Over Limit", ["Groceries"]),
+            (.near, "Categories Near Limit", ["Electronics"]),
+            (.underLimit, "Categories Under Limit", ["Electronics"])
+        ]
+
+        for testCase in cases {
+            let request = semanticRequest(
+                entity: .category,
+                operation: .list,
+                measure: .categoryAvailability,
+                categoryAvailabilityFilter: testCase.filter,
+                shape: .list
+            )
+            let universal = try fixture.requireUniversalAttempt(for: request)
+
+            #expect(universal.result.kind == .list)
+            #expect(universal.result.title == testCase.title)
+            #expect(universal.result.subtitle?.isEmpty == false)
+            #expect(universal.result.rows.map(\.title) == testCase.rows)
+            #expect(universal.result.rows.allSatisfy { $0.objectType == .category })
+            #expect(universal.result.rows.allSatisfy { $0.value.contains("Spent") })
+            #expect(universal.diagnostics.scenario == .categoryAvailabilityFilteredList)
+        }
+    }
+
     @Test func allowlistedRemainingFormulaShapesReturnUniversalResults() throws {
         let fixture = makeFixture()
         let recurringRequest = semanticRequest(entity: .preset, operation: .sum, measure: .recurringBurden)
@@ -580,6 +609,7 @@ struct MarinaUniversalRoutingHarnessTests {
         sort: MarinaSemanticSort? = nil,
         expenseScope: MarinaSemanticExpenseScope? = nil,
         incomeState: MarinaSemanticIncomeState? = nil,
+        categoryAvailabilityFilter: MarinaCategoryAvailabilityFilter? = nil,
         shape: MarinaSemanticAnswerShape = .metric
     ) -> MarinaSemanticRequest {
         MarinaSemanticRequest(
@@ -594,8 +624,24 @@ struct MarinaUniversalRoutingHarnessTests {
             sort: sort,
             expenseScope: expenseScope,
             incomeState: incomeState,
+            categoryAvailabilityFilter: categoryAvailabilityFilter,
             expectedAnswerShape: shape
         )
+    }
+
+    private func addCategoryAvailabilityLimits(
+        to fixture: MarinaUniversalRoutingHarnessFixture
+    ) {
+        guard let budget = fixture.snapshot.budgets.first,
+              let groceries = fixture.snapshot.categories.first(where: { $0.name == "Groceries" }),
+              let electronics = fixture.snapshot.categories.first(where: { $0.name == "Electronics" }) else {
+            return
+        }
+
+        budget.categoryLimits = [
+            BudgetCategoryLimit(minAmount: 0, maxAmount: 35, budget: budget, category: groceries),
+            BudgetCategoryLimit(minAmount: 0, maxAmount: 520, budget: budget, category: electronics)
+        ]
     }
 
     private func requireFallback(

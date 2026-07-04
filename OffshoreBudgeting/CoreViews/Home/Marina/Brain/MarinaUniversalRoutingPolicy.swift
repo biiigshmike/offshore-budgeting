@@ -22,6 +22,7 @@ nonisolated enum MarinaUniversalRoutingScenario: String, Codable, CaseIterable, 
     case budgetCoverageRatio
     case incomeCoverageRatio
     case categoryAvailability
+    case categoryAvailabilityFilteredList
     case categoryConcentration
     case presetRecurringBurden
     case forecastSavings
@@ -463,8 +464,18 @@ nonisolated struct MarinaUniversalRoutingPolicy: Equatable, Sendable {
         guard exactDimensions(request, []),
               hasNoNamedTargets(request),
               request.dateRangeToken != .allTime,
-              request.sort == nil,
-              request.categoryAvailabilityFilter == nil else {
+              request.sort == nil else {
+            return nil
+        }
+
+        if request.operation == .list,
+           request.measure == .categoryAvailability,
+           request.expectedAnswerShape == .list,
+           filteredCategoryAvailabilityListFilter(request.categoryAvailabilityFilter) {
+            return .categoryAvailabilityFilteredList
+        }
+
+        guard request.categoryAvailabilityFilter == nil else {
             return nil
         }
 
@@ -483,6 +494,17 @@ nonisolated struct MarinaUniversalRoutingPolicy: Equatable, Sendable {
         _ expectedScope: MarinaSemanticExpenseScope
     ) -> Bool {
         request.expenseScope == nil || request.expenseScope == expectedScope
+    }
+
+    private func filteredCategoryAvailabilityListFilter(
+        _ filter: MarinaCategoryAvailabilityFilter?
+    ) -> Bool {
+        switch filter {
+        case .over, .near, .underLimit:
+            return true
+        case .all, nil:
+            return false
+        }
     }
 
     private func exactDimensions(
@@ -618,6 +640,7 @@ extension MarinaUniversalRoutingPolicy {
             .budgetCoverageRatio,
             .incomeCoverageRatio,
             .categoryAvailability,
+            .categoryAvailabilityFilteredList,
             .categoryConcentration,
             .presetRecurringBurden,
             .forecastSavings,

@@ -212,6 +212,10 @@ struct MarinaUniversalResultPresenter {
         plan: MarinaUniversalQueryPlan,
         context: MarinaUniversalPresentationContext
     ) -> MarinaExecutionResult {
+        if isCategoryAvailabilityList(plan) {
+            return categoryAvailabilityRowsResult(rows, plan: plan, context: context)
+        }
+
         guard rows.isEmpty == false else {
             return emptyResult(plan: plan, context: context)
         }
@@ -331,6 +335,48 @@ struct MarinaUniversalResultPresenter {
             amount: amount(for: row, plan: plan),
             date: date(for: row),
             role: role
+        )
+    }
+
+    private func categoryAvailabilityRowsResult(
+        _ rows: [MarinaQueryableRow],
+        plan: MarinaUniversalQueryPlan,
+        context: MarinaUniversalPresentationContext
+    ) -> MarinaExecutionResult {
+        guard rows.isEmpty == false else {
+            return emptyResult(plan: plan, context: context)
+        }
+
+        return MarinaExecutionResult(
+            kind: .list,
+            title: categoryAvailabilityTitle(for: plan.categoryAvailabilityFilter),
+            subtitle: context.dateRange.map {
+                categoryAvailabilityPeriodLabel($0, calendar: context.calendar)
+            },
+            rows: rows.map { categoryAvailabilityRow(from: $0) }
+        )
+    }
+
+    private func categoryAvailabilityRow(from row: MarinaQueryableRow) -> HomeAnswerRow {
+        let spentTotal = numericValue(row.fields[.amount]) ?? 0
+        let value: String
+        if let maxAmount = numericValue(row.fields[.plannedAmount]) {
+            let available = numericValue(row.fields[.actualAmount]) ?? 0
+            let availability = available < 0
+                ? "Over \(CurrencyFormatter.string(from: abs(available)))"
+                : "Remaining \(CurrencyFormatter.string(from: available))"
+            value = "\(availability) • Spent \(CurrencyFormatter.string(from: spentTotal)) of \(CurrencyFormatter.string(from: maxAmount))"
+        } else {
+            value = "Unlimited • Spent \(CurrencyFormatter.string(from: spentTotal))"
+        }
+
+        return HomeAnswerRow(
+            title: row.displayName,
+            value: value,
+            sourceID: row.id,
+            objectType: .category,
+            amount: spentTotal,
+            role: .result
         )
     }
 
@@ -528,6 +574,40 @@ struct MarinaUniversalResultPresenter {
              .reconciliationLedgerEntries:
             return false
         }
+    }
+
+    private func isCategoryAvailabilityList(_ plan: MarinaUniversalQueryPlan) -> Bool {
+        plan.surface == .semantic(.category)
+            && plan.operation == .list
+            && plan.measure == .categoryAvailability
+    }
+
+    private func categoryAvailabilityTitle(for filter: MarinaCategoryAvailabilityFilter?) -> String {
+        switch filter ?? .all {
+        case .all:
+            return "Category Availability"
+        case .over:
+            return "Categories Over Limit"
+        case .near:
+            return "Categories Near Limit"
+        case .underLimit:
+            return "Categories Under Limit"
+        }
+    }
+
+    private func categoryAvailabilityPeriodLabel(_ range: HomeQueryDateRange, calendar: Calendar) -> String {
+        let start = calendar.startOfDay(for: range.startDate)
+        let end = calendar.startOfDay(for: range.endDate)
+        if let interval = calendar.dateInterval(of: .month, for: start) {
+            let monthStart = calendar.startOfDay(for: interval.start)
+            let monthEnd = calendar.date(byAdding: .day, value: -1, to: interval.end).map {
+                calendar.startOfDay(for: $0)
+            }
+            if start == monthStart, end == monthEnd {
+                return start.formatted(.dateTime.month(.wide).year())
+            }
+        }
+        return "\(shortDate(range.startDate)) - \(shortDate(range.endDate))"
     }
 
     private func displayTarget(in context: MarinaUniversalPresentationContext) -> String? {

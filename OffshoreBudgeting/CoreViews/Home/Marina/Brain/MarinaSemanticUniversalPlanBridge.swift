@@ -50,6 +50,10 @@ struct MarinaSemanticUniversalPlanBridge {
             return .unsupported(.unsupportedCombination)
         }
 
+        guard supportedFormulaVariant(request) else {
+            return .unsupported(.unsupportedCombination)
+        }
+
         guard supportedOperations.contains(request.operation)
             || formulaSupports(request: request, surface: surface) else {
             return .unsupported(.unsupportedCombination)
@@ -167,6 +171,7 @@ struct MarinaSemanticUniversalPlanBridge {
                 dateRange: resolvedDateContext?.dateRange,
                 comparisonDateRange: resolvedDateContext?.comparisonDateRange,
                 whatIfAmount: request.whatIfAmount,
+                categoryAvailabilityFilter: request.categoryAvailabilityFilter,
                 requiresDateField: requiresDateField(
                     for: request,
                     surface: surface,
@@ -202,6 +207,21 @@ struct MarinaSemanticUniversalPlanBridge {
 
     private var dateFilteredEntities: Set<MarinaSemanticEntity> {
         [.variableExpense, .plannedExpense, .income]
+    }
+
+    private func supportedFormulaVariant(_ request: MarinaSemanticRequest) -> Bool {
+        guard request.entity == .category,
+              request.operation == .list,
+              request.measure == .categoryAvailability else {
+            return true
+        }
+
+        switch request.categoryAvailabilityFilter {
+        case .over, .near, .underLimit:
+            return true
+        case .all, nil:
+            return false
+        }
     }
 
     private func supportedSurface(_ surface: MarinaUniversalEntitySurface) -> Bool {

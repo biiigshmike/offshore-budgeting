@@ -26,6 +26,7 @@ nonisolated struct MarinaUniversalQueryPlan: Equatable, Sendable {
     let dateRange: HomeQueryDateRange?
     let comparisonDateRange: HomeQueryDateRange?
     let whatIfAmount: Double?
+    let categoryAvailabilityFilter: MarinaCategoryAvailabilityFilter?
     let requiresDateField: Bool
     let requiresAmountField: Bool
 
@@ -45,6 +46,7 @@ nonisolated struct MarinaUniversalQueryPlan: Equatable, Sendable {
         dateRange: HomeQueryDateRange? = nil,
         comparisonDateRange: HomeQueryDateRange? = nil,
         whatIfAmount: Double? = nil,
+        categoryAvailabilityFilter: MarinaCategoryAvailabilityFilter? = nil,
         requiresDateField: Bool = false,
         requiresAmountField: Bool = false
     ) {
@@ -60,6 +62,7 @@ nonisolated struct MarinaUniversalQueryPlan: Equatable, Sendable {
             dateRange: dateRange,
             comparisonDateRange: comparisonDateRange,
             whatIfAmount: whatIfAmount,
+            categoryAvailabilityFilter: categoryAvailabilityFilter,
             requiresDateField: requiresDateField,
             requiresAmountField: requiresAmountField
         )
@@ -77,6 +80,7 @@ nonisolated struct MarinaUniversalQueryPlan: Equatable, Sendable {
         dateRange: HomeQueryDateRange? = nil,
         comparisonDateRange: HomeQueryDateRange? = nil,
         whatIfAmount: Double? = nil,
+        categoryAvailabilityFilter: MarinaCategoryAvailabilityFilter? = nil,
         requiresDateField: Bool = false,
         requiresAmountField: Bool = false
     ) {
@@ -91,6 +95,7 @@ nonisolated struct MarinaUniversalQueryPlan: Equatable, Sendable {
         self.dateRange = dateRange
         self.comparisonDateRange = comparisonDateRange
         self.whatIfAmount = whatIfAmount
+        self.categoryAvailabilityFilter = categoryAvailabilityFilter
         self.requiresDateField = requiresDateField
         self.requiresAmountField = requiresAmountField
     }

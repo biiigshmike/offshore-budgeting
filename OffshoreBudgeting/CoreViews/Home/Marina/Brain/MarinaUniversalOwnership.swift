@@ -59,6 +59,7 @@ struct MarinaUniversalOwnershipRegistry: Sendable {
         universalOwned(.budgetCoverageRatio, "Budget coverage ratio has shadow, presentation, and debug-routing parity."),
         universalOwned(.incomeCoverageRatio, "Income coverage ratio has shadow, presentation, and debug-routing parity."),
         universalOwned(.categoryAvailability, "Category availability has shadow, presentation, and debug-routing parity for the exact metric shape."),
+        universalOwned(.categoryAvailabilityFilteredList, "Filtered category availability lists have legacy shape, shadow, presentation, and debug-routing parity for over, near, and under-limit requests."),
         universalOwned(.categoryConcentration, "Category concentration has shadow, presentation, and debug-routing parity for the exact metric shape."),
         universalOwned(.presetRecurringBurden, "Preset recurring burden has shadow, presentation, and debug-routing parity for the exact metric shape."),
         universalOwned(.forecastSavings, "Forecast savings has shadow, presentation, and debug-routing parity for the exact metric shape."),
