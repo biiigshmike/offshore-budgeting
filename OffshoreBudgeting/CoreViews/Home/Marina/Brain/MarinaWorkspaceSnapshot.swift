@@ -18,51 +18,6 @@ struct MarinaWorkspaceSnapshot {
     let savingsAccounts: [SavingsAccount]
     let savingsEntries: [SavingsLedgerEntry]
     let incomes: [Income]
-    let incomeSeries: [IncomeSeries]
-    let importMerchantRules: [ImportMerchantRule]
-    let assistantAliasRules: [AssistantAliasRule]
-
-    init(
-        workspace: Workspace,
-        budgets: [Budget],
-        cards: [Card],
-        categories: [Category],
-        presets: [Preset],
-        plannedExpenses: [PlannedExpense],
-        variableExpenses: [VariableExpense],
-        homePlannedExpenses: [PlannedExpense],
-        homeCalculationPlannedExpenses: [PlannedExpense],
-        homeCalculationVariableExpenses: [VariableExpense],
-        reconciliationAccounts: [AllocationAccount],
-        expenseAllocations: [ExpenseAllocation],
-        allocationSettlements: [AllocationSettlement],
-        savingsAccounts: [SavingsAccount],
-        savingsEntries: [SavingsLedgerEntry],
-        incomes: [Income],
-        incomeSeries: [IncomeSeries] = [],
-        importMerchantRules: [ImportMerchantRule] = [],
-        assistantAliasRules: [AssistantAliasRule] = []
-    ) {
-        self.workspace = workspace
-        self.budgets = budgets
-        self.cards = cards
-        self.categories = categories
-        self.presets = presets
-        self.plannedExpenses = plannedExpenses
-        self.variableExpenses = variableExpenses
-        self.homePlannedExpenses = homePlannedExpenses
-        self.homeCalculationPlannedExpenses = homeCalculationPlannedExpenses
-        self.homeCalculationVariableExpenses = homeCalculationVariableExpenses
-        self.reconciliationAccounts = reconciliationAccounts
-        self.expenseAllocations = expenseAllocations
-        self.allocationSettlements = allocationSettlements
-        self.savingsAccounts = savingsAccounts
-        self.savingsEntries = savingsEntries
-        self.incomes = incomes
-        self.incomeSeries = incomeSeries
-        self.importMerchantRules = importMerchantRules
-        self.assistantAliasRules = assistantAliasRules
-    }
 }
 
 @MainActor
@@ -147,24 +102,6 @@ struct MarinaWorkspaceSnapshotProvider {
                 sortBy: [SortDescriptor(\Income.date, order: .forward)]
             )
         )
-        let incomeSeries = try modelContext.fetch(
-            FetchDescriptor<IncomeSeries>(
-                predicate: #Predicate<IncomeSeries> { $0.workspace?.id == workspaceID },
-                sortBy: [SortDescriptor(\IncomeSeries.source, order: .forward)]
-            )
-        )
-        let importMerchantRules = try modelContext.fetch(
-            FetchDescriptor<ImportMerchantRule>(
-                predicate: #Predicate<ImportMerchantRule> { $0.workspace?.id == workspaceID },
-                sortBy: [SortDescriptor(\ImportMerchantRule.merchantKey, order: .forward)]
-            )
-        )
-        let assistantAliasRules = try modelContext.fetch(
-            FetchDescriptor<AssistantAliasRule>(
-                predicate: #Predicate<AssistantAliasRule> { $0.workspace?.id == workspaceID },
-                sortBy: [SortDescriptor(\AssistantAliasRule.aliasKey, order: .forward)]
-            )
-        )
         let existingBudgetIDs = Set(budgets.map(\.id))
         let homePlannedExpenses = plannedExpenses.filter { expense in
             guard let sourceBudgetID = expense.sourceBudgetID else {
@@ -199,10 +136,7 @@ struct MarinaWorkspaceSnapshotProvider {
             allocationSettlements: allocationSettlements,
             savingsAccounts: savingsAccounts,
             savingsEntries: savingsEntries,
-            incomes: incomes,
-            incomeSeries: incomeSeries,
-            importMerchantRules: importMerchantRules,
-            assistantAliasRules: assistantAliasRules
+            incomes: incomes
         )
     }
 }

@@ -28,11 +28,6 @@ struct DateRange: Equatable {
         }
     }
 
-    private init(exactStart: Date, exactEnd: Date) {
-        self.start = exactStart
-        self.end = exactEnd
-    }
-
     // MARK: - Public
 
     func overlaps(_ other: DateRange) -> Bool {
@@ -45,7 +40,7 @@ struct DateRange: Equatable {
         let intersectionEnd = min(self.end, other.end)
 
         guard intersectionStart <= intersectionEnd else { return nil }
-        return DateRange(exactStart: intersectionStart, exactEnd: intersectionEnd)
+        return DateRange(start: intersectionStart, end: intersectionEnd)
     }
 
     /// Inclusive overlap days (e.g. Jan 1..Jan 1 = 1 day).

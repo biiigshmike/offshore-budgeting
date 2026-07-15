@@ -31,8 +31,9 @@ struct MarinaAnswerDebugTrace: Equatable, Sendable {
     }
 
     enum ExecutionRoute: String, Equatable, Sendable {
+        case legacy
         case universal
-        case notExecuted
+        case legacyFallback
     }
 
     let originalPrompt: String
@@ -42,7 +43,7 @@ struct MarinaAnswerDebugTrace: Equatable, Sendable {
     let interpretedSource: MarinaSemanticSource
     let interpretedConfidence: MarinaSemanticConfidence
     let interpretedNotes: [String]
-    let compilerAttempts: [MarinaFoundationModelAttemptDiagnostic]
+    let explicitPromptTargets: [String]
     let candidateSearches: [MarinaCandidateSearchTrace]
     let resolverOutput: MarinaSemanticRequest
     let validatorOutput: MarinaSemanticRequest
@@ -50,7 +51,9 @@ struct MarinaAnswerDebugTrace: Equatable, Sendable {
     let validatorNotes: [String]
     let queryPlan: MarinaQueryPlanTrace
     let executionRoute: ExecutionRoute
-    let executionSucceeded: Bool
+    let universalScenario: MarinaUniversalRoutingScenario?
+    let universalFallbackReason: MarinaUniversalFallbackReason?
+    let universalNotes: [String]
     let rowCount: Int
     let evidenceRowSummaries: [String]
     let answerKind: HomeAnswerKind
@@ -65,9 +68,9 @@ struct MarinaAnswerDebugTrace: Equatable, Sendable {
             "priorContextChangedRequest=\(priorContextChangedRequest)",
             "source=\(interpretedSource.rawValue)",
             "confidence=\(interpretedConfidence.rawValue)",
-            "compilerAttempts=\(Self.list(compilerAttempts.map(\.diagnosticNote)))",
             "interpreted=\(Self.summary(interpretedRequest))",
             "interpretedNotes=\(Self.list(interpretedNotes))",
+            "explicitPromptTargets=\(explicitPromptTargets.joined(separator: ", "))",
             "candidateSearches=\(candidateSearches.map(\.debugDescription).joined(separator: " || "))",
             "resolverOutput=\(Self.summary(resolverOutput))",
             "validatorOutput=\(Self.summary(validatorOutput))",
@@ -75,7 +78,9 @@ struct MarinaAnswerDebugTrace: Equatable, Sendable {
             "validatorNotes=\(Self.list(validatorNotes))",
             "queryPlan=\(queryPlan.debugDescription)",
             "executionRoute=\(executionRoute.rawValue)",
-            "executionSucceeded=\(executionSucceeded)",
+            "universalScenario=\(universalScenario?.rawValue ?? "none")",
+            "universalFallbackReason=\(universalFallbackReason?.rawValue ?? "none")",
+            "universalNotes=\(Self.list(universalNotes))",
             "rowCount=\(rowCount)",
             "evidenceRows=\(evidenceRowSummaries.joined(separator: " | "))",
             "answer=\(answerKind.rawValue) title=\(answerTitle) value=\(answerPrimaryValue ?? "none")",

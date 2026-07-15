@@ -64,6 +64,91 @@ enum MarinaRecommendedFollowUp {
         }
     }
 
+    static func isAffirmative(_ prompt: String) -> Bool {
+        affirmativeReplies.contains(normalized(prompt))
+    }
+
+    static func isNegative(_ prompt: String) -> Bool {
+        negativeReplies.contains(normalized(prompt))
+    }
+
+    private static let affirmativeReplies: Set<String> = [
+        "absolutely",
+        "affirmative",
+        "all right",
+        "alright",
+        "do it",
+        "do that",
+        "fine",
+        "go ahead",
+        "go for it",
+        "i am in",
+        "im in",
+        "lets",
+        "lets do it",
+        "lets go",
+        "of course",
+        "ok",
+        "okay",
+        "please",
+        "please do",
+        "run it",
+        "show me",
+        "show me that",
+        "sounds great",
+        "sounds good",
+        "sounds good to me",
+        "sure",
+        "sure thing",
+        "that works",
+        "totally",
+        "works for me",
+        "y",
+        "yes",
+        "yeah",
+        "yep",
+        "yes please",
+        "yup"
+    ]
+
+    private static let negativeReplies: Set<String> = [
+        "all set",
+        "cancel",
+        "cancel that",
+        "do not",
+        "do not do it",
+        "dont",
+        "dont do it",
+        "i am good",
+        "im good",
+        "leave it",
+        "maybe later",
+        "n",
+        "nah",
+        "nah thanks",
+        "never mind",
+        "nevermind",
+        "no",
+        "no need",
+        "no thank you",
+        "no thanks",
+        "no thats okay",
+        "nope",
+        "nope thanks",
+        "not interested",
+        "not necessary",
+        "not needed",
+        "not now",
+        "not right now",
+        "not this time",
+        "not today",
+        "pass",
+        "skip",
+        "skip it",
+        "stop",
+        "thanks but no"
+    ]
+
     private static func suggestion(
         in followUps: [MarinaFollowUpSuggestion],
         mode: MarinaFollowUpExecutionMode
@@ -104,17 +189,17 @@ enum MarinaRecommendedFollowUp {
 
     private static func reasonRank(_ reason: MarinaFollowUpSuggestion.Reason) -> Int {
         switch reason {
-        case .showMore:
-            return 0
         case .whatIf:
-            return 1
+            return 0
         case .safeDailySpend:
-            return 2
+            return 1
         case .breakdown:
-            return 3
+            return 2
         case .comparePreviousPeriod:
-            return 4
+            return 3
         case .inspectRows:
+            return 4
+        case .showMore:
             return 5
         case .forecast:
             return 6
@@ -149,13 +234,13 @@ enum MarinaRecommendedFollowUp {
             return MarinaL10n.string("marina.followUp.confirmation.compareCard", defaultValue: "Want to compare this card to last period?", comment: "Confirmation question for comparing a card to the last period.")
         case .some(.budget):
             return MarinaL10n.string("marina.followUp.confirmation.compareBudget", defaultValue: "Want to compare this budget to last period?", comment: "Confirmation question for comparing a budget to the last period.")
-        case .some(.workspace), .some(.plannedExpense), .some(.variableExpense), .some(.reconciliationAccount), .some(.savingsAccount), .some(.incomeSeries), .some(.preset), .none:
+        case .some(.workspace), .some(.plannedExpense), .some(.variableExpense), .some(.reconciliationAccount), .some(.savingsAccount), .some(.preset), .none:
             return MarinaL10n.string("marina.followUp.confirmation.compareGeneric", defaultValue: "Want to compare this to last period?", comment: "Generic confirmation question for a previous-period follow-up.")
         }
     }
 
     private static func whatIfQuestion(for followUp: MarinaFollowUpSuggestion) -> String {
-        let amount = followUp.semanticRequest?.whatIfAmount
+        let amount = followUp.semanticRequest?.whatIfAmount ?? amountInPrompt(followUp.prompt)
         let amountPhrase = amount.map { shortCurrency($0) } ?? MarinaL10n.string("marina.followUp.confirmation.whatIfAmountFallback", defaultValue: "that amount", comment: "Fallback amount phrase for a what-if follow-up.")
         return MarinaL10n.format("marina.followUp.confirmation.whatIfFormat", defaultValue: "Want to see what happens if you spend %@?", comment: "Confirmation question for a what-if follow-up.", amountPhrase)
     }
@@ -186,6 +271,16 @@ enum MarinaRecommendedFollowUp {
         return trimmed.isEmpty ? nil : trimmed
     }
 
+    private static func amountInPrompt(_ prompt: String) -> Double? {
+        let pattern = #"(?<!\d)(\d+(?:\.\d+)?)(?!\d)"#
+        guard let regex = try? NSRegularExpression(pattern: pattern),
+              let match = regex.firstMatch(in: prompt, range: NSRange(prompt.startIndex..., in: prompt)),
+              let range = Range(match.range(at: 1), in: prompt) else {
+            return nil
+        }
+        return Double(prompt[range])
+    }
+
     nonisolated private static func shortCurrency(_ value: Double) -> String {
         if abs(value.rounded() - value) < 0.0001 {
             return "$\(Int(value.rounded()))"
@@ -193,4 +288,21 @@ enum MarinaRecommendedFollowUp {
         return "$\(String(format: "%.2f", value))"
     }
 
+    private static func normalized(_ value: String) -> String {
+        let folded = value
+            .replacingOccurrences(of: "’", with: "'")
+            .replacingOccurrences(of: "‘", with: "'")
+            .replacingOccurrences(of: "“", with: "\"")
+            .replacingOccurrences(of: "”", with: "\"")
+            .replacingOccurrences(of: ",", with: "")
+            .replacingOccurrences(of: "let's", with: "lets", options: .caseInsensitive)
+            .replacingOccurrences(of: "don't", with: "dont", options: .caseInsensitive)
+            .replacingOccurrences(of: "i'm", with: "im", options: .caseInsensitive)
+
+        return folded
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .trimmingCharacters(in: CharacterSet(charactersIn: ".!?;:"))
+            .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+            .lowercased()
+    }
 }

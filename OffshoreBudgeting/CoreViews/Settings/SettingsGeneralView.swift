@@ -284,6 +284,7 @@ private struct SettingsMaintenanceView: View {
     @AppStorage("debug_tabFlickerDiagnosticsEnabled") private var tabFlickerDiagnosticsEnabled: Bool = false
     @AppStorage("debug_tabFlickerVerboseEventsEnabled") private var tabFlickerVerboseEventsEnabled: Bool = false
     @AppStorage("debug_resumeTraceEnabled") private var resumeTraceEnabled: Bool = false
+    @AppStorage(MarinaUniversalRoutingDebugFlagResolver.key) private var marinaUniversalRoutingEnabled: Bool = false
     #endif
 
     var body: some View {
@@ -322,6 +323,8 @@ private struct SettingsMaintenanceView: View {
                 Toggle("Resume Trace", isOn: $resumeTraceEnabled)
                     .tint(Color("AccentColor"))
 
+                Toggle("Marina Universal Routing", isOn: $marinaUniversalRoutingEnabled)
+                    .tint(Color("AccentColor"))
             } header: {
                 Text("Debug Diagnostics")
             } footer: {

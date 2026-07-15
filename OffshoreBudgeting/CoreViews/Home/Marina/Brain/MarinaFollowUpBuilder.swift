@@ -5,7 +5,6 @@ struct MarinaFollowUpBuilder {
         for context: MarinaAnswerSemanticContext
     ) -> [MarinaFollowUpSuggestion] {
         guard context.request.expectedAnswerShape != .clarification,
-              context.request.expectedAnswerShape != .acknowledgement,
               context.request.expectedAnswerShape != .unsupported else {
             return []
         }
@@ -29,7 +28,7 @@ struct MarinaFollowUpBuilder {
             suggestions.append(contentsOf: incomeFollowUps(for: context))
         case .card:
             suggestions.append(contentsOf: cardFollowUps(for: context))
-        case .workspace, .plannedExpense, .variableExpense, .reconciliationAccount, .savingsAccount, .incomeSeries, .preset:
+        case .workspace, .plannedExpense, .variableExpense, .reconciliationAccount, .savingsAccount, .preset:
             break
         }
 
@@ -260,16 +259,14 @@ struct MarinaFollowUpBuilder {
     private func listFollowUps(for context: MarinaAnswerSemanticContext) -> [MarinaFollowUpSuggestion] {
         var suggestions: [MarinaFollowUpSuggestion] = []
         let displayedCount = context.displayedRowCount ?? context.rowReferences.count
-        let consumedCount = context.nextOffset ?? displayedCount
-        let remainingCount = context.totalRowCount.map { max($0 - consumedCount, 0) }
-        if context.hasMore == true,
-           let nextOffset = context.nextOffset,
-           remainingCount == nil || (remainingCount ?? 0) > 0 {
+        let remainingCount = context.totalRowCount.map { max($0 - displayedCount, 0) }
+        // TODO(Marina pagination): future long-result cards should show the first
+        // 8-10 rows, keep the full total visible, include "Showing 10 of 22",
+        // support Show more, avoid duplicate rows, and keep totals stable.
+        if remainingCount == nil || (remainingCount ?? 0) > 0 {
             var moreRequest = context.request
-            moreRequest.continuationIntent = .showMore
             moreRequest.expectedAnswerShape = .list
-            moreRequest.resultLimit = context.request.resultLimit
-            moreRequest.resultOffset = nextOffset
+            moreRequest.resultLimit = min(max((context.request.resultLimit ?? displayedCount) + 5, 10), HomeQuery.maxResultLimit)
             suggestions.append(
                 suggestion(
                     title: MarinaL10n.string("marina.followUp.list.more.title", defaultValue: "Show more", comment: "Follow-up title for showing more rows."),
@@ -397,7 +394,7 @@ struct MarinaFollowUpBuilder {
         switch request.entity {
         case .variableExpense, .plannedExpense:
             return true
-        case .workspace, .budget, .card, .reconciliationAccount, .savingsAccount, .income, .incomeSeries, .category, .preset:
+        case .workspace, .budget, .card, .reconciliationAccount, .savingsAccount, .income, .category, .preset:
             return false
         }
     }
@@ -413,7 +410,7 @@ struct MarinaFollowUpBuilder {
             return context.request.dimensions.contains(.category) == false
         case .category:
             return context.request.operation != .group
-        case .workspace, .budget, .reconciliationAccount, .savingsAccount, .income, .incomeSeries, .preset:
+        case .workspace, .budget, .reconciliationAccount, .savingsAccount, .income, .preset:
             return false
         }
     }
@@ -449,7 +446,7 @@ struct MarinaFollowUpBuilder {
         switch context.request.entity {
         case .category, .variableExpense, .plannedExpense, .budget, .card:
             return true
-        case .workspace, .reconciliationAccount, .savingsAccount, .income, .incomeSeries, .preset:
+        case .workspace, .reconciliationAccount, .savingsAccount, .income, .preset:
             return false
         }
     }

@@ -202,17 +202,6 @@ struct MarinaRowOperationEngineTests {
         #expect(engine.limit(fixture.variableRows, to: nil) == fixture.variableRows)
     }
 
-    @Test func pageReturnsStableNonoverlappingSlice() throws {
-        let fixture = try makeFixture()
-
-        let firstPage = engine.page(fixture.variableRows, offset: 0, limit: 2)
-        let secondPage = engine.page(fixture.variableRows, offset: 2, limit: 2)
-
-        #expect(rowNames(firstPage) == ["Apple Store", "Apple Market"])
-        #expect(rowNames(secondPage) == ["Kroger", "Trader Joe's"])
-        #expect(Set(firstPage.map(\.id)).isDisjoint(with: Set(secondPage.map(\.id))))
-    }
-
     @Test func unsupportedFieldValueComparisonsDoNotCrash() throws {
         let fixture = try makeFixture()
         let textComparedToMoney = engine.filter(

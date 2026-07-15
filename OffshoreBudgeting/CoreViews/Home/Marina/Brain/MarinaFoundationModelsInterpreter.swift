@@ -1,480 +1,201 @@
-import Dispatch
 import Foundation
 
 #if canImport(FoundationModels)
 import FoundationModels
 
 @available(iOS 26.0, macCatalyst 26.0, *)
-nonisolated enum MarinaFoundationModelGenerationFailure: String, Equatable, Sendable {
-    case decodingFailure
-    case unsupportedGuide
-    case cancelled
-    case unexpected
+@Generable(description: "A compact semantic request for a read-only budgeting assistant.")
+fileprivate struct MarinaGeneratedSemanticRequest {
+    @Guide(description: "One of: workspace, budget, card, plannedExpense, variableExpense, reconciliationAccount, savingsAccount, income, category, preset. For generic spend on a named target whose type is unclear, use variableExpense and let Marina resolve the target.")
+    var entity: String
 
-    var rejectionCode: String { "generation.\(rawValue)" }
+    @Guide(description: "One of: list, count, sum, average, compare, last, next, group, share, forecast, whatIf.")
+    var operation: String
 
-    var isRetryable: Bool {
-        self == .decodingFailure
-    }
-}
+    @Guide(description: "Optional measure: amount, plannedAmount, actualAmount, effectiveAmount, budgetImpact, savingsTotal, incomeAmount, reconciliationBalance, categoryAvailability, remainingRoom, burnRate, projectedSpend, safeDailySpend, paceDifference, coverageRatio, recurringBurden, concentration, color, name.")
+    var measure: String?
 
-@available(iOS 26.0, macCatalyst 26.0, *)
-nonisolated enum MarinaFoundationModelInvalidOutcome: String, Equatable, Sendable {
-    case emptyNamedBudget
-    case emptyTarget
-    case emptyComparisonTarget
-    case emptyNamedFilter
-    case invalidResultLimit
-    case dateContextWithoutPriorRequest
-    case continuationWithoutContext
-    case continuationWithoutOffset
-    case clarificationSelectionWithoutContext
-    case clarificationSelectionOutOfBounds
-    case followUpDecisionWithoutContext
-    case followUpAcceptanceWithoutExecutableRequest
+    @Guide(description: "Dimensions such as category, card, merchantText, incomeSource, preset, reconciliationAccount, date. Use a dimension only when the user's wording explicitly identifies that kind of target.")
+    var dimensions: [String]
 
-    var rejectionCode: String { "compiler.\(rawValue)" }
+    @Guide(description: "One of: currentPeriod, previousPeriod, currentMonth, previousMonth, yearToDate, nextSevenDays, allTime.")
+    var dateRangeToken: String
 
-    var reason: String {
-        switch self {
-        case .emptyNamedBudget: "The named budget wording was empty."
-        case .emptyTarget: "The primary target wording was empty."
-        case .emptyComparisonTarget: "The comparison target wording was empty."
-        case .emptyNamedFilter: "A generated named-filter value was empty."
-        case .invalidResultLimit: "The result limit was outside the supported range."
-        case .dateContextWithoutPriorRequest: "A conversation-context date was generated without trusted prior context."
-        case .continuationWithoutContext: "A show-more continuation was generated without trusted prior context."
-        case .continuationWithoutOffset: "A show-more continuation had no trusted next offset."
-        case .clarificationSelectionWithoutContext: "A clarification selection was generated without trusted choices."
-        case .clarificationSelectionOutOfBounds: "The generated clarification selection was outside the trusted choices."
-        case .followUpDecisionWithoutContext: "A follow-up decision was generated without a trusted offered follow-up."
-        case .followUpAcceptanceWithoutExecutableRequest: "The accepted follow-up had no trusted executable request."
-        }
-    }
-}
+    @Guide(description: "The raw primary target text, like Apple, Apple Card, Grocery, Groceries, Salary, or Alejandro. Preserve the user's target wording when the type is unclear.")
+    var targetName: String?
 
-@available(iOS 26.0, macCatalyst 26.0, *)
-nonisolated enum MarinaFoundationModelInterpretationError: LocalizedError, Equatable, Sendable {
-    case generationFailed(MarinaFoundationModelGenerationFailure)
-    case invalidGeneratedOutcome(MarinaFoundationModelInvalidOutcome)
+    @Guide(description: "The second named entity for compare requests. Leave empty if none.")
+    var comparisonTargetName: String?
 
-    var errorDescription: String? {
-        switch self {
-        case .generationFailed(.decodingFailure):
-            return "Marina's on-device model could not decode a semantic request."
-        case .generationFailed(.unsupportedGuide):
-            return "Marina's on-device model does not support part of the semantic schema."
-        case .generationFailed(.cancelled):
-            return "Marina's on-device semantic request was cancelled."
-        case .generationFailed(.unexpected):
-            return "Marina's on-device model could not generate a semantic request."
-        case .invalidGeneratedOutcome(let invalid):
-            return "\(invalid.rejectionCode): \(invalid.reason)"
-        }
-    }
+    @Guide(description: "Expense title/description text to search. Use only when the user explicitly says merchant, store, vendor, title, description, or clearly asks for expense text.")
+    var textQuery: String?
 
-    var rejectionCode: String {
-        attemptRejectionCode.rawValue
-    }
+    @Guide(description: "Requested list limit, from 1 to 20. Leave empty when not a list.")
+    var resultLimit: Int?
 
-    var attemptRejectionCode: MarinaFoundationModelAttemptRejectionCode {
-        switch self {
-        case .generationFailed(let failure):
-            .generation(failure.attemptDiagnosticCode)
-        case .invalidGeneratedOutcome(let invalid):
-            .compiler(invalid.attemptDiagnosticCode)
-        }
-    }
-}
+    @Guide(description: "Sort mode: dateAscending, dateDescending, amountAscending, amountDescending, nameAscending.")
+    var sort: String?
 
-@available(iOS 26.0, macCatalyst 26.0, *)
-private extension MarinaFoundationModelGenerationFailure {
-    nonisolated var attemptDiagnosticCode: MarinaFoundationModelAttemptRejectionCode.Generation {
-        switch self {
-        case .decodingFailure: .decodingFailure
-        case .unsupportedGuide: .unsupportedGuide
-        case .cancelled: .cancelled
-        case .unexpected: .unexpected
-        }
-    }
-}
+    @Guide(description: "Expense scope: planned, variable, unified.")
+    var expenseScope: String?
 
-@available(iOS 26.0, macCatalyst 26.0, *)
-private extension MarinaFoundationModelInvalidOutcome {
-    nonisolated var attemptDiagnosticCode: MarinaFoundationModelAttemptRejectionCode.Compiler {
-        switch self {
-        case .emptyNamedBudget: .emptyNamedBudget
-        case .emptyTarget: .emptyTarget
-        case .emptyComparisonTarget: .emptyComparisonTarget
-        case .emptyNamedFilter: .emptyNamedFilter
-        case .invalidResultLimit: .invalidResultLimit
-        case .dateContextWithoutPriorRequest: .dateContextWithoutPriorRequest
-        case .continuationWithoutContext: .continuationWithoutContext
-        case .continuationWithoutOffset: .continuationWithoutOffset
-        case .clarificationSelectionWithoutContext: .clarificationSelectionWithoutContext
-        case .clarificationSelectionOutOfBounds: .clarificationSelectionOutOfBounds
-        case .followUpDecisionWithoutContext: .followUpDecisionWithoutContext
-        case .followUpAcceptanceWithoutExecutableRequest: .followUpAcceptanceWithoutExecutableRequest
-        }
-    }
-}
+    @Guide(description: "Income state: planned, actual, all.")
+    var incomeState: String?
 
-@available(iOS 26.0, macCatalyst 26.0, *)
-nonisolated enum MarinaFoundationModelRuntimeResult: Equatable, Sendable {
-    case generated(
-        MarinaFoundationModelGeneratedOutcomeV3,
-        generationMetadata: MarinaFoundationModelGenerationDiagnosticMetadata? = nil,
-        diagnosticNotes: [String]
-    )
-    case unsupported(MarinaSemanticUnsupportedReason, diagnosticNotes: [String])
-    case generationFailure(MarinaFoundationModelGenerationFailure, diagnosticNotes: [String])
-    case stagedFailure(
-        MarinaFoundationModelStagedRuntimeFailure,
-        generatedIntent: MarinaFoundationModelGeneratedIntentDigest?,
-        generationMetadata: MarinaFoundationModelGenerationDiagnosticMetadata? = nil,
-        diagnosticNotes: [String]
-    )
-}
+    @Guide(description: "A virtual spend amount for what-if spending prompts. Leave empty unless the user provides a numeric spend amount.")
+    var whatIfAmount: Double?
 
-@available(iOS 26.0, macCatalyst 26.0, *)
-nonisolated enum MarinaFoundationModelStagedRuntimeFailure: Equatable, Sendable {
-    case unsupported(MarinaSemanticUnsupportedReason)
-    case generation(MarinaFoundationModelGenerationFailure)
-}
+    @Guide(description: "Category availability list filter: all, over, near, or underLimit. Use only with measure categoryAvailability.")
+    var categoryAvailabilityFilter: String?
 
-@available(iOS 26.0, macCatalyst 26.0, *)
-protocol MarinaFoundationModelGenerating: Sendable {
-    func generateOutcome(
-        for prompt: String,
-        localeConfiguration: MarinaFoundationModelLocaleConfiguration
-    ) async -> MarinaFoundationModelRuntimeResult
+    @Guide(description: "Expected answer shape: metric, list, comparison, clarification, unsupported.")
+    var expectedAnswerShape: String
+
+    @Guide(description: "A clarification question only when required information is missing. Leave empty for target-type ambiguity; Marina's resolver will create executable choices.")
+    var clarificationQuestion: String?
+
+    @Guide(description: "Unsupported reason: readOnly, unavailableModel, unsupportedCombination, unresolvedEntity, ambiguousEntity, incomeSavingsWhatIfUnsupported. Leave empty otherwise.")
+    var unsupportedReason: String?
 }
 
 @available(iOS 26.0, macCatalyst 26.0, *)
 struct MarinaFoundationModelsInterpreter: MarinaModelInterpreting {
-    private let runtime: any MarinaFoundationModelGenerating
+    private let runtime: MarinaFoundationModelRuntime
     private let localeConfiguration: MarinaFoundationModelLocaleConfiguration
-    private let alignmentValidator: MarinaSemanticPromptAlignmentValidator
 
     init(
-        runtime: any MarinaFoundationModelGenerating = MarinaFoundationModelRuntime(),
-        localeConfiguration: MarinaFoundationModelLocaleConfiguration = .current,
-        alignmentValidator: MarinaSemanticPromptAlignmentValidator = MarinaSemanticPromptAlignmentValidator()
+        runtime: MarinaFoundationModelRuntime = MarinaFoundationModelRuntime(),
+        localeConfiguration: MarinaFoundationModelLocaleConfiguration = .current
     ) {
         self.runtime = runtime
         self.localeConfiguration = localeConfiguration
-        self.alignmentValidator = alignmentValidator
     }
 
-    func interpretedSemanticRequest(
-        for prompt: String,
-        context: MarinaBrainContext
-    ) async throws -> MarinaInterpretedSemanticRequest {
-        let normalizedPrompt = MarinaPromptNormalizer.normalize(prompt)
-        let turn = MarinaSemanticCompilerTurnV3(
-            userInput: normalizedPrompt,
-            conversationContext: context.conversationContext
+    func interpretedSemanticRequest(for prompt: String, context: MarinaBrainContext) async throws -> MarinaInterpretedSemanticRequest {
+        let result = await runtime.generateSemanticRequest(
+            for: prompt,
+            instructions: localeConfiguration.appending(to: instructions),
+            localeConfiguration: localeConfiguration
         )
-        var accumulatedNotes: [String] = []
-        var attemptDiagnostics: [MarinaFoundationModelAttemptDiagnostic] = []
-        var retryCode: String?
 
-        for attempt in 1...2 {
-            let attemptPrompt = retryCode.map { turn.promptForRetry(rejectionCode: $0) } ?? turn.prompt
-            let result = await runtime.generateOutcome(
-                for: attemptPrompt,
-                localeConfiguration: localeConfiguration
+        switch result {
+        case .generated(let generated, let diagnosticNotes):
+            return MarinaInterpretedSemanticRequest(
+                request: semanticRequest(from: generated),
+                confidence: .medium,
+                source: .foundationModel,
+                diagnosticNotes: diagnosticNotes
             )
-
-            switch result {
-            case .generated(let outcome, let generationMetadata, let runtimeNotes):
-                let generatedIntent = outcome.generatedIntentDigest
-                do {
-                    var interpreted = try MarinaFoundationModelOutcomeCompilerV3().interpretedRequest(
-                        from: outcome,
-                        turn: turn
-                    )
-                    let compiledRequest = MarinaFoundationModelCompiledRequestDigest(
-                        request: interpreted.request
-                    )
-                    let alignment = alignmentValidator.validate(
-                        userInput: normalizedPrompt,
-                        request: interpreted.request,
-                        localeIdentifier: localeConfiguration.identifier
-                    )
-                    switch alignment {
-                    case .accepted:
-                        let diagnostic = MarinaFoundationModelAttemptDiagnostic(
-                            attempt: attempt,
-                            compilerVersion: MarinaSemanticCompilerInstructionsV3.version,
-                            generationPhase: generationMetadata?.phase,
-                            generationPhaseCount: generationMetadata?.phaseCount,
-                            generatedRoutePath: generationMetadata?.routePath,
-                            generationPhaseDurations: generationMetadata?.phaseDurations ?? [],
-                            stage: .alignment,
-                            status: .accepted,
-                            rejection: nil,
-                            alignmentVerdict: .accepted,
-                            generatedIntent: generatedIntent,
-                            compiledRequest: compiledRequest,
-                            alignment: nil
-                        )
-                        attemptDiagnostics.append(diagnostic)
-                        interpreted.diagnosticNotes = accumulatedNotes + runtimeNotes + [diagnostic.diagnosticNote]
-                        interpreted.attemptDiagnostics = attemptDiagnostics
-                        return interpreted
-                    case .inconclusive:
-                        let diagnostic = MarinaFoundationModelAttemptDiagnostic(
-                            attempt: attempt,
-                            compilerVersion: MarinaSemanticCompilerInstructionsV3.version,
-                            generationPhase: generationMetadata?.phase,
-                            generationPhaseCount: generationMetadata?.phaseCount,
-                            generatedRoutePath: generationMetadata?.routePath,
-                            generationPhaseDurations: generationMetadata?.phaseDurations ?? [],
-                            stage: .alignment,
-                            status: .accepted,
-                            rejection: nil,
-                            alignmentVerdict: .inconclusive,
-                            generatedIntent: generatedIntent,
-                            compiledRequest: compiledRequest,
-                            alignment: nil
-                        )
-                        attemptDiagnostics.append(diagnostic)
-                        interpreted.diagnosticNotes = accumulatedNotes + runtimeNotes + [diagnostic.diagnosticNote]
-                        interpreted.attemptDiagnostics = attemptDiagnostics
-                        return interpreted
-                    case .rejected(let rejection):
-                        let canRetry = attempt == 1
-                        let diagnostic = MarinaFoundationModelAttemptDiagnostic(
-                            attempt: attempt,
-                            compilerVersion: MarinaSemanticCompilerInstructionsV3.version,
-                            generationPhase: generationMetadata?.phase,
-                            generationPhaseCount: generationMetadata?.phaseCount,
-                            generatedRoutePath: generationMetadata?.routePath,
-                            generationPhaseDurations: generationMetadata?.phaseDurations ?? [],
-                            stage: .alignment,
-                            status: canRetry ? .rejected : .terminal,
-                            rejection: .alignment(rejection.code),
-                            alignmentVerdict: .rejected,
-                            generatedIntent: generatedIntent,
-                            compiledRequest: compiledRequest,
-                            alignment: MarinaFoundationModelAlignmentDigest(
-                                expected: rejection.expectedDigest,
-                                actual: rejection.actualDigest
-                            )
-                        )
-                        attemptDiagnostics.append(diagnostic)
-                        accumulatedNotes.append(contentsOf: runtimeNotes + [diagnostic.diagnosticNote])
-                        if canRetry {
-                            retryCode = rejection.code.rawValue
-                            continue
-                        }
-                        return generationFailureRequest(
-                            diagnosticNotes: accumulatedNotes,
-                            attemptDiagnostics: attemptDiagnostics
-                        )
-                    }
-                } catch let error as MarinaFoundationModelInterpretationError {
-                    let canRetry = attempt == 1
-                    let diagnostic = MarinaFoundationModelAttemptDiagnostic(
-                        attempt: attempt,
-                        compilerVersion: MarinaSemanticCompilerInstructionsV3.version,
-                        generationPhase: generationMetadata?.phase,
-                        generationPhaseCount: generationMetadata?.phaseCount,
-                        generatedRoutePath: generationMetadata?.routePath,
-                        generationPhaseDurations: generationMetadata?.phaseDurations ?? [],
-                        stage: .compilation,
-                        status: canRetry ? .rejected : .terminal,
-                        rejection: error.attemptRejectionCode,
-                        alignmentVerdict: nil,
-                        generatedIntent: generatedIntent,
-                        compiledRequest: nil,
-                        alignment: nil
-                    )
-                    attemptDiagnostics.append(diagnostic)
-                    accumulatedNotes.append(contentsOf: runtimeNotes + [diagnostic.diagnosticNote])
-                    if canRetry {
-                        retryCode = error.rejectionCode
-                        continue
-                    }
-                    return generationFailureRequest(
-                        diagnosticNotes: accumulatedNotes,
-                        attemptDiagnostics: attemptDiagnostics
-                    )
-                }
-            case .unsupported(let reason, let runtimeNotes):
-                let diagnostic = MarinaFoundationModelAttemptDiagnostic(
-                    attempt: attempt,
-                    compilerVersion: MarinaSemanticCompilerInstructionsV3.version,
-                    stage: .generation,
-                    status: .terminal,
-                    rejection: .runtime(reason),
-                    alignmentVerdict: nil,
-                    generatedIntent: nil,
-                    compiledRequest: nil,
-                    alignment: nil
-                )
-                attemptDiagnostics.append(diagnostic)
-                return MarinaInterpretedSemanticRequest(
-                    request: systemUnsupportedRequest(reason: reason),
-                    confidence: .low,
-                    source: .unavailableFallback,
-                    diagnosticNotes: accumulatedNotes + runtimeNotes + [diagnostic.diagnosticNote],
-                    attemptDiagnostics: attemptDiagnostics
-                )
-            case .generationFailure(let failure, let runtimeNotes):
-                let canRetry = attempt == 1 && failure.isRetryable
-                let error = MarinaFoundationModelInterpretationError.generationFailed(failure)
-                let diagnostic = MarinaFoundationModelAttemptDiagnostic(
-                    attempt: attempt,
-                    compilerVersion: MarinaSemanticCompilerInstructionsV3.version,
-                    stage: .generation,
-                    status: canRetry ? .rejected : .terminal,
-                    rejection: error.attemptRejectionCode,
-                    alignmentVerdict: nil,
-                    generatedIntent: nil,
-                    compiledRequest: nil,
-                    alignment: nil
-                )
-                attemptDiagnostics.append(diagnostic)
-                accumulatedNotes.append(contentsOf: runtimeNotes + [diagnostic.diagnosticNote])
-                if canRetry {
-                    retryCode = error.rejectionCode
-                    continue
-                }
-                return generationFailureRequest(
-                    diagnosticNotes: accumulatedNotes,
-                    attemptDiagnostics: attemptDiagnostics
-                )
-            case .stagedFailure(let failure, let generatedIntent, let generationMetadata, let runtimeNotes):
-                switch failure {
-                case .unsupported(let reason):
-                    let diagnostic = MarinaFoundationModelAttemptDiagnostic(
-                        attempt: attempt,
-                        compilerVersion: MarinaSemanticCompilerInstructionsV3.version,
-                        generationPhase: generationMetadata?.phase,
-                        generationPhaseCount: generationMetadata?.phaseCount,
-                        generatedRoutePath: generationMetadata?.routePath,
-                        generationPhaseDurations: generationMetadata?.phaseDurations ?? [],
-                        stage: .generation,
-                        status: .terminal,
-                        rejection: .runtime(reason),
-                        alignmentVerdict: nil,
-                        generatedIntent: generatedIntent,
-                        compiledRequest: nil,
-                        alignment: nil
-                    )
-                    attemptDiagnostics.append(diagnostic)
-                    return MarinaInterpretedSemanticRequest(
-                        request: systemUnsupportedRequest(reason: reason),
-                        confidence: .low,
-                        source: .unavailableFallback,
-                        diagnosticNotes: accumulatedNotes + runtimeNotes + [diagnostic.diagnosticNote],
-                        attemptDiagnostics: attemptDiagnostics
-                    )
-                case .generation(let generationFailure):
-                    let canRetry = attempt == 1 && generationFailure.isRetryable
-                    let error = MarinaFoundationModelInterpretationError.generationFailed(
-                        generationFailure
-                    )
-                    let diagnostic = MarinaFoundationModelAttemptDiagnostic(
-                        attempt: attempt,
-                        compilerVersion: MarinaSemanticCompilerInstructionsV3.version,
-                        generationPhase: generationMetadata?.phase,
-                        generationPhaseCount: generationMetadata?.phaseCount,
-                        generatedRoutePath: generationMetadata?.routePath,
-                        generationPhaseDurations: generationMetadata?.phaseDurations ?? [],
-                        stage: .generation,
-                        status: canRetry ? .rejected : .terminal,
-                        rejection: error.attemptRejectionCode,
-                        alignmentVerdict: nil,
-                        generatedIntent: generatedIntent,
-                        compiledRequest: nil,
-                        alignment: nil
-                    )
-                    attemptDiagnostics.append(diagnostic)
-                    accumulatedNotes.append(contentsOf: runtimeNotes + [diagnostic.diagnosticNote])
-                    if canRetry {
-                        retryCode = error.rejectionCode
-                        continue
-                    }
-                    return generationFailureRequest(
-                        diagnosticNotes: accumulatedNotes,
-                        attemptDiagnostics: attemptDiagnostics
-                    )
-                }
-            }
+        case .unsupported(let reason, let diagnosticNotes):
+            return MarinaInterpretedSemanticRequest(
+                request: MarinaSemanticRequest(
+                    entity: .workspace,
+                    operation: .list,
+                    expectedAnswerShape: .unsupported,
+                    unsupportedReason: reason
+                ),
+                confidence: .low,
+                source: .unavailableFallback,
+                diagnosticNotes: diagnosticNotes
+            )
         }
+    }
 
-        return generationFailureRequest(
-            diagnosticNotes: accumulatedNotes,
-            attemptDiagnostics: attemptDiagnostics
+    private var instructions: String {
+        """
+        You are Marina, a read-only budgeting assistant for Offshore.
+        Convert the user's message into one compact semantic request.
+        Keep every generated enum value, raw semantic token, date-range token, and schema token in the canonical English values described by the schema.
+        Natural-language fields such as clarificationQuestion must follow the requested response language.
+        Do not calculate money. Do not invent records. Do not mutate data.
+        Preserve raw target words and let Marina resolve aliases, singular/plural forms, workspace records, and ambiguity.
+        Marina may resolve short follow-up phrases from deterministic local conversation context before this model interpreter runs; if a follow-up reaches you, interpret only the visible prompt and do not assume hidden financial state.
+        Use currentPeriod when the user says this period, current period, or gives no date.
+        Use currentMonth when the user says this month. Use previousMonth when the user says last month. Use yearToDate when the user says this year, so far this year, or year to date.
+        Treat merchant/store/vendor wording as expense title/description text, not a separate stored entity.
+        Treat Home metric terms as semantic requests: safe spend means remainingRoom; savings outlook or projected savings means savingsTotal forecast; actual savings means savings status for the current period; income progress means actual-to-planned income share; category availability means categoryAvailability; category spotlight means grouped category spend; spend trends means grouped category spend over date buckets; next planned expense means plannedExpense next; card summary means card budgetImpact.
+        If the user asks for expenses, transactions, or rows behind/driving spend trends, return a variableExpense list request with budgetImpact, amountDescending, unified expense scope, and do not return the grouped spend trends summary.
+        Formula metric phrases map to deterministic Marina measures only: daily spend, burn rate, or spending rate means entity budget, operation average, measure burnRate; projected spend, where will I end up, or on track to spend means entity budget, operation forecast, measure projectedSpend; daily allowance, safe per day, or what can I spend per day means entity budget, operation forecast, measure safeDailySpend; on track, ahead, behind, or spending too fast means entity budget, operation compare, measure paceDifference; does my income cover, covered by income, or income coverage means measure coverageRatio on income or budget; recurring burden, fixed expenses, or preset burden means entity preset, operation sum, measure recurringBurden; what is eating my budget, biggest share, or concentration means entity category, operation share, measure concentration.
+        For "show category availability", use entity category, operation forecast, measure categoryAvailability, and expectedAnswerShape metric.
+        For "which/list/show categories are over/near/under limit" requests, use entity category, operation list, measure categoryAvailability, expectedAnswerShape list, and set categoryAvailabilityFilter to over, near, or underLimit. Preserve requested list limits.
+        For safe spend, can I spend, remaining room, or budget room, use entity budget and measure remainingRoom.
+        For "what if I spend $X" safe-spend questions, use operation whatIf, measure remainingRoom, expectedAnswerShape comparison, and set whatIfAmount.
+        For income or savings replacement what-if prompts such as "what if I earned $X" or "what if I saved $X", preserve whatIfAmount and use unsupported with unsupportedCombination; deterministic Marina validation will return the typed unsupported response.
+        Do not calculate safe spend, category cap room, split ownership, or category availability; deterministic Home calculators handle those details.
+        For generic spend/list/average/count expense requests such as "spend on Grocery", put the raw target in targetName, leave dimensions empty, use variableExpense, and let Marina clarify category/card/expense text if needed.
+        Use dimensions only when the user explicitly names the target type, such as category, card, income source, preset, savings account, reconciliation account, merchant, store, vendor, title, or description.
+        If a request asks to delete, move, edit, rename, or create records, return unsupported with readOnly.
+        Do not return clarification just because a target could mean multiple stored records or expense text; Marina's deterministic resolver handles that.
+        Prefer budgetImpact for spend questions. Prefer incomeAmount for income questions.
+        """
+    }
+
+    private func semanticRequest(from generated: MarinaGeneratedSemanticRequest) -> MarinaSemanticRequest {
+        let entity = MarinaSemanticEntity(rawValue: generated.entity) ?? .workspace
+        let operation = MarinaSemanticOperation(rawValue: generated.operation) ?? .list
+        let measure = generated.measure.flatMap(MarinaSemanticMeasure.init(rawValue:))
+        let dimensions = generated.dimensions.compactMap(MarinaSemanticDimension.init(rawValue:))
+        let dateRange = MarinaSemanticDateRangeToken(rawValue: generated.dateRangeToken) ?? .currentPeriod
+        let sort = generated.sort.flatMap(MarinaSemanticSort.init(rawValue:))
+        let expenseScope = generated.expenseScope.flatMap(MarinaSemanticExpenseScope.init(rawValue:))
+        let incomeState = generated.incomeState.flatMap(MarinaSemanticIncomeState.init(rawValue:))
+        let answerShape = MarinaSemanticAnswerShape(rawValue: generated.expectedAnswerShape) ?? .metric
+        let unsupportedReason = generated.unsupportedReason.flatMap(MarinaSemanticUnsupportedReason.init(rawValue:))
+            ?? (answerShape == .unsupported ? .unsupportedCombination : nil)
+
+        return MarinaSemanticRequest(
+            entity: entity,
+            operation: operation,
+            measure: measure,
+            dimensions: dimensions,
+            dateRangeToken: dateRange,
+            targetName: normalizedOptional(generated.targetName),
+            comparisonTargetName: normalizedOptional(generated.comparisonTargetName),
+            textQuery: normalizedOptional(generated.textQuery),
+            resultLimit: generated.resultLimit,
+            sort: sort,
+            expenseScope: expenseScope,
+            incomeState: incomeState,
+            whatIfAmount: generated.whatIfAmount,
+            categoryAvailabilityFilter: generated.categoryAvailabilityFilter.flatMap(MarinaCategoryAvailabilityFilter.init(rawValue:)),
+            expectedAnswerShape: answerShape,
+            clarificationQuestion: normalizedOptional(generated.clarificationQuestion),
+            unsupportedReason: unsupportedReason
         )
     }
 
-    private func generationFailureRequest(
-        diagnosticNotes: [String],
-        attemptDiagnostics: [MarinaFoundationModelAttemptDiagnostic]
-    ) -> MarinaInterpretedSemanticRequest {
-        MarinaInterpretedSemanticRequest(
-            request: systemUnsupportedRequest(reason: .modelGenerationFailed),
-            confidence: .low,
-            source: .unavailableFallback,
-            diagnosticNotes: diagnosticNotes,
-            attemptDiagnostics: attemptDiagnostics
-        )
-    }
-
-    private func systemUnsupportedRequest(
-        reason: MarinaSemanticUnsupportedReason
-    ) -> MarinaSemanticRequest {
-        MarinaSemanticRequest(
-            entity: .workspace,
-            operation: .list,
-            projection: .records,
-            expectedAnswerShape: .unsupported,
-            unsupportedReason: reason
-        )
+    private func normalizedOptional(_ value: String?) -> String? {
+        let trimmed = (value ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
     }
 }
 
 @available(iOS 26.0, macCatalyst 26.0, *)
-private struct MarinaFoundationModelStagedGeneratedOutcomeV3 {
-    let outcome: MarinaFoundationModelGeneratedOutcomeV3
-    let generationMetadata: MarinaFoundationModelGenerationDiagnosticMetadata
+fileprivate enum MarinaFoundationModelRuntimeResult {
+    case generated(MarinaGeneratedSemanticRequest, diagnosticNotes: [String])
+    case unsupported(MarinaSemanticUnsupportedReason, diagnosticNotes: [String])
 }
 
 @available(iOS 26.0, macCatalyst 26.0, *)
-private struct MarinaFoundationModelTimedPhaseV3<Value> {
-    let value: Value
-    let generationMetadata: MarinaFoundationModelGenerationDiagnosticMetadata
-}
-
-
-@available(iOS 26.0, macCatalyst 26.0, *)
-struct MarinaFoundationModelRuntime: MarinaFoundationModelGenerating {
-    private typealias Generated = MarinaFoundationModelGeneratedOutcomeV3
-    private typealias ActionRoute = MarinaFoundationModelGeneratedActionRouteV3
-
+struct MarinaFoundationModelRuntime {
     private let model: SystemLanguageModel
     private let options: GenerationOptions
-    private let instructionCatalog: MarinaFoundationModelInstructionCatalogV3
 
     init(
         model: SystemLanguageModel = SystemLanguageModel(useCase: .general, guardrails: .default),
         options: GenerationOptions = GenerationOptions(
             sampling: .greedy,
-            temperature: 0.0
-        ),
-        instructionCatalog: MarinaFoundationModelInstructionCatalogV3 = .production
+            temperature: 0.0,
+            maximumResponseTokens: 512
+        )
     ) {
         self.model = model
         self.options = options
-        self.instructionCatalog = instructionCatalog
     }
 
-    func generateOutcome(
+    fileprivate func generateSemanticRequest(
         for prompt: String,
+        instructions: String,
         localeConfiguration: MarinaFoundationModelLocaleConfiguration
     ) async -> MarinaFoundationModelRuntimeResult {
         guard model.isAvailable else {
@@ -491,1262 +212,53 @@ struct MarinaFoundationModelRuntime: MarinaFoundationModelGenerating {
             )
         }
 
-        do {
-            let generated = try await stagedOutcome(
-                for: prompt,
-                localeConfiguration: localeConfiguration
-            )
-            return .generated(
-                generated.outcome,
-                generationMetadata: generated.generationMetadata,
-                diagnosticNotes: [
-                    "FoundationModels instructionVersion=\(MarinaFoundationModelInstructionCatalogV3.instructionVersion)",
-                    "FoundationModels stagedGenerationPhases=\(generated.generationMetadata.phaseCount?.rawValue ?? 0)",
-                    "FoundationModels stagedGenerationMaximumPhases=4",
-                    "FoundationModels contextSize=\(model.contextSize)"
-                ]
-            )
-        } catch let error as MarinaFoundationModelStagedPayloadErrorV3 {
-            return stagedRuntimeResult(for: error)
-        } catch let error as LanguageModelSession.GenerationError {
-            return runtimeResult(for: error)
-        } catch is CancellationError {
-            return .generationFailure(
-                .cancelled,
-                diagnosticNotes: ["FoundationModels generation cancelled."]
-            )
-        } catch {
-            return .generationFailure(
-                .unexpected,
-                diagnosticNotes: ["FoundationModels generationError=unexpected"]
-            )
-        }
-    }
-
-    /// Phase one chooses financial query, Workspace metadata, or a terminal
-    /// outcome. Workspace is absent from the subsequent financial-domain schema.
-    private func stagedOutcome(
-        for prompt: String,
-        localeConfiguration: MarinaFoundationModelLocaleConfiguration
-    ) async throws -> MarinaFoundationModelStagedGeneratedOutcomeV3 {
-        let routeSession = makeSession(
-            instructions: instructionCatalog.outcomeRouteText(
-                localeConfiguration: localeConfiguration
-            )
-        )
-        let routePhase = try await performStagedPhase(
-            generatedIntent: nil,
-            metadata: MarinaFoundationModelGenerationDiagnosticMetadata(
-                phase: .outcomeRoute
-            ),
-            priorPhaseDurations: []
-        ) {
-            try await routeSession.respond(
-                to: prompt,
-                generating: MarinaFoundationModelGeneratedOutcomeRouteV3.self,
-                includeSchemaInPrompt: true,
-                options: options
-            )
-        }
-        let outcomeRoute = routePhase.value.content
-        let outcomePlan = MarinaFoundationModelOutcomeGenerationPlanV3(
-            modelAuthoredRoute: outcomeRoute
-        )
-        let outcomePath = MarinaFoundationModelGeneratedRoutePathDigest(
-            outcome: outcomeRoute.diagnosticDigest
-        )
-
-        switch outcomePlan.payloadSchema {
-        case .financialDomain:
-            let financialDomainPhase = try await generateFinancialDomain(
-                prompt: prompt,
-                outcomePath: outcomePath,
-                priorPhaseDurations: routePhase.generationMetadata.phaseDurations,
-                localeConfiguration: localeConfiguration
-            )
-            let domainPlan = MarinaFoundationModelFinancialDomainGenerationPlanV3(
-                modelAuthoredDomain: financialDomainPhase.value
-            )
-            let domainPath = MarinaFoundationModelGeneratedRoutePathDigest(
-                outcome: .financialQuery,
-                financialDomain: financialDomainPhase.value.diagnosticDigest
-            )
-            let actionRoutePhase = try await generateActionRoute(
-                for: domainPlan.queryDomain,
-                prompt: prompt,
-                phaseCount: .four,
-                routePath: domainPath,
-                priorPhaseDurations: financialDomainPhase.generationMetadata.phaseDurations,
-                localeConfiguration: localeConfiguration
-            )
-            return try await generateActionOutcome(
-                for: actionRoutePhase.value,
-                prompt: prompt,
-                phaseCount: .four,
-                baseRoutePath: domainPath,
-                priorPhaseDurations: actionRoutePhase.generationMetadata.phaseDurations,
-                localeConfiguration: localeConfiguration
-            )
-        case .workspaceMetadata:
-            let actionRoutePhase = try await generateActionRoute(
-                for: .workspaceMetadata,
-                prompt: prompt,
-                phaseCount: .three,
-                routePath: outcomePath,
-                priorPhaseDurations: routePhase.generationMetadata.phaseDurations,
-                localeConfiguration: localeConfiguration
-            )
-            return try await generateActionOutcome(
-                for: actionRoutePhase.value,
-                prompt: prompt,
-                phaseCount: .three,
-                baseRoutePath: outcomePath,
-                priorPhaseDurations: actionRoutePhase.generationMetadata.phaseDurations,
-                localeConfiguration: localeConfiguration
-            )
-        case .clarificationSelection, .followUpDecision, .unsupported:
-            return try await generateTerminalOutcome(
-                for: outcomePlan.payloadSchema,
-                prompt: prompt,
-                routePath: outcomePath,
-                priorPhaseDurations: routePhase.generationMetadata.phaseDurations,
-                localeConfiguration: localeConfiguration
-            )
-        }
-    }
-
-    private func generateFinancialDomain(
-        prompt: String,
-        outcomePath: MarinaFoundationModelGeneratedRoutePathDigest,
-        priorPhaseDurations: [MarinaFoundationModelGenerationPhaseDuration],
-        localeConfiguration: MarinaFoundationModelLocaleConfiguration
-    ) async throws -> MarinaFoundationModelTimedPhaseV3<MarinaFoundationModelGeneratedFinancialDomainV3> {
-        let session = makeSession(
-            instructions: instructionCatalog.financialDomainText(
-                localeConfiguration: localeConfiguration
-            )
-        )
-        return try await performStagedPhase(
-            generatedIntent: MarinaFoundationModelGeneratedIntentDigest(intent: .query),
-            metadata: MarinaFoundationModelGenerationDiagnosticMetadata(
-                phase: .financialDomain,
-                phaseCount: .four,
-                routePath: outcomePath
-            ),
-            priorPhaseDurations: priorPhaseDurations
-        ) {
-            let response = try await session.respond(
-                to: prompt,
-                generating: MarinaFoundationModelGeneratedFinancialDomainV3.self,
-                includeSchemaInPrompt: true,
-                options: options
-            )
-            return response.content
-        }
-    }
-
-    private func generateTerminalOutcome(
-        for route: MarinaFoundationModelOutcomePayloadSchemaV3,
-        prompt: String,
-        routePath: MarinaFoundationModelGeneratedRoutePathDigest,
-        priorPhaseDurations: [MarinaFoundationModelGenerationPhaseDuration],
-        localeConfiguration: MarinaFoundationModelLocaleConfiguration
-    ) async throws -> MarinaFoundationModelStagedGeneratedOutcomeV3 {
-        let session = makeSession(
-            instructions: instructionCatalog.terminalPayloadText(
-                for: route,
-                localeConfiguration: localeConfiguration
-            )
-        )
-        let metadata = MarinaFoundationModelGenerationDiagnosticMetadata(
-            phase: .terminalPayload,
-            phaseCount: .two,
-            routePath: routePath
-        )
-        let phase = try await performStagedPhase(
-            generatedIntent: generatedIntent(for: route),
-            metadata: metadata,
-            priorPhaseDurations: priorPhaseDurations
-        ) {
-            switch route {
-            case .clarificationSelection:
-                let response = try await session.respond(
-                    to: prompt,
-                    generating: Generated.ClarificationSelection.self,
-                    includeSchemaInPrompt: true,
-                    options: options
-                )
-                return Generated.clarificationSelection(response.content)
-            case .followUpDecision:
-                let response = try await session.respond(
-                    to: prompt,
-                    generating: Generated.FollowUpDecision.self,
-                    includeSchemaInPrompt: true,
-                    options: options
-                )
-                return Generated.followUpDecision(response.content)
-            case .unsupported:
-                let response = try await session.respond(
-                    to: prompt,
-                    generating: Generated.Unsupported.self,
-                    includeSchemaInPrompt: true,
-                    options: options
-                )
-                return Generated.unsupported(response.content)
-            case .financialDomain, .workspaceMetadata:
-                preconditionFailure("Only terminal outcome routes can generate terminal payloads.")
-            }
-        }
-        return MarinaFoundationModelStagedGeneratedOutcomeV3(
-            outcome: phase.value,
-            generationMetadata: phase.generationMetadata
-        )
-    }
-
-    private func generatedIntent(
-        for route: MarinaFoundationModelOutcomePayloadSchemaV3
-    ) -> MarinaFoundationModelGeneratedIntentDigest? {
-        switch route {
-        case .clarificationSelection:
-            MarinaFoundationModelGeneratedIntentDigest(intent: .clarificationSelection)
-        case .followUpDecision:
-            MarinaFoundationModelGeneratedIntentDigest(intent: .followUpDecision)
-        case .unsupported:
-            MarinaFoundationModelGeneratedIntentDigest(intent: .unsupported)
-        case .financialDomain:
-            MarinaFoundationModelGeneratedIntentDigest(intent: .query)
-        case .workspaceMetadata:
-            MarinaFoundationModelGeneratedIntentDigest(
-                intent: .workspaceMetadata,
-                entity: .workspace
-            )
-        }
-    }
-
-    private func generateActionRoute(
-        for domain: MarinaFoundationModelQueryDomainV3,
-        prompt: String,
-        phaseCount: MarinaFoundationModelGenerationPhaseCount,
-        routePath: MarinaFoundationModelGeneratedRoutePathDigest,
-        priorPhaseDurations: [MarinaFoundationModelGenerationPhaseDuration],
-        localeConfiguration: MarinaFoundationModelLocaleConfiguration
-    ) async throws -> MarinaFoundationModelTimedPhaseV3<MarinaFoundationModelAuthoredActionRouteV3> {
-        let session = makeSession(
-            instructions: instructionCatalog.actionRouteText(
-                for: domain,
-                localeConfiguration: localeConfiguration
-            )
-        )
-        return try await performStagedPhase(
-            generatedIntent: MarinaFoundationModelGeneratedIntentDigest(
-                intent: domain == .workspaceMetadata ? .workspaceMetadata : .query,
-                entity: domain.semanticEntity
-            ),
-            metadata: MarinaFoundationModelGenerationDiagnosticMetadata(
-                phase: .actionRoute,
-                phaseCount: phaseCount,
-                routePath: routePath
-            ),
-            priorPhaseDurations: priorPhaseDurations
-        ) {
-            switch domain {
-            case .workspaceMetadata:
-                let response = try await session.respond(to: prompt, generating: ActionRoute.WorkspaceMetadata.self, includeSchemaInPrompt: true, options: options)
-                return .workspaceMetadata(response.content)
-            case .budget:
-                let response = try await session.respond(to: prompt, generating: ActionRoute.Budget.self, includeSchemaInPrompt: true, options: options)
-                return .budget(response.content)
-            case .card:
-                let response = try await session.respond(to: prompt, generating: ActionRoute.Card.self, includeSchemaInPrompt: true, options: options)
-                return .card(response.content)
-            case .plannedExpense:
-                let response = try await session.respond(to: prompt, generating: ActionRoute.PlannedExpense.self, includeSchemaInPrompt: true, options: options)
-                return .plannedExpense(response.content)
-            case .variableExpense:
-                let response = try await session.respond(to: prompt, generating: ActionRoute.VariableExpense.self, includeSchemaInPrompt: true, options: options)
-                return .variableExpense(response.content)
-            case .reconciliationAccount:
-                let response = try await session.respond(to: prompt, generating: ActionRoute.ReconciliationAccount.self, includeSchemaInPrompt: true, options: options)
-                return .reconciliationAccount(response.content)
-            case .savingsAccount:
-                let response = try await session.respond(to: prompt, generating: ActionRoute.SavingsAccount.self, includeSchemaInPrompt: true, options: options)
-                return .savingsAccount(response.content)
-            case .income:
-                let response = try await session.respond(to: prompt, generating: ActionRoute.Income.self, includeSchemaInPrompt: true, options: options)
-                return .income(response.content)
-            case .incomeSeries:
-                let response = try await session.respond(to: prompt, generating: ActionRoute.IncomeSeries.self, includeSchemaInPrompt: true, options: options)
-                return .incomeSeries(response.content)
-            case .category:
-                let response = try await session.respond(to: prompt, generating: ActionRoute.Category.self, includeSchemaInPrompt: true, options: options)
-                return .category(response.content)
-            case .preset:
-                let response = try await session.respond(to: prompt, generating: ActionRoute.Preset.self, includeSchemaInPrompt: true, options: options)
-                return .preset(response.content)
-            }
-        }
-    }
-
-    private func generateActionOutcome(
-        for actionRoute: MarinaFoundationModelAuthoredActionRouteV3,
-        prompt: String,
-        phaseCount: MarinaFoundationModelGenerationPhaseCount,
-        baseRoutePath: MarinaFoundationModelGeneratedRoutePathDigest,
-        priorPhaseDurations: [MarinaFoundationModelGenerationPhaseDuration],
-        localeConfiguration: MarinaFoundationModelLocaleConfiguration
-    ) async throws -> MarinaFoundationModelStagedGeneratedOutcomeV3 {
-        let actionPlan = MarinaFoundationModelActionGenerationPlanV3(
-            modelAuthoredActionRoute: actionRoute
-        )
-        let payloadSession = makeSession(
-            instructions: instructionCatalog.actionPayloadText(
-                for: actionPlan.payloadSchema,
-                localeConfiguration: localeConfiguration
-            )
-        )
-        let actionDigest = actionRoute.generatedIntentDigest
-        let routePath = MarinaFoundationModelGeneratedRoutePathDigest(
-            outcome: baseRoutePath.outcome,
-            financialDomain: baseRoutePath.financialDomain,
-            actionRoute: actionPlan.payloadSchema.diagnosticDigest,
-            actionPayload: actionPlan.payloadSchema.diagnosticDigest
-        )
-        let metadata = MarinaFoundationModelGenerationDiagnosticMetadata(
-            phase: .actionPayload,
-            phaseCount: phaseCount,
-            routePath: routePath
-        )
-        let startedAt = DispatchTime.now().uptimeNanoseconds
-
-        do {
-            let generated: MarinaFoundationModelStagedGeneratedOutcomeV3 = try await {
-              switch actionPlan.payloadSchema {
-            case .workspaceList:
-                let response = try await payloadSession.respond(
-                    to: prompt,
-                    generating: Generated.WorkspaceList.self,
-                    includeSchemaInPrompt: true,
-                    options: options
-                )
-                return MarinaFoundationModelStagedGeneratedOutcomeV3(
-                    outcome: .query(.workspaceMetadata(Generated.WorkspaceMetadataQuery(action: .list(response.content)))),
-                    generationMetadata: metadata
-                )
-            case .workspaceCount:
-                let response = try await payloadSession.respond(
-                    to: prompt,
-                    generating: Generated.WorkspaceCount.self,
-                    includeSchemaInPrompt: true,
-                    options: options
-                )
-                return MarinaFoundationModelStagedGeneratedOutcomeV3(
-                    outcome: .query(.workspaceMetadata(Generated.WorkspaceMetadataQuery(action: .count(response.content)))),
-                    generationMetadata: metadata
-                )
-            case .workspaceName:
-                let response = try await payloadSession.respond(
-                    to: prompt,
-                    generating: Generated.WorkspaceMetadataValue.self,
-                    includeSchemaInPrompt: true,
-                    options: options
-                )
-                return MarinaFoundationModelStagedGeneratedOutcomeV3(
-                    outcome: .query(.workspaceMetadata(Generated.WorkspaceMetadataQuery(action: .name(response.content)))),
-                    generationMetadata: metadata
-                )
-            case .workspaceColor:
-                let response = try await payloadSession.respond(
-                    to: prompt,
-                    generating: Generated.WorkspaceMetadataValue.self,
-                    includeSchemaInPrompt: true,
-                    options: options
-                )
-                return MarinaFoundationModelStagedGeneratedOutcomeV3(
-                    outcome: .query(.workspaceMetadata(Generated.WorkspaceMetadataQuery(action: .color(response.content)))),
-                    generationMetadata: metadata
-                )
-            case .budgetList:
-                let response = try await payloadSession.respond(
-                    to: prompt,
-                    generating: Generated.BudgetList.self,
-                    includeSchemaInPrompt: true,
-                    options: options
-                )
-                return MarinaFoundationModelStagedGeneratedOutcomeV3(
-                    outcome: .query(.budget(Generated.BudgetQuery(action: .list(response.content)))),
-                    generationMetadata: metadata
-                )
-            case .budgetSum:
-                let response = try await payloadSession.respond(
-                    to: prompt,
-                    generating: Generated.BudgetMetric.self,
-                    includeSchemaInPrompt: true,
-                    options: options
-                )
-                return MarinaFoundationModelStagedGeneratedOutcomeV3(
-                    outcome: .query(.budget(Generated.BudgetQuery(action: .sum(response.content)))),
-                    generationMetadata: metadata
-                )
-            case .budgetAverage:
-                let response = try await payloadSession.respond(
-                    to: prompt,
-                    generating: Generated.BudgetMetric.self,
-                    includeSchemaInPrompt: true,
-                    options: options
-                )
-                return MarinaFoundationModelStagedGeneratedOutcomeV3(
-                    outcome: .query(.budget(Generated.BudgetQuery(action: .average(response.content)))),
-                    generationMetadata: metadata
-                )
-            case .budgetCompare:
-                let response = try await payloadSession.respond(
-                    to: prompt,
-                    generating: Generated.BudgetComparison.self,
-                    includeSchemaInPrompt: true,
-                    options: options
-                )
-                return MarinaFoundationModelStagedGeneratedOutcomeV3(
-                    outcome: .query(.budget(Generated.BudgetQuery(action: .compare(response.content)))),
-                    generationMetadata: metadata
-                )
-            case .budgetForecast:
-                let response = try await payloadSession.respond(
-                    to: prompt,
-                    generating: Generated.BudgetForecast.self,
-                    includeSchemaInPrompt: true,
-                    options: options
-                )
-                return MarinaFoundationModelStagedGeneratedOutcomeV3(
-                    outcome: .query(.budget(Generated.BudgetQuery(action: .forecast(response.content)))),
-                    generationMetadata: metadata
-                )
-            case .budgetWhatIf:
-                let response = try await payloadSession.respond(
-                    to: prompt,
-                    generating: Generated.BudgetWhatIf.self,
-                    includeSchemaInPrompt: true,
-                    options: options
-                )
-                return MarinaFoundationModelStagedGeneratedOutcomeV3(
-                    outcome: .query(.budget(Generated.BudgetQuery(action: .whatIf(response.content)))),
-                    generationMetadata: metadata
-                )
-            case .cardList:
-                let response = try await payloadSession.respond(
-                    to: prompt,
-                    generating: Generated.CardList.self,
-                    includeSchemaInPrompt: true,
-                    options: options
-                )
-                return MarinaFoundationModelStagedGeneratedOutcomeV3(
-                    outcome: .query(.card(Generated.CardQuery(action: .list(response.content)))),
-                    generationMetadata: metadata
-                )
-            case .cardCount:
-                let response = try await payloadSession.respond(
-                    to: prompt,
-                    generating: Generated.CardCount.self,
-                    includeSchemaInPrompt: true,
-                    options: options
-                )
-                return MarinaFoundationModelStagedGeneratedOutcomeV3(
-                    outcome: .query(.card(Generated.CardQuery(action: .count(response.content)))),
-                    generationMetadata: metadata
-                )
-            case .cardSum:
-                let response = try await payloadSession.respond(
-                    to: prompt,
-                    generating: Generated.CardMetric.self,
-                    includeSchemaInPrompt: true,
-                    options: options
-                )
-                return MarinaFoundationModelStagedGeneratedOutcomeV3(
-                    outcome: .query(.card(Generated.CardQuery(action: .sum(response.content)))),
-                    generationMetadata: metadata
-                )
-            case .cardCompare:
-                let response = try await payloadSession.respond(
-                    to: prompt,
-                    generating: Generated.CardComparison.self,
-                    includeSchemaInPrompt: true,
-                    options: options
-                )
-                return MarinaFoundationModelStagedGeneratedOutcomeV3(
-                    outcome: .query(.card(Generated.CardQuery(action: .compare(response.content)))),
-                    generationMetadata: metadata
-                )
-            case .cardGroup:
-                let response = try await payloadSession.respond(
-                    to: prompt,
-                    generating: Generated.CardGroup.self,
-                    includeSchemaInPrompt: true,
-                    options: options
-                )
-                return MarinaFoundationModelStagedGeneratedOutcomeV3(
-                    outcome: .query(.card(Generated.CardQuery(action: .group(response.content)))),
-                    generationMetadata: metadata
-                )
-            case .plannedExpenseList:
-                let response = try await payloadSession.respond(
-                    to: prompt,
-                    generating: Generated.PlannedExpenseList.self,
-                    includeSchemaInPrompt: true,
-                    options: options
-                )
-                return MarinaFoundationModelStagedGeneratedOutcomeV3(
-                    outcome: .query(.plannedExpense(Generated.PlannedExpenseQuery(action: .list(response.content)))),
-                    generationMetadata: metadata
-                )
-            case .plannedExpenseCount:
-                let response = try await payloadSession.respond(
-                    to: prompt,
-                    generating: Generated.ExpenseCount.self,
-                    includeSchemaInPrompt: true,
-                    options: options
-                )
-                return MarinaFoundationModelStagedGeneratedOutcomeV3(
-                    outcome: .query(.plannedExpense(Generated.PlannedExpenseQuery(action: .count(response.content)))),
-                    generationMetadata: metadata
-                )
-            case .plannedExpenseSum:
-                let response = try await payloadSession.respond(
-                    to: prompt,
-                    generating: Generated.PlannedExpenseMetric.self,
-                    includeSchemaInPrompt: true,
-                    options: options
-                )
-                return MarinaFoundationModelStagedGeneratedOutcomeV3(
-                    outcome: .query(.plannedExpense(Generated.PlannedExpenseQuery(action: .sum(response.content)))),
-                    generationMetadata: metadata
-                )
-            case .plannedExpenseAverage:
-                let response = try await payloadSession.respond(
-                    to: prompt,
-                    generating: Generated.PlannedExpenseMetric.self,
-                    includeSchemaInPrompt: true,
-                    options: options
-                )
-                return MarinaFoundationModelStagedGeneratedOutcomeV3(
-                    outcome: .query(.plannedExpense(Generated.PlannedExpenseQuery(action: .average(response.content)))),
-                    generationMetadata: metadata
-                )
-            case .plannedExpenseLast:
-                let response = try await payloadSession.respond(
-                    to: prompt,
-                    generating: Generated.PlannedExpenseSingle.self,
-                    includeSchemaInPrompt: true,
-                    options: options
-                )
-                return MarinaFoundationModelStagedGeneratedOutcomeV3(
-                    outcome: .query(.plannedExpense(Generated.PlannedExpenseQuery(action: .last(response.content)))),
-                    generationMetadata: metadata
-                )
-            case .plannedExpenseNext:
-                let response = try await payloadSession.respond(
-                    to: prompt,
-                    generating: Generated.PlannedExpenseSingle.self,
-                    includeSchemaInPrompt: true,
-                    options: options
-                )
-                return MarinaFoundationModelStagedGeneratedOutcomeV3(
-                    outcome: .query(.plannedExpense(Generated.PlannedExpenseQuery(action: .next(response.content)))),
-                    generationMetadata: metadata
-                )
-            case .plannedExpenseGroup:
-                let response = try await payloadSession.respond(
-                    to: prompt,
-                    generating: Generated.PlannedExpenseGroup.self,
-                    includeSchemaInPrompt: true,
-                    options: options
-                )
-                return MarinaFoundationModelStagedGeneratedOutcomeV3(
-                    outcome: .query(.plannedExpense(Generated.PlannedExpenseQuery(action: .group(response.content)))),
-                    generationMetadata: metadata
-                )
-            case .variableExpenseList:
-                let response = try await payloadSession.respond(
-                    to: prompt,
-                    generating: Generated.VariableExpenseList.self,
-                    includeSchemaInPrompt: true,
-                    options: options
-                )
-                return MarinaFoundationModelStagedGeneratedOutcomeV3(
-                    outcome: .query(.variableExpense(Generated.VariableExpenseQuery(action: .list(response.content)))),
-                    generationMetadata: metadata
-                )
-            case .variableExpenseCount:
-                let response = try await payloadSession.respond(
-                    to: prompt,
-                    generating: Generated.ExpenseCount.self,
-                    includeSchemaInPrompt: true,
-                    options: options
-                )
-                return MarinaFoundationModelStagedGeneratedOutcomeV3(
-                    outcome: .query(.variableExpense(Generated.VariableExpenseQuery(action: .count(response.content)))),
-                    generationMetadata: metadata
-                )
-            case .variableExpenseSum:
-                let response = try await payloadSession.respond(
-                    to: prompt,
-                    generating: Generated.VariableExpenseMetric.self,
-                    includeSchemaInPrompt: true,
-                    options: options
-                )
-                return MarinaFoundationModelStagedGeneratedOutcomeV3(
-                    outcome: .query(.variableExpense(Generated.VariableExpenseQuery(action: .sum(response.content)))),
-                    generationMetadata: metadata
-                )
-            case .variableExpenseAverage:
-                let response = try await payloadSession.respond(
-                    to: prompt,
-                    generating: Generated.VariableExpenseMetric.self,
-                    includeSchemaInPrompt: true,
-                    options: options
-                )
-                return MarinaFoundationModelStagedGeneratedOutcomeV3(
-                    outcome: .query(.variableExpense(Generated.VariableExpenseQuery(action: .average(response.content)))),
-                    generationMetadata: metadata
-                )
-            case .variableExpenseLast:
-                let response = try await payloadSession.respond(
-                    to: prompt,
-                    generating: Generated.VariableExpenseSingle.self,
-                    includeSchemaInPrompt: true,
-                    options: options
-                )
-                return MarinaFoundationModelStagedGeneratedOutcomeV3(
-                    outcome: .query(.variableExpense(Generated.VariableExpenseQuery(action: .last(response.content)))),
-                    generationMetadata: metadata
-                )
-            case .variableExpenseGroup:
-                let response = try await payloadSession.respond(
-                    to: prompt,
-                    generating: Generated.VariableExpenseGroup.self,
-                    includeSchemaInPrompt: true,
-                    options: options
-                )
-                return MarinaFoundationModelStagedGeneratedOutcomeV3(
-                    outcome: .query(.variableExpense(Generated.VariableExpenseQuery(action: .group(response.content)))),
-                    generationMetadata: metadata
-                )
-            case .reconciliationList:
-                let response = try await payloadSession.respond(
-                    to: prompt,
-                    generating: Generated.ReconciliationList.self,
-                    includeSchemaInPrompt: true,
-                    options: options
-                )
-                return MarinaFoundationModelStagedGeneratedOutcomeV3(
-                    outcome: .query(.reconciliationAccount(Generated.ReconciliationAccountQuery(action: .list(response.content)))),
-                    generationMetadata: metadata
-                )
-            case .reconciliationCount:
-                let response = try await payloadSession.respond(
-                    to: prompt,
-                    generating: Generated.AccountCount.self,
-                    includeSchemaInPrompt: true,
-                    options: options
-                )
-                return MarinaFoundationModelStagedGeneratedOutcomeV3(
-                    outcome: .query(.reconciliationAccount(Generated.ReconciliationAccountQuery(action: .count(response.content)))),
-                    generationMetadata: metadata
-                )
-            case .reconciliationSum:
-                let response = try await payloadSession.respond(
-                    to: prompt,
-                    generating: Generated.ReconciliationMetric.self,
-                    includeSchemaInPrompt: true,
-                    options: options
-                )
-                return MarinaFoundationModelStagedGeneratedOutcomeV3(
-                    outcome: .query(.reconciliationAccount(Generated.ReconciliationAccountQuery(action: .sum(response.content)))),
-                    generationMetadata: metadata
-                )
-            case .reconciliationGroup:
-                let response = try await payloadSession.respond(
-                    to: prompt,
-                    generating: Generated.ReconciliationGroup.self,
-                    includeSchemaInPrompt: true,
-                    options: options
-                )
-                return MarinaFoundationModelStagedGeneratedOutcomeV3(
-                    outcome: .query(.reconciliationAccount(Generated.ReconciliationAccountQuery(action: .group(response.content)))),
-                    generationMetadata: metadata
-                )
-            case .savingsList:
-                let response = try await payloadSession.respond(
-                    to: prompt,
-                    generating: Generated.SavingsList.self,
-                    includeSchemaInPrompt: true,
-                    options: options
-                )
-                return MarinaFoundationModelStagedGeneratedOutcomeV3(
-                    outcome: .query(.savingsAccount(Generated.SavingsAccountQuery(action: .list(response.content)))),
-                    generationMetadata: metadata
-                )
-            case .savingsCount:
-                let response = try await payloadSession.respond(
-                    to: prompt,
-                    generating: Generated.AccountCount.self,
-                    includeSchemaInPrompt: true,
-                    options: options
-                )
-                return MarinaFoundationModelStagedGeneratedOutcomeV3(
-                    outcome: .query(.savingsAccount(Generated.SavingsAccountQuery(action: .count(response.content)))),
-                    generationMetadata: metadata
-                )
-            case .savingsSum:
-                let response = try await payloadSession.respond(
-                    to: prompt,
-                    generating: Generated.SavingsMetric.self,
-                    includeSchemaInPrompt: true,
-                    options: options
-                )
-                return MarinaFoundationModelStagedGeneratedOutcomeV3(
-                    outcome: .query(.savingsAccount(Generated.SavingsAccountQuery(action: .sum(response.content)))),
-                    generationMetadata: metadata
-                )
-            case .savingsLast:
-                let response = try await payloadSession.respond(
-                    to: prompt,
-                    generating: Generated.SavingsMetric.self,
-                    includeSchemaInPrompt: true,
-                    options: options
-                )
-                return MarinaFoundationModelStagedGeneratedOutcomeV3(
-                    outcome: .query(.savingsAccount(Generated.SavingsAccountQuery(action: .last(response.content)))),
-                    generationMetadata: metadata
-                )
-            case .savingsGroup:
-                let response = try await payloadSession.respond(
-                    to: prompt,
-                    generating: Generated.SavingsGroup.self,
-                    includeSchemaInPrompt: true,
-                    options: options
-                )
-                return MarinaFoundationModelStagedGeneratedOutcomeV3(
-                    outcome: .query(.savingsAccount(Generated.SavingsAccountQuery(action: .group(response.content)))),
-                    generationMetadata: metadata
-                )
-            case .savingsForecast:
-                let response = try await payloadSession.respond(
-                    to: prompt,
-                    generating: Generated.SavingsMetric.self,
-                    includeSchemaInPrompt: true,
-                    options: options
-                )
-                return MarinaFoundationModelStagedGeneratedOutcomeV3(
-                    outcome: .query(.savingsAccount(Generated.SavingsAccountQuery(action: .forecast(response.content)))),
-                    generationMetadata: metadata
-                )
-            case .incomeList:
-                let response = try await payloadSession.respond(
-                    to: prompt,
-                    generating: Generated.IncomeList.self,
-                    includeSchemaInPrompt: true,
-                    options: options
-                )
-                return MarinaFoundationModelStagedGeneratedOutcomeV3(
-                    outcome: .query(.income(Generated.IncomeQuery(action: .list(response.content)))),
-                    generationMetadata: metadata
-                )
-            case .incomeCount:
-                let response = try await payloadSession.respond(
-                    to: prompt,
-                    generating: Generated.IncomeCount.self,
-                    includeSchemaInPrompt: true,
-                    options: options
-                )
-                return MarinaFoundationModelStagedGeneratedOutcomeV3(
-                    outcome: .query(.income(Generated.IncomeQuery(action: .count(response.content)))),
-                    generationMetadata: metadata
-                )
-            case .incomeSum:
-                let response = try await payloadSession.respond(
-                    to: prompt,
-                    generating: Generated.IncomeMetric.self,
-                    includeSchemaInPrompt: true,
-                    options: options
-                )
-                return MarinaFoundationModelStagedGeneratedOutcomeV3(
-                    outcome: .query(.income(Generated.IncomeQuery(action: .sum(response.content)))),
-                    generationMetadata: metadata
-                )
-            case .incomeAverage:
-                let response = try await payloadSession.respond(
-                    to: prompt,
-                    generating: Generated.IncomeMetric.self,
-                    includeSchemaInPrompt: true,
-                    options: options
-                )
-                return MarinaFoundationModelStagedGeneratedOutcomeV3(
-                    outcome: .query(.income(Generated.IncomeQuery(action: .average(response.content)))),
-                    generationMetadata: metadata
-                )
-            case .incomeCompare:
-                let response = try await payloadSession.respond(
-                    to: prompt,
-                    generating: Generated.IncomeComparison.self,
-                    includeSchemaInPrompt: true,
-                    options: options
-                )
-                return MarinaFoundationModelStagedGeneratedOutcomeV3(
-                    outcome: .query(.income(Generated.IncomeQuery(action: .compare(response.content)))),
-                    generationMetadata: metadata
-                )
-            case .incomeGroup:
-                let response = try await payloadSession.respond(
-                    to: prompt,
-                    generating: Generated.IncomeGroup.self,
-                    includeSchemaInPrompt: true,
-                    options: options
-                )
-                return MarinaFoundationModelStagedGeneratedOutcomeV3(
-                    outcome: .query(.income(Generated.IncomeQuery(action: .group(response.content)))),
-                    generationMetadata: metadata
-                )
-            case .incomeProgress:
-                let response = try await payloadSession.respond(
-                    to: prompt,
-                    generating: Generated.IncomeProgress.self,
-                    includeSchemaInPrompt: true,
-                    options: options
-                )
-                return MarinaFoundationModelStagedGeneratedOutcomeV3(
-                    outcome: .query(.income(Generated.IncomeQuery(action: .progress(response.content)))),
-                    generationMetadata: metadata
-                )
-            case .incomeCoverage:
-                let response = try await payloadSession.respond(
-                    to: prompt,
-                    generating: Generated.IncomeCoverage.self,
-                    includeSchemaInPrompt: true,
-                    options: options
-                )
-                return MarinaFoundationModelStagedGeneratedOutcomeV3(
-                    outcome: .query(.income(Generated.IncomeQuery(action: .coverage(response.content)))),
-                    generationMetadata: metadata
-                )
-            case .incomeForecast:
-                let response = try await payloadSession.respond(
-                    to: prompt,
-                    generating: Generated.IncomeForecast.self,
-                    includeSchemaInPrompt: true,
-                    options: options
-                )
-                return MarinaFoundationModelStagedGeneratedOutcomeV3(
-                    outcome: .query(.income(Generated.IncomeQuery(action: .forecast(response.content)))),
-                    generationMetadata: metadata
-                )
-            case .incomeSeriesList:
-                let response = try await payloadSession.respond(
-                    to: prompt,
-                    generating: Generated.IncomeSeriesList.self,
-                    includeSchemaInPrompt: true,
-                    options: options
-                )
-                return MarinaFoundationModelStagedGeneratedOutcomeV3(
-                    outcome: .query(.incomeSeries(Generated.IncomeSeriesQuery(action: .list(response.content)))),
-                    generationMetadata: metadata
-                )
-            case .incomeSeriesCount:
-                let response = try await payloadSession.respond(
-                    to: prompt,
-                    generating: Generated.IncomeSeriesCount.self,
-                    includeSchemaInPrompt: true,
-                    options: options
-                )
-                return MarinaFoundationModelStagedGeneratedOutcomeV3(
-                    outcome: .query(.incomeSeries(Generated.IncomeSeriesQuery(action: .count(response.content)))),
-                    generationMetadata: metadata
-                )
-            case .incomeSeriesLast:
-                let response = try await payloadSession.respond(
-                    to: prompt,
-                    generating: Generated.IncomeSeriesSingle.self,
-                    includeSchemaInPrompt: true,
-                    options: options
-                )
-                return MarinaFoundationModelStagedGeneratedOutcomeV3(
-                    outcome: .query(.incomeSeries(Generated.IncomeSeriesQuery(action: .last(response.content)))),
-                    generationMetadata: metadata
-                )
-            case .incomeSeriesNext:
-                let response = try await payloadSession.respond(
-                    to: prompt,
-                    generating: Generated.IncomeSeriesSingle.self,
-                    includeSchemaInPrompt: true,
-                    options: options
-                )
-                return MarinaFoundationModelStagedGeneratedOutcomeV3(
-                    outcome: .query(.incomeSeries(Generated.IncomeSeriesQuery(action: .next(response.content)))),
-                    generationMetadata: metadata
-                )
-            case .categoryList:
-                let response = try await payloadSession.respond(
-                    to: prompt,
-                    generating: Generated.CategoryList.self,
-                    includeSchemaInPrompt: true,
-                    options: options
-                )
-                return MarinaFoundationModelStagedGeneratedOutcomeV3(
-                    outcome: .query(.category(Generated.CategoryQuery(action: .list(response.content)))),
-                    generationMetadata: metadata
-                )
-            case .categoryCount:
-                let response = try await payloadSession.respond(
-                    to: prompt,
-                    generating: Generated.CategoryCount.self,
-                    includeSchemaInPrompt: true,
-                    options: options
-                )
-                return MarinaFoundationModelStagedGeneratedOutcomeV3(
-                    outcome: .query(.category(Generated.CategoryQuery(action: .count(response.content)))),
-                    generationMetadata: metadata
-                )
-            case .categorySum:
-                let response = try await payloadSession.respond(
-                    to: prompt,
-                    generating: Generated.CategoryMetric.self,
-                    includeSchemaInPrompt: true,
-                    options: options
-                )
-                return MarinaFoundationModelStagedGeneratedOutcomeV3(
-                    outcome: .query(.category(Generated.CategoryQuery(action: .sum(response.content)))),
-                    generationMetadata: metadata
-                )
-            case .categoryAverage:
-                let response = try await payloadSession.respond(
-                    to: prompt,
-                    generating: Generated.CategoryMetric.self,
-                    includeSchemaInPrompt: true,
-                    options: options
-                )
-                return MarinaFoundationModelStagedGeneratedOutcomeV3(
-                    outcome: .query(.category(Generated.CategoryQuery(action: .average(response.content)))),
-                    generationMetadata: metadata
-                )
-            case .categoryCompare:
-                let response = try await payloadSession.respond(
-                    to: prompt,
-                    generating: Generated.CategoryComparison.self,
-                    includeSchemaInPrompt: true,
-                    options: options
-                )
-                return MarinaFoundationModelStagedGeneratedOutcomeV3(
-                    outcome: .query(.category(Generated.CategoryQuery(action: .compare(response.content)))),
-                    generationMetadata: metadata
-                )
-            case .categoryGroupedSpend:
-                let response = try await payloadSession.respond(
-                    to: prompt,
-                    generating: Generated.CategoryGroupedSpend.self,
-                    includeSchemaInPrompt: true,
-                    options: options
-                )
-                return MarinaFoundationModelStagedGeneratedOutcomeV3(
-                    outcome: .query(.category(Generated.CategoryQuery(action: .groupedSpend(response.content)))),
-                    generationMetadata: metadata
-                )
-            case .categoryShare:
-                let response = try await payloadSession.respond(
-                    to: prompt,
-                    generating: Generated.CategoryMetric.self,
-                    includeSchemaInPrompt: true,
-                    options: options
-                )
-                return MarinaFoundationModelStagedGeneratedOutcomeV3(
-                    outcome: .query(.category(Generated.CategoryQuery(action: .share(response.content)))),
-                    generationMetadata: metadata
-                )
-            case .categoryForecast:
-                let response = try await payloadSession.respond(
-                    to: prompt,
-                    generating: Generated.CategoryForecast.self,
-                    includeSchemaInPrompt: true,
-                    options: options
-                )
-                return MarinaFoundationModelStagedGeneratedOutcomeV3(
-                    outcome: .query(.category(Generated.CategoryQuery(action: .forecast(response.content)))),
-                    generationMetadata: metadata
-                )
-            case .categoryAvailabilitySummary:
-                let response = try await payloadSession.respond(
-                    to: prompt,
-                    generating: Generated.CategoryAvailabilitySummary.self,
-                    includeSchemaInPrompt: true,
-                    options: options
-                )
-                return MarinaFoundationModelStagedGeneratedOutcomeV3(
-                    outcome: .query(.category(Generated.CategoryQuery(action: .availabilitySummary(response.content)))),
-                    generationMetadata: metadata
-                )
-            case .categoryAvailabilityList:
-                let response = try await payloadSession.respond(
-                    to: prompt,
-                    generating: Generated.CategoryAvailabilityList.self,
-                    includeSchemaInPrompt: true,
-                    options: options
-                )
-                return MarinaFoundationModelStagedGeneratedOutcomeV3(
-                    outcome: .query(.category(Generated.CategoryQuery(action: .availabilityList(response.content)))),
-                    generationMetadata: metadata
-                )
-            case .presetList:
-                let response = try await payloadSession.respond(
-                    to: prompt,
-                    generating: Generated.PresetList.self,
-                    includeSchemaInPrompt: true,
-                    options: options
-                )
-                return MarinaFoundationModelStagedGeneratedOutcomeV3(
-                    outcome: .query(.preset(Generated.PresetQuery(action: .list(response.content)))),
-                    generationMetadata: metadata
-                )
-            case .presetSum:
-                let response = try await payloadSession.respond(
-                    to: prompt,
-                    generating: Generated.PresetMetric.self,
-                    includeSchemaInPrompt: true,
-                    options: options
-                )
-                return MarinaFoundationModelStagedGeneratedOutcomeV3(
-                    outcome: .query(.preset(Generated.PresetQuery(action: .sum(response.content)))),
-                    generationMetadata: metadata
-                )
-            case .presetNext:
-                let response = try await payloadSession.respond(
-                    to: prompt,
-                    generating: Generated.PresetSingle.self,
-                    includeSchemaInPrompt: true,
-                    options: options
-                )
-                return MarinaFoundationModelStagedGeneratedOutcomeV3(
-                    outcome: .query(.preset(Generated.PresetQuery(action: .next(response.content)))),
-                    generationMetadata: metadata
-                )
-            case .presetGroup:
-                let response = try await payloadSession.respond(
-                    to: prompt,
-                    generating: Generated.PresetGroup.self,
-                    includeSchemaInPrompt: true,
-                    options: options
-                )
-                return MarinaFoundationModelStagedGeneratedOutcomeV3(
-                    outcome: .query(.preset(Generated.PresetQuery(action: .group(response.content)))),
-                    generationMetadata: metadata
-                )
-              }
-            }()
-            return MarinaFoundationModelStagedGeneratedOutcomeV3(
-                outcome: generated.outcome,
-                generationMetadata: appendingPhaseDuration(
-                    metadata,
-                    appendingElapsedSince: startedAt,
-                    to: priorPhaseDurations
-                )
-            )
-        } catch let error as LanguageModelSession.GenerationError {
-            throw MarinaFoundationModelStagedPayloadErrorV3.generation(
-                error,
-                generatedIntent: actionDigest,
-                generationMetadata: appendingPhaseDuration(
-                    metadata,
-                    appendingElapsedSince: startedAt,
-                    to: priorPhaseDurations
-                )
-            )
-        } catch is CancellationError {
-            throw MarinaFoundationModelStagedPayloadErrorV3.cancelled(
-                generatedIntent: actionDigest,
-                generationMetadata: appendingPhaseDuration(
-                    metadata,
-                    appendingElapsedSince: startedAt,
-                    to: priorPhaseDurations
-                )
-            )
-        } catch {
-            throw MarinaFoundationModelStagedPayloadErrorV3.unexpected(
-                generatedIntent: actionDigest,
-                generationMetadata: appendingPhaseDuration(
-                    metadata,
-                    appendingElapsedSince: startedAt,
-                    to: priorPhaseDurations
-                )
-            )
-        }
-    }
-
-    private func performStagedPhase<Value>(
-        generatedIntent: MarinaFoundationModelGeneratedIntentDigest?,
-        metadata: MarinaFoundationModelGenerationDiagnosticMetadata,
-        priorPhaseDurations: [MarinaFoundationModelGenerationPhaseDuration],
-        operation: () async throws -> Value
-    ) async throws -> MarinaFoundationModelTimedPhaseV3<Value> {
-        let startedAt = DispatchTime.now().uptimeNanoseconds
-        do {
-            let value = try await operation()
-            return MarinaFoundationModelTimedPhaseV3(
-                value: value,
-                generationMetadata: appendingPhaseDuration(
-                    metadata,
-                    appendingElapsedSince: startedAt,
-                    to: priorPhaseDurations
-                )
-            )
-        } catch let error as MarinaFoundationModelStagedPayloadErrorV3 {
-            throw error.replacingGenerationMetadata(
-                appendingPhaseDuration(
-                    metadata,
-                    appendingElapsedSince: startedAt,
-                    to: priorPhaseDurations
-                )
-            )
-        } catch let error as LanguageModelSession.GenerationError {
-            throw MarinaFoundationModelStagedPayloadErrorV3.generation(
-                error,
-                generatedIntent: generatedIntent,
-                generationMetadata: appendingPhaseDuration(
-                    metadata,
-                    appendingElapsedSince: startedAt,
-                    to: priorPhaseDurations
-                )
-            )
-        } catch is CancellationError {
-            throw MarinaFoundationModelStagedPayloadErrorV3.cancelled(
-                generatedIntent: generatedIntent,
-                generationMetadata: appendingPhaseDuration(
-                    metadata,
-                    appendingElapsedSince: startedAt,
-                    to: priorPhaseDurations
-                )
-            )
-        } catch {
-            throw MarinaFoundationModelStagedPayloadErrorV3.unexpected(
-                generatedIntent: generatedIntent,
-                generationMetadata: appendingPhaseDuration(
-                    metadata,
-                    appendingElapsedSince: startedAt,
-                    to: priorPhaseDurations
-                )
-            )
-        }
-    }
-
-    private func appendingPhaseDuration(
-        _ metadata: MarinaFoundationModelGenerationDiagnosticMetadata,
-        appendingElapsedSince startedAt: UInt64,
-        to priorPhaseDurations: [MarinaFoundationModelGenerationPhaseDuration]
-    ) -> MarinaFoundationModelGenerationDiagnosticMetadata {
-        let endedAt = DispatchTime.now().uptimeNanoseconds
-        let nanoseconds = endedAt >= startedAt ? endedAt - startedAt : 0
-        let milliseconds = Int(min(UInt64(Int.max), nanoseconds / 1_000_000))
-        return MarinaFoundationModelGenerationDiagnosticMetadata(
-            phase: metadata.phase,
-            phaseCount: metadata.phaseCount,
-            routePath: metadata.routePath,
-            phaseDurations: priorPhaseDurations + [
-                MarinaFoundationModelGenerationPhaseDuration(
-                    phase: metadata.phase,
-                    milliseconds: milliseconds
-                )
-            ]
-        )
-    }
-
-    /// Each phase is intentionally tool-free and transcript-free.
-    private func makeSession(instructions: String) -> LanguageModelSession {
-        LanguageModelSession(
+        let session = LanguageModelSession(
             model: model,
             tools: [],
             instructions: instructions
         )
-    }
 
-    private func runtimeResult(
-        for error: LanguageModelSession.GenerationError
-    ) -> MarinaFoundationModelRuntimeResult {
-        switch error {
-        case .assetsUnavailable, .rateLimited, .concurrentRequests:
+        do {
+            let response = try await session.respond(
+                to: prompt,
+                generating: MarinaGeneratedSemanticRequest.self,
+                includeSchemaInPrompt: true,
+                options: options
+            )
+            return .generated(
+                response.content,
+                diagnosticNotes: [
+                    "FoundationModels transcriptEntries=\(response.transcriptEntries.count)",
+                    "FoundationModels contextSize=\(model.contextSize)"
+                ]
+            )
+        } catch let error as LanguageModelSession.GenerationError {
             return .unsupported(
-                .unavailableModel,
-                diagnosticNotes: ["FoundationModels generationError=runtimeUnavailable"]
+                unsupportedReason(for: error),
+                diagnosticNotes: ["FoundationModels generation error: \(error.localizedDescription)"]
             )
-        case .exceededContextWindowSize:
+        } catch {
             return .unsupported(
-                .modelContextLimit,
-                diagnosticNotes: ["FoundationModels generationError=contextLimit"]
-            )
-        case .guardrailViolation, .refusal:
-            return .unsupported(
-                .modelGuardrail,
-                diagnosticNotes: ["FoundationModels generationError=guardrail"]
-            )
-        case .unsupportedLanguageOrLocale:
-            return .unsupported(
-                .unsupportedLanguageOrLocale,
-                diagnosticNotes: ["FoundationModels generationError=unsupportedLocale"]
-            )
-        case .decodingFailure:
-            return .generationFailure(
-                .decodingFailure,
-                diagnosticNotes: ["FoundationModels generationError=decodingFailure"]
-            )
-        case .unsupportedGuide:
-            return .generationFailure(
-                .unsupportedGuide,
-                diagnosticNotes: ["FoundationModels generationError=unsupportedGuide"]
-            )
-        @unknown default:
-            return .generationFailure(
-                .unexpected,
-                diagnosticNotes: ["FoundationModels generationError=unexpected"]
+                .modelGenerationFailed,
+                diagnosticNotes: ["FoundationModels error: \(error.localizedDescription)"]
             )
         }
     }
 
-    private func stagedRuntimeResult(
-        for error: MarinaFoundationModelStagedPayloadErrorV3
-    ) -> MarinaFoundationModelRuntimeResult {
+    private func unsupportedReason(for error: LanguageModelSession.GenerationError) -> MarinaSemanticUnsupportedReason {
         switch error {
-        case .generation(let generationError, let generatedIntent, let generationMetadata):
-            switch runtimeResult(for: generationError) {
-            case .unsupported(let reason, let notes):
-                return .stagedFailure(
-                    .unsupported(reason),
-                    generatedIntent: generatedIntent,
-                    generationMetadata: generationMetadata,
-                    diagnosticNotes: notes
-                )
-            case .generationFailure(let failure, let notes):
-                return .stagedFailure(
-                    .generation(failure),
-                    generatedIntent: generatedIntent,
-                    generationMetadata: generationMetadata,
-                    diagnosticNotes: notes
-                )
-            case .generated, .stagedFailure:
-                return .stagedFailure(
-                    .generation(.unexpected),
-                    generatedIntent: generatedIntent,
-                    generationMetadata: generationMetadata,
-                    diagnosticNotes: ["FoundationModels generationError=unexpected"]
-                )
-            }
-        case .cancelled(let generatedIntent, let generationMetadata):
-            return .stagedFailure(
-                .generation(.cancelled),
-                generatedIntent: generatedIntent,
-                generationMetadata: generationMetadata,
-                diagnosticNotes: ["FoundationModels generation cancelled."]
-            )
-        case .unexpected(let generatedIntent, let generationMetadata):
-            return .stagedFailure(
-                .generation(.unexpected),
-                generatedIntent: generatedIntent,
-                generationMetadata: generationMetadata,
-                diagnosticNotes: ["FoundationModels generationError=unexpected"]
-            )
+        case .assetsUnavailable, .rateLimited, .concurrentRequests:
+            return .unavailableModel
+        case .exceededContextWindowSize:
+            return .modelContextLimit
+        case .guardrailViolation, .refusal:
+            return .modelGuardrail
+        case .unsupportedLanguageOrLocale:
+            return .unsupportedLanguageOrLocale
+        case .decodingFailure, .unsupportedGuide:
+            return .modelGenerationFailed
+        @unknown default:
+            return .modelGenerationFailed
         }
     }
 
@@ -1765,50 +277,6 @@ struct MarinaFoundationModelRuntime: MarinaFoundationModelGenerating {
         }
     }
 }
-
-@available(iOS 26.0, macCatalyst 26.0, *)
-private enum MarinaFoundationModelStagedPayloadErrorV3: Error {
-    case generation(
-        LanguageModelSession.GenerationError,
-        generatedIntent: MarinaFoundationModelGeneratedIntentDigest?,
-        generationMetadata: MarinaFoundationModelGenerationDiagnosticMetadata
-    )
-    case cancelled(
-        generatedIntent: MarinaFoundationModelGeneratedIntentDigest?,
-        generationMetadata: MarinaFoundationModelGenerationDiagnosticMetadata
-    )
-    case unexpected(
-        generatedIntent: MarinaFoundationModelGeneratedIntentDigest?,
-        generationMetadata: MarinaFoundationModelGenerationDiagnosticMetadata
-    )
-}
-
-@available(iOS 26.0, macCatalyst 26.0, *)
-private extension MarinaFoundationModelStagedPayloadErrorV3 {
-    func replacingGenerationMetadata(
-        _ generationMetadata: MarinaFoundationModelGenerationDiagnosticMetadata
-    ) -> Self {
-        switch self {
-        case .generation(let error, let generatedIntent, _):
-            .generation(
-                error,
-                generatedIntent: generatedIntent,
-                generationMetadata: generationMetadata
-            )
-        case .cancelled(let generatedIntent, _):
-            .cancelled(
-                generatedIntent: generatedIntent,
-                generationMetadata: generationMetadata
-            )
-        case .unexpected(let generatedIntent, _):
-            .unexpected(
-                generatedIntent: generatedIntent,
-                generationMetadata: generationMetadata
-            )
-        }
-    }
-}
-
 #endif
 
 enum MarinaModelInterpreterFactory {

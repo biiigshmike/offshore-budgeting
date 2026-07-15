@@ -213,23 +213,13 @@ struct MarinaRowOperationEngine: Sendable {
         _ rows: [MarinaQueryableRow],
         to count: Int?
     ) -> [MarinaQueryableRow] {
-        page(rows, offset: 0, limit: count)
-    }
-
-    func page(
-        _ rows: [MarinaQueryableRow],
-        offset: Int,
-        limit: Int?
-    ) -> [MarinaQueryableRow] {
-        let start = min(max(0, offset), rows.count)
-        let remaining = rows.dropFirst(start)
-        guard let limit else {
-            return Array(remaining)
+        guard let count else {
+            return rows
         }
-        guard limit > 0 else {
+        guard count > 0 else {
             return []
         }
-        return Array(remaining.prefix(limit))
+        return Array(rows.prefix(count))
     }
 
     private func matches(row: MarinaQueryableRow, filter: MarinaRowFilter) -> Bool {
