@@ -12,7 +12,10 @@ struct MarinaSemanticUniversalPlanBridgeTests {
         #expect(plan.operation == .list)
         #expect(plan.measure == nil)
         #expect(plan.filters.isEmpty)
-        #expect(plan.sorts.isEmpty)
+        #expect(plan.sorts == [
+            MarinaRowSort(target: .field(.transactionDate), direction: .descending),
+            MarinaRowSort(target: .field(.id), direction: .ascending)
+        ])
     }
 
     @Test func variableExpenseCountRequestMapsToUniversalCountPlan() throws {
@@ -47,30 +50,34 @@ struct MarinaSemanticUniversalPlanBridgeTests {
     }
 
     @Test func variableExpenseCategoryDimensionAndTargetNameMapToCategoryRelationshipFilter() throws {
+        let categoryID = UUID()
         let plan = try requirePlan(bridge.makePlan(from: request(
             entity: .variableExpense,
             operation: .sum,
             measure: .budgetImpact,
             dimensions: [.category],
-            targetName: "Groceries"
+            targetName: "Groceries",
+            resolvedTarget: reference(.category, categoryID, "Groceries")
         )))
 
         #expect(plan.filters == [
-            MarinaRowFilter(target: .relationship(.category), operation: .equals, value: .text("Groceries"))
+            MarinaRowFilter(target: .relationship(.category), operation: .equals, value: .text(categoryID.uuidString))
         ])
     }
 
     @Test func variableExpenseCardDimensionAndTargetNameMapToCardRelationshipFilter() throws {
+        let cardID = UUID()
         let plan = try requirePlan(bridge.makePlan(from: request(
             entity: .variableExpense,
             operation: .sum,
             measure: .budgetImpact,
             dimensions: [.card],
-            targetName: "Apple Card"
+            targetName: "Apple Card",
+            resolvedTarget: reference(.card, cardID, "Apple Card")
         )))
 
         #expect(plan.filters == [
-            MarinaRowFilter(target: .relationship(.card), operation: .equals, value: .text("Apple Card"))
+            MarinaRowFilter(target: .relationship(.card), operation: .equals, value: .text(cardID.uuidString))
         ])
     }
 
@@ -108,7 +115,8 @@ struct MarinaSemanticUniversalPlanBridgeTests {
         )))
 
         #expect(plan.sorts == [
-            MarinaRowSort(target: .field(.budgetImpact), direction: .descending)
+            MarinaRowSort(target: .field(.budgetImpact), direction: .descending),
+            MarinaRowSort(target: .field(.id), direction: .ascending)
         ])
     }
 
@@ -121,7 +129,8 @@ struct MarinaSemanticUniversalPlanBridgeTests {
         )))
 
         #expect(plan.sorts == [
-            MarinaRowSort(target: .field(.transactionDate), direction: .descending)
+            MarinaRowSort(target: .field(.transactionDate), direction: .descending),
+            MarinaRowSort(target: .field(.id), direction: .ascending)
         ])
     }
 
@@ -138,7 +147,8 @@ struct MarinaSemanticUniversalPlanBridgeTests {
         #expect(plan.entity == .plannedExpense)
         #expect(plan.operation == .next)
         #expect(plan.sorts == [
-            MarinaRowSort(target: .field(.expenseDate), direction: .ascending)
+            MarinaRowSort(target: .field(.expenseDate), direction: .ascending),
+            MarinaRowSort(target: .field(.id), direction: .ascending)
         ])
     }
 
@@ -160,7 +170,13 @@ struct MarinaSemanticUniversalPlanBridgeTests {
             operation: .sum,
             measure: .incomeAmount,
             dimensions: [.incomeSource],
-            targetName: "Paycheck"
+            targetName: "Paycheck",
+            resolvedTarget: MarinaResolvedEntityReference(
+                entity: .income,
+                id: nil,
+                displayName: "Paycheck",
+                provenance: .candidateResolver
+            )
         )))
 
         #expect(plan.filters == [
@@ -289,7 +305,7 @@ struct MarinaSemanticUniversalPlanBridgeTests {
             targetName: "Apple"
         ))
 
-        #expect(result == .unsupported(.unsupportedCombination))
+        #expect(result == .unsupported(.unresolvedEntity))
     }
 
     private func request(
@@ -299,6 +315,7 @@ struct MarinaSemanticUniversalPlanBridgeTests {
         dimensions: [MarinaSemanticDimension] = [],
         dateRangeToken: MarinaSemanticDateRangeToken = .currentPeriod,
         targetName: String? = nil,
+        resolvedTarget: MarinaResolvedEntityReference? = nil,
         textQuery: String? = nil,
         resultLimit: Int? = nil,
         sort: MarinaSemanticSort? = nil,
@@ -314,6 +331,7 @@ struct MarinaSemanticUniversalPlanBridgeTests {
             dateRangeToken: dateRangeToken,
             targetName: targetName,
             textQuery: textQuery,
+            resolvedTarget: resolvedTarget,
             resultLimit: resultLimit,
             sort: sort,
             expenseScope: expenseScope,
@@ -338,6 +356,19 @@ struct MarinaSemanticUniversalPlanBridgeTests {
 
     private func date(_ year: Int, _ month: Int, _ day: Int) -> Date {
         DateComponents(calendar: calendar, timeZone: TimeZone(secondsFromGMT: 0), year: year, month: month, day: day).date!
+    }
+
+    private func reference(
+        _ entity: MarinaSemanticEntity,
+        _ id: UUID,
+        _ name: String
+    ) -> MarinaResolvedEntityReference {
+        MarinaResolvedEntityReference(
+            entity: entity,
+            id: id,
+            displayName: name,
+            provenance: .candidateResolver
+        )
     }
 
     private func requirePlan(

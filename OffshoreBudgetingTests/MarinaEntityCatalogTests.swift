@@ -82,18 +82,24 @@ struct MarinaEntityCatalogTests {
         #expect(catalog.supports(entity: .preset, measure: .plannedAmount) == .supported)
         #expect(catalog.supports(entity: .preset, measure: .savingsTotal) == .unsupported(.measureNotAvailable))
         #expect(catalog.supports(entity: .preset, measure: .reconciliationBalance) == .unsupported(.measureNotAvailable))
+        #expect(catalog.supports(entity: .savingsAccount, operation: .sum) == .supported)
+        #expect(catalog.supports(entity: .savingsAccount, operation: .forecast) == .supported)
+        #expect(catalog.supports(entity: .savingsAccount, measure: .savingsTotal) == .supported)
+        #expect(catalog.supports(entity: .reconciliationAccount, operation: .sum) == .supported)
+        #expect(catalog.supports(entity: .reconciliationAccount, measure: .reconciliationBalance) == .supported)
     }
 
-    @Test func catalogDoesNotBroadenCurrentOperationRegistry() {
+    @Test func catalogIsTheAuthoritativeOperationRegistry() {
         let catalog = MarinaEntityCatalog()
-        let registry = MarinaQueryCapabilityRegistry()
 
         for entity in MarinaSemanticEntity.allCases {
+            let descriptor = catalog.descriptor(for: entity)
+            #expect(descriptor != nil)
             for operation in MarinaSemanticOperation.allCases {
-                guard catalog.supports(entity: entity, operation: operation) == .supported else {
-                    continue
-                }
-                #expect(registry.supports(entity: entity, operation: operation), "Catalog broadened \(entity.rawValue).\(operation.rawValue)")
+                let expected = descriptor?.supportedOperations.contains(operation) == true
+                    ? MarinaCapabilityResult.supported
+                    : MarinaCapabilityResult.unsupported(.operationNotSupported)
+                #expect(catalog.supports(entity: entity, operation: operation) == expected)
             }
         }
     }

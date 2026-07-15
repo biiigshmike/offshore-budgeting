@@ -24,12 +24,36 @@ nonisolated struct MarinaQueryableRow: Equatable, Sendable {
     let displayName: String
     let fields: [MarinaFieldKey: MarinaValue]
     let relationships: [MarinaRelationshipKey: MarinaResolvedRelationship]
+    let relationshipCollections: [MarinaRelationshipKey: [MarinaResolvedRelationship]]
+
+    init(
+        id: UUID,
+        entity: MarinaSemanticEntity,
+        displayName: String,
+        fields: [MarinaFieldKey: MarinaValue],
+        relationships: [MarinaRelationshipKey: MarinaResolvedRelationship],
+        relationshipCollections: [MarinaRelationshipKey: [MarinaResolvedRelationship]] = [:]
+    ) {
+        self.id = id
+        self.entity = entity
+        self.displayName = displayName
+        self.fields = fields
+        self.relationships = relationships
+        self.relationshipCollections = relationshipCollections
+    }
 }
 
 protocol MarinaEntityAdapter {
     var entity: MarinaSemanticEntity { get }
 
     func rows(from snapshot: MarinaWorkspaceSnapshot) -> [MarinaQueryableRow]
+    func calculationRows(from snapshot: MarinaWorkspaceSnapshot) -> [MarinaQueryableRow]
+}
+
+extension MarinaEntityAdapter {
+    func calculationRows(from snapshot: MarinaWorkspaceSnapshot) -> [MarinaQueryableRow] {
+        rows(from: snapshot)
+    }
 }
 
 struct MarinaEntityAdapterRegistry {
@@ -64,10 +88,19 @@ struct MarinaEntityAdapterRegistry {
         }
     }
 
+    func rows(
+        for plan: MarinaUniversalQueryPlan,
+        from snapshot: MarinaWorkspaceSnapshot
+    ) -> [MarinaQueryableRow]? {
+        MarinaScopedRowProvider(adapterRegistry: self).rows(for: plan, from: snapshot)
+    }
+
     static let defaultAdapters: [any MarinaEntityAdapter] = [
+        MarinaWorkspaceAdapter(),
         MarinaVariableExpenseAdapter(),
         MarinaPlannedExpenseAdapter(),
         MarinaIncomeAdapter(),
+        MarinaIncomeSeriesAdapter(),
         MarinaCategoryAdapter(),
         MarinaCardAdapter(),
         MarinaBudgetAdapter(),

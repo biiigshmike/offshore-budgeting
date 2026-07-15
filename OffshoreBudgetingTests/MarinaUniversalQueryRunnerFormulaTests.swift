@@ -80,6 +80,24 @@ struct MarinaUniversalQueryRunnerFormulaTests {
         #expect(metric.details.map(\.component).contains(.clampedToZero))
     }
 
+    @Test func formulaBackedIncomeProgressRoutesThroughRegistry() {
+        let fixture = makeFixture()
+        let runner = formulaRunner()
+        let metric = requireMetric(runner.runFormulaAware(
+            plan: MarinaUniversalQueryPlan(
+                entity: .income,
+                operation: .share,
+                measure: .incomeAmount,
+                dateRange: HomeQueryDateRange(startDate: date(2026, 6, 1), endDate: date(2026, 6, 30))
+            ),
+            snapshot: fixture.snapshot
+        ))
+
+        #expect(metric.value == .number(2))
+        #expect(metric.evidenceRows.map(\.displayName).sorted() == ["Bonus", "Paycheck"])
+        #expect(metric.presentationRows.map(\.title) == ["Actual", "Planned", "Progress"])
+    }
+
     @Test func safeDailySpendPresentationExplainsZeroClamp() {
         let fixture = makeFixture(extraVariableExpenseAmount: 5_000)
         let runner = formulaRunner()

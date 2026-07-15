@@ -54,7 +54,6 @@ struct MarinaManualQAPromptInterpretationSmokeTests {
 
         #expect(request.expectedAnswerShape == .clarification)
         #expect(request.unsupportedReason == .ambiguousEntity)
-        #expect(MarinaUniversalRoutingPolicy.internalParityProven.allows(request) == false)
 
         let choices = try #require(interpreted.clarificationChoices)
         #expect(choices.choices.map(\.title).contains("Apple Store"))
@@ -109,8 +108,6 @@ struct MarinaManualQAPromptInterpretationSmokeTests {
         let request = interpreted.request
 
         #expect(request.targetName != "Emergency")
-        #expect(MarinaUniversalRoutingPolicy.internalParityProven.scenario(for: request) == nil)
-        #expect(MarinaUniversalRoutingPolicy.internalParityProven.allows(request) == false)
     }
 
     @Test func explicitSavingsAccountWordingResolvesAccountTarget() {
@@ -133,8 +130,6 @@ struct MarinaManualQAPromptInterpretationSmokeTests {
         let request = interpreted.request
 
         #expect(request.targetName != "Roommate")
-        #expect(MarinaUniversalRoutingPolicy.internalParityProven.scenario(for: request) == nil)
-        #expect(MarinaUniversalRoutingPolicy.internalParityProven.allows(request) == false)
         #expect(request.expectedAnswerShape == .unsupported || request.expectedAnswerShape == .clarification || request.targetName == "Reconciliation")
     }
 
@@ -142,10 +137,85 @@ struct MarinaManualQAPromptInterpretationSmokeTests {
         _ prompt: String,
         snapshot: MarinaWorkspaceSnapshot
     ) -> MarinaInterpretedSemanticRequest {
-        let interpreted = MarinaRuleBasedInterpreter().interpretWithConfidence(prompt)
-        return MarinaSemanticRequestValidator().validate(
+        let interpreted = MarinaInterpretedSemanticRequest(
+            request: fixtureRequest(for: prompt),
+            confidence: .high,
+            source: .foundationModel,
+            diagnosticNotes: ["Typed Foundation outcome fixture."]
+        )
+        return MarinaSemanticRequestValidator().validateWithTrace(
             interpreted: interpreted,
             snapshot: snapshot
+        ).interpreted
+    }
+
+    private func fixtureRequest(for prompt: String) -> MarinaSemanticRequest {
+        switch prompt {
+        case "How much did I spend at Apple?":
+            return spendRequest(dimension: .merchantText, textQuery: "Apple")
+        case "How much did I spend on Apple Card?":
+            return spendRequest(dimension: .card, targetName: "Apple Card")
+        case "How much did I spend on Apple?":
+            return spendRequest(targetName: "Apple")
+        case "How much did I spend on groceries?":
+            return spendRequest(dimension: .category, targetName: "groceries")
+        case "How much income from Paycheck?":
+            return MarinaSemanticRequest(
+                entity: .income,
+                operation: .sum,
+                measure: .incomeAmount,
+                dimensions: [.incomeSource],
+                targetName: "Paycheck",
+                incomeState: .all,
+                expectedAnswerShape: .metric
+            )
+        case "How much did I spend at Paycheck?":
+            return spendRequest(dimension: .merchantText, textQuery: "Paycheck")
+        case "What is my savings total?":
+            return MarinaSemanticRequest(
+                entity: .savingsAccount,
+                operation: .sum,
+                measure: .savingsTotal,
+                dateRangeToken: .allTime,
+                expectedAnswerShape: .metric
+            )
+        case "What is my Emergency savings account balance?":
+            return MarinaSemanticRequest(
+                entity: .savingsAccount,
+                operation: .sum,
+                measure: .savingsTotal,
+                dimensions: [.savingsAccount],
+                dateRangeToken: .allTime,
+                targetName: "Emergency",
+                expectedAnswerShape: .metric
+            )
+        case "What is my reconciliation balance?":
+            return MarinaSemanticRequest(
+                entity: .reconciliationAccount,
+                operation: .sum,
+                measure: .reconciliationBalance,
+                dateRangeToken: .allTime,
+                expectedAnswerShape: .metric
+            )
+        default:
+            preconditionFailure("Missing typed Foundation outcome fixture for: \(prompt)")
+        }
+    }
+
+    private func spendRequest(
+        dimension: MarinaSemanticDimension? = nil,
+        targetName: String? = nil,
+        textQuery: String? = nil
+    ) -> MarinaSemanticRequest {
+        MarinaSemanticRequest(
+            entity: dimension == .card ? .card : dimension == .category ? .category : .variableExpense,
+            operation: .sum,
+            measure: .budgetImpact,
+            dimensions: dimension.map { [$0] } ?? [],
+            targetName: targetName,
+            textQuery: textQuery,
+            expenseScope: .unified,
+            expectedAnswerShape: .metric
         )
     }
 

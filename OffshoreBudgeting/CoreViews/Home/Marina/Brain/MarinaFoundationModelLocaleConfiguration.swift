@@ -1,6 +1,6 @@
 import Foundation
 
-struct MarinaFoundationModelLocaleConfiguration: Equatable {
+struct MarinaFoundationModelLocaleConfiguration: Equatable, Sendable {
     static var current: MarinaFoundationModelLocaleConfiguration {
         MarinaFoundationModelLocaleConfiguration(locale: .current)
     }
@@ -34,6 +34,14 @@ struct MarinaFoundationModelLocaleConfiguration: Equatable {
         let prefix = instructionsPrefix()
         guard prefix.isEmpty == false else { return instructions }
         return "\(prefix)\n\(instructions)"
+    }
+
+    func appendingSemanticCompiler(to instructions: String) -> String {
+        let compilerPrefix = """
+        Interpret the request using \(responseLanguageName) and \(identifier) locale conventions.
+        Preserve named target and scope wording exactly as supplied. Typed schema cases remain canonical and are never translated.
+        """
+        return "\(compilerPrefix)\n\(instructions)"
     }
 
     private var isUSEnglish: Bool {

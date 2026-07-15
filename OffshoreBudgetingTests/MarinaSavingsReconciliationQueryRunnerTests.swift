@@ -273,7 +273,88 @@ struct MarinaSavingsReconciliationQueryRunnerTests {
         ))) == ["May true-up", "Apple Store", "Paid back"])
     }
 
-    private func makeFixture() -> SavingsReconciliationRunnerFixture {
+    @Test func accountActivityUsesStableNonduplicatingPagesAndFullSetAggregates() {
+        let fixture = makeFixture(longActivity: true)
+        let bridge = MarinaSemanticUniversalPlanBridge()
+
+        func page(
+            entity: MarinaSemanticEntity,
+            targetID: UUID,
+            targetName: String,
+            offset: Int
+        ) -> MarinaUniversalRowsPage {
+            let request = MarinaSemanticRequest(
+                entity: entity,
+                operation: .list,
+                projection: .activity,
+                dateRangeToken: .allTime,
+                dateRangeSource: .explicit,
+                targetName: targetName,
+                resolvedTarget: MarinaResolvedEntityReference(
+                    entity: entity,
+                    id: targetID,
+                    displayName: targetName,
+                    provenance: .explicitIdentifier
+                ),
+                resolvedScope: .workspace(fixture.snapshot.workspace.id),
+                resultLimit: 20,
+                resultOffset: offset,
+                expectedAnswerShape: .list
+            )
+            guard case let .plan(plan) = bridge.makePlan(from: request) else {
+                Issue.record("Expected public account activity request to bridge.")
+                return MarinaUniversalRowsPage(rows: [], totalRowCount: 0, displayLimit: 20)
+            }
+            let result = runner.run(
+                plan: plan,
+                snapshot: fixture.snapshot
+            )
+            guard case let .rowsPage(page) = result else {
+                Issue.record("Expected paged activity rows, got \(result).")
+                return MarinaUniversalRowsPage(rows: [], totalRowCount: 0, displayLimit: 20)
+            }
+            return page
+        }
+
+        let cases: [(MarinaSemanticEntity, UUID, String, MarinaUniversalEntitySurface)] = [
+            (
+                .savingsAccount,
+                fixture.snapshot.savingsAccounts[0].id,
+                fixture.snapshot.savingsAccounts[0].name,
+                .savingsLedgerEntries
+            ),
+            (
+                .reconciliationAccount,
+                fixture.snapshot.reconciliationAccounts[0].id,
+                fixture.snapshot.reconciliationAccounts[0].name,
+                .reconciliationLedgerEntries
+            )
+        ]
+
+        for (entity, targetID, targetName, internalSurface) in cases {
+            let first = page(entity: entity, targetID: targetID, targetName: targetName, offset: 0)
+            let second = page(entity: entity, targetID: targetID, targetName: targetName, offset: 20)
+
+            #expect(first.rows.count == 20)
+            #expect(first.totalRowCount == 25)
+            #expect(first.fullTotalAmount == 325)
+            #expect(first.hasMore)
+            #expect(first.nextOffset == 20)
+            #expect(second.rows.count == 5)
+            #expect(second.totalRowCount == 25)
+            #expect(second.fullTotalAmount == 325)
+            #expect(second.hasMore == false)
+            #expect(second.nextOffset == nil)
+            #expect(Set(first.rows.map(\.id)).isDisjoint(with: Set(second.rows.map(\.id))))
+
+            #expect(requireMetric(runner.run(
+                plan: MarinaUniversalQueryPlan(surface: internalSurface, operation: .sum, measure: .amount),
+                snapshot: fixture.snapshot
+            )).value == .money(325))
+        }
+    }
+
+    private func makeFixture(longActivity: Bool = false) -> SavingsReconciliationRunnerFixture {
         let workspace = Workspace(name: "Personal", hexColor: "#3B82F6")
         let appleCard = Card(name: "Apple Card", theme: "ruby", effect: "plastic", workspace: workspace)
         let travelCard = Card(name: "Travel Card", theme: "ocean", effect: "matte", workspace: workspace)
@@ -311,21 +392,46 @@ struct MarinaSavingsReconciliationQueryRunnerTests {
             category: travel
         )
 
-        let savingsEntries = [
-            SavingsLedgerEntry(date: date(2026, 5, 20), amount: 50, note: "May reserve", kindRaw: SavingsLedgerEntryKind.manualAdjustment.rawValue, workspace: workspace, account: emergency),
-            SavingsLedgerEntry(date: date(2026, 6, 3), amount: 125, note: "Emergency deposit", kindRaw: SavingsLedgerEntryKind.manualAdjustment.rawValue, workspace: workspace, account: emergency),
-            SavingsLedgerEntry(date: date(2026, 6, 7), amount: -25, note: "Expense offset", kindRaw: SavingsLedgerEntryKind.expenseOffset.rawValue, workspace: workspace, account: emergency, variableExpense: offsetExpense),
-            SavingsLedgerEntry(date: date(2026, 6, 10), amount: 200, note: "Travel deposit", kindRaw: SavingsLedgerEntryKind.manualAdjustment.rawValue, workspace: workspace, account: travelSavings)
-        ]
-
-        let allocations = [
-            ExpenseAllocation(allocatedAmount: 40, createdAt: date(2026, 6, 6), updatedAt: date(2026, 6, 6), workspace: workspace, account: roommate, expense: appleExpense),
-            ExpenseAllocation(allocatedAmount: 20, createdAt: date(2026, 6, 9), updatedAt: date(2026, 6, 9), workspace: workspace, account: travelKitty, plannedExpense: hotel)
-        ]
-        let settlements = [
-            AllocationSettlement(date: date(2026, 5, 18), note: "May true-up", amount: 10, workspace: workspace, account: roommate),
-            AllocationSettlement(date: date(2026, 6, 8), note: "Paid back", amount: -15, workspace: workspace, account: roommate)
-        ]
+        let savingsEntries: [SavingsLedgerEntry]
+        let allocations: [ExpenseAllocation]
+        let settlements: [AllocationSettlement]
+        if longActivity {
+            savingsEntries = (0..<25).map { index in
+                SavingsLedgerEntry(
+                    date: date(2026, 6, 1).addingTimeInterval(Double(index) * 86_400),
+                    amount: Double(index + 1),
+                    note: "Savings activity \(index + 1)",
+                    kindRaw: SavingsLedgerEntryKind.manualAdjustment.rawValue,
+                    workspace: workspace,
+                    account: emergency
+                )
+            }
+            allocations = []
+            settlements = (0..<25).map { index in
+                AllocationSettlement(
+                    date: date(2026, 6, 1).addingTimeInterval(Double(index) * 86_400),
+                    note: "Reconciliation activity \(index + 1)",
+                    amount: Double(index + 1),
+                    workspace: workspace,
+                    account: roommate
+                )
+            }
+        } else {
+            savingsEntries = [
+                SavingsLedgerEntry(date: date(2026, 5, 20), amount: 50, note: "May reserve", kindRaw: SavingsLedgerEntryKind.manualAdjustment.rawValue, workspace: workspace, account: emergency),
+                SavingsLedgerEntry(date: date(2026, 6, 3), amount: 125, note: "Emergency deposit", kindRaw: SavingsLedgerEntryKind.manualAdjustment.rawValue, workspace: workspace, account: emergency),
+                SavingsLedgerEntry(date: date(2026, 6, 7), amount: -25, note: "Expense offset", kindRaw: SavingsLedgerEntryKind.expenseOffset.rawValue, workspace: workspace, account: emergency, variableExpense: offsetExpense),
+                SavingsLedgerEntry(date: date(2026, 6, 10), amount: 200, note: "Travel deposit", kindRaw: SavingsLedgerEntryKind.manualAdjustment.rawValue, workspace: workspace, account: travelSavings)
+            ]
+            allocations = [
+                ExpenseAllocation(allocatedAmount: 40, createdAt: date(2026, 6, 6), updatedAt: date(2026, 6, 6), workspace: workspace, account: roommate, expense: appleExpense),
+                ExpenseAllocation(allocatedAmount: 20, createdAt: date(2026, 6, 9), updatedAt: date(2026, 6, 9), workspace: workspace, account: travelKitty, plannedExpense: hotel)
+            ]
+            settlements = [
+                AllocationSettlement(date: date(2026, 5, 18), note: "May true-up", amount: 10, workspace: workspace, account: roommate),
+                AllocationSettlement(date: date(2026, 6, 8), note: "Paid back", amount: -15, workspace: workspace, account: roommate)
+            ]
+        }
 
         let snapshot = MarinaWorkspaceSnapshot(
             workspace: workspace,

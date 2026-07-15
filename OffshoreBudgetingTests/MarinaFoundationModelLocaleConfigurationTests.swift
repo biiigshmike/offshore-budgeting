@@ -33,4 +33,16 @@ struct MarinaFoundationModelLocaleConfigurationTests {
             #expect(configuration.instructionsPrefix().contains("You MUST respond in \(languageName)."))
         }
     }
+
+    @Test func semanticCompilerLocaleInstructionsPreserveCanonicalSchemaAndTargetWording() {
+        let configuration = MarinaFoundationModelLocaleConfiguration(
+            locale: Locale(identifier: "es_MX")
+        )
+        let instructions = configuration.appendingSemanticCompiler(to: "ROLE")
+
+        #expect(instructions.contains("Spanish and es_MX locale conventions"))
+        #expect(instructions.contains("Preserve named target and scope wording exactly as supplied"))
+        #expect(instructions.contains("Typed schema cases remain canonical"))
+        #expect(instructions.hasSuffix("ROLE"))
+    }
 }

@@ -28,6 +28,7 @@ struct MarinaSemanticUniversalPlanBridgeRunnerDateTests {
 
     @Test func previousMonthGrocerySpendBridgesAndRunsThroughDateFilters() throws {
         let fixture = makeFixture()
+        let groceries = try #require(fixture.snapshot.categories.first { $0.name == "Groceries" })
         let plan = try requirePlan(bridge.makePlan(
             from: request(
                 entity: .variableExpense,
@@ -35,13 +36,18 @@ struct MarinaSemanticUniversalPlanBridgeRunnerDateTests {
                 measure: .budgetImpact,
                 dimensions: [.category],
                 dateRangeToken: .previousMonth,
-                targetName: "Groceries"
+                targetName: "Groceries",
+                resolvedTarget: reference(.category, groceries.id, groceries.name)
             ),
             planningContext: fixture.context()
         ))
         let metric = requireMetric(runner.run(plan: plan, snapshot: fixture.snapshot))
 
-        #expect(plan.filters.contains(MarinaRowFilter(target: .relationship(.category), operation: .equals, value: .text("Groceries"))))
+        #expect(plan.filters.contains(MarinaRowFilter(
+            target: .relationship(.category),
+            operation: .equals,
+            value: .text(groceries.id.uuidString)
+        )))
         #expect(dateFilters(in: plan).count == 2)
         #expect(metric.value == .money(116))
         #expect(rowNames(metric.evidenceRows) == ["Kroger", "Trader Joe's"])
@@ -373,6 +379,7 @@ struct MarinaSemanticUniversalPlanBridgeRunnerDateTests {
         dimensions: [MarinaSemanticDimension] = [],
         dateRangeToken: MarinaSemanticDateRangeToken,
         targetName: String? = nil,
+        resolvedTarget: MarinaResolvedEntityReference? = nil,
         textQuery: String? = nil,
         shape: MarinaSemanticAnswerShape = .metric
     ) -> MarinaSemanticRequest {
@@ -384,7 +391,21 @@ struct MarinaSemanticUniversalPlanBridgeRunnerDateTests {
             dateRangeToken: dateRangeToken,
             targetName: targetName,
             textQuery: textQuery,
+            resolvedTarget: resolvedTarget,
             expectedAnswerShape: shape
+        )
+    }
+
+    private func reference(
+        _ entity: MarinaSemanticEntity,
+        _ id: UUID,
+        _ name: String
+    ) -> MarinaResolvedEntityReference {
+        MarinaResolvedEntityReference(
+            entity: entity,
+            id: id,
+            displayName: name,
+            provenance: .candidateResolver
         )
     }
 

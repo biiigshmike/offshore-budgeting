@@ -1,0 +1,43 @@
+{
+  "configurations" : [
+    {
+      "id" : "15C64DAB-388F-4EF5-850B-875899AB557E",
+      "name" : "Physical Device Calibration",
+      "options" : {
+
+      }
+    }
+  ],
+  "defaultOptions" : {
+    "environmentVariableEntries" : [
+      {
+        "key" : "MARINA_SOURCE_DIRTY",
+        "value" : "$(MARINA_SOURCE_DIRTY)"
+      },
+      {
+        "key" : "MARINA_SOURCE_REVISION",
+        "value" : "$(MARINA_SOURCE_REVISION)"
+      }
+    ],
+    "performanceAntipatternCheckerEnabled" : true,
+    "targetForVariableExpansion" : {
+      "containerPath" : "container:OffshoreBudgeting.xcodeproj",
+      "identifier" : "4C96F8502F20523700541774",
+      "name" : "OffshoreBudgeting"
+    }
+  },
+  "testTargets" : [
+    {
+      "parallelizable" : false,
+      "selectedTests" : [
+        "MarinaFoundationModelDeviceGateTests/testCalibrationObservedFailuresOnSupportedPhysicalDevice()"
+      ],
+      "target" : {
+        "containerPath" : "container:OffshoreBudgeting.xcodeproj",
+        "identifier" : "D30000000000000000000008",
+        "name" : "OffshoreBudgetingFoundationModelDeviceTests"
+      }
+    }
+  ],
+  "version" : 1
+}

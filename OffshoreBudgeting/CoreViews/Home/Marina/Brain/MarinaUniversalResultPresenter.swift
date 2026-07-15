@@ -36,6 +36,43 @@ struct MarinaUniversalPresentationResult: Equatable {
 }
 
 struct MarinaUniversalResultPresenter {
+    func capabilityUnsupportedResult(
+        _ reason: MarinaCapabilityFailureReason
+    ) -> MarinaExecutionResult {
+        unsupportedResult(reason).executionResult
+    }
+
+    func semanticBoundaryResult(
+        for request: MarinaSemanticRequest,
+        clarificationChoices: MarinaClarificationChoices?
+    ) -> MarinaExecutionResult? {
+        if request.expectedAnswerShape == .acknowledgement {
+            return MarinaExecutionResult(
+                kind: .message,
+                title: "",
+                explanation: MarinaL10n.string(
+                    "marina.followUp.declinedAcknowledgement",
+                    defaultValue: "No problem. I’m here whenever you want to dig into something else.",
+                    comment: "Marina acknowledgement after the user declines an offered follow-up."
+                )
+            )
+        }
+
+        if request.expectedAnswerShape == .clarification {
+            return MarinaExecutionResult(
+                kind: .message,
+                title: MarinaL10n.string("marina.clarification.title", defaultValue: "Can you clarify?", comment: "Marina clarification answer title."),
+                subtitle: request.clarificationQuestion ?? MarinaL10n.string("marina.clarification.defaultQuestion", defaultValue: "Can you clarify what you want Marina to look up?", comment: "Default Marina clarification question."),
+                attachment: clarificationChoices.map(MarinaAttachment.clarificationChoices)
+            )
+        }
+
+        guard request.expectedAnswerShape == .unsupported || request.unsupportedReason != nil else {
+            return nil
+        }
+        return unsupportedSemanticResult(request.unsupportedReason ?? .unsupportedCombination)
+    }
+
     func presentationResult(
         for universalResult: MarinaUniversalQueryResult,
         plan: MarinaUniversalQueryPlan,
@@ -114,7 +151,9 @@ struct MarinaUniversalResultPresenter {
         plan: MarinaUniversalQueryPlan,
         context: MarinaUniversalPresentationContext
     ) -> MarinaExecutionResult {
-        let value = formattedMetricValue(metric.value, measure: plan.measure, details: metric.details)
+        let value = isIncomeProgress(plan)
+            ? formattedIncomeProgress(metric.value)
+            : formattedMetricValue(metric.value, measure: plan.measure, details: metric.details)
         let presentationRows = metric.presentationRows.map { presentationRow in
             HomeAnswerRow(
                 title: presentationRow.title,
@@ -155,6 +194,16 @@ struct MarinaUniversalResultPresenter {
         _ metric: MarinaUniversalMetricResult,
         plan: MarinaUniversalQueryPlan
     ) -> [HomeAnswerRow]? {
+        if isIncomeProgress(plan) {
+            return metric.presentationRows.map { presentationRow in
+                HomeAnswerRow(
+                    title: presentationRow.title,
+                    value: formattedPresentationRowValue(presentationRow),
+                    amount: presentationRow.amount
+                )
+            }
+        }
+
         let components: [MarinaFormulaMetricComponent]
         switch plan.measure {
         case .safeDailySpend:
@@ -163,23 +212,7 @@ struct MarinaUniversalResultPresenter {
             components = [.period, .plannedSpending, .plannedSpendingRemaining, .actualSpendSoFar, .periodRemainingRoom]
         case .projectedSpend:
             components = [.actualSpendSoFar, .plannedSpendingRemaining, .projectedSpend]
-        case .amount,
-             .plannedAmount,
-             .actualAmount,
-             .effectiveAmount,
-             .budgetImpact,
-             .savingsTotal,
-             .incomeAmount,
-             .reconciliationBalance,
-             .categoryAvailability,
-             .burnRate,
-             .paceDifference,
-             .coverageRatio,
-             .recurringBurden,
-             .concentration,
-             .color,
-             .name,
-             nil:
+        default:
             return nil
         }
 
@@ -220,6 +253,17 @@ struct MarinaUniversalResultPresenter {
             return emptyResult(plan: plan, context: context)
         }
 
+        if plan.operation == .next, let row = rows.first {
+            let answerRow = homeAnswerRow(from: row, plan: plan, role: .result)
+            return MarinaExecutionResult(
+                kind: .metric,
+                title: title(for: plan, context: context),
+                subtitle: answerRow.title,
+                primaryValue: answerRow.value,
+                rows: [answerRow]
+            )
+        }
+
         return MarinaExecutionResult(
             kind: .list,
             title: title(for: plan, context: context),
@@ -245,7 +289,9 @@ struct MarinaUniversalResultPresenter {
             rows: page.rows.map { homeAnswerRow(from: $0, plan: plan, role: .result) },
             displayedRowCount: page.rows.count,
             totalRowCount: page.totalRowCount,
-            fullTotalAmount: page.fullTotalAmount
+            fullTotalAmount: page.fullTotalAmount,
+            hasMore: page.hasMore,
+            nextOffset: page.nextOffset
         )
     }
 
@@ -302,10 +348,43 @@ struct MarinaUniversalResultPresenter {
             executionResult: MarinaExecutionResult(
                 kind: .message,
                 title: "I can't answer that yet",
-                subtitle: "That universal result is not supported for presentation yet."
+                subtitle: "That budgeting question is not supported by Marina's query catalog yet."
             ),
             unsupportedReason: reason
         )
+    }
+
+    private func unsupportedSemanticResult(
+        _ reason: MarinaSemanticUnsupportedReason
+    ) -> MarinaExecutionResult {
+        let title = MarinaL10n.string("marina.unsupported.title", defaultValue: "I can't answer that yet", comment: "Marina unsupported answer title.")
+        let subtitle: String?
+        switch reason {
+        case .readOnly:
+            subtitle = MarinaL10n.string("marina.unsupported.readOnly", defaultValue: "Marina is read-only for natural-language requests. You can still use the explicit creation forms.", comment: "Unsupported message for read-only Marina free-text mutations.")
+        case .unavailableModel:
+            subtitle = MarinaL10n.string("marina.unsupported.unavailableModel", defaultValue: "Apple Intelligence is not available or ready on this device. Marina will not guess or fall back to phrase rules.", comment: "Unsupported message when Foundation Models are unavailable.")
+        case .unsupportedCombination:
+            subtitle = MarinaL10n.string("marina.unsupported.unsupportedCombination", defaultValue: "I do not know how to answer that shape of budgeting question yet.", comment: "Unsupported message for an unsupported Marina query shape.")
+        case .unresolvedEntity:
+            subtitle = MarinaL10n.string("marina.unsupported.unresolvedEntity", defaultValue: "I could not find a matching live record in this workspace, so I did not calculate a zero.", comment: "Unsupported message when no matching workspace record is found.")
+        case .ambiguousEntity:
+            subtitle = MarinaL10n.string("marina.unsupported.ambiguousEntity", defaultValue: "That request could mean more than one thing.", comment: "Unsupported message for ambiguous Marina request.")
+        case .modelContextLimit:
+            subtitle = MarinaL10n.string("marina.unsupported.modelContextLimit", defaultValue: "That request was too large for the on-device language model. Try asking a shorter question.", comment: "Unsupported message for model context limit.")
+        case .modelGuardrail:
+            subtitle = MarinaL10n.string("marina.unsupported.modelGuardrail", defaultValue: "The on-device language model declined that request. I can still answer ordinary read-only budgeting questions.", comment: "Unsupported message when model guardrails decline.")
+        case .modelGenerationFailed:
+            subtitle = MarinaL10n.string("marina.unsupported.modelGenerationFailed", defaultValue: "The on-device language model did not produce a valid budgeting request, so Marina did not guess.", comment: "Unsupported message when model generation fails.")
+        case .unsupportedLanguageOrLocale:
+            subtitle = MarinaL10n.string("marina.unsupported.languageOrLocale", defaultValue: "The on-device language model does not support that language or locale yet.", comment: "Unsupported message when model language or locale is unsupported.")
+        case .incomeSavingsWhatIfUnsupported:
+            return MarinaExecutionResult(
+                kind: .message,
+                title: MarinaL10n.string("marina.unsupported.incomeSavingsWhatIf.title", defaultValue: "I can see the scenario amount, but I don't support income or savings replacement what-if calculations yet.", comment: "Unsupported title for income or savings replacement what-if scenarios.")
+            )
+        }
+        return MarinaExecutionResult(kind: .message, title: title, subtitle: subtitle)
     }
 
     private func emptyResult(
@@ -400,6 +479,34 @@ struct MarinaUniversalResultPresenter {
         for plan: MarinaUniversalQueryPlan,
         context: MarinaUniversalPresentationContext
     ) -> String {
+        if plan.operation == .next, plan.entity == .plannedExpense {
+            return "Next Planned Expense"
+        }
+
+        if isIncomeProgress(plan) {
+            return "Income Progress"
+        }
+
+        if plan.operation == .compare {
+            if plan.measure == .paceDifference {
+                return "Pace Difference"
+            }
+
+            let comparisonEntity = plan.resolvedTarget?.entity
+                ?? context.semanticRequest?.entity
+                ?? plan.entity
+            switch (comparisonEntity, plan.measure) {
+            case (.card, .budgetImpact):
+                return "Card Spend Comparison"
+            case (.category, .budgetImpact):
+                return "Category Spend Comparison"
+            case (.income, .incomeAmount):
+                return "Income Comparison"
+            default:
+                return "Comparison"
+            }
+        }
+
         if isExpenseList(plan),
            let target = displayTarget(in: context) {
             return "\(target) Expenses"
@@ -442,7 +549,7 @@ struct MarinaUniversalResultPresenter {
                 return "Income Coverage"
             case .budget:
                 return "Budget Coverage"
-            case .workspace, .card, .plannedExpense, .variableExpense, .reconciliationAccount, .savingsAccount, .category, .preset:
+            case .workspace, .card, .plannedExpense, .variableExpense, .reconciliationAccount, .savingsAccount, .incomeSeries, .category, .preset:
                 return "Coverage Ratio"
             }
         case .categoryAvailability:
@@ -453,6 +560,30 @@ struct MarinaUniversalResultPresenter {
             return "Recurring Burden"
         case .incomeAmount:
             return "Income"
+        case .ledgerSignedAmount:
+            return "Signed Ledger Total"
+        case .projectedBudgetImpact:
+            return "Projected Budget Impact"
+        case .plannedIncomeTotal:
+            return "Planned Income"
+        case .actualIncomeTotal:
+            return "Actual Income"
+        case .plannedExpenseProjectedTotal:
+            return "Projected Planned Expenses"
+        case .plannedExpenseActualTotal:
+            return "Recorded Planned Expenses"
+        case .plannedExpenseEffectiveTotal:
+            return "Effective Planned Expenses"
+        case .variableExpenseTotal:
+            return "Variable Expenses"
+        case .unifiedExpenseTotal:
+            return "Unified Expenses"
+        case .maximumSavings:
+            return "Maximum Savings"
+        case .projectedSavings:
+            return "Projected Savings"
+        case .actualSavings:
+            return "Actual Savings"
         case .budgetImpact:
             switch plan.operation {
             case .average:
@@ -493,13 +624,13 @@ struct MarinaUniversalResultPresenter {
     }
 
     private func subtitle(for context: MarinaUniversalPresentationContext) -> String? {
+        var parts = resolvedLensLabels(in: context)
         if let label = dateLabel(for: context, capitalization: .title) {
-            return label
+            parts.append(label)
+        } else if let dateRange = context.dateRange {
+            parts.append("\(shortDate(dateRange.startDate)) - \(shortDate(dateRange.endDate))")
         }
-        guard let dateRange = context.dateRange else {
-            return nil
-        }
-        return "\(shortDate(dateRange.startDate)) - \(shortDate(dateRange.endDate))"
+        return parts.isEmpty ? nil : parts.joined(separator: " • ")
     }
 
     private func listSubtitle(
@@ -507,13 +638,80 @@ struct MarinaUniversalResultPresenter {
         plan: MarinaUniversalQueryPlan,
         context: MarinaUniversalPresentationContext
     ) -> String? {
-        guard page.totalRowCount > page.rows.count else {
+        guard page.offset > 0 || page.totalRowCount > page.rows.count else {
             return subtitle(for: context)
         }
 
         let noun = expenseNoun(for: context)
         let date = dateLabel(for: context, capitalization: .sentence).map { " from \($0)" } ?? ""
-        return "Showing \(page.rows.count) of \(page.totalRowCount) \(noun)\(date)."
+        let lensPrefix = resolvedLensLabels(in: context).joined(separator: " • ")
+        let prefix = lensPrefix.isEmpty ? "" : "\(lensPrefix) • "
+        if page.offset > 0 {
+            let first = page.offset + 1
+            let last = page.offset + page.rows.count
+            return "\(prefix)Showing \(first)–\(last) of \(page.totalRowCount) \(noun)\(date)."
+        }
+        return "\(prefix)Showing \(page.rows.count) of \(page.totalRowCount) \(noun)\(date)."
+    }
+
+    private func resolvedLensLabels(in context: MarinaUniversalPresentationContext) -> [String] {
+        guard let request = context.semanticRequest else { return [] }
+        var labels: [String] = []
+
+        if let reference = request.resolvedTarget {
+            labels.append("\(lensName(for: reference.entity)): \(reference.displayName)")
+        } else if request.dimensions.contains(.merchantText),
+                  let text = request.textQuery?.trimmingCharacters(in: .whitespacesAndNewlines),
+                  text.isEmpty == false {
+            labels.append("Merchant: \(text)")
+        }
+
+        for constraint in request.constraints where constraint.dimension != .date {
+            let name = lensName(for: constraint.dimension)
+            let label = "\(name): \(constraint.resolvedReference?.displayName ?? constraint.value)"
+            if labels.contains(label) == false {
+                labels.append(label)
+            }
+        }
+
+        if case .budget? = request.resolvedScope,
+           labels.contains(where: { $0.hasPrefix("Budget: ") }) == false,
+           let budgetName = request.constraints.first(where: { $0.dimension == .budget })?.value {
+            labels.append("Budget: \(budgetName)")
+        }
+        return labels
+    }
+
+    private func lensName(for entity: MarinaSemanticEntity) -> String {
+        switch entity {
+        case .workspace: "Workspace"
+        case .budget: "Budget"
+        case .card: "Card"
+        case .plannedExpense: "Planned expense"
+        case .variableExpense: "Merchant"
+        case .reconciliationAccount: "Reconciliation"
+        case .savingsAccount: "Savings"
+        case .income: "Income source"
+        case .incomeSeries: "Income series"
+        case .category: "Category"
+        case .preset: "Preset"
+        }
+    }
+
+    private func lensName(for dimension: MarinaSemanticDimension) -> String {
+        switch dimension {
+        case .date: "Date"
+        case .category: "Category"
+        case .card: "Card"
+        case .merchantText: "Merchant"
+        case .budget: "Budget"
+        case .incomeSource: "Income source"
+        case .incomeSeries: "Income series"
+        case .preset: "Preset"
+        case .savingsAccount: "Savings"
+        case .reconciliationAccount: "Reconciliation"
+        case .workspace: "Workspace"
+        }
     }
 
     private func emptyTitle(
@@ -719,7 +917,7 @@ struct MarinaUniversalResultPresenter {
         switch entity {
         case .variableExpense, .plannedExpense:
             fields.append(contentsOf: [.budgetImpact, .amount, .effectiveAmount, .plannedAmount, .actualAmount])
-        case .income:
+        case .income, .incomeSeries:
             fields.append(contentsOf: [.incomeAmount, .amount, .date, .source])
         case .workspace, .budget, .card, .reconciliationAccount, .savingsAccount, .category:
             fields.append(contentsOf: [.name, .title, .color, .date, .startDate])
@@ -742,6 +940,30 @@ struct MarinaUniversalResultPresenter {
             return .effectiveAmount
         case .budgetImpact:
             return .budgetImpact
+        case .projectedBudgetImpact:
+            return .projectedBudgetImpact
+        case .ledgerSignedAmount:
+            return .ledgerSignedAmount
+        case .plannedIncomeTotal:
+            return .plannedIncomeTotal
+        case .actualIncomeTotal:
+            return .actualIncomeTotal
+        case .plannedExpenseProjectedTotal:
+            return .plannedExpenseProjectedTotal
+        case .plannedExpenseActualTotal:
+            return .plannedExpenseActualTotal
+        case .plannedExpenseEffectiveTotal:
+            return .plannedExpenseEffectiveTotal
+        case .variableExpenseTotal:
+            return .variableExpenseTotal
+        case .unifiedExpenseTotal:
+            return .unifiedExpenseTotal
+        case .maximumSavings:
+            return .maximumSavings
+        case .projectedSavings:
+            return .projectedSavings
+        case .actualSavings:
+            return .actualSavings
         case .incomeAmount:
             return .incomeAmount
         case .name:
@@ -778,7 +1000,26 @@ struct MarinaUniversalResultPresenter {
     }
 
     private var amountFields: Set<MarinaFieldKey> {
-        [.amount, .plannedAmount, .actualAmount, .effectiveAmount, .budgetImpact, .incomeAmount]
+        [
+            .amount,
+            .plannedAmount,
+            .actualAmount,
+            .effectiveAmount,
+            .budgetImpact,
+            .projectedBudgetImpact,
+            .ledgerSignedAmount,
+            .plannedIncomeTotal,
+            .actualIncomeTotal,
+            .plannedExpenseProjectedTotal,
+            .plannedExpenseActualTotal,
+            .plannedExpenseEffectiveTotal,
+            .variableExpenseTotal,
+            .unifiedExpenseTotal,
+            .maximumSavings,
+            .projectedSavings,
+            .actualSavings,
+            .incomeAmount
+        ]
     }
 
     private func date(for row: MarinaQueryableRow) -> Date? {
@@ -808,6 +1049,8 @@ struct MarinaUniversalResultPresenter {
             return .savingsAccount
         case .income:
             return .income
+        case .incomeSeries:
+            return .incomeSeries
         case .category:
             return .category
         case .preset:
@@ -857,11 +1100,23 @@ struct MarinaUniversalResultPresenter {
         case .recurringBurden:
             return formattedValue(value, style: .percent)
         case .amount,
+             .projectedBudgetImpact,
+             .ledgerSignedAmount,
              .plannedAmount,
              .actualAmount,
              .effectiveAmount,
              .budgetImpact,
+             .plannedIncomeTotal,
+             .actualIncomeTotal,
+             .plannedExpenseProjectedTotal,
+             .plannedExpenseActualTotal,
+             .plannedExpenseEffectiveTotal,
+             .variableExpenseTotal,
+             .unifiedExpenseTotal,
              .savingsTotal,
+             .maximumSavings,
+             .projectedSavings,
+             .actualSavings,
              .incomeAmount,
              .reconciliationBalance,
              .remainingRoom,
@@ -873,6 +1128,19 @@ struct MarinaUniversalResultPresenter {
              nil:
             return formattedValue(value)
         }
+    }
+
+    private func formattedIncomeProgress(_ value: MarinaValue) -> String {
+        if value == .empty {
+            return "-"
+        }
+        return formattedValue(value, style: .percent)
+    }
+
+    private func isIncomeProgress(_ plan: MarinaUniversalQueryPlan) -> Bool {
+        plan.entity == .income
+            && plan.operation == .share
+            && plan.measure == .incomeAmount
     }
 
     private func formattedDetailValue(_ detail: MarinaFormulaMetricDetail) -> String {
@@ -906,15 +1174,31 @@ struct MarinaUniversalResultPresenter {
     }
 
     private func kind(for plan: MarinaUniversalQueryPlan) -> HomeAnswerKind {
+        if plan.operation == .compare {
+            return .comparison
+        }
+
         switch plan.measure {
         case .paceDifference:
             return .comparison
         case .amount,
+             .projectedBudgetImpact,
+             .ledgerSignedAmount,
              .plannedAmount,
              .actualAmount,
              .effectiveAmount,
              .budgetImpact,
+             .plannedIncomeTotal,
+             .actualIncomeTotal,
+             .plannedExpenseProjectedTotal,
+             .plannedExpenseActualTotal,
+             .plannedExpenseEffectiveTotal,
+             .variableExpenseTotal,
+             .unifiedExpenseTotal,
              .savingsTotal,
+             .maximumSavings,
+             .projectedSavings,
+             .actualSavings,
              .incomeAmount,
              .reconciliationBalance,
              .categoryAvailability,

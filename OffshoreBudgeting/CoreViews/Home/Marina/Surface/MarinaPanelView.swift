@@ -1,34 +1,6 @@
 import SwiftData
 import SwiftUI
 
-struct MarinaStarterPromptFactory {
-    static var basePromptPool: [String] {
-        [
-            MarinaL10n.string("marina.starter.safeSpend", defaultValue: "What is my safe spend today?", comment: "Starter prompt asking Marina about safe spend."),
-            MarinaL10n.string("marina.starter.savingsOutlook", defaultValue: "Show my savings outlook.", comment: "Starter prompt asking Marina about savings outlook."),
-            MarinaL10n.string("marina.starter.incomeProgress", defaultValue: "How is my income progress?", comment: "Starter prompt asking Marina about income progress."),
-            MarinaL10n.string("marina.starter.nextPlannedExpense", defaultValue: "What is my next planned expense?", comment: "Starter prompt asking Marina about the next planned expense."),
-            MarinaL10n.string("marina.starter.categoryAvailability", defaultValue: "Show category availability.", comment: "Starter prompt asking Marina about category availability."),
-            MarinaL10n.string("marina.starter.spendTrends", defaultValue: "What are my spend trends?", comment: "Starter prompt asking Marina about spend trends."),
-            MarinaL10n.string("marina.starter.topCategory", defaultValue: "What is my top category this period?", comment: "Starter prompt asking Marina about the top spending category.")
-        ]
-    }
-
-    static func promptPool(cardNames: [String]) -> [String] {
-        var pool = basePromptPool
-        if let cardName = cardNames
-            .map({ $0.trimmingCharacters(in: .whitespacesAndNewlines) })
-            .first(where: { $0.isEmpty == false }) {
-            pool.append(MarinaL10n.format("marina.starter.cardSummaryFormat", defaultValue: "Summarize my %@.", comment: "Starter prompt asking Marina to summarize a specific card.", cardName))
-        }
-        return pool
-    }
-
-    static func randomPrompts(cardNames: [String]) -> [String] {
-        Array(promptPool(cardNames: cardNames).shuffled().prefix(4))
-    }
-}
-
 struct MarinaPanelView: View {
     private enum ScrollTarget {
         static let bottomAnchor = "assistant-bottom-anchor"
@@ -77,6 +49,7 @@ struct MarinaPanelView: View {
     @State private var renamingSessionID: UUID?
     @State private var pendingDeleteSession: PendingDeleteSession?
     @State private var pendingClarification: PendingClarification?
+    @State private var resolvingClarificationAnswerID: UUID?
     @State private var responseTask: Task<Void, Never>?
     @State private var answerUpdateTick = 0
     @State private var starterPrompts: [String] = []
@@ -720,20 +693,17 @@ struct MarinaPanelView: View {
             promptText = ""
         }
 
-        if let pendingClarification,
-           let choice = pendingClarification.choices.choice(matching: submittedPrompt) {
-            resolveClarification(
-                pendingClarification,
-                choice: choice,
-                replyPrompt: submittedPrompt
-            )
-            return
-        }
-
         cancelResponseTask()
+        let submittedClarification = pendingClarification
+        resolvingClarificationAnswerID = submittedClarification?.answerID
         isResponding = true
         let conversationContext = followUpContext
         responseTask = Task {
+            defer {
+                resolvingClarificationAnswerID = nil
+                isResponding = false
+                responseTask = nil
+            }
             let seed = await brain.answerSeed(
                 prompt: submittedPrompt,
                 workspace: workspace,
@@ -745,8 +715,28 @@ struct MarinaPanelView: View {
             )
             guard Task.isCancelled == false else { return }
             await handleAnswerSeed(seed)
-            isResponding = false
-            responseTask = nil
+            guard Task.isCancelled == false else { return }
+
+            guard let submittedClarification else { return }
+            if MarinaClarificationResolutionLifecycle.shouldCommit(
+                validatorAccepted: seed.debugTrace?.validatorAccepted,
+                executionSucceeded: seed.debugTrace?.executionSucceeded,
+                answerAttachment: seed.answer.attachment
+            ) {
+                if let interpretedRequest = seed.debugTrace?.interpretedRequest,
+                   let choiceID = MarinaTypedClarificationDispatch.choiceID(
+                    selectedBy: interpretedRequest,
+                    from: submittedClarification.choices
+                   ) {
+                    markClarificationResolved(
+                        answerID: submittedClarification.answerID,
+                        choiceID: choiceID
+                    )
+                }
+                pendingClarification = nil
+            } else if pendingClarification(from: seed.answer) == nil {
+                pendingClarification = submittedClarification
+            }
         }
     }
 
@@ -770,6 +760,11 @@ struct MarinaPanelView: View {
                     .buttonStyle(.plain)
                     .disabled(isResponding || choices.isResolved)
                     .accessibilityLabel(accessibilityLabel(for: choice))
+                    .accessibilityValue(
+                        choices.resolvedChoiceID == choice.id
+                            ? MarinaL10n.string("marina.clarification.selected", defaultValue: "Selected", comment: "VoiceOver value for the chosen Marina clarification option.")
+                            : ""
+                    )
                 }
             }
 
@@ -802,14 +797,18 @@ struct MarinaPanelView: View {
         replyPrompt: String
     ) {
         guard isResponding == false else { return }
-        markClarificationResolved(answerID: pending.answerID, choiceID: choice.id)
-        pendingClarification = nil
 
         cancelResponseTask()
+        resolvingClarificationAnswerID = pending.answerID
         isResponding = true
         responseTask = Task {
+            defer {
+                resolvingClarificationAnswerID = nil
+                isResponding = false
+                responseTask = nil
+            }
             let seed = await brain.answerSeed(
-                resolvedRequest: choice.request,
+                resolvedRequest: choice.executableRequest,
                 prompt: replyPrompt,
                 workspace: workspace,
                 modelContext: modelContext,
@@ -819,8 +818,18 @@ struct MarinaPanelView: View {
             )
             guard Task.isCancelled == false else { return }
             await handleAnswerSeed(seed)
-            isResponding = false
-            responseTask = nil
+            guard Task.isCancelled == false else { return }
+
+            if MarinaClarificationResolutionLifecycle.shouldCommit(
+                validatorAccepted: seed.debugTrace?.validatorAccepted,
+                executionSucceeded: seed.debugTrace?.executionSucceeded,
+                answerAttachment: seed.answer.attachment
+            ) {
+                markClarificationResolved(answerID: pending.answerID, choiceID: choice.id)
+                pendingClarification = nil
+            } else if pendingClarification(from: seed.answer) == nil {
+                pendingClarification = pending
+            }
         }
     }
 
@@ -1487,7 +1496,11 @@ struct MarinaPanelView: View {
     }
 
     private func updatePendingClarification(afterAppending answer: HomeAnswer) {
-        pendingClarification = pendingClarification(from: answer)
+        if let nextClarification = pendingClarification(from: answer) {
+            pendingClarification = nextClarification
+        } else if resolvingClarificationAnswerID == nil {
+            pendingClarification = nil
+        }
     }
 
     private func pendingClarification(from answer: HomeAnswer?) -> PendingClarification? {
@@ -1520,6 +1533,16 @@ struct MarinaPanelView: View {
 
     private func timestampText(for date: Date) -> String {
         date.formatted(.dateTime.hour().minute())
+    }
+}
+
+enum MarinaTypedClarificationDispatch {
+    static func choiceID(
+        selectedBy request: MarinaSemanticRequest,
+        from choices: MarinaClarificationChoices
+    ) -> UUID? {
+        let matches = choices.choices.filter { $0.executableRequest == request }
+        return matches.count == 1 ? matches[0].id : nil
     }
 }
 
@@ -1716,19 +1739,25 @@ private struct MarinaClarificationChoiceButton: View {
                 .foregroundStyle(Color("AccentColor"))
                 .frame(width: 18, height: 20, alignment: .center)
                 .padding(.top, 1)
+                .accessibilityHidden(true)
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(choice.title)
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(Color("AccentColor"))
-                    .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
 
                 if let kindLabel = choice.kindLabel, kindLabel.isEmpty == false {
                     Text(kindLabel)
                         .font(.caption2.weight(.medium))
                         .foregroundStyle(.secondary)
-                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                if let subtitle = choice.subtitle, subtitle.isEmpty == false {
+                    Text(subtitle)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }

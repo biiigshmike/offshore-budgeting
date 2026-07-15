@@ -323,42 +323,109 @@ struct HomeAnswer: Identifiable, Codable, Equatable {
     }
 }
 
+nonisolated enum MarinaClarificationTargetSlot: String, Codable, Equatable, Sendable {
+    case primary
+    case comparison
+}
+
+nonisolated struct MarinaClarificationTargetPatch: Codable, Equatable, Sendable {
+    let slot: MarinaClarificationTargetSlot
+    let reference: MarinaResolvedEntityReference
+    let scope: MarinaResolvedScope
+
+    func applying(to request: MarinaSemanticRequest) -> MarinaSemanticRequest {
+        var patched = request
+        switch slot {
+        case .primary:
+            patched.resolvedTarget = reference
+        case .comparison:
+            patched.resolvedComparisonTarget = reference
+        }
+        patched.resolvedScope = scope
+        return patched
+    }
+}
+
 nonisolated struct MarinaClarificationChoice: Identifiable, Codable, Equatable, Sendable {
     let id: UUID
+    let meaningKey: String
     let title: String
     let kindLabel: String?
     let subtitle: String?
     let aliases: [String]
+    let targetPatch: MarinaClarificationTargetPatch?
     let request: MarinaSemanticRequest
 
     init(
         id: UUID = UUID(),
+        meaningKey: String? = nil,
         title: String,
         kindLabel: String? = nil,
         subtitle: String? = nil,
         aliases: [String],
+        targetPatch: MarinaClarificationTargetPatch? = nil,
         request: MarinaSemanticRequest
     ) {
         self.id = id
+        self.meaningKey = meaningKey ?? "legacy:\(id.uuidString)"
         self.title = title
         self.kindLabel = kindLabel
         self.subtitle = subtitle
         self.aliases = aliases
+        self.targetPatch = targetPatch
         self.request = request
+    }
+
+    var executableRequest: MarinaSemanticRequest {
+        targetPatch?.applying(to: request) ?? request
     }
 
     func matches(_ reply: String) -> Bool {
         let normalizedReply = Self.normalized(reply)
         guard normalizedReply.isEmpty == false else { return false }
         return Self.normalized(title) == normalizedReply
+            || Self.normalized(meaningKey) == normalizedReply
             || aliases.contains { Self.normalized($0) == normalizedReply }
     }
 
+    private enum CodingKeys: String, CodingKey {
+        case id
+        case meaningKey
+        case title
+        case kindLabel
+        case subtitle
+        case aliases
+        case targetPatch
+        case request
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        meaningKey = try container.decodeIfPresent(String.self, forKey: .meaningKey)
+            ?? "legacy:\(id.uuidString)"
+        title = try container.decode(String.self, forKey: .title)
+        kindLabel = try container.decodeIfPresent(String.self, forKey: .kindLabel)
+        subtitle = try container.decodeIfPresent(String.self, forKey: .subtitle)
+        aliases = try container.decodeIfPresent([String].self, forKey: .aliases) ?? []
+        targetPatch = try container.decodeIfPresent(MarinaClarificationTargetPatch.self, forKey: .targetPatch)
+        request = try container.decode(MarinaSemanticRequest.self, forKey: .request)
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(meaningKey, forKey: .meaningKey)
+        try container.encode(title, forKey: .title)
+        try container.encodeIfPresent(kindLabel, forKey: .kindLabel)
+        try container.encodeIfPresent(subtitle, forKey: .subtitle)
+        try container.encode(aliases, forKey: .aliases)
+        try container.encodeIfPresent(targetPatch, forKey: .targetPatch)
+        try container.encode(request, forKey: .request)
+    }
+
     private static func normalized(_ value: String) -> String {
-        value
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
-            .lowercased()
+        MarinaCanonicalTextNormalizer.canonical(value)
     }
 }
 
@@ -367,9 +434,6 @@ nonisolated struct MarinaClarificationChoices: Identifiable, Codable, Equatable,
     let originalPrompt: String?
     let question: String
     var choices: [MarinaClarificationChoice]
-    // TODO: Comparison clarifications need a multi-select mode. The current model
-    // stores one resolved choice; future card/category comparisons should support
-    // selecting exactly two choices with Clear, Cancel, and Submit/Compare actions.
     var resolvedChoiceID: UUID?
 
     init(
@@ -391,7 +455,23 @@ nonisolated struct MarinaClarificationChoices: Identifiable, Codable, Equatable,
     }
 
     func choice(matching reply: String) -> MarinaClarificationChoice? {
-        choices.first { $0.matches(reply) }
+        let matches = choices.filter { $0.matches(reply) }
+        return matches.count == 1 ? matches[0] : nil
+    }
+}
+
+enum MarinaClarificationResolutionLifecycle {
+    static func shouldCommit(
+        validatorAccepted: Bool?,
+        executionSucceeded: Bool?,
+        answerAttachment: MarinaAttachment?
+    ) -> Bool {
+        guard validatorAccepted == true, executionSucceeded == true else { return false }
+        if case .clarificationChoices(let choices)? = answerAttachment,
+           choices.isResolved == false {
+            return false
+        }
+        return true
     }
 }
 

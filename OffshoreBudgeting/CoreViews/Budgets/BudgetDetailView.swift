@@ -129,16 +129,6 @@ struct BudgetDetailView: View {
     
     // MARK: - Budget Window
     
-    private func isWithinBudget(_ date: Date) -> Bool {
-        let cal = Calendar.current
-        
-        let start = cal.startOfDay(for: budget.startDate)
-        let endStart = cal.startOfDay(for: budget.endDate)
-        let end = cal.date(byAdding: DateComponents(day: 1, second: -1), to: endStart) ?? budget.endDate
-        
-        return date >= start && date <= end
-    }
-    
     private var budgetDateRangeLabel: String {
         let start = AppDateFormat.abbreviatedDate(budget.startDate)
         let end = AppDateFormat.abbreviatedDate(budget.endDate)
@@ -276,42 +266,30 @@ struct BudgetDetailView: View {
     }
 
     private func buildDerivedState() -> BudgetDetailDerivedState {
-        let incomesInBudget = workspaceIncomes
-            .filter { isWithinBudget($0.date) }
-            .sorted { $0.date > $1.date }
-
-        let plannedIncomeTotal = incomesInBudget
-            .filter { $0.isPlanned }
-            .reduce(0) { $0 + $1.amount }
-        let actualIncomeTotal = incomesInBudget
-            .filter { !$0.isPlanned }
-            .reduce(0) { $0 + $1.amount }
-
-        let linkedCardIDs = Set(linkedCards.map(\.id))
-        let budgetRange = DateRange(start: budget.startDate, end: budget.endDate, calendar: .current)
-        let plannedExpensesInBudget = BudgetPlannedExpenseStore.plannedExpenses(
-            workspacePlannedExpenses,
-            budgetID: budget.id,
-            linkedCardIDs: linkedCardIDs,
-            range: budgetRange
+        let calendar = Calendar.current
+        let futureCalculationPolicy = BudgetLensService.FutureCalculationPolicy(
+            excludeFuturePlannedExpenses: excludeFuturePlannedExpensesFromCalculationsInView,
+            excludeFutureVariableExpenses: excludeFutureVariableExpensesFromCalculationsInView,
+            now: .now
         )
-        let variableExpensesInBudget = workspaceVariableExpenses
-            .filter { expense in
-                guard let cardID = expense.card?.id else { return false }
-                return linkedCardIDs.contains(cardID)
-            }
-            .filter { isWithinBudget($0.transactionDate) }
-            .sorted { $0.transactionDate > $1.transactionDate }
-
-        var categoriesByID: [UUID: Category] = [:]
-        for category in workspaceCategories {
-            categoriesByID[category.id] = category
-        }
-        for category in (plannedExpensesInBudget.compactMap { $0.category } + variableExpensesInBudget.compactMap { $0.category }) {
-            categoriesByID[category.id] = category
-        }
-        let categoriesInBudget = categoriesByID.values
-            .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+        let lensOutcome = BudgetLensService.makeLens(
+            workspace: workspace,
+            budget: budget,
+            budgetCardLinks: budgetCardLinks,
+            budgetPresetLinks: budgetPresetLinks,
+            budgetCategoryLimits: budgetCategoryLimits,
+            workspaceCategories: workspaceCategories,
+            workspaceIncomes: workspaceIncomes,
+            workspacePlannedExpenses: workspacePlannedExpenses,
+            workspaceVariableExpenses: workspaceVariableExpenses,
+            workspaceSavingsEntries: workspaceSavingsEntries,
+            requestedDateRange: nil,
+            futureCalculationPolicy: futureCalculationPolicy,
+            calendar: calendar
+        )
+        guard case .lens(let lens) = lensOutcome else { return .empty }
+        let plannedExpensesInBudget = lens.plannedExpensesInBudget
+        let variableExpensesInBudget = lens.variableExpensesInBudget
 
         let query = SearchQueryParser.parse(searchText)
         let isSearching = query.isEmpty == false
@@ -399,67 +377,44 @@ struct BudgetDetailView: View {
         )
         let plannedExpensesFiltered = sortPlanned(plannedVisible)
 
-        let plannedIncluded = PlannedExpenseFuturePolicy.filteredForCalculations(
-            plannedFilteredForCurrentControls,
-            excludeFuture: excludeFuturePlannedExpensesFromCalculationsInView
-        )
-        let plannedExpensesForCalculations = sortPlanned(plannedIncluded)
-
         let variableVisible = VariableExpenseFuturePolicy.filteredForVisibility(
             variableFilteredForCurrentControls,
             hideFuture: hideFutureVariableExpensesInView
         )
         let variableExpensesFiltered = sortVariable(variableVisible)
 
-        let variableIncluded = VariableExpenseFuturePolicy.filteredForCalculations(
-            variableFilteredForCurrentControls,
-            excludeFuture: excludeFutureVariableExpensesFromCalculationsInView
-        )
-        let variableExpensesForCalculations = sortVariable(variableIncluded)
-
         let unifiedItemsFiltered = sortUnified(
             plannedExpensesFiltered.map { BudgetUnifiedExpenseItem.planned($0) } +
             variableExpensesFiltered.map { BudgetUnifiedExpenseItem.variable($0) }
         )
 
-        let plannedExpensesPlannedTotal = plannedExpensesForCalculations.reduce(0) {
-            $0 + SavingsMathService.plannedProjectedBudgetImpactAmount(for: $1)
-        }
-        let plannedExpensesActualTotal = plannedExpensesForCalculations.reduce(0) { $0 + max(0, $1.actualAmount) }
-        let plannedExpensesEffectiveTotal = plannedExpensesForCalculations.reduce(0) {
-            $0 + SavingsMathService.plannedBudgetImpactAmount(for: $1)
-        }
-        let variableExpensesTotal = variableExpensesForCalculations.reduce(0) {
-            $0 + SavingsMathService.variableBudgetImpactAmount(for: $1)
-        }
-        let actualSavingsAdjustments = SavingsMathService.actualSavingsAdjustmentTotal(
-            from: workspaceSavingsEntries,
-            startDate: budget.startDate,
-            endDate: budget.endDate
+        let totals = BudgetLensService.totals(
+            incomesInBudget: lens.incomesInBudget,
+            plannedExpensesInBudget: plannedFilteredForCurrentControls,
+            variableExpensesInBudget: variableFilteredForCurrentControls,
+            savingsEntriesInBudget: lens.savingsEntriesInBudget,
+            futureCalculationPolicy: futureCalculationPolicy,
+            calendar: calendar
         )
-
-        let maxSavings = plannedIncomeTotal - plannedExpensesEffectiveTotal
-        let projectedSavings = plannedIncomeTotal - plannedExpensesPlannedTotal
-        let actualSavings = actualIncomeTotal - plannedExpensesEffectiveTotal - variableExpensesTotal + actualSavingsAdjustments
 
         return BudgetDetailDerivedState(
             plannedExpensesInBudget: plannedExpensesInBudget,
             variableExpensesInBudget: variableExpensesInBudget,
-            categoriesInBudget: categoriesInBudget,
-            plannedIncomeTotal: plannedIncomeTotal,
-            actualIncomeTotal: actualIncomeTotal,
+            categoriesInBudget: lens.categoriesInBudget,
+            plannedIncomeTotal: totals.plannedIncomeTotal,
+            actualIncomeTotal: totals.actualIncomeTotal,
             plannedExpensesFiltered: plannedExpensesFiltered,
             variableExpensesFiltered: variableExpensesFiltered,
             unifiedItemsFiltered: unifiedItemsFiltered,
             hiddenFuturePlannedExpenseCount: hiddenFuturePlannedExpenseCount,
             hiddenFutureVariableExpenseCount: hiddenFutureVariableExpenseCount,
-            plannedExpensesPlannedTotal: plannedExpensesPlannedTotal,
-            plannedExpensesActualTotal: plannedExpensesActualTotal,
-            plannedExpensesEffectiveTotal: plannedExpensesEffectiveTotal,
-            variableExpensesTotal: variableExpensesTotal,
-            maxSavings: maxSavings,
-            projectedSavings: projectedSavings,
-            actualSavings: actualSavings,
+            plannedExpensesPlannedTotal: totals.plannedExpenseProjectedTotal,
+            plannedExpensesActualTotal: totals.plannedExpenseActualTotal,
+            plannedExpensesEffectiveTotal: totals.plannedExpenseEffectiveTotal,
+            variableExpensesTotal: totals.variableExpenseTotal,
+            maxSavings: totals.maxSavings,
+            projectedSavings: totals.projectedSavings,
+            actualSavings: totals.actualSavings,
             presetBySourceID: presetLookup(for: plannedExpensesFiltered)
         )
     }

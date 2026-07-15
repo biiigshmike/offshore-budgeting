@@ -38,12 +38,14 @@ struct MarinaSemanticUniversalPlanBridgeRunnerTests {
 
     @Test func grocerySpendBridgesAndRunsThroughUniversalRunner() throws {
         let fixture = makeFixture()
+        let groceries = try #require(fixture.snapshot.categories.first { $0.name == "Groceries" })
         let plan = try requirePlan(bridge.makePlan(from: request(
             entity: .variableExpense,
             operation: .sum,
             measure: .budgetImpact,
             dimensions: [.category],
-            targetName: "Groceries"
+            targetName: "Groceries",
+            resolvedTarget: reference(.category, groceries.id, groceries.name)
         )))
         let metric = requireMetric(runner.run(plan: plan, snapshot: fixture.snapshot))
 
@@ -53,12 +55,14 @@ struct MarinaSemanticUniversalPlanBridgeRunnerTests {
 
     @Test func biggestGroceryPurchasesBridgeAndRunThroughUniversalRunner() throws {
         let fixture = makeFixture()
+        let groceries = try #require(fixture.snapshot.categories.first { $0.name == "Groceries" })
         let plan = try requirePlan(bridge.makePlan(from: request(
             entity: .variableExpense,
             operation: .list,
             measure: .budgetImpact,
             dimensions: [.category],
             targetName: "Groceries",
+            resolvedTarget: reference(.category, groceries.id, groceries.name),
             resultLimit: 5,
             sort: .amountDescending,
             shape: .list
@@ -268,6 +272,7 @@ struct MarinaSemanticUniversalPlanBridgeRunnerTests {
         measure: MarinaSemanticMeasure? = nil,
         dimensions: [MarinaSemanticDimension] = [],
         targetName: String? = nil,
+        resolvedTarget: MarinaResolvedEntityReference? = nil,
         textQuery: String? = nil,
         resultLimit: Int? = nil,
         sort: MarinaSemanticSort? = nil,
@@ -281,10 +286,24 @@ struct MarinaSemanticUniversalPlanBridgeRunnerTests {
             dimensions: dimensions,
             targetName: targetName,
             textQuery: textQuery,
+            resolvedTarget: resolvedTarget,
             resultLimit: resultLimit,
             sort: sort,
             incomeState: incomeState,
             expectedAnswerShape: shape
+        )
+    }
+
+    private func reference(
+        _ entity: MarinaSemanticEntity,
+        _ id: UUID,
+        _ name: String
+    ) -> MarinaResolvedEntityReference {
+        MarinaResolvedEntityReference(
+            entity: entity,
+            id: id,
+            displayName: name,
+            provenance: .candidateResolver
         )
     }
 

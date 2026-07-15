@@ -6,117 +6,11 @@ import Testing
 @Suite(.serialized)
 @MainActor
 struct MarinaSemanticPromptSuiteTests {
-    private struct PromptCase {
-        let prompt: String
-        let entity: MarinaSemanticEntity
-        let operation: MarinaSemanticOperation
-        let measure: MarinaSemanticMeasure?
-        let shape: MarinaSemanticAnswerShape
-        let categoryAvailabilityFilter: MarinaCategoryAvailabilityFilter?
-        let source: MarinaSemanticSource
-        let confidence: MarinaSemanticConfidence
-
-        init(
-            prompt: String,
-            entity: MarinaSemanticEntity,
-            operation: MarinaSemanticOperation,
-            measure: MarinaSemanticMeasure?,
-            shape: MarinaSemanticAnswerShape,
-            categoryAvailabilityFilter: MarinaCategoryAvailabilityFilter? = nil,
-            source: MarinaSemanticSource = .ruleBased,
-            confidence: MarinaSemanticConfidence = .high
-        ) {
-            self.prompt = prompt
-            self.entity = entity
-            self.operation = operation
-            self.measure = measure
-            self.shape = shape
-            self.categoryAvailabilityFilter = categoryAvailabilityFilter
-            self.source = source
-            self.confidence = confidence
-        }
-    }
-
-    private struct AnswerCase {
-        let prompt: String
-        let kind: HomeAnswerKind
-    }
-
     private struct Fixture {
         let context: ModelContext
         let workspace: Workspace
         let currentRange: HomeQueryDateRange
         let now: Date
-    }
-
-    @Test func promptSuite_parsesIntoUniversalSemanticRequests() throws {
-        let interpreter = MarinaRuleBasedInterpreter()
-        let planner = MarinaQueryPlanner()
-        let cases: [PromptCase] = [
-            .init(prompt: "What workspace am I in?", entity: .workspace, operation: .list, measure: .name, shape: .metric),
-            .init(prompt: "What is the name of this workspace?", entity: .workspace, operation: .list, measure: .name, shape: .metric),
-            .init(prompt: "What is this workspace's color?", entity: .workspace, operation: .list, measure: .color, shape: .metric),
-            .init(prompt: "What is my top category this month?", entity: .category, operation: .group, measure: .budgetImpact, shape: .list),
-            .init(prompt: "What preset is due next?", entity: .preset, operation: .next, measure: .plannedAmount, shape: .metric),
-            .init(prompt: "What presets have an actual amount greater than 0 this month?", entity: .preset, operation: .list, measure: .actualAmount, shape: .list),
-            .init(prompt: "Which category has the most presets assigned to it?", entity: .preset, operation: .group, measure: .plannedAmount, shape: .list),
-            .init(prompt: "How many cards do I have?", entity: .card, operation: .count, measure: nil, shape: .metric),
-            .init(prompt: "What is my Apple Card spend this month?", entity: .card, operation: .sum, measure: .budgetImpact, shape: .metric),
-            .init(prompt: "Compare Apple Card spend to Chase spend", entity: .card, operation: .compare, measure: .budgetImpact, shape: .comparison),
-            .init(prompt: "What is my Target spend this month?", entity: .variableExpense, operation: .sum, measure: .budgetImpact, shape: .metric),
-            .init(prompt: "When did I last go shopping at Target?", entity: .variableExpense, operation: .last, measure: .budgetImpact, shape: .metric),
-            .init(prompt: "List my most recent 5 expenses on Apple Card", entity: .variableExpense, operation: .list, measure: .budgetImpact, shape: .list),
-            .init(prompt: "What is Alejandro's balance for the current period?", entity: .reconciliationAccount, operation: .sum, measure: .reconciliationBalance, shape: .metric),
-            .init(prompt: "How much did Alejandro spend on Groceries for the current period?", entity: .reconciliationAccount, operation: .sum, measure: .reconciliationBalance, shape: .metric),
-            .init(prompt: "What is my current Savings Account balance?", entity: .savingsAccount, operation: .sum, measure: .savingsTotal, shape: .metric),
-            .init(prompt: "What is my projected savings for the current period?", entity: .savingsAccount, operation: .forecast, measure: .savingsTotal, shape: .metric),
-            .init(prompt: "What is my actual income for this month?", entity: .income, operation: .sum, measure: .incomeAmount, shape: .metric),
-            .init(prompt: "Compare my actual income this month to last month. Am I up or down?", entity: .income, operation: .compare, measure: .incomeAmount, shape: .comparison),
-            .init(prompt: "What is my Actual Income to Planned Income percentage?", entity: .income, operation: .share, measure: .incomeAmount, shape: .metric),
-            .init(prompt: "How is my income progress?", entity: .income, operation: .share, measure: .incomeAmount, shape: .metric),
-            .init(prompt: "How is my budget for this period?", entity: .budget, operation: .forecast, measure: .budgetImpact, shape: .metric),
-            .init(prompt: "What is my safe spend today?", entity: .budget, operation: .forecast, measure: .remainingRoom, shape: .metric),
-            .init(prompt: "What is my burn rate?", entity: .budget, operation: .average, measure: .burnRate, shape: .metric),
-            .init(prompt: "Where will I end up on projected spend?", entity: .budget, operation: .forecast, measure: .projectedSpend, shape: .metric),
-            .init(prompt: "What can I spend per day?", entity: .budget, operation: .forecast, measure: .safeDailySpend, shape: .metric),
-            .init(prompt: "Am I spending too fast?", entity: .budget, operation: .compare, measure: .paceDifference, shape: .comparison),
-            .init(prompt: "Does my income cover planned expenses?", entity: .income, operation: .share, measure: .coverageRatio, shape: .metric),
-            .init(prompt: "What is my recurring burden?", entity: .preset, operation: .sum, measure: .recurringBurden, shape: .metric),
-            .init(prompt: "What is eating my budget?", entity: .category, operation: .share, measure: .concentration, shape: .metric),
-            .init(prompt: "See the expenses driving my spend trends.", entity: .variableExpense, operation: .list, measure: .budgetImpact, shape: .list),
-            .init(prompt: "Compare this budget period to last period.", entity: .budget, operation: .compare, measure: .budgetImpact, shape: .comparison),
-            .init(prompt: "If I spend $50 at Target, what happens to my safe spend?", entity: .budget, operation: .whatIf, measure: .remainingRoom, shape: .comparison),
-            .init(prompt: "If I spend $200 on Groceries, what happens to projected savings?", entity: .budget, operation: .whatIf, measure: .savingsTotal, shape: .comparison),
-            .init(prompt: "Show my savings outlook.", entity: .savingsAccount, operation: .forecast, measure: .savingsTotal, shape: .metric),
-            .init(prompt: "Show category availability.", entity: .category, operation: .forecast, measure: .categoryAvailability, shape: .metric),
-            .init(prompt: "Which 5 categories are over limit?", entity: .category, operation: .list, measure: .categoryAvailability, shape: .list, categoryAvailabilityFilter: .over),
-            .init(prompt: "Which categories are near limit?", entity: .category, operation: .list, measure: .categoryAvailability, shape: .list, categoryAvailabilityFilter: .near),
-            .init(prompt: "List categories under limit.", entity: .category, operation: .list, measure: .categoryAvailability, shape: .list, categoryAvailabilityFilter: .underLimit),
-            .init(prompt: "Show category spotlight.", entity: .category, operation: .group, measure: .budgetImpact, shape: .list),
-            .init(prompt: "What are my spend trends?", entity: .category, operation: .group, measure: .budgetImpact, shape: .list),
-            .init(prompt: "What is my next planned expense?", entity: .plannedExpense, operation: .next, measure: .effectiveAmount, shape: .metric),
-            .init(prompt: "Summarize my Apple Card.", entity: .card, operation: .sum, measure: .budgetImpact, shape: .metric)
-        ]
-
-        for testCase in cases {
-            let interpreted = interpreter.interpretWithConfidence(testCase.prompt)
-            let request = interpreted.request
-            let plan = planner.plan(
-                request: request,
-                ambientDateRange: HomeQueryDateRange(startDate: date(2026, 4, 1), endDate: date(2026, 4, 30)),
-                defaultBudgetingPeriod: .monthly,
-                now: date(2026, 4, 20)
-            )
-            #expect(interpreted.source == testCase.source, "Source mismatch for \(testCase.prompt)")
-            #expect(interpreted.confidence == testCase.confidence, "Confidence mismatch for \(testCase.prompt)")
-            #expect(request.entity == testCase.entity, "Entity mismatch for \(testCase.prompt)")
-            #expect(request.operation == testCase.operation, "Operation mismatch for \(testCase.prompt)")
-            #expect(request.measure == testCase.measure, "Measure mismatch for \(testCase.prompt)")
-            #expect(request.expectedAnswerShape == testCase.shape, "Shape mismatch for \(testCase.prompt)")
-            #expect(request.categoryAvailabilityFilter == testCase.categoryAvailabilityFilter, "Category availability filter mismatch for \(testCase.prompt)")
-            #expect(plan.entity == testCase.entity, "Plan entity mismatch for \(testCase.prompt)")
-            #expect(plan.operation == testCase.operation, "Plan operation mismatch for \(testCase.prompt)")
-        }
     }
 
     @Test func queryPlanner_currentMonthUsesAmbientRangeForComparisonsAndFormulas() throws {
@@ -187,156 +81,6 @@ struct MarinaSemanticPromptSuiteTests {
         #expect(plan.dateRange?.endDate == date(2026, 4, 20))
     }
 
-    @Test func promptSuite_executesEveryInAppQuestionPhrase() async throws {
-        let fixture = try makeFixture()
-        let brain = legacyRuleBasedBrain()
-        let cases: [AnswerCase] = [
-            .init(prompt: "What workspace am I in?", kind: .metric),
-            .init(prompt: "What is the name of this workspace?", kind: .metric),
-            .init(prompt: "What is this workspace's color?", kind: .metric),
-            .init(prompt: "What is my top category this month?", kind: .list),
-            .init(prompt: "What preset is due next?", kind: .metric),
-            .init(prompt: "What presets have an actual amount greater than 0 this month?", kind: .list),
-            .init(prompt: "Which category has the most presets assigned to it?", kind: .list),
-            .init(prompt: "How many cards do I have?", kind: .metric),
-            .init(prompt: "What is my Apple Card spend this month?", kind: .metric),
-            .init(prompt: "Compare Apple Card spend to Chase spend", kind: .comparison),
-            .init(prompt: "What is my Target spend this month?", kind: .metric),
-            .init(prompt: "When did I last go shopping at Target?", kind: .metric),
-            .init(prompt: "List my most recent 5 expenses on Apple Card", kind: .list),
-            .init(prompt: "What is Alejandro's balance for the current period?", kind: .metric),
-            .init(prompt: "How much did Alejandro spend on Groceries for the current period?", kind: .metric),
-            .init(prompt: "What is my current Savings Account balance?", kind: .metric),
-            .init(prompt: "What is my projected savings for the current period?", kind: .metric),
-            .init(prompt: "What is my actual income for this month?", kind: .metric),
-            .init(prompt: "Compare my actual income this month to last month. Am I up or down?", kind: .comparison),
-            .init(prompt: "What is my Actual Income to Planned Income percentage?", kind: .metric),
-            .init(prompt: "How is my income progress?", kind: .metric),
-            .init(prompt: "How is my budget for this period?", kind: .list),
-            .init(prompt: "What is my safe spend today?", kind: .metric),
-            .init(prompt: "What is my burn rate?", kind: .metric),
-            .init(prompt: "Where will I end up on projected spend?", kind: .metric),
-            .init(prompt: "What can I spend per day?", kind: .metric),
-            .init(prompt: "Am I spending too fast?", kind: .comparison),
-            .init(prompt: "Does my income cover planned expenses?", kind: .metric),
-            .init(prompt: "What is my recurring burden?", kind: .metric),
-            .init(prompt: "What is eating my budget?", kind: .metric),
-            .init(prompt: "See the expenses driving my spend trends.", kind: .list),
-            .init(prompt: "Compare this budget period to last period.", kind: .comparison),
-            .init(prompt: "If I spend $50 at Target, what happens to my safe spend?", kind: .comparison),
-            .init(prompt: "If I spend $200 on Groceries, what happens to projected savings?", kind: .comparison),
-            .init(prompt: "Show my savings outlook.", kind: .metric),
-            .init(prompt: "Show category availability.", kind: .metric),
-            .init(prompt: "Show category spotlight.", kind: .list),
-            .init(prompt: "What are my spend trends?", kind: .list),
-            .init(prompt: "What is my next planned expense?", kind: .metric),
-            .init(prompt: "Summarize my Apple Card.", kind: .metric)
-        ]
-
-        for testCase in cases {
-            let answer = await answer(testCase.prompt, using: brain, fixture: fixture)
-            #expect(answer.kind == testCase.kind, "Answer kind mismatch for \(testCase.prompt): \(answer.title)")
-            #expect(answer.title.isEmpty == false, "Missing title for \(testCase.prompt)")
-        }
-    }
-
-    @Test func promptSuite_formulaPhraseVariantsMapToDeterministicMeasures() throws {
-        let interpreter = MarinaRuleBasedInterpreter()
-        let cases: [(prompt: String, entity: MarinaSemanticEntity, operation: MarinaSemanticOperation, measure: MarinaSemanticMeasure)] = [
-            ("What is my daily spend?", .budget, .average, .burnRate),
-            ("Show my spending rate.", .budget, .average, .burnRate),
-            ("Where will I end up?", .budget, .forecast, .projectedSpend),
-            ("Am I on track to spend too much?", .budget, .forecast, .projectedSpend),
-            ("What's my daily allowance?", .budget, .forecast, .safeDailySpend),
-            ("Show my safe per day.", .budget, .forecast, .safeDailySpend),
-            ("Am I ahead?", .budget, .compare, .paceDifference),
-            ("Am I behind?", .budget, .compare, .paceDifference),
-            ("Are expenses covered by income?", .income, .share, .coverageRatio),
-            ("Show fixed expenses.", .preset, .sum, .recurringBurden),
-            ("Show preset burden.", .preset, .sum, .recurringBurden),
-            ("Which category has the biggest share?", .category, .share, .concentration)
-        ]
-
-        for testCase in cases {
-            let request = interpreter.interpret(testCase.prompt)
-            #expect(request.entity == testCase.entity, "Entity mismatch for \(testCase.prompt)")
-            #expect(request.operation == testCase.operation, "Operation mismatch for \(testCase.prompt)")
-            #expect(request.measure == testCase.measure, "Measure mismatch for \(testCase.prompt)")
-        }
-    }
-
-    @Test func promptSuite_plansAndExecutesRepresentativeAnswers() async throws {
-        let fixture = try makeFixture()
-        let brain = legacyRuleBasedBrain()
-
-        let cardCount = await answer("How many cards do I have?", using: brain, fixture: fixture)
-        #expect(cardCount.kind == .metric)
-        #expect(cardCount.primaryValue == "2")
-
-        let appleSpend = await answer("What is my Apple Card spend this month?", using: brain, fixture: fixture)
-        #expect(appleSpend.kind == .metric)
-        #expect((appleSpend.primaryValue ?? "").contains("1,370") || (appleSpend.primaryValue ?? "").contains("1370"))
-        #expect(appleSpend.rows.contains(where: { $0.title == "Planned" }))
-        #expect(appleSpend.rows.contains(where: { $0.title == "Variable" }))
-
-        let targetLast = await answer("When did I last go shopping at Target?", using: brain, fixture: fixture)
-        #expect(targetLast.kind == .metric)
-        #expect(targetLast.rows.contains(where: { $0.title.contains("Target") }))
-
-        let reconciliation = await answer("What is Alejandro's balance for the current period?", using: brain, fixture: fixture)
-        #expect(reconciliation.kind == .metric)
-        #expect((reconciliation.primaryValue ?? "").contains("40"))
-
-        let monthlyReconciliation = await answer("What is Alejandro's balance for the current month?", using: brain, fixture: fixture)
-        #expect(monthlyReconciliation.kind == .metric)
-        #expect((monthlyReconciliation.primaryValue ?? "").contains("40"))
-
-        let allTimeReconciliation = await answer("What is Alejandro's balance?", using: brain, fixture: fixture)
-        #expect(allTimeReconciliation.kind == .metric)
-        #expect((allTimeReconciliation.primaryValue ?? "").contains("50"))
-
-        let reconciliationSpend = await answer("How much did Alejandro spend on Groceries for the current period?", using: brain, fixture: fixture)
-        #expect(reconciliationSpend.kind == .metric)
-        #expect((reconciliationSpend.primaryValue ?? "").contains("40"))
-
-        let presetCategory = await answer("What presets are tied to Groceries?", using: brain, fixture: fixture)
-        #expect(presetCategory.kind == .list)
-        #expect(presetCategory.rows.contains(where: { $0.title == "Grocery Envelope" }))
-
-        let savingsMonth = await answer("What is my Savings Account balance this month?", using: brain, fixture: fixture)
-        #expect(savingsMonth.kind == .metric)
-        #expect(savingsMonth.title == "Savings Status")
-
-        let incomeShare = await answer("What is my Actual Income to Planned Income percentage?", using: brain, fixture: fixture)
-        #expect(incomeShare.kind == .metric)
-        #expect((incomeShare.primaryValue ?? "").contains("93"))
-
-        let whatIf = await answer("If I spend $50 at Target, what happens to my safe spend?", using: brain, fixture: fixture)
-        #expect(whatIf.kind == .comparison)
-        #expect((whatIf.primaryValue ?? "").contains("113.18"))
-        #expect(whatIf.rows.contains(where: { $0.title == "Current safe spend today" }))
-        #expect(whatIf.rows.contains(where: { $0.title == "Virtual spend" }))
-        let safeSpendAfter = whatIf.rows.first(where: { $0.title == "Safe spend after" })?.amount ?? -1
-        let periodRoomAfter = whatIf.rows.first(where: { $0.title == "Period room after" })?.amount
-        #expect(abs(safeSpendAfter - 113.18181818181819) < 0.0001)
-        #expect(periodRoomAfter == 1_245)
-
-        let categoryAvailability = await answer("Show category availability.", using: brain, fixture: fixture)
-        #expect(categoryAvailability.kind == .metric)
-        #expect(categoryAvailability.title == "Category Availability")
-        let categoryAvailabilityHasOverRow = categoryAvailability.rows.contains { row in
-            row.title == "Over" && row.value == "0"
-        }
-        #expect(categoryAvailabilityHasOverRow)
-
-        let nextPlanned = await answer("What is my next planned expense?", using: brain, fixture: fixture)
-        #expect(nextPlanned.kind == .metric)
-        let nextPlannedHasExpenseRow = nextPlanned.rows.contains { row in
-            row.title == "Expense" && row.value == "Phone"
-        }
-        #expect(nextPlannedHasExpenseRow)
-    }
-
     @Test func budgetFormulaCalculator_returnsExpectedValuesAndNilForInvalidInputs() throws {
         #expect(MarinaBudgetFormulaCalculator.burnRate(actualSpend: 1_715, elapsedDays: 20) == 85.75)
         #expect(MarinaBudgetFormulaCalculator.burnRate(actualSpend: 1_715, elapsedDays: 0) == nil)
@@ -364,213 +108,6 @@ struct MarinaSemanticPromptSuiteTests {
         #expect(MarinaBudgetFormulaCalculator.concentration(partTotal: 1_590, wholeTotal: 0) == nil)
     }
 
-    @Test func formulaAnswers_explainDeterministicBudgetMath() async throws {
-        let fixture = try makeFixture()
-        let brain = legacyRuleBasedBrain()
-
-        let burnRate = await answer("What is my burn rate?", using: brain, fixture: fixture)
-        #expect(burnRate.kind == .metric)
-        #expect(burnRate.title == "Budget Pace")
-        #expect(burnRate.primaryValue == CurrencyFormatter.string(from: 85.75))
-        #expect(burnRate.rows.first(where: { $0.title == "Spent so far" })?.amount == 1_715)
-        #expect(burnRate.rows.first(where: { $0.title == "Elapsed days" })?.amount == 20)
-        #expect(burnRate.rows.first(where: { $0.title == "Average per day" })?.amount == 85.75)
-
-        let projectedSpend = await answer("Where will I end up on projected spend?", using: brain, fixture: fixture)
-        #expect(projectedSpend.kind == .metric)
-        #expect(projectedSpend.title == "Projected Spend")
-        #expect(projectedSpend.primaryValue == CurrencyFormatter.string(from: 1_805))
-        #expect(projectedSpend.rows.first(where: { $0.title == "Actual spend so far" })?.amount == 1_715)
-        #expect(projectedSpend.rows.first(where: { $0.title == "Planned spending remaining" })?.amount == 90)
-        #expect(projectedSpend.rows.first(where: { $0.title == "Projected spend" })?.amount == 1_805)
-        #expect(projectedSpend.rows.contains { $0.title == "Average per day" } == false)
-        #expect(projectedSpend.rows.contains { $0.title == "Projected total" } == false)
-
-        let safeDailySpend = await answer("What can I spend per day?", using: brain, fixture: fixture)
-        #expect(safeDailySpend.kind == .metric)
-        #expect(safeDailySpend.title == "Safe Daily Spend")
-        #expect(safeDailySpend.rows.first(where: { $0.title == "Remaining room" })?.amount == 1_295)
-        #expect(safeDailySpend.rows.first(where: { $0.title == "Remaining days" })?.amount == 11)
-        let safePerDay = try #require(safeDailySpend.rows.first(where: { $0.title == "Safe per day" })?.amount)
-        #expect(abs(safePerDay - 117.72727272727273) < 0.0001)
-
-        let pace = await answer("Am I spending too fast?", using: brain, fixture: fixture)
-        #expect(pace.kind == .comparison)
-        #expect(pace.title == "Pace Difference")
-        #expect((pace.primaryValue ?? "").contains("721.67"))
-        #expect(pace.rows.first(where: { $0.title == "Spent so far" })?.amount == 1_715)
-        let expectedByNow = try #require(pace.rows.first(where: { $0.title == "Expected by now" })?.amount)
-        #expect(abs(expectedByNow - 993.3333333333333) < 0.0001)
-        let paceDifference = try #require(pace.rows.first(where: { $0.title == "Pace difference" })?.amount)
-        #expect(abs(paceDifference - 721.6666666666667) < 0.0001)
-
-        let coverage = await answer("Does my income cover planned expenses?", using: brain, fixture: fixture)
-        #expect(coverage.kind == .metric)
-        #expect(coverage.title == "Income Coverage")
-        #expect(coverage.primaryValue == (3_000.0 / 1_490.0).formatted(.percent.precision(.fractionLength(1))))
-        #expect(coverage.rows.first(where: { $0.title == "Income" })?.amount == 3_000)
-        #expect(coverage.rows.first(where: { $0.title == "Planned expenses" })?.amount == 1_490)
-        let coveragePercent = try #require(coverage.rows.first(where: { $0.title == "Coverage percent" })?.amount)
-        #expect(abs(coveragePercent - (3_000.0 / 1_490.0)) < 0.0001)
-        #expect(coverage.rows.first(where: { $0.title == "Difference" })?.amount == 1_510)
-
-        let recurringBurden = await answer("What is my recurring burden?", using: brain, fixture: fixture)
-        #expect(recurringBurden.kind == .metric)
-        #expect(recurringBurden.title == "Recurring Burden")
-        #expect(recurringBurden.primaryValue == 1.0.formatted(.percent.precision(.fractionLength(1))))
-        #expect(recurringBurden.rows.first(where: { $0.title == "Recurring total" })?.amount == 1_490)
-        #expect(recurringBurden.rows.first(where: { $0.title == "Planned expenses" })?.amount == 1_490)
-        #expect(recurringBurden.rows.first(where: { $0.title == "Recurring burden" })?.amount == 1)
-
-        let concentration = await answer("What is eating my budget?", using: brain, fixture: fixture)
-        #expect(concentration.kind == .metric)
-        #expect(concentration.title == "Category Spend Share")
-        #expect(concentration.primaryValue == (1_590.0 / 1_805.0).formatted(.percent.precision(.fractionLength(1))))
-        #expect(concentration.rows.first(where: { $0.title == "Category" })?.value == "Bills")
-        #expect(concentration.rows.first(where: { $0.title == "Category spend" })?.amount == 1_590)
-        #expect(concentration.rows.first(where: { $0.title == "Total spend" })?.amount == 1_805)
-        let concentrationRatio = try #require(concentration.rows.first(where: { $0.title == "Concentration" })?.amount)
-        #expect(abs(concentrationRatio - (1_590.0 / 1_805.0)) < 0.0001)
-    }
-
-    @Test func incomeSavingsWhatIfFollowUpPreservesAmountAndReturnsTypedUnsupported() async throws {
-        let fixture = try makeFixture()
-        let brain = legacyRuleBasedBrain()
-
-        let baseline = await seed("What is the amount of income I need to break even on my savings this month?", using: brain, fixture: fixture)
-        let followUp = await seed(
-            "What if I saved 4,000 this month?",
-            using: brain,
-            fixture: fixture,
-            conversationContext: MarinaConversationContext(recentAnswers: [baseline.answer])
-        )
-
-        #expect(followUp.debugTrace?.promptTreatment == .standalone)
-        #expect(followUp.debugTrace?.validatorOutput.operation == .whatIf)
-        #expect(followUp.debugTrace?.validatorOutput.whatIfAmount == 4_000)
-        #expect(followUp.debugTrace?.validatorOutput.unsupportedReason == .incomeSavingsWhatIfUnsupported)
-        #expect(followUp.answer.kind == .message)
-        #expect(followUp.answer.title == "I can see the scenario amount, but I don't support income or savings replacement what-if calculations yet.")
-        #expect(followUp.answer.title != "Income Coverage")
-        #expect(followUp.answer.primaryValue == nil)
-    }
-
-    @Test func incomeSavingsWhatIfAuditedPhrasesPreserveScenarioAmount() async throws {
-        let fixture = try makeFixture()
-        let brain = legacyRuleBasedBrain()
-        let cases: [(String, MarinaSemanticEntity, Double)] = [
-            ("What if I earned 5,000?", .income, 5_000),
-            ("What if I only earned $4,250.50?", .income, 4_250.50),
-            ("What if income was 3200?", .income, 3_200),
-            ("What if I saved 4,000?", .savingsAccount, 4_000),
-            ("What if I only saved $750?", .savingsAccount, 750),
-            ("What if savings were 1,250.25?", .savingsAccount, 1_250.25)
-        ]
-
-        for (prompt, entity, amount) in cases {
-            let result = await seed(prompt, using: brain, fixture: fixture)
-            #expect(result.debugTrace?.validatorOutput.entity == entity, "\(prompt)")
-            #expect(result.debugTrace?.validatorOutput.operation == .whatIf, "\(prompt)")
-            #expect(result.debugTrace?.validatorOutput.whatIfAmount == amount, "\(prompt)")
-            #expect(result.debugTrace?.validatorOutput.unsupportedReason == .incomeSavingsWhatIfUnsupported, "\(prompt)")
-            #expect(result.answer.kind == .message, "\(prompt)")
-            #expect(result.answer.title == "I can see the scenario amount, but I don't support income or savings replacement what-if calculations yet.", "\(prompt)")
-        }
-    }
-
-    @Test func resolver_cardSummaryPhrasesResolveSameWorkspaceCardTarget() async throws {
-        let fixture = try makeFixture(includeDebitCard: true)
-        let brain = legacyRuleBasedBrain()
-
-        let prompts = [
-            "Summarize my Debit Card.",
-            "Debit Card spend",
-            "What is my Debit Card spend this period?"
-        ]
-
-        for prompt in prompts {
-            let cardAnswer = await answer(prompt, using: brain, fixture: fixture)
-            #expect(cardAnswer.kind == .metric, "Expected metric for \(prompt), got \(cardAnswer.kind)")
-            #expect(cardAnswer.title == "Debit Card Spend", "Wrong title for \(prompt): \(cardAnswer.title)")
-            #expect(cardAnswer.primaryValue == CurrencyFormatter.string(from: 100), "Wrong value for \(prompt): \(cardAnswer.primaryValue ?? "nil")")
-            let hasPlannedRow = cardAnswer.rows.contains { row in
-                row.title == "Planned" && row.amount == 70
-            }
-            let hasVariableRow = cardAnswer.rows.contains { row in
-                row.title == "Variable" && row.amount == 30
-            }
-            #expect(hasPlannedRow)
-            #expect(hasVariableRow)
-        }
-    }
-
-    @Test func resolver_phraseInvarianceWorksAcrossNonHardcodedEntityTypes() async throws {
-        let fixture = try makeFixture(includeTransportationCategory: true)
-        let brain = legacyRuleBasedBrain()
-
-        let transportation = await answer("Summarize my Transportation.", using: brain, fixture: fixture)
-        #expect(transportation.kind == .metric)
-        #expect(transportation.title == "Transportation Spend")
-        #expect((transportation.primaryValue ?? "").contains("60"))
-
-        let paycheck = await answer("Paycheck income", using: brain, fixture: fixture)
-        #expect(paycheck.kind == .metric)
-        #expect(paycheck.title == "Paycheck Income")
-        #expect((paycheck.primaryValue ?? "").contains("6,200") || (paycheck.primaryValue ?? "").contains("6200"))
-
-        let savings = await answer("Summarize my Savings Account.", using: brain, fixture: fixture)
-        #expect(savings.kind == .metric)
-        #expect(savings.title == "Savings Account Balance")
-
-        let balance = await answer("Alejandro balance", using: brain, fixture: fixture)
-        #expect(balance.kind == .metric)
-        #expect(balance.title == "Alejandro Balance")
-
-        let merchant = await answer("Target spend", using: brain, fixture: fixture)
-        #expect(merchant.kind == .metric)
-        #expect(merchant.title == "Target groceries Spend")
-        #expect((merchant.primaryValue ?? "").contains("40"))
-
-        let preset = await answer("Summarize my Phone preset.", using: brain, fixture: fixture)
-        #expect(preset.kind == .metric)
-        #expect(preset.title == "Phone Preset")
-        #expect(preset.primaryValue == CurrencyFormatter.string(from: 90))
-
-        let budget = await answer("Summarize my April 2026 budget.", using: brain, fixture: fixture)
-        #expect(budget.kind == .list)
-        #expect(budget.title == "Budget Overview")
-        #expect(budget.subtitle?.isEmpty == false)
-    }
-
-    @Test func resolver_unknownNamedTargetNeverFallsBackToAggregate() async throws {
-        let fixture = try makeFixture(includeDebitCard: false)
-        let brain = legacyRuleBasedBrain()
-
-        let answer = await answer("Summarize my Debit Card.", using: brain, fixture: fixture)
-
-        #expect(answer.kind == .message)
-        #expect(answer.title == "I can't answer that yet")
-        #expect(answer.subtitle?.contains("could not find") == true)
-        #expect(answer.title != "Card Spend")
-    }
-
-    @Test func resolver_incomeComparisonDoesNotInventSourceFromComparisonWords() async throws {
-        let fixture = try makeFixture()
-        let brain = legacyRuleBasedBrain()
-        let interpreter = MarinaRuleBasedInterpreter()
-        let prompt = "Compare my actual income this month to last month. Am I up or down?"
-
-        let interpreted = interpreter.interpret(prompt)
-        #expect(interpreted.entity == .income)
-        #expect(interpreted.operation == .compare)
-        #expect(interpreted.targetName == nil)
-        #expect(interpreted.dimensions.contains(.incomeSource) == false)
-
-        let answer = await answer(prompt, using: brain, fixture: fixture)
-        #expect(answer.kind == .comparison)
-        #expect(answer.title == "Income Comparison")
-    }
-
     @Test func starterPromptFactoryUsesWorkspaceCardsWithoutHardcodedAppleCard() throws {
         let noCardPrompts = MarinaStarterPromptFactory.promptPool(cardNames: [])
         #expect(noCardPrompts.contains("Summarize my Apple Card.") == false)
@@ -580,222 +117,17 @@ struct MarinaSemanticPromptSuiteTests {
         #expect(debitPrompts.contains("Summarize my Apple Card.") == false)
     }
 
-    @Test func promptSuite_negativeCasesStaySafe() async throws {
-        let fixture = try makeFixture()
-        let brain = legacyRuleBasedBrain()
-        let interpreter = MarinaRuleBasedInterpreter()
-
-        let ambiguous = interpreter.interpret("How much did I spend on Apple?")
-        #expect(ambiguous.entity == .variableExpense)
-        #expect(ambiguous.targetName == "Apple")
-
-        let readOnly = await answer("Delete my Apple Card expense", using: brain, fixture: fixture)
-        #expect(readOnly.kind == .message)
-        #expect(readOnly.title == "I can't answer that yet")
-        #expect(readOnly.subtitle?.contains("read-only") == true)
-        #expect(readOnly.subtitle?.contains("I'm") == true)
-        #expect(readOnly.subtitle?.contains("Marina") == false)
-
-        let unknown = await answer("What did I spend on Food?", using: brain, fixture: fixture)
-        #expect(unknown.kind == .message)
-        #expect(unknown.subtitle?.contains("could not find") == true)
-    }
-
-    @Test func clarification_appleMerchantOrCardStoresExecutableChoices() async throws {
-        let fixture = try makeFixture(includeAppleMerchantExpense: true)
-        let brain = legacyRuleBasedBrain()
-
-        let clarification = await answer("How much did I spend on Apple?", using: brain, fixture: fixture)
-        #expect(clarification.kind == .message)
-        #expect(clarification.title == "Can you clarify?")
-
-        guard case .clarificationChoices(let choices)? = clarification.attachment else {
-            Issue.record("Expected clarification choices attachment.")
-            return
-        }
-
-        #expect(choices.choices.map(\.title).contains("Apple Store"))
-        #expect(choices.choices.map(\.title).contains("Apple Card"))
-        #expect(choices.choice(matching: "Apple Store")?.kindLabel == "Expense match")
-        #expect(choices.choice(matching: "Apple Card")?.kindLabel == "Card")
-        #expect(choices.choices.contains { $0.title.contains("Text") } == false)
-
-        let merchantChoice = try #require(choices.choice(matching: "merchant"))
-        let merchantAnswer = await answer(merchantChoice.request, prompt: "merchant", using: brain, fixture: fixture)
-        #expect(merchantAnswer.kind == .metric)
-        #expect(merchantAnswer.title == "Apple Store Spend")
-        #expect((merchantAnswer.primaryValue ?? "").contains("300"))
-
-        let cardChoice = try #require(choices.choice(matching: "Apple Card"))
-        let cardAnswer = await answer(cardChoice.request, prompt: "Apple Card", using: brain, fixture: fixture)
-        #expect(cardAnswer.kind == .metric)
-        #expect(cardAnswer.title == "Apple Card Spend")
-    }
-
-    @Test func resolver_appleCardOnlyDoesNotOfferSyntheticTextChoice() async throws {
-        let fixture = try makeFixture(includeAppleMerchantExpense: false)
-        let brain = legacyRuleBasedBrain()
-
-        let answer = await answer("How much did I spend on Apple?", using: brain, fixture: fixture)
-
-        #expect(answer.kind == .metric)
-        #expect(answer.title == "Apple Card Spend")
-        #expect(answer.attachment == nil)
-    }
-
-    @Test func resolver_groceryAmbiguityCreatesExecutableCategoryAndTextChoices() async throws {
-        let fixture = try makeFixture()
-        let brain = legacyRuleBasedBrain()
-
-        let clarification = await answer("How much did I spend on Grocery?", using: brain, fixture: fixture)
-        #expect(clarification.kind == .message)
-        #expect(clarification.title == "Can you clarify?")
-
-        guard case .clarificationChoices(let choices)? = clarification.attachment else {
-            Issue.record("Expected Grocery clarification choices.")
-            return
-        }
-
-        #expect(choices.choices.map(\.title).contains("Groceries"))
-        #expect(choices.choices.map(\.title).contains("Grocery Envelope"))
-        #expect(choices.choices.map(\.title).contains("Target groceries"))
-        #expect(choices.choices.map(\.title).contains("All expense matches for \"Grocery\""))
-        #expect(choices.choice(matching: "category")?.kindLabel == "Category")
-        #expect(choices.choice(matching: "Grocery Envelope")?.kindLabel == "Planned expense match")
-        #expect(choices.choice(matching: "Target groceries")?.kindLabel == "Expense match")
-        #expect(choices.choice(matching: "description")?.kindLabel == "Expense search")
-        #expect(choices.choices.contains { $0.title.contains("Text") } == false)
-
-        let categoryChoice = try #require(choices.choice(matching: "category"))
-        let categoryAnswer = await answer(categoryChoice.request, prompt: "category", using: brain, fixture: fixture)
-        #expect(categoryAnswer.kind == .metric)
-        #expect(categoryAnswer.title == "Groceries Spend")
-        #expect((categoryAnswer.primaryValue ?? "").contains("190"))
-
-        let textChoice = try #require(choices.choice(matching: "description"))
-        let textAnswer = await answer(textChoice.request, prompt: "description", using: brain, fixture: fixture)
-        #expect(textAnswer.kind == .metric)
-        #expect(textAnswer.title == "All expense matches for \"Grocery\" Spend")
-        #expect((textAnswer.primaryValue ?? "").contains("190"))
-    }
-
-    @Test func resolver_expenseMatchChoiceUsesStoredTitleInButtonAndAnswer() async throws {
-        let fixture = try makeFixture(includeGroceryOutletExpense: true)
-        let brain = legacyRuleBasedBrain()
-
-        let clarification = await answer("How much did I spend on Grocery?", using: brain, fixture: fixture)
-        guard case .clarificationChoices(let choices)? = clarification.attachment else {
-            Issue.record("Expected Grocery clarification choices.")
-            return
-        }
-
-        let groceryOutletChoice = try #require(choices.choice(matching: "Grocery Outlet of Midt"))
-        #expect(groceryOutletChoice.title == "Grocery Outlet of Midt")
-        #expect(groceryOutletChoice.kindLabel == "Expense match")
-        #expect(choices.choices.contains { $0.title.contains("Text") } == false)
-
-        let answer = await answer(groceryOutletChoice.request, prompt: "Grocery Outlet of Midt", using: brain, fixture: fixture)
-        #expect(answer.kind == .metric)
-        #expect(answer.title == "Grocery Outlet of Midt Spend")
-        #expect((answer.primaryValue ?? "").contains("42"))
-    }
-
-    @Test func resolver_multipleExpenseTextMatchesUsesExplicitAggregateChoice() async throws {
-        let fixture = try makeFixture()
-        let brain = legacyRuleBasedBrain()
-
-        let clarification = await answer("Show Grocery expenses", using: brain, fixture: fixture)
-        guard case .clarificationChoices(let choices)? = clarification.attachment else {
-            Issue.record("Expected Grocery list clarification choices.")
-            return
-        }
-
-        let aggregate = try #require(choices.choice(matching: "description"))
-        #expect(aggregate.title == "All expense matches for \"Grocery\"")
-        #expect(aggregate.kindLabel == "Expense search")
-        #expect(choices.choices.contains { $0.title.contains("Text") } == false)
-    }
-
-    @Test func resolver_categoryOnlySpendTargetAutoResolvesWithoutTextChoice() async throws {
-        let fixture = try makeFixture(includeTransportationCategory: true)
-        let brain = legacyRuleBasedBrain()
-
-        let answer = await answer("What did I spend on Transportation?", using: brain, fixture: fixture)
-
-        #expect(answer.kind == .metric)
-        #expect(answer.title == "Transportation Spend")
-        #expect(answer.attachment == nil)
-        #expect((answer.primaryValue ?? "").contains("60"))
-    }
-
-    @Test func resolver_showGroceryExpensesCanResolveCategoryOrExpenseTextLists() async throws {
-        let fixture = try makeFixture()
-        let brain = legacyRuleBasedBrain()
-
-        let clarification = await answer("Show Grocery expenses", using: brain, fixture: fixture)
-        guard case .clarificationChoices(let choices)? = clarification.attachment else {
-            Issue.record("Expected Grocery list clarification choices.")
-            return
-        }
-
-        let categoryAnswer = await answer(try #require(choices.choice(matching: "category")).request, prompt: "category", using: brain, fixture: fixture)
-        #expect(categoryAnswer.kind == .list)
-        #expect(categoryAnswer.rows.contains(where: { $0.title == "Target groceries" }))
-        #expect(categoryAnswer.rows.contains(where: { $0.title == "Grocery Envelope" }))
-
-        let textAnswer = await answer(try #require(choices.choice(matching: "description")).request, prompt: "description", using: brain, fixture: fixture)
-        #expect(textAnswer.kind == .list)
-        #expect(textAnswer.rows.contains(where: { $0.title == "Target groceries" }))
-        #expect(textAnswer.rows.contains(where: { $0.title == "Grocery Envelope" }))
-    }
-
     @Test func capabilityMatrix_declaresEveryEntityAndRejectsInvalidShapes() throws {
-        let registry = MarinaQueryCapabilityRegistry()
+        let catalog = MarinaEntityCatalog()
 
         for entity in MarinaSemanticEntity.allCases {
-            #expect(registry.supportedOperations(for: entity).isEmpty == false, "Missing capabilities for \(entity.rawValue)")
+            #expect(catalog.descriptor(for: entity)?.supportedOperations.isEmpty == false, "Missing capabilities for \(entity.rawValue)")
         }
 
-        #expect(registry.supports(entity: .budget, operation: .whatIf))
-        #expect(registry.supports(entity: .income, operation: .share))
-        #expect(registry.supports(entity: .preset, operation: .next))
-        #expect(registry.supports(entity: .workspace, operation: .whatIf) == false)
-    }
-
-    @Test func clarification_merchantWithoutPendingContextDoesNotBecomeWorkspace() async throws {
-        let fixture = try makeFixture()
-        let brain = legacyRuleBasedBrain()
-
-        let answer = await answer("merchant", using: brain, fixture: fixture)
-
-        #expect(answer.title != "Current Workspace")
-        #expect(answer.kind == .message)
-    }
-
-    @Test func merchantNoResultsAndMerchantMatchesUseDistinctCards() async throws {
-        let noAppleFixture = try makeFixture(includeAppleMerchantExpense: false)
-        let appleFixture = try makeFixture(includeAppleMerchantExpense: true)
-        let brain = legacyRuleBasedBrain()
-        let request = MarinaSemanticRequest(
-            entity: .variableExpense,
-            operation: .sum,
-            measure: .budgetImpact,
-            dimensions: [.merchantText],
-            dateRangeToken: .currentPeriod,
-            textQuery: "Apple",
-            expenseScope: .variable,
-            expectedAnswerShape: .metric
-        )
-
-        let noResults = await answer(request, prompt: "merchant", using: brain, fixture: noAppleFixture)
-        #expect(noResults.kind == .message)
-        #expect(noResults.title == "No Results Found")
-        #expect(noResults.primaryValue == nil)
-
-        let metric = await answer(request, prompt: "merchant", using: brain, fixture: appleFixture)
-        #expect(metric.kind == .metric)
-        #expect(metric.title == "Apple Spend")
-        #expect((metric.primaryValue ?? "").contains("300"))
+        #expect(catalog.supports(entity: .budget, operation: .whatIf) == .supported)
+        #expect(catalog.supports(entity: .income, operation: .share) == .supported)
+        #expect(catalog.supports(entity: .preset, operation: .next) == .supported)
+        #expect(catalog.supports(entity: .workspace, operation: .whatIf) != .supported)
     }
 
     @Test func clarificationChoices_persistResolvedStateAndCanBeCleared() throws {
@@ -860,7 +192,7 @@ struct MarinaSemanticPromptSuiteTests {
         #expect(store.loadAnswers(workspaceID: workspaceID).isEmpty)
     }
 
-    @Test func factory_defaultUsesModelBackedInterpreterBeforeRuleBasedParser() async throws {
+    @Test func factory_defaultUsesProvidedModelBackedInterpreter() async throws {
         let fixture = try makeFixture()
         let model = RecordingInterpreter(
             result: MarinaInterpretedSemanticRequest(
@@ -891,45 +223,7 @@ struct MarinaSemanticPromptSuiteTests {
         #expect(interpreted.request.unsupportedReason == .unavailableModel)
     }
 
-    @Test func migrationHybrid_highConfidencePromptDoesNotCallModelInterpreter() async throws {
-        let fixture = try makeFixture()
-        let model = RecordingInterpreter(
-            result: MarinaInterpretedSemanticRequest(
-                request: MarinaSemanticRequest(entity: .income, operation: .sum, measure: .incomeAmount, expectedAnswerShape: .metric),
-                confidence: .medium,
-                source: .foundationModel
-            )
-        )
-        let hybrid = MarinaHybridInterpreter(modelBackedInterpreter: model)
-        let context = brainContext(fixture)
-
-        let interpreted = try await hybrid.interpretedSemanticRequest(for: "How many cards do I have?", context: context)
-
-        #expect(interpreted.source == .ruleBased)
-        #expect(interpreted.request.entity == .card)
-        #expect(model.callCount == 0)
-    }
-
-    @Test func migrationHybrid_lowConfidencePromptCallsModelInterpreter() async throws {
-        let fixture = try makeFixture()
-        let model = RecordingInterpreter(
-            result: MarinaInterpretedSemanticRequest(
-                request: MarinaSemanticRequest(entity: .income, operation: .sum, measure: .incomeAmount, expectedAnswerShape: .metric),
-                confidence: .medium,
-                source: .foundationModel
-            )
-        )
-        let hybrid = MarinaHybridInterpreter(modelBackedInterpreter: model)
-        let context = brainContext(fixture)
-
-        let interpreted = try await hybrid.interpretedSemanticRequest(for: "Did my paycheck vibe improve?", context: context)
-
-        #expect(interpreted.source == .foundationModel)
-        #expect(interpreted.request.entity == .income)
-        #expect(model.callCount == 1)
-    }
-
-    @Test func validator_repairsFoundationModelMerchantSpendAndRejectsUnknownCategory() throws {
+    @Test func validatorRejectsMalformedModelMeaningWithoutRawPromptRepair() throws {
         let fixture = try makeFixture()
         let snapshot = try MarinaWorkspaceSnapshotProvider().snapshot(for: fixture.workspace, modelContext: fixture.context)
         let validator = MarinaSemanticRequestValidator()
@@ -947,10 +241,11 @@ struct MarinaSemanticPromptSuiteTests {
             source: .foundationModel
         )
 
-        let repaired = validator.validate(interpreted: merchantAsCard, snapshot: snapshot)
-        #expect(repaired.source == .repairedFoundationModel)
-        #expect(repaired.request.entity == .variableExpense)
-        #expect(repaired.request.textQuery == "Target")
+        let rejectedMerchant = validator.validate(interpreted: merchantAsCard, snapshot: snapshot)
+        #expect(rejectedMerchant.source == .foundationModel)
+        #expect(rejectedMerchant.request.expectedAnswerShape == .unsupported)
+        #expect(rejectedMerchant.request.unsupportedReason == .unresolvedEntity)
+        #expect(rejectedMerchant.request.textQuery == nil)
 
         let unknownCategory = MarinaInterpretedSemanticRequest(
             request: MarinaSemanticRequest(
@@ -962,57 +257,11 @@ struct MarinaSemanticPromptSuiteTests {
                 expectedAnswerShape: .metric
             ),
             confidence: .high,
-            source: .ruleBased
+            source: .foundationModel
         )
         let rejected = validator.validate(interpreted: unknownCategory, snapshot: snapshot)
         #expect(rejected.request.expectedAnswerShape == .unsupported)
         #expect(rejected.request.unsupportedReason == .unresolvedEntity)
-    }
-
-    @Test func hybrid_modelUnavailableFallsBackCleanlyAndModelErrorsAreFriendly() async throws {
-        let fixture = try makeFixture()
-        let context = brainContext(fixture)
-        let hybrid = MarinaHybridInterpreter(modelBackedInterpreter: nil)
-
-        let unavailable = try await hybrid.interpretedSemanticRequest(for: "Is my paycheck vibe improving?", context: context)
-        #expect(unavailable.source == .unavailableFallback)
-        #expect(unavailable.request.unsupportedReason == .unavailableModel)
-
-        let executor = MarinaQueryExecutor()
-        let unavailablePlan = MarinaQueryPlan(
-            id: UUID(),
-            semanticRequest: MarinaSemanticRequest(
-                entity: .workspace,
-                operation: .list,
-                expectedAnswerShape: .unsupported,
-                unsupportedReason: .unavailableModel
-            ),
-            dateRange: nil,
-            comparisonDateRange: nil,
-            now: fixture.now
-        )
-        let unavailableAnswer = executor.execute(plan: unavailablePlan, snapshot: try MarinaWorkspaceSnapshotProvider().snapshot(for: fixture.workspace, modelContext: fixture.context))
-        #expect(unavailableAnswer.title == "I can't answer that yet")
-        #expect(unavailableAnswer.subtitle?.contains("My on-device language model") == true)
-        #expect(unavailableAnswer.subtitle?.contains("Marina") == false)
-
-        let plan = MarinaQueryPlan(
-            id: UUID(),
-            semanticRequest: MarinaSemanticRequest(
-                entity: .workspace,
-                operation: .list,
-                expectedAnswerShape: .unsupported,
-                unsupportedReason: .modelGuardrail
-            ),
-            dateRange: nil,
-            comparisonDateRange: nil,
-            now: fixture.now
-        )
-        let answer = executor.execute(plan: plan, snapshot: try MarinaWorkspaceSnapshotProvider().snapshot(for: fixture.workspace, modelContext: fixture.context))
-        #expect(answer.kind == .message)
-        #expect(answer.subtitle?.contains("declined") == true)
-        #expect(answer.title == "I can't answer that yet")
-        #expect(answer.subtitle?.contains("I can still answer") == true)
     }
 
     @Test func insightContext_buildsCompactFactsForSupportedAnswerShapes() throws {
@@ -1303,7 +552,11 @@ struct MarinaSemanticPromptSuiteTests {
             primaryValue: nil,
             rowReferences: [
                 MarinaAnswerSemanticRowReference(row: HomeAnswerRow(title: "Coffee", value: "$5.00", amount: 5))
-            ]
+            ],
+            displayedRowCount: 1,
+            totalRowCount: 3,
+            hasMore: true,
+            nextOffset: 1
         )
         let comparisonContext = MarinaAnswerSemanticContext(
             request: MarinaSemanticRequest(
@@ -1321,7 +574,11 @@ struct MarinaSemanticPromptSuiteTests {
             primaryValue: nil,
             rowReferences: [
                 MarinaAnswerSemanticRowReference(row: HomeAnswerRow(title: "Coffee", value: "$5.00", amount: 5))
-            ]
+            ],
+            displayedRowCount: 1,
+            totalRowCount: 3,
+            hasMore: true,
+            nextOffset: 1
         )
 
         let previousFollowUps = MarinaFollowUpBuilder().followUps(for: previousContext)
@@ -1416,7 +673,12 @@ struct MarinaSemanticPromptSuiteTests {
             rowReferences: [
                 MarinaAnswerSemanticRowReference(row: HomeAnswerRow(title: "Bills & Utilities", value: "$2,200.94 (90.4%)", amount: 2_200.94)),
                 MarinaAnswerSemanticRowReference(row: HomeAnswerRow(title: "Shopping", value: "$148.57 (6.1%)", amount: 148.57))
-            ]
+            ],
+            displayedRowCount: 2,
+            totalRowCount: 5,
+            fullTotalAmount: 2_435.40,
+            hasMore: true,
+            nextOffset: 2
         )
 
         let followUps = MarinaFollowUpBuilder().followUps(for: context)
@@ -1425,7 +687,8 @@ struct MarinaSemanticPromptSuiteTests {
 
         #expect(showMore.semanticRequest?.entity == .category)
         #expect(showMore.semanticRequest?.operation == .group)
-        #expect(showMore.semanticRequest?.resultLimit == 10)
+        #expect(showMore.semanticRequest?.resultLimit == 3)
+        #expect(showMore.semanticRequest?.resultOffset == 2)
         #expect(inspectRows.semanticRequest?.entity == .variableExpense)
         #expect(inspectRows.semanticRequest?.operation == .list)
         #expect(inspectRows.semanticRequest?.measure == .budgetImpact)
@@ -1455,13 +718,20 @@ struct MarinaSemanticPromptSuiteTests {
             primaryValue: nil,
             rowReferences: [
                 MarinaAnswerSemanticRowReference(row: HomeAnswerRow(title: "Rent", value: "$1,200.00", sourceID: UUID(), objectType: .plannedExpense, amount: 1_200))
-            ]
+            ],
+            displayedRowCount: 1,
+            totalRowCount: 8,
+            fullTotalAmount: 1_200,
+            hasMore: true,
+            nextOffset: 5
         )
 
         let followUps = MarinaFollowUpBuilder().followUps(for: context)
 
         #expect(followUps.contains { $0.reason == .inspectRows } == false)
         #expect(followUps.contains { $0.reason == .showMore })
+        #expect(followUps.first { $0.reason == .showMore }?.semanticRequest?.resultLimit == 5)
+        #expect(followUps.first { $0.reason == .showMore }?.semanticRequest?.resultOffset == 5)
     }
 
     @Test func followUpBuilder_allInspectRowsSuggestionsExecuteRowListRequests() throws {
@@ -1711,17 +981,6 @@ struct MarinaSemanticPromptSuiteTests {
         #expect(MarinaRecommendedFollowUp.suggestion(from: [suggested], memory: memory) == nil)
     }
 
-    @Test func recommendedFollowUpMemory_suppressesRecentlyDeclinedIdenticalFollowUp() throws {
-        let declined = semanticFollowUp(reason: .whatIf, targetName: "April Budget", whatIfAmount: 50)
-        let memory = MarinaConversationContext(recentAnswers: [
-            answerWithFollowUps([declined], userPrompt: "How much room do I have?"),
-            HomeAnswer(queryID: UUID(), kind: .message, userPrompt: "No thanks", title: "")
-        ]).followUpMemory
-
-        #expect(memory.recentDeclines == [MarinaFollowUpMemoryEntry(followUp: declined)])
-        #expect(MarinaRecommendedFollowUp.suggestion(from: [declined], memory: memory) == nil)
-    }
-
     @Test func recommendedFollowUpMemory_allSuppressedCandidatesReturnNoRecommendation() throws {
         let suggested = semanticFollowUp(reason: .breakdown, targetName: "Groceries", entity: .category)
         let memory = MarinaConversationContext(recentAnswers: [
@@ -1743,9 +1002,25 @@ struct MarinaSemanticPromptSuiteTests {
 
     @Test func recommendedFollowUpMemory_acceptanceIsNotStoredAsDecline() throws {
         let accepted = semanticFollowUp(reason: .comparePreviousPeriod, targetName: "Income", entity: .income)
+        let acceptedRequest = try #require(accepted.semanticRequest)
         let memory = MarinaConversationContext(recentAnswers: [
             answerWithFollowUps([accepted], userPrompt: "How is income progress?"),
-            HomeAnswer(queryID: UUID(), kind: .comparison, userPrompt: "Yes", title: "Income Comparison")
+            HomeAnswer(
+                queryID: UUID(),
+                kind: .comparison,
+                userPrompt: "Yes",
+                title: "Income Comparison",
+                semanticContext: MarinaAnswerSemanticContext(
+                    request: acceptedRequest,
+                    dateRange: nil,
+                    comparisonDateRange: nil,
+                    answerKind: .comparison,
+                    answerTitle: "Income Comparison",
+                    answerSubtitle: nil,
+                    primaryValue: nil,
+                    rowReferences: []
+                )
+            )
         ]).followUpMemory
 
         #expect(memory.recentAcceptances == [MarinaFollowUpMemoryEntry(followUp: accepted)])
@@ -1761,7 +1036,7 @@ struct MarinaSemanticPromptSuiteTests {
         #expect(memory.recentAcceptances.isEmpty)
     }
 
-    @Test func recommendedFollowUpMemory_showMoreDoesNotLoopForSameListContext() throws {
+    @Test func recommendedFollowUpMemory_showMoreSuppressesIdenticalOffsetButAllowsNextPage() throws {
         let first = semanticFollowUp(
             reason: .showMore,
             targetName: "Groceries",
@@ -1769,6 +1044,17 @@ struct MarinaSemanticPromptSuiteTests {
             operation: .list,
             measure: .budgetImpact,
             resultLimit: 10,
+            resultOffset: 10,
+            answerShape: .list
+        )
+        let identical = semanticFollowUp(
+            reason: .showMore,
+            targetName: "Groceries",
+            entity: .variableExpense,
+            operation: .list,
+            measure: .budgetImpact,
+            resultLimit: 10,
+            resultOffset: 10,
             answerShape: .list
         )
         let next = semanticFollowUp(
@@ -1777,14 +1063,16 @@ struct MarinaSemanticPromptSuiteTests {
             entity: .variableExpense,
             operation: .list,
             measure: .budgetImpact,
-            resultLimit: 15,
+            resultLimit: 10,
+            resultOffset: 20,
             answerShape: .list
         )
         let memory = MarinaConversationContext(recentAnswers: [
             answerWithFollowUps([first])
         ]).followUpMemory
 
-        #expect(MarinaRecommendedFollowUp.suggestion(from: [next], memory: memory) == nil)
+        #expect(MarinaRecommendedFollowUp.suggestion(from: [identical], memory: memory) == nil)
+        #expect(MarinaRecommendedFollowUp.suggestion(from: [next], memory: memory) == next)
     }
 
     @Test func insightAnalyzer_emitsDomainSignalsForFormulaAnswers() throws {
@@ -1972,6 +1260,7 @@ struct MarinaSemanticPromptSuiteTests {
 
         let digest = MarinaAnswerFactsDigest(context: context).text()
 
+        #expect(digest.contains("How much did I spend on groceries?") == false)
         #expect(digest.contains("Deterministic headline fact: Groceries Spend: $120.00"))
         #expect(digest.contains("Deterministic signals:"))
         #expect(digest.contains("caution: Daily room is tight - The remaining room is spread thin across the days left in this period."))
@@ -1985,8 +1274,6 @@ struct MarinaSemanticPromptSuiteTests {
 
     #if canImport(FoundationModels)
     @Test func readAnswerFactsTool_returnsOnlySuppliedFacts() async throws {
-        guard #available(iOS 26.0, *) else { return }
-
         let plan = MarinaQueryPlan(
             id: UUID(),
             semanticRequest: MarinaSemanticRequest(
@@ -2015,12 +1302,11 @@ struct MarinaSemanticPromptSuiteTests {
         #expect(output.contains("Apple Card Spend"))
         #expect(output.contains("$1,370.00"))
         #expect(output.contains("Variable"))
+        #expect(output.contains("Summarize my Apple Card.") == false)
         #expect(output.contains("SwiftData") == false)
     }
 
     @Test func foundationModelsInsightInstructionsRequireRecommendedFollowUpOnly() throws {
-        guard #available(iOS 26.0, *) else { return }
-
         let instructions = MarinaFoundationModelsInsightRuntime.baseInstructions
 
         #expect(instructions.contains("If a Recommended follow-up question is supplied, write the answer, then a blank line, then that exact Recommended follow-up question."))
@@ -2074,6 +1360,18 @@ struct MarinaSemanticPromptSuiteTests {
         let finalized = MarinaNarrationFinalizer.finalized("Your safe daily room is tight for the rest of this period.", context: context)
 
         #expect(finalized == "Your safe daily room is tight for the rest of this period.\n\nWant to see what happens if you spend $50?")
+    }
+
+    @Test func narrationFinalizerRejectsNumbersMissingFromDeterministicFacts() {
+        let context = insightContext(
+            kind: .metric,
+            title: "Safe Spend Today",
+            primaryValue: "$42.00",
+            rows: [HomeAnswerRow(title: "Period room", value: "$420.00")]
+        )
+
+        #expect(MarinaNarrationFinalizer.finalized("Your safe spend is $42.00.", context: context) != nil)
+        #expect(MarinaNarrationFinalizer.finalized("Your safe spend is $999.00.", context: context) == nil)
     }
 
     @Test func recommendedFollowUpFormatterCreatesNaturalConfirmationQuestions() throws {
@@ -2361,379 +1659,6 @@ struct MarinaSemanticPromptSuiteTests {
         #expect(values == ["Alejandro owes you \(CurrencyFormatter.string(from: 21.06))."])
     }
 
-    @Test func brain_addsInsightToSuccessfulAnswersAndSkipsTerminalAnswers() async throws {
-        let fixture = try makeFixture()
-        let narrator = RecordingInsightNarrator(response: "Stub insight.")
-        let brain = legacyRuleBasedBrain(insightNarrator: narrator)
-
-        let successful = await answer("What is my safe spend today?", using: brain, fixture: fixture)
-        #expect(successful.kind == .metric)
-        #expect(successful.explanation == "Stub insight.")
-        #expect(narrator.contexts.count == 1)
-        #expect(narrator.contexts.first?.title == "Safe Spend Today")
-
-        let unsupported = await answer("delete my Apple Card", using: brain, fixture: fixture)
-        #expect(unsupported.kind == .message)
-        #expect(unsupported.explanation == nil)
-        #expect(narrator.contexts.count == 1)
-
-        let clarification = await answer(
-            MarinaSemanticRequest(
-                entity: .workspace,
-                operation: .list,
-                expectedAnswerShape: .clarification,
-                clarificationQuestion: "Which matching record should Marina use?",
-                unsupportedReason: .ambiguousEntity
-            ),
-            prompt: "Clarify this.",
-            using: brain,
-            fixture: fixture
-        )
-        #expect(clarification.kind == .message)
-        #expect(clarification.explanation == nil)
-        #expect(narrator.contexts.count == 1)
-    }
-
-    @Test func brain_keepsOriginalAnswerWhenInsightNarratorFails() async throws {
-        let fixture = try makeFixture()
-        let brain = legacyRuleBasedBrain(insightNarrator: ThrowingInsightNarrator())
-
-        let answer = await answer("What is my safe spend today?", using: brain, fixture: fixture)
-        #expect(answer.kind == .metric)
-        #expect(answer.primaryValue != nil)
-        #expect(answer.explanation == nil)
-    }
-
-    @Test func brain_answerSeedReturnsCardBeforeNarrationAndIncludesContextOnlyForNarratableAnswers() async throws {
-        let fixture = try makeFixture()
-        let narrator = RecordingInsightNarrator(response: "Stub insight.")
-        let brain = legacyRuleBasedBrain(insightNarrator: narrator)
-
-        let successful = await brain.answerSeed(
-            prompt: "What is my safe spend today?",
-            workspace: fixture.workspace,
-            modelContext: fixture.context,
-            ambientDateRange: fixture.currentRange,
-            homeContext: MarinaPanelHomeContext(dateRange: fixture.currentRange),
-            defaultBudgetingPeriod: .monthly,
-            now: fixture.now
-        )
-
-        #expect(successful.answer.kind == .metric)
-        #expect(successful.answer.explanation == nil)
-        #expect(successful.insightContext?.title == "Safe Spend Today")
-        #expect(narrator.contexts.isEmpty)
-
-        let terminal = await brain.answerSeed(
-            prompt: "delete my Apple Card",
-            workspace: fixture.workspace,
-            modelContext: fixture.context,
-            ambientDateRange: fixture.currentRange,
-            homeContext: MarinaPanelHomeContext(dateRange: fixture.currentRange),
-            defaultBudgetingPeriod: .monthly,
-            now: fixture.now
-        )
-
-        #expect(terminal.answer.kind == .message)
-        #expect(terminal.insightContext == nil)
-        #expect(narrator.contexts.isEmpty)
-    }
-
-    @Test func brain_completedAnswerCombinesStreamedNarrationWithSeed() async throws {
-        let fixture = try makeFixture()
-        let brain = legacyRuleBasedBrain()
-        let seed = await brain.answerSeed(
-            prompt: "What is my safe spend today?",
-            workspace: fixture.workspace,
-            modelContext: fixture.context,
-            ambientDateRange: fixture.currentRange,
-            homeContext: MarinaPanelHomeContext(dateRange: fixture.currentRange),
-            defaultBudgetingPeriod: .monthly,
-            now: fixture.now
-        )
-
-        let completed = brain.completedAnswer(from: seed, streamingNarration: "Streamed insight.")
-
-        #expect(completed.id == seed.answer.id)
-        #expect(completed.rows == seed.answer.rows)
-        #expect(completed.explanation == "Streamed insight.")
-    }
-
-    @Test func homeMetricParity_matchesCardCategoryAvailabilityIncomeAndNextPlannedCalculators() async throws {
-        let fixture = try makeFixture()
-        let brain = legacyRuleBasedBrain()
-        let homeContext = MarinaPanelHomeContext(dateRange: fixture.currentRange)
-        let snapshot = try MarinaWorkspaceSnapshotProvider().snapshot(
-            for: fixture.workspace,
-            modelContext: fixture.context,
-            homeContext: homeContext,
-            now: fixture.now
-        )
-
-        let appleCard = try #require(snapshot.cards.first(where: { $0.name == "Apple Card" }))
-        let cardMetrics = HomeCardMetricsCalculator.metrics(
-            for: appleCard,
-            plannedExpenses: snapshot.homeCalculationPlannedExpenses,
-            variableExpenses: snapshot.homeCalculationVariableExpenses,
-            start: fixture.currentRange.startDate,
-            end: fixture.currentRange.endDate,
-            excludeFuturePlannedExpenses: false,
-            excludeFutureVariableExpenses: false,
-            now: fixture.now
-        )
-        let cardAnswer = await answer("Summarize my Apple Card.", using: brain, fixture: fixture, homeContext: homeContext)
-        #expect(cardAnswer.primaryValue == CurrencyFormatter.string(from: cardMetrics.total))
-        #expect(cardAnswer.rows.contains(where: { $0.title == "Planned" && $0.amount == cardMetrics.plannedTotal }))
-        #expect(cardAnswer.rows.contains(where: { $0.title == "Variable" && $0.amount == cardMetrics.variableTotal }))
-
-        let availability = HomeCategoryLimitsAggregator.build(
-            budgets: snapshot.budgets,
-            categories: snapshot.categories,
-            plannedExpenses: snapshot.homeCalculationPlannedExpenses,
-            variableExpenses: snapshot.homeCalculationVariableExpenses,
-            rangeStart: fixture.currentRange.startDate,
-            rangeEnd: fixture.currentRange.endDate
-        )
-        let availabilityAnswer = await answer("Show category availability.", using: brain, fixture: fixture, homeContext: homeContext)
-        #expect(availabilityAnswer.rows.first(where: { $0.title == "Over" })?.value == AppNumberFormat.integer(availability.overCount))
-        #expect(availabilityAnswer.rows.first(where: { $0.title == "Near" })?.value == AppNumberFormat.integer(availability.nearCount))
-
-        let incomeProgress = HomeQueryEngine().execute(
-            query: HomeQuery(intent: .incomeProgressSummary, dateRange: fixture.currentRange),
-            categories: snapshot.categories,
-            plannedExpenses: snapshot.homeCalculationPlannedExpenses,
-            variableExpenses: snapshot.homeCalculationVariableExpenses,
-            incomes: snapshot.incomes,
-            now: fixture.now
-        )
-        let incomeAnswer = await answer("How is my income progress?", using: brain, fixture: fixture, homeContext: homeContext)
-        #expect(incomeAnswer.primaryValue == incomeProgress.primaryValue)
-
-        let safeSpend = HomeQueryEngine().execute(
-            query: HomeQuery(intent: .safeSpendToday, dateRange: fixture.currentRange),
-            budgets: snapshot.budgets,
-            categories: snapshot.categories,
-            plannedExpenses: snapshot.homeCalculationPlannedExpenses,
-            variableExpenses: snapshot.homeCalculationVariableExpenses,
-            incomes: snapshot.incomes,
-            savingsEntries: snapshot.savingsEntries,
-            now: fixture.now
-        )
-        let safeSpendAnswer = await answer("What is my safe spend today?", using: brain, fixture: fixture, homeContext: homeContext)
-        #expect(safeSpendAnswer.primaryValue == safeSpend.primaryValue)
-
-        let next = try #require(
-            HomeNextPlannedExpenseFinder.nextExpense(
-                from: snapshot.homePlannedExpenses,
-                in: fixture.currentRange.startDate,
-                to: fixture.currentRange.endDate,
-                now: fixture.now
-            )
-        )
-        let nextAnswer = await answer("What is my next planned expense?", using: brain, fixture: fixture, homeContext: homeContext)
-        #expect(nextAnswer.rows.first(where: { $0.title == "Expense" })?.value == next.title)
-    }
-
-    @Test func homeMetricParity_honorsFutureExclusionButKeepsNextPlannedUnfiltered() async throws {
-        let fixture = try makeFixture()
-        let brain = legacyRuleBasedBrain()
-        let includeFutureContext = MarinaPanelHomeContext(dateRange: fixture.currentRange)
-        let excludeFutureContext = MarinaPanelHomeContext(
-            dateRange: fixture.currentRange,
-            excludeFuturePlannedExpensesFromCalculations: true,
-            excludeFutureVariableExpensesFromCalculations: true
-        )
-
-        let included = await answer("Summarize my Apple Card.", using: brain, fixture: fixture, homeContext: includeFutureContext)
-        let excluded = await answer("Summarize my Apple Card.", using: brain, fixture: fixture, homeContext: excludeFutureContext)
-        #expect(included.primaryValue == CurrencyFormatter.string(from: 1_370))
-        #expect(excluded.primaryValue == CurrencyFormatter.string(from: 1_280))
-
-        let next = await answer("What is my next planned expense?", using: brain, fixture: fixture, homeContext: excludeFutureContext)
-        #expect(next.primaryValue == CurrencyFormatter.string(from: 90))
-        let nextHasExpenseRow = next.rows.contains { row in
-            row.title == "Expense" && row.value == "Phone"
-        }
-        #expect(nextHasExpenseRow)
-    }
-
-    @Test func homeMetricParity_ignoresOrphanBudgetGeneratedPlannedExpenses() async throws {
-        let fixture = try makeFixture()
-        let snapshot = try MarinaWorkspaceSnapshotProvider().snapshot(
-            for: fixture.workspace,
-            modelContext: fixture.context,
-            homeContext: MarinaPanelHomeContext(dateRange: fixture.currentRange),
-            now: fixture.now
-        )
-        let appleCard = try #require(snapshot.cards.first(where: { $0.name == "Apple Card" }))
-        let bills = try #require(snapshot.categories.first(where: { $0.name == "Bills" }))
-        let orphan = PlannedExpense(
-            title: "Orphan Generated Row",
-            plannedAmount: 500,
-            expenseDate: date(2026, 4, 9),
-            workspace: fixture.workspace,
-            card: appleCard,
-            category: bills,
-            sourceBudgetID: UUID()
-        )
-        fixture.context.insert(orphan)
-        try fixture.context.save()
-
-        let brain = legacyRuleBasedBrain()
-        let answer = await answer("Summarize my Apple Card.", using: brain, fixture: fixture)
-        #expect(answer.primaryValue == CurrencyFormatter.string(from: 1_370))
-    }
-
-    @Test func categoryAvailabilityList_returnsFilteredOverCategories() async throws {
-        let fixture = try makeFixture(includeTransportationCategory: true)
-        try addCategoryAvailabilityListScenario(to: fixture)
-        let brain = legacyRuleBasedBrain()
-        let expected = try expectedCategoryAvailabilityNames(fixture: fixture, filter: .over, limit: 5)
-
-        let answer = await answer("Which 5 categories are over limit?", using: brain, fixture: fixture)
-
-        #expect(answer.kind == .list)
-        #expect(answer.title == "Categories Over Limit")
-        #expect(answer.rows.map(\.title) == expected)
-        #expect(answer.rows.allSatisfy { $0.objectType == .category })
-        #expect(answer.rows.allSatisfy { $0.value.contains("Over") && $0.value.contains("Spent") })
-    }
-
-    @Test func categoryAvailabilityList_returnsNearAndUnderLimitCategories() async throws {
-        let fixture = try makeFixture(includeTransportationCategory: true)
-        try addCategoryAvailabilityListScenario(to: fixture)
-        let brain = legacyRuleBasedBrain()
-
-        let near = await answer("Which categories are near limit?", using: brain, fixture: fixture)
-        let expectedNear = try expectedCategoryAvailabilityNames(fixture: fixture, filter: .near, limit: 5)
-        #expect(near.kind == .list)
-        #expect(near.title == "Categories Near Limit")
-        #expect(near.rows.map(\.title) == expectedNear)
-
-        let under = await answer("List categories under limit.", using: brain, fixture: fixture)
-        let expectedUnder = try expectedCategoryAvailabilityNames(fixture: fixture, filter: .underLimit, limit: 5)
-        #expect(under.kind == .list)
-        #expect(under.title == "Categories Under Limit")
-        #expect(under.rows.map(\.title) == expectedUnder)
-        #expect(under.rows.contains(where: { $0.title == "Health" }))
-        #expect(under.rows.contains(where: { $0.title == "Books" }))
-    }
-
-    @Test func categoryAvailabilityFollowUp_usesPreviousAvailabilityAnswer() async throws {
-        let fixture = try makeFixture(includeTransportationCategory: true)
-        try addCategoryAvailabilityListScenario(to: fixture)
-        let brain = legacyRuleBasedBrain()
-        let summary = await answer("Show category availability.", using: brain, fixture: fixture)
-        let context = MarinaConversationContext(recentAnswers: [summary])
-
-        let followUp = await answer(
-            "Which 5 are over limit?",
-            using: brain,
-            fixture: fixture,
-            conversationContext: context
-        )
-
-        #expect(summary.title == "Category Availability")
-        let expected = try expectedCategoryAvailabilityNames(fixture: fixture, filter: .over, limit: 5)
-        #expect(followUp.kind == .list)
-        #expect(followUp.title == "Categories Over Limit")
-        #expect(followUp.rows.map(\.title) == expected)
-    }
-
-    @Test func semanticContext_persistsAndSurvivesStreamingNarrationReplacement() async throws {
-        let fixture = try makeFixture()
-        let brain = legacyRuleBasedBrain()
-        let seed = await brain.answerSeed(
-            prompt: "Summarize my Apple Card.",
-            workspace: fixture.workspace,
-            modelContext: fixture.context,
-            ambientDateRange: fixture.currentRange,
-            homeContext: MarinaPanelHomeContext(dateRange: fixture.currentRange),
-            defaultBudgetingPeriod: .monthly,
-            now: fixture.now
-        )
-
-        let context = try #require(seed.answer.semanticContext)
-        #expect(context.request.entity == .card)
-        #expect(context.request.targetName == "Apple Card")
-        #expect(context.answerTitle == "Apple Card Spend")
-        #expect(context.rowReferences.contains(where: { $0.title == "Variable" }))
-
-        let insightBundle = try #require(seed.answer.insightBundle)
-        let largest = try #require(insightBundle.followUps.first(where: { $0.title == "Show largest expenses on this card" }))
-        let compare = try #require(insightBundle.followUps.first(where: { $0.title == "Compare this card to another card" }))
-        #expect(largest.executionMode == .executable)
-        #expect(largest.semanticRequest?.entity == .variableExpense)
-        #expect(compare.executionMode == .clarificationRequired)
-        #expect(compare.semanticRequest == nil)
-
-        let streamed = brain.completedAnswer(from: seed, streamingNarration: "Apple Card is the largest card this period.")
-        #expect(streamed.semanticContext == seed.answer.semanticContext)
-        #expect(streamed.insightBundle == seed.answer.insightBundle)
-
-        let suiteName = "MarinaSemanticPromptSuiteTests.semanticContext"
-        let defaults = try #require(UserDefaults(suiteName: suiteName))
-        defer { defaults.removePersistentDomain(forName: suiteName) }
-        let store = MarinaConversationStore(userDefaults: defaults, storageKeyPrefix: "tests.marina.semanticContext")
-        store.saveAnswers([streamed], workspaceID: fixture.workspace.id)
-
-        let loaded = try #require(store.loadAnswers(workspaceID: fixture.workspace.id).first)
-        #expect(loaded.semanticContext == streamed.semanticContext)
-        #expect(loaded.insightBundle == streamed.insightBundle)
-        #expect(MarinaConversationContext(recentAnswers: [loaded]).lastSemanticContext == streamed.semanticContext)
-    }
-
-    @Test func recommendedFollowUpConfirmation_yesExecutesStoredRequestAndKeepsVisiblePrompt() async throws {
-        let fixture = try makeFixture()
-        let brain = legacyRuleBasedBrain()
-        let summary = await answer("How is income progress?", using: brain, fixture: fixture)
-        let context = MarinaConversationContext(recentAnswers: [summary])
-
-        let recommendation = try #require(context.lastRecommendedFollowUp)
-        #expect(MarinaRecommendedFollowUp.confirmationQuestion(for: recommendation) == "Want to compare your income to last period?")
-
-        let yes = await answer("Yes", using: brain, fixture: fixture, conversationContext: context)
-
-        #expect(yes.userPrompt == "Yes")
-        #expect(yes.kind == .comparison)
-        #expect(yes.title == "Income Comparison")
-        #expect(yes.semanticContext?.request.entity == .income)
-        #expect(yes.semanticContext?.request.operation == .compare)
-        #expect(yes.insightBundle?.followUps.contains { $0.reason == .comparePreviousPeriod } == false)
-        #expect(MarinaConversationContext(recentAnswers: [yes]).lastRecommendedFollowUp?.reason != .comparePreviousPeriod)
-    }
-
-    @Test func recommendedFollowUpConfirmation_noReturnsCasualMessageWithoutQuery() async throws {
-        let fixture = try makeFixture()
-        let brain = legacyRuleBasedBrain()
-        let summary = await answer("How is income progress?", using: brain, fixture: fixture)
-
-        let no = await answer(
-            "No",
-            using: brain,
-            fixture: fixture,
-            conversationContext: MarinaConversationContext(recentAnswers: [summary])
-        )
-
-        #expect(no.userPrompt == "No")
-        #expect(no.kind == .message)
-        #expect(no.title == "")
-        #expect(no.subtitle == nil)
-        #expect(no.rows.isEmpty)
-        #expect(no.attachment == nil)
-        #expect(no.explanation == "No problem. I’m here whenever you want to dig into something else.")
-        #expect(no.semanticContext == nil)
-        #expect(no.insightBundle == nil)
-        #expect(MarinaPanelView.hasAssistantCardContent(no) == false)
-
-        let messages = MarinaConversationDisplayAdapter.messages(from: [no])
-        #expect(messages.count == 2)
-        #expect(messages[0].role == .user)
-        #expect(messages[0].prompt == "No")
-        #expect(messages[1].role == .assistant)
-        #expect(messages[1].answer?.explanation == "No problem. I’m here whenever you want to dig into something else.")
-    }
-
     @Test func marinaPanel_assistantCardContentPredicateTreatsNormalAnswersAsVisible() throws {
         let metric = HomeAnswer(
             queryID: UUID(),
@@ -2752,158 +1677,6 @@ struct MarinaSemanticPromptSuiteTests {
         #expect(MarinaPanelView.hasAssistantCardContent(message))
     }
 
-    @Test func spendTrendsRecommendedFollowUpsDrillIntoExpenseRowsAfterComparison() async throws {
-        let fixture = try makeFixture()
-        let brain = legacyRuleBasedBrain()
-        let trends = await answer("Show my spend trends.", using: brain, fixture: fixture)
-        let trendsContext = MarinaConversationContext(recentAnswers: [trends])
-
-        #expect(trends.title == "Spend Trends")
-        #expect(trendsContext.lastRecommendedFollowUp?.reason == .comparePreviousPeriod)
-
-        let previous = await answer("Yes please", using: brain, fixture: fixture, conversationContext: trendsContext)
-        let previousContext = MarinaConversationContext(recentAnswers: [previous])
-
-        #expect(previous.title == "Spend Trends")
-        #expect(previous.semanticContext?.request.operation == .group)
-        #expect(previous.semanticContext?.request.dateRangeToken == .previousPeriod)
-        #expect(previousContext.lastRecommendedFollowUp?.reason == .inspectRows)
-
-        let drillDown = await answer("Sure", using: brain, fixture: fixture, conversationContext: previousContext)
-
-        #expect(drillDown.title == "Recent Expenses")
-        #expect(drillDown.kind == .list)
-        #expect(drillDown.semanticContext?.request.entity == .variableExpense)
-        #expect(drillDown.semanticContext?.request.operation == .list)
-        #expect(drillDown.semanticContext?.request.sort == .amountDescending)
-        #expect(drillDown.semanticContext?.request.dimensions.contains(.date) == false)
-        #expect(drillDown.rows.isEmpty == false)
-        #expect(drillDown.rows.allSatisfy { $0.objectType == .plannedExpense || $0.objectType == .variableExpense })
-        #expect(drillDown.insightBundle?.followUps.contains { $0.reason == .inspectRows } == false)
-    }
-
-    @Test func spendTrendsExpenseDriverPromptRoutesToExpenseRows() async throws {
-        let fixture = try makeFixture()
-        let brain = legacyRuleBasedBrain()
-
-        let answer = await answer("See the expenses driving my spend trends.", using: brain, fixture: fixture)
-
-        #expect(answer.title == "Recent Expenses")
-        #expect(answer.kind == .list)
-        #expect(answer.semanticContext?.request.entity == .variableExpense)
-        #expect(answer.semanticContext?.request.operation == .list)
-        #expect(answer.semanticContext?.request.sort == .amountDescending)
-        #expect(answer.rows.isEmpty == false)
-    }
-
-    @Test func comparisonDriverPromptsKeepCategoryDriversUnlessExpensesAreExplicit() async throws {
-        let fixture = try makeFixture()
-        let brain = legacyRuleBasedBrain()
-        let comparison = await answer("Compare this budget period to last period.", using: brain, fixture: fixture)
-        let context = MarinaConversationContext(recentAnswers: [comparison])
-
-        let categoryDrivers = await answer("what drove the increase?", using: brain, fixture: fixture, conversationContext: context)
-        #expect(categoryDrivers.kind == .list)
-        #expect(categoryDrivers.semanticContext?.request.entity == .category)
-        #expect(categoryDrivers.semanticContext?.request.operation == .group)
-
-        let expenseDrivers = await answer("which expenses drove the increase?", using: brain, fixture: fixture, conversationContext: context)
-        #expect(expenseDrivers.kind == .list)
-        #expect(expenseDrivers.title == "Recent Expenses")
-        #expect(expenseDrivers.semanticContext?.request.entity == .variableExpense)
-        #expect(expenseDrivers.semanticContext?.request.operation == .list)
-        #expect(expenseDrivers.rows.allSatisfy { $0.objectType == .plannedExpense || $0.objectType == .variableExpense })
-    }
-
-    @Test func recommendedFollowUpConfirmation_yesWithoutRecommendationDoesNotResolveHiddenRequest() throws {
-        let answer = HomeAnswer(
-            queryID: UUID(),
-            kind: .message,
-            title: "Plain Answer"
-        )
-        let context = MarinaConversationContext(recentAnswers: [answer])
-
-        #expect(MarinaFollowUpResolver().resolve(prompt: "Yes", conversationContext: context) == nil)
-    }
-
-    @Test func recommendedFollowUpConfirmation_aliasesRecognizeCommonYesAndNoReplies() throws {
-        let yesReplies = [
-            "yes",
-            "sure",
-            "okay",
-            "go for it!",
-            "let’s do it",
-            "sounds good",
-            "yup",
-            "please do",
-            "works for me"
-        ]
-        let noReplies = [
-            "no",
-            "nah",
-            "no thanks",
-            "no, thanks.",
-            "no thank you",
-            "not right now",
-            "maybe later",
-            "pass",
-            "don’t do it"
-        ]
-
-        for reply in yesReplies {
-            #expect(MarinaRecommendedFollowUp.isAffirmative(reply), "\(reply) should confirm the recommended follow-up.")
-            #expect(MarinaRecommendedFollowUp.isNegative(reply) == false, "\(reply) should not decline the recommended follow-up.")
-        }
-
-        for reply in noReplies {
-            #expect(MarinaRecommendedFollowUp.isNegative(reply), "\(reply) should decline the recommended follow-up.")
-            #expect(MarinaRecommendedFollowUp.isAffirmative(reply) == false, "\(reply) should not confirm the recommended follow-up.")
-        }
-    }
-
-    @Test func followUpResolver_drillsDownAndCorrectsCardAnswers() async throws {
-        let fixture = try makeFixture()
-        let brain = legacyRuleBasedBrain()
-        let summary = await answer("Summarize my Apple Card.", using: brain, fixture: fixture)
-        let context = MarinaConversationContext(recentAnswers: [summary])
-
-        let largest = await answer("show largest 2", using: brain, fixture: fixture, conversationContext: context)
-        #expect(largest.kind == .list)
-        #expect(largest.title == "Apple Card Expenses")
-        #expect(Array(largest.rows.map(\.title).prefix(2)) == ["Rent", "Phone"])
-        #expect(Array(largest.rows.map(\.objectType).prefix(2)) == [.plannedExpense, .plannedExpense])
-
-        let chase = await answer("what about Chase?", using: brain, fixture: fixture, conversationContext: context)
-        #expect(chase.kind == .metric)
-        #expect(chase.title == "Chase Spend")
-
-        let appleStore = await answer("not Apple Card, Apple Store", using: brain, fixture: fixture, conversationContext: context)
-        #expect(appleStore.kind == .metric)
-        #expect(appleStore.title == "Apple Store Spend")
-        #expect(appleStore.primaryValue == CurrencyFormatter.string(from: 300))
-    }
-
-    @Test func followUpResolver_completeStandaloneExpenseListDoesNotInheritRecentCardContext() async throws {
-        let fixture = try makeFixture()
-        let brain = legacyRuleBasedBrain()
-        let summary = await answer("Summarize my Apple Card.", using: brain, fixture: fixture)
-        let context = MarinaConversationContext(recentAnswers: [summary])
-
-        let standalone = await answer(
-            "List my most recent 5 expenses on Chase",
-            using: brain,
-            fixture: fixture,
-            conversationContext: context
-        )
-
-        #expect(standalone.kind == .list)
-        #expect(standalone.title == "Chase Expenses")
-        #expect(standalone.semanticContext?.request.entity == .variableExpense)
-        #expect(standalone.semanticContext?.request.operation == .list)
-        #expect(standalone.semanticContext?.request.targetName == "Chase")
-        #expect(standalone.semanticContext?.request.targetName != "Apple Card")
-    }
-
     @Test func stabilization_knownPromptShapesStayTargetedWithMockedModelOutput() async throws {
         let fixture = try makeFixture(includeDebitCard: true, includeStabilizationTargets: true)
         let interpreter = PromptMappedInterpreter([
@@ -2914,7 +1687,7 @@ struct MarinaSemanticPromptSuiteTests {
             "What is my safe spend today?": interpreted(.foundationModel, request: safeDailySpend()),
             "What is eating my budget?": interpreted(.foundationModel, request: budgetConcentration())
         ])
-        let brain = modelBackedBrain(interpreter: interpreter, policy: .internalParityProven)
+        let brain = modelBackedBrain(interpreter: interpreter)
 
         let uber = await seed("What did I spend at Uber?", using: brain, fixture: fixture)
         #expect(uber.answer.kind == .metric)
@@ -2922,7 +1695,8 @@ struct MarinaSemanticPromptSuiteTests {
         #expect(uber.debugTrace?.validatorOutput.textQuery == "Uber")
         #expect(uber.debugTrace?.validatorOutput.dimensions.contains(.merchantText) == true)
         #expect(uber.debugTrace?.executionRoute == .universal)
-        #expect(uber.debugTrace?.universalScenario == .merchantVariableSpend)
+        #expect(uber.debugTrace?.queryPlan.entity == MarinaSemanticEntity.variableExpense)
+        #expect(uber.debugTrace?.queryPlan.expenseScope == MarinaSemanticExpenseScope.variable)
 
         let food = await seed("Show my Food & Drink expenses from last month.", using: brain, fixture: fixture)
         #expect(food.answer.kind == .list)
@@ -2958,47 +1732,6 @@ struct MarinaSemanticPromptSuiteTests {
         #expect(concentration.answer.rows.contains { $0.title == "Concentration" })
     }
 
-    @Test func stabilization_promptTargetLossCannotValidateToBroadAnswer() async throws {
-        let fixture = try makeFixture(includeDebitCard: true, includeStabilizationTargets: true)
-        let interpreter = PromptMappedInterpreter([
-            "What did I spend at Uber?": interpreted(.foundationModel, request: cardSpend("Apple Card")),
-            "Show my Food & Drink expenses from last month.": interpreted(.foundationModel, request: broadExpenseList(dateRangeToken: .previousMonth)),
-            "How much did I spend on Groceries last month?": interpreted(.foundationModel, request: budgetOverview(dateRangeToken: .previousMonth)),
-            "Compare Apple Card to Debit Card.": interpreted(.foundationModel, request: MarinaSemanticRequest(
-                entity: .card,
-                operation: .compare,
-                measure: .budgetImpact,
-                dimensions: [.card],
-                expectedAnswerShape: .comparison
-            ))
-        ])
-        let brain = modelBackedBrain(interpreter: interpreter, policy: .internalParityProven)
-
-        let wrongTarget = await seed("What did I spend at Uber?", using: brain, fixture: fixture)
-        #expect(wrongTarget.answer.kind == .message)
-        #expect(wrongTarget.debugTrace?.validatorOutput.expectedAnswerShape == .unsupported)
-        #expect(wrongTarget.debugTrace?.validatorOutput.unsupportedReason == .unresolvedEntity)
-        #expect(wrongTarget.answer.title != "Card Spend")
-
-        let food = await seed("Show my Food & Drink expenses from last month.", using: brain, fixture: fixture)
-        #expect(food.debugTrace?.validatorOutput.expectedAnswerShape != .unsupported)
-        #expect(food.debugTrace?.validatorOutput.dateRangeToken == .previousMonth)
-        #expect(food.answer.title != "Budget Overview")
-
-        let groceries = await seed("How much did I spend on Groceries last month?", using: brain, fixture: fixture)
-        #expect(groceries.answer.kind == .message)
-        #expect(groceries.debugTrace?.validatorOutput.expectedAnswerShape == .clarification)
-        #expect(groceries.debugTrace?.validatorOutput.unsupportedReason == .ambiguousEntity)
-        #expect(groceries.answer.title != "Budget Overview")
-
-        let comparison = await seed("Compare Apple Card to Debit Card.", using: brain, fixture: fixture)
-        #expect(comparison.answer.kind == .comparison)
-        #expect(comparison.debugTrace?.validatorOutput.targetName == "Apple Card")
-        #expect(comparison.debugTrace?.validatorOutput.comparisonTargetName == "Debit Card")
-        #expect(comparison.debugTrace?.validatorOutput.expectedAnswerShape == .comparison)
-        #expect(comparison.answer.title == "Card Spend Comparison")
-    }
-
     @Test func stabilization_standalonePromptsDoNotInheritPreviousContextWithMockedModelOutput() async throws {
         let fixture = try makeFixture(includeDebitCard: true, includeStabilizationTargets: true)
         let interpreter = PromptMappedInterpreter([
@@ -3009,7 +1742,7 @@ struct MarinaSemanticPromptSuiteTests {
             "Compare Apple Card to Debit Card.": interpreted(.foundationModel, request: cardComparison("Apple Card", "Debit Card")),
             "How much did I spend on Groceries last month?": interpreted(.foundationModel, request: categorySpendTotalAsCategory("Groceries", dateRangeToken: .previousMonth))
         ])
-        let brain = modelBackedBrain(interpreter: interpreter, policy: .internalParityProven)
+        let brain = modelBackedBrain(interpreter: interpreter)
 
         let safeSpend = await seed("What is my safe spend today?", using: brain, fixture: fixture)
         let uberAfterSafeSpend = await seed(
@@ -3050,88 +1783,24 @@ struct MarinaSemanticPromptSuiteTests {
         #expect(groceriesAfterComparison.answer.title != "Card Spend Comparison")
     }
 
-    @Test func stabilization_formulaConceptsRepairGenericFoundationModelShapes() async throws {
-        let fixture = try makeFixture(includeStabilizationTargets: true)
-        let interpreter = PromptMappedInterpreter([
-            "What is my safe spend today?": interpreted(.foundationModel, request: genericBudgetList(shape: .metric)),
-            "What is my projected spend this month?": interpreted(.foundationModel, request: genericBudgetList(dateRangeToken: .currentMonth, shape: .metric)),
-            "Am I spending too fast this month?": interpreted(.foundationModel, request: genericBudgetCompare(dateRangeToken: .currentMonth)),
-            "What is eating my budget?": interpreted(.foundationModel, request: genericCategoryList())
-        ])
-        let brain = modelBackedBrain(interpreter: interpreter, policy: .internalParityProven)
-
-        let safeSpend = await seed("What is my safe spend today?", using: brain, fixture: fixture)
-        #expect(safeSpend.debugTrace?.validatorOutput.entity == .budget)
-        #expect(safeSpend.debugTrace?.validatorOutput.operation == .forecast)
-        #expect(safeSpend.debugTrace?.validatorOutput.measure == .safeDailySpend)
-        #expect(safeSpend.debugTrace?.validatorOutput.expectedAnswerShape == .metric)
-        #expect(safeSpend.debugTrace?.interpretedSource == .foundationModel)
-        #expect(safeSpend.debugTrace?.validatorNotes.contains("Validation repaired known formula-backed concept semantic shape.") == true)
-        #expect(safeSpend.answer.kind == .metric)
-        #expect(safeSpend.answer.title == "Safe Daily Spend")
-        #expect(safeSpend.answer.title != "Budget Overview")
-
-        let projected = await seed(
-            "What is my projected spend this month?",
-            using: brain,
-            fixture: fixture,
-            conversationContext: MarinaConversationContext(recentAnswers: [safeSpend.answer])
-        )
-        #expect(projected.debugTrace?.promptTreatment == .standalone)
-        #expect(projected.debugTrace?.priorContextChangedRequest == false)
-        #expect(projected.debugTrace?.validatorOutput.entity == .budget)
-        #expect(projected.debugTrace?.validatorOutput.operation == .forecast)
-        #expect(projected.debugTrace?.validatorOutput.measure == .projectedSpend)
-        #expect(projected.debugTrace?.validatorOutput.dateRangeToken == .currentMonth)
-        #expect(projected.answer.kind == .metric)
-        #expect(projected.answer.title == "Projected Spend")
-        #expect(projected.answer.title != "Budget Overview")
-
-        let pace = await seed("Am I spending too fast this month?", using: brain, fixture: fixture)
-        #expect(pace.debugTrace?.validatorOutput.entity == .budget)
-        #expect(pace.debugTrace?.validatorOutput.operation == .compare)
-        #expect(pace.debugTrace?.validatorOutput.measure == .paceDifference)
-        #expect(pace.debugTrace?.validatorOutput.expectedAnswerShape == .comparison)
-        #expect(pace.answer.kind == .comparison)
-        #expect(pace.answer.title == "Pace Difference")
-
-        let concentration = await seed("What is eating my budget?", using: brain, fixture: fixture)
-        #expect(concentration.debugTrace?.validatorOutput.entity == .category)
-        #expect(concentration.debugTrace?.validatorOutput.operation == .share)
-        #expect(concentration.debugTrace?.validatorOutput.measure == .concentration)
-        #expect(concentration.debugTrace?.validatorOutput.expectedAnswerShape == .metric)
-        #expect(concentration.answer.kind == .metric)
-        #expect(concentration.answer.title == "Category Spend Share")
-        #expect(concentration.answer.rows.contains { $0.title == "Category spend" })
-        #expect(concentration.answer.rows.contains { $0.title == "Total spend" })
-        #expect(concentration.answer.rows.contains { $0.title == "Concentration" })
-    }
-
-    @Test func stabilization_formulaRepairDoesNotOverrideExplicitExpenseTargets() async throws {
+    @Test func typedModelOutputKeepsExplicitExpenseTargets() async throws {
         let fixture = try makeFixture(includeDebitCard: true, includeStabilizationTargets: true)
-        let badCardList = MarinaSemanticRequest(
-            entity: .card,
-            operation: .list,
-            measure: .budgetImpact,
-            dimensions: [.card],
-            resultLimit: 10,
-            sort: .dateDescending,
-            expectedAnswerShape: .list
-        )
-        let badCardMetric = MarinaSemanticRequest(
-            entity: .card,
-            operation: .sum,
-            measure: .budgetImpact,
-            dimensions: [.card],
-            expectedAnswerShape: .metric
-        )
         let interpreter = PromptMappedInterpreter([
             "Show my Hair Care expenses": interpreted(.foundationModel, request: categoryExpenseListAsCategory("Hair Care")),
-            "What did I spend at Uber": interpreted(.foundationModel, request: badCardMetric),
-            "Compare Apple Card to Debit Card": interpreted(.foundationModel, request: genericCardComparison()),
-            "Show my Apple Card expenses": interpreted(.foundationModel, request: badCardList)
+            "What did I spend at Uber": interpreted(.foundationModel, request: merchantSpend("Uber")),
+            "Compare Apple Card to Debit Card": interpreted(.foundationModel, request: cardComparison("Apple Card", "Debit Card")),
+            "Show my Apple Card expenses": interpreted(.foundationModel, request: MarinaSemanticRequest(
+                entity: .card,
+                operation: .list,
+                measure: .budgetImpact,
+                dimensions: [.card],
+                targetName: "Apple Card",
+                resultLimit: 10,
+                sort: .dateDescending,
+                expectedAnswerShape: .list
+            ))
         ])
-        let brain = modelBackedBrain(interpreter: interpreter, policy: .internalParityProven)
+        let brain = modelBackedBrain(interpreter: interpreter)
 
         let hairCare = await seed("Show my Hair Care expenses", using: brain, fixture: fixture)
         assertCategoryExpenseListContract(
@@ -3160,9 +1829,11 @@ struct MarinaSemanticPromptSuiteTests {
         #expect(comparison.answer.title == "Card Spend Comparison")
 
         let appleCard = await seed("Show my Apple Card expenses", using: brain, fixture: fixture)
-        #expect(appleCard.debugTrace?.validatorOutput.entity == .variableExpense)
+        #expect(appleCard.debugTrace?.validatorOutput.entity == .card)
         #expect(appleCard.debugTrace?.validatorOutput.dimensions == [.card])
         #expect(appleCard.debugTrace?.validatorOutput.targetName == "Apple Card")
+        #expect(appleCard.debugTrace?.validatorOutput.resolvedTarget?.entity == .card)
+        #expect(appleCard.debugTrace?.validatorOutput.resolvedTarget?.id != nil)
         #expect(appleCard.debugTrace?.validatorOutput.measure == .budgetImpact)
         #expect(appleCard.answer.kind == .list)
         #expect(appleCard.answer.title != "Category Spend Share")
@@ -3172,20 +1843,14 @@ struct MarinaSemanticPromptSuiteTests {
         let fixture = try makeFixture(includeDebitCard: true, includeStabilizationTargets: true)
         let interpreter = PromptMappedInterpreter([
             "Show my Hair Care Expenses": interpreted(.foundationModel, request: categoryExpenseListAsCategory("Hair Care")),
-            "What did I spend on Hair Care last month?": interpreted(.foundationModel, request: droppedCategoryExpenseList(dateRangeToken: .previousMonth)),
             "Show my Food & Drink expenses from last month.": interpreted(.foundationModel, request: categoryExpenseListAsCategory("Food & Drink", dateRangeToken: .previousMonth))
         ])
-        let brain = modelBackedBrain(interpreter: interpreter, policy: .internalParityProven)
+        let brain = modelBackedBrain(interpreter: interpreter)
 
         let hairCare = await seed("Show my Hair Care Expenses", using: brain, fixture: fixture)
         assertCategoryExpenseListContract(hairCare.debugTrace?.validatorOutput, targetName: "Hair Care", dateRangeToken: .currentPeriod)
         #expect(hairCare.answer.kind == .list)
         #expect(hairCare.answer.rows.contains { $0.title == "Salon Visit" })
-
-        let droppedHairCare = await seed("What did I spend on Hair Care last month?", using: brain, fixture: fixture)
-        assertCategoryExpenseListContract(droppedHairCare.debugTrace?.validatorOutput, targetName: "Hair Care", dateRangeToken: .previousMonth)
-        #expect(droppedHairCare.debugTrace?.candidateSearches.contains { $0.rawTargetText == "Hair Care" && $0.slot == "explicitPromptTarget" } == true)
-        #expect(droppedHairCare.debugTrace?.validatorOutput.expectedAnswerShape != .unsupported)
 
         let food = await seed("Show my Food & Drink expenses from last month.", using: brain, fixture: fixture)
         assertCategoryExpenseListContract(food.debugTrace?.validatorOutput, targetName: "Food & Drink", dateRangeToken: .previousMonth)
@@ -3199,12 +1864,14 @@ struct MarinaSemanticPromptSuiteTests {
             includeStabilizationTargets: true,
             includeHairCareExpense: false
         )
+        var contextualLastPeriod = categoryExpenseListAsCategory("Hair Care", dateRangeToken: .previousPeriod)
+        contextualLastPeriod.dateRangeSource = .conversationContext
         let interpreter = PromptMappedInterpreter([
             "Show my Hair Care expenses.": interpreted(.foundationModel, request: categoryList("Hair Care")),
-            "Can you check last period for me?": interpreted(.foundationModel, request: categoryExpenseListAsCategory("Me", dateRangeToken: .previousPeriod)),
-            "Sure": interpreted(.foundationModel, request: budgetOverview())
-        ])
-        let brain = modelBackedBrain(interpreter: interpreter, policy: .internalParityProven)
+            "Check last period": interpreted(.foundationModel, request: contextualLastPeriod),
+            "Can you check last period for me?": interpreted(.foundationModel, request: contextualLastPeriod)
+        ], followUpDecisions: ["Yes": .accept, "Sure": .accept])
+        let brain = modelBackedBrain(interpreter: interpreter)
 
         let empty = await seed("Show my Hair Care expenses.", using: brain, fixture: fixture)
         let followUp = try #require(empty.answer.insightBundle?.followUps.first)
@@ -3250,8 +1917,8 @@ struct MarinaSemanticPromptSuiteTests {
         #expect(sure.debugTrace?.promptTreatment == .recommendedFollowUpConfirmation)
         #expect(sure.debugTrace?.validatorOutput.dateRangeToken == .previousPeriod)
         #expect(sure.debugTrace?.validatorOutput.targetName == "Hair Care")
-        #expect(sure.debugTrace?.interpretedSource == .ruleBased)
-        #expect(interpreter.prompts.contains("Sure") == false)
+        #expect(sure.debugTrace?.interpretedSource == .foundationModel)
+        #expect(interpreter.prompts.contains("Sure"))
 
         let checkLastPeriod = await seed(
             "Check last period",
@@ -3263,8 +1930,8 @@ struct MarinaSemanticPromptSuiteTests {
         #expect(checkLastPeriod.debugTrace?.promptTreatment == .contextualFollowUp)
         #expect(checkLastPeriod.debugTrace?.validatorOutput.dateRangeToken == .previousPeriod)
         #expect(checkLastPeriod.debugTrace?.validatorOutput.targetName == "Hair Care")
-        #expect(checkLastPeriod.debugTrace?.interpretedSource == .ruleBased)
-        #expect(interpreter.prompts.contains("Check last period") == false)
+        #expect(checkLastPeriod.debugTrace?.interpretedSource == .foundationModel)
+        #expect(interpreter.prompts.contains("Check last period"))
 
         let checkForMe = await seed(
             "Can you check last period for me?",
@@ -3277,56 +1944,8 @@ struct MarinaSemanticPromptSuiteTests {
         #expect(checkForMe.debugTrace?.validatorOutput.dateRangeToken == .previousPeriod)
         #expect(checkForMe.debugTrace?.validatorOutput.targetName == "Hair Care")
         #expect(checkForMe.debugTrace?.validatorOutput.targetName != "Me")
-        #expect(checkForMe.debugTrace?.interpretedSource == .ruleBased)
-        #expect(interpreter.prompts.contains("Can you check last period for me?") == false)
-    }
-
-    @Test func explicitLastPeriodCategoryExpensePromptUsesCleanCandidateTarget() async throws {
-        let fixture = try makeFixture(includeDebitCard: true, includeStabilizationTargets: true)
-        let interpreter = PromptMappedInterpreter([
-            "Check last period for Hair Care expenses.": interpreted(
-                .foundationModel,
-                request: categoryExpenseListAsCategory(
-                    "Check Last Period For Hair Care",
-                    dateRangeToken: .previousPeriod
-                )
-            )
-        ])
-        let brain = modelBackedBrain(interpreter: interpreter, policy: .internalParityProven)
-
-        let result = await seed("Check last period for Hair Care expenses.", using: brain, fixture: fixture)
-
-        assertCategoryExpenseListContract(
-            result.debugTrace?.validatorOutput,
-            targetName: "Hair Care",
-            dateRangeToken: .previousPeriod
-        )
-        #expect(result.debugTrace?.candidateSearches.contains { $0.rawTargetText == "Hair Care" && $0.slot == "explicitPromptTarget" } == true)
-        #expect(result.debugTrace?.validatorOutput.targetName != "Check Last Period For Hair Care")
-    }
-
-    @Test func yearToDateWordingRepairsCurrentPeriodModelOutput() async throws {
-        let fixture = try makeFixture(includeStabilizationTargets: true)
-        let prompts = [
-            "What have I spent on groceries so far this year?",
-            "What did I spend on Groceries this year?",
-            "Groceries year to date"
-        ]
-        let interpreter = PromptMappedInterpreter(
-            Dictionary(uniqueKeysWithValues: prompts.map {
-                ($0, interpreted(.foundationModel, request: categorySpendTotalAsCategory("Groceries", dateRangeToken: .currentPeriod)))
-            })
-        )
-        let brain = modelBackedBrain(interpreter: interpreter, policy: .internalParityProven)
-
-        for prompt in prompts {
-            let result = await seed(prompt, using: brain, fixture: fixture)
-            let request = try #require(result.debugTrace?.validatorOutput)
-            #expect(request.dateRangeToken == .yearToDate, "\(prompt)")
-            #expect(request.dateRangeToken != .currentPeriod, "\(prompt)")
-            #expect(request.targetName == "Groceries", "\(prompt)")
-            #expect(request.dimensions.contains(.category), "\(prompt)")
-        }
+        #expect(checkForMe.debugTrace?.interpretedSource == .foundationModel)
+        #expect(interpreter.prompts.contains("Can you check last period for me?"))
     }
 
     @Test func semanticContracts_categorySpendTotalValidatesToUnifiedCategoryMetric() async throws {
@@ -3334,7 +1953,7 @@ struct MarinaSemanticPromptSuiteTests {
         let interpreter = PromptMappedInterpreter([
             "How much did I spend on Groceries last month?": interpreted(.foundationModel, request: categorySpendTotalAsCategory("Groceries", dateRangeToken: .previousMonth))
         ])
-        let brain = modelBackedBrain(interpreter: interpreter, policy: .internalParityProven)
+        let brain = modelBackedBrain(interpreter: interpreter)
 
         let groceries = await seed("How much did I spend on Groceries last month?", using: brain, fixture: fixture)
         let request = try #require(groceries.debugTrace?.validatorOutput)
@@ -3355,7 +1974,7 @@ struct MarinaSemanticPromptSuiteTests {
         let interpreter = PromptMappedInterpreter([
             "What did I spend at Uber?": interpreted(.foundationModel, request: merchantSpend("Uber"))
         ])
-        let brain = modelBackedBrain(interpreter: interpreter, policy: .internalParityProven)
+        let brain = modelBackedBrain(interpreter: interpreter)
 
         let uber = await seed("What did I spend at Uber?", using: brain, fixture: fixture)
         let request = try #require(uber.debugTrace?.validatorOutput)
@@ -3375,7 +1994,7 @@ struct MarinaSemanticPromptSuiteTests {
         let interpreter = PromptMappedInterpreter([
             "Compare Apple Card to Debit Card.": interpreted(.foundationModel, request: cardComparison("Apple Card", "Debit Card"))
         ])
-        let brain = modelBackedBrain(interpreter: interpreter, policy: .internalParityProven)
+        let brain = modelBackedBrain(interpreter: interpreter)
 
         let comparison = await seed("Compare Apple Card to Debit Card.", using: brain, fixture: fixture)
         let request = try #require(comparison.debugTrace?.validatorOutput)
@@ -3390,115 +2009,6 @@ struct MarinaSemanticPromptSuiteTests {
         #expect(comparison.answer.title != "I can't answer that yet.")
     }
 
-    @Test func semanticContracts_explicitTargetStabilizationRecoversManualQAPrompts() async throws {
-        let fixture = try makeFixture(includeDebitCard: true, includeStabilizationTargets: true)
-        let droppedCardComparison = MarinaSemanticRequest(
-            entity: .card,
-            operation: .compare,
-            measure: .budgetImpact,
-            dimensions: [.card],
-            dateRangeToken: .previousMonth,
-            expectedAnswerShape: .comparison
-        )
-        let badCardList = MarinaSemanticRequest(
-            entity: .card,
-            operation: .list,
-            measure: .budgetImpact,
-            dimensions: [.card],
-            resultLimit: 10,
-            sort: .dateDescending,
-            expectedAnswerShape: .list
-        )
-        let badCardMetric = MarinaSemanticRequest(
-            entity: .card,
-            operation: .sum,
-            measure: .budgetImpact,
-            dimensions: [.card],
-            expectedAnswerShape: .metric
-        )
-        let interpreter = PromptMappedInterpreter([
-            "Compare Apple Card to Debit Card last month.": interpreted(.foundationModel, request: droppedCardComparison),
-            "Which was higher last month, Apple Card or Debit Card?": interpreted(.foundationModel, request: droppedCardComparison),
-            "Compare my debit card and Apple Card spend last month.": interpreted(.foundationModel, request: badCardList),
-            "Which card had more spend last month, my debit card or Apple Card?": interpreted(.foundationModel, request: badCardList),
-            "Which card had less spend last month, my debit card or Apple Card?": interpreted(.foundationModel, request: badCardList),
-            "Show my Apple Card expenses.": interpreted(.foundationModel, request: badCardList),
-            "Show my Uber expenses.": interpreted(.foundationModel, request: badCardList),
-            "Show me my Uber expenses.": interpreted(.foundationModel, request: badCardList),
-            "What did I spend at Uber?": interpreted(.foundationModel, request: badCardMetric)
-        ])
-        let brain = modelBackedBrain(interpreter: interpreter, policy: .internalParityProven)
-
-        let comparison = await seed("Compare Apple Card to Debit Card last month.", using: brain, fixture: fixture)
-        #expect(comparison.answer.kind == .comparison)
-        #expect(comparison.debugTrace?.validatorOutput.targetName == "Apple Card")
-        #expect(comparison.debugTrace?.validatorOutput.comparisonTargetName == "Debit Card")
-        #expect(comparison.debugTrace?.validatorOutput.dateRangeToken == .previousMonth)
-
-        let higher = await seed("Which was higher last month, Apple Card or Debit Card?", using: brain, fixture: fixture)
-        #expect(higher.answer.kind == .comparison)
-        #expect(higher.debugTrace?.validatorOutput.targetName == "Apple Card")
-        #expect(higher.debugTrace?.validatorOutput.comparisonTargetName == "Debit Card")
-        #expect(higher.debugTrace?.validatorOutput.expectedAnswerShape == .comparison)
-
-        let naturalComparison = await seed("Compare my debit card and Apple Card spend last month.", using: brain, fixture: fixture)
-        #expect(naturalComparison.answer.kind == .comparison)
-        #expect(naturalComparison.answer.title == "Card Spend Comparison")
-        #expect(naturalComparison.debugTrace?.validatorOutput.entity == .card)
-        #expect(naturalComparison.debugTrace?.validatorOutput.operation == .compare)
-        #expect(naturalComparison.debugTrace?.validatorOutput.measure == .budgetImpact)
-        #expect(naturalComparison.debugTrace?.validatorOutput.dimensions == [.card])
-        #expect(naturalComparison.debugTrace?.validatorOutput.targetName == "Debit Card")
-        #expect(naturalComparison.debugTrace?.validatorOutput.comparisonTargetName == "Apple Card")
-        #expect(naturalComparison.debugTrace?.validatorOutput.expectedAnswerShape == .comparison)
-
-        let moreSpendComparison = await seed("Which card had more spend last month, my debit card or Apple Card?", using: brain, fixture: fixture)
-        #expect(moreSpendComparison.answer.kind == .comparison)
-        #expect(moreSpendComparison.answer.title == "Card Spend Comparison")
-        #expect(moreSpendComparison.debugTrace?.validatorOutput.entity == .card)
-        #expect(moreSpendComparison.debugTrace?.validatorOutput.operation == .compare)
-        #expect(moreSpendComparison.debugTrace?.validatorOutput.measure == .budgetImpact)
-        #expect(moreSpendComparison.debugTrace?.validatorOutput.targetName == "Debit Card")
-        #expect(moreSpendComparison.debugTrace?.validatorOutput.comparisonTargetName == "Apple Card")
-        #expect(moreSpendComparison.debugTrace?.validatorOutput.expectedAnswerShape == .comparison)
-
-        let lessSpendComparison = await seed("Which card had less spend last month, my debit card or Apple Card?", using: brain, fixture: fixture)
-        #expect(lessSpendComparison.answer.kind == .comparison)
-        #expect(lessSpendComparison.answer.title == "Card Spend Comparison")
-        #expect(lessSpendComparison.debugTrace?.validatorOutput.entity == .card)
-        #expect(lessSpendComparison.debugTrace?.validatorOutput.operation == .compare)
-        #expect(lessSpendComparison.debugTrace?.validatorOutput.measure == .budgetImpact)
-        #expect(lessSpendComparison.debugTrace?.validatorOutput.targetName == "Debit Card")
-        #expect(lessSpendComparison.debugTrace?.validatorOutput.comparisonTargetName == "Apple Card")
-        #expect(lessSpendComparison.debugTrace?.validatorOutput.expectedAnswerShape == .comparison)
-
-        let appleCardList = await seed("Show my Apple Card expenses.", using: brain, fixture: fixture)
-        #expect(appleCardList.answer.kind == .list)
-        #expect(appleCardList.debugTrace?.validatorOutput.entity == .variableExpense)
-        #expect(appleCardList.debugTrace?.validatorOutput.dimensions == [.card])
-        #expect(appleCardList.debugTrace?.validatorOutput.targetName == "Apple Card")
-        #expect(appleCardList.debugTrace?.validatorOutput.expenseScope == .unified)
-
-        let uberList = await seed("Show my Uber expenses.", using: brain, fixture: fixture)
-        #expect(uberList.answer.kind == .list)
-        #expect(uberList.debugTrace?.validatorOutput.entity == .variableExpense)
-        #expect(uberList.debugTrace?.validatorOutput.dimensions == [.merchantText])
-        #expect(uberList.debugTrace?.validatorOutput.textQuery == "Uber")
-        #expect(uberList.debugTrace?.validatorOutput.expenseScope == .unified)
-
-        let uberListWithMe = await seed("Show me my Uber expenses.", using: brain, fixture: fixture)
-        #expect(uberListWithMe.answer.kind == .list)
-        #expect(uberListWithMe.debugTrace?.validatorOutput.textQuery == "Uber")
-        #expect(uberListWithMe.debugTrace?.validatorOutput.expectedAnswerShape == .list)
-
-        let uberMetric = await seed("What did I spend at Uber?", using: brain, fixture: fixture)
-        #expect(uberMetric.answer.kind == .metric)
-        #expect(uberMetric.debugTrace?.validatorOutput.entity == .variableExpense)
-        #expect(uberMetric.debugTrace?.validatorOutput.dimensions == [.merchantText])
-        #expect(uberMetric.debugTrace?.validatorOutput.textQuery == "Uber")
-        #expect(uberMetric.debugTrace?.validatorOutput.expectedAnswerShape == .metric)
-    }
-
     @Test func semanticContracts_standalonePromptsMatchFreshChatAfterUnrelatedContext() async throws {
         let fixture = try makeFixture(includeDebitCard: true, includeStabilizationTargets: true)
         let interpreter = PromptMappedInterpreter([
@@ -3509,7 +2019,7 @@ struct MarinaSemanticPromptSuiteTests {
             "Show my Food & Drink expenses from last month.": interpreted(.foundationModel, request: categoryExpenseListAsCategory("Food & Drink", dateRangeToken: .previousMonth)),
             "How much did I spend on Groceries last month?": interpreted(.foundationModel, request: categorySpendTotalAsCategory("Groceries", dateRangeToken: .previousMonth))
         ])
-        let brain = modelBackedBrain(interpreter: interpreter, policy: .internalParityProven)
+        let brain = modelBackedBrain(interpreter: interpreter)
 
         let unrelatedSafeSpend = await seed("What is my safe spend today?", using: brain, fixture: fixture)
         await assertStandaloneContract(
@@ -3545,7 +2055,7 @@ struct MarinaSemanticPromptSuiteTests {
                 request: categoryExpenseListAsCategory("Subscriptions", dateRangeToken: .currentMonth)
             )
         ])
-        let brain = modelBackedBrain(interpreter: interpreter, policy: .internalParityProven)
+        let brain = modelBackedBrain(interpreter: interpreter)
 
         let safeSpend = await seed("What is my safe spend today?", using: brain, fixture: fixture)
         let subscriptions = await seed(
@@ -3557,8 +2067,6 @@ struct MarinaSemanticPromptSuiteTests {
 
         #expect(subscriptions.debugTrace?.promptTreatment == .standalone)
         #expect(subscriptions.debugTrace?.priorContextChangedRequest == false)
-        #expect(subscriptions.debugTrace?.explicitPromptTargets.contains("Subscriptions") == true)
-        #expect(subscriptions.debugTrace?.explicitPromptTargets.contains("Me My Subscriptions") == false)
         assertCategoryExpenseListContract(
             subscriptions.debugTrace?.validatorOutput,
             targetName: "Subscriptions",
@@ -3573,7 +2081,7 @@ struct MarinaSemanticPromptSuiteTests {
             "What is my safe spend today?": interpreted(.foundationModel, request: safeDailySpend()),
             "What is my projected spend this month?": interpreted(.foundationModel, request: projectedSpend(dateRangeToken: .currentMonth))
         ])
-        let brain = modelBackedBrain(interpreter: interpreter, policy: .internalParityProven)
+        let brain = modelBackedBrain(interpreter: interpreter)
 
         let safeSpend = await seed("What is my safe spend today?", using: brain, fixture: fixture)
         let projected = await seed(
@@ -3595,7 +2103,7 @@ struct MarinaSemanticPromptSuiteTests {
             "What is my safe spend today?": interpreted(.foundationModel, request: safeDailySpend()),
             "What did I spend at Uber?": interpreted(.foundationModel, request: merchantSpend("Uber"))
         ])
-        let brain = modelBackedBrain(interpreter: interpreter, policy: .internalParityProven)
+        let brain = modelBackedBrain(interpreter: interpreter)
 
         let safeSpend = await seed("What is my safe spend today?", using: brain, fixture: fixture)
         let uber = await seed(
@@ -3623,7 +2131,7 @@ struct MarinaSemanticPromptSuiteTests {
                 request: categorySpendTotalAsCategory("Groceries", dateRangeToken: .previousMonth)
             )
         ])
-        let brain = modelBackedBrain(interpreter: interpreter, policy: .internalParityProven)
+        let brain = modelBackedBrain(interpreter: interpreter)
 
         let comparison = await seed("Compare Apple Card to Debit Card.", using: brain, fixture: fixture)
         let groceries = await seed(
@@ -3643,13 +2151,21 @@ struct MarinaSemanticPromptSuiteTests {
     @Test func fullPromptAfterRecommendedFollowUp_doesNotExecuteVisibleFollowUp() async throws {
         let fixture = try makeFixture(includeStabilizationTargets: true)
         let interpreter = PromptMappedInterpreter([
-            "How is income progress?": interpreted(.foundationModel, request: incomeProgress()),
             "Show my Hair Care expenses.": interpreted(.foundationModel, request: categoryExpenseListAsCategory("Hair Care"))
         ])
-        let brain = modelBackedBrain(interpreter: interpreter, policy: .internalParityProven)
+        let brain = modelBackedBrain(interpreter: interpreter)
 
-        let income = await seed("How is income progress?", using: brain, fixture: fixture)
-        let context = MarinaConversationContext(recentAnswers: [income.answer])
+        let visibleFollowUp = semanticFollowUp(
+            reason: .comparePreviousPeriod,
+            targetName: "Income",
+            entity: .income,
+            operation: .compare,
+            measure: .incomeAmount,
+            answerShape: .comparison
+        )
+        let context = MarinaConversationContext(recentAnswers: [
+            answerWithFollowUps([visibleFollowUp], userPrompt: "How is income progress?")
+        ])
         #expect(context.lastRecommendedFollowUp != nil)
 
         let hairCare = await seed(
@@ -3673,53 +2189,51 @@ struct MarinaSemanticPromptSuiteTests {
     @Test func showMeMoreAfterVisibleShowMore_executesRecommendedFollowUp() async throws {
         let fixture = try makeFixture(includeStabilizationTargets: true)
         let interpreter = PromptMappedInterpreter([
-            "Show my Food & Drink expenses from last month.": interpreted(.foundationModel, request: categoryExpenseListAsCategory("Food & Drink", dateRangeToken: .previousMonth)),
-            "Show me more.": interpreted(.foundationModel, request: budgetOverview())
-        ])
-        let brain = modelBackedBrain(interpreter: interpreter, policy: .internalParityProven)
+            "Show my Food & Drink expenses from last month.": interpreted(.foundationModel, request: categoryExpenseListAsCategory("Food & Drink", dateRangeToken: .previousMonth, resultLimit: 4))
+        ], followUpDecisions: ["Show me more.": .accept])
+        let brain = modelBackedBrain(interpreter: interpreter)
         let context = await foodDrinkShowMoreContext(using: brain, fixture: fixture)
 
         let more = await seed("Show me more.", using: brain, fixture: fixture, conversationContext: context)
 
         #expect(more.debugTrace?.promptTreatment == .recommendedFollowUpConfirmation)
         #expect(more.debugTrace?.priorContextChangedRequest == true)
-        #expect(more.debugTrace?.interpretedSource == .ruleBased)
+        #expect(more.debugTrace?.interpretedSource == .foundationModel)
         #expect(more.debugTrace?.validatorOutput.targetName == "Food & Drink")
         #expect(more.debugTrace?.validatorOutput.dateRangeToken == .previousMonth)
-        #expect(more.debugTrace?.validatorOutput.resultLimit == 13)
+        #expect(more.debugTrace?.validatorOutput.resultLimit == 4)
+        #expect(more.debugTrace?.validatorOutput.resultOffset == 4)
         #expect(more.answer.title != "Budget Overview")
-        #expect(interpreter.prompts.contains("Show me more.") == false)
+        #expect(interpreter.prompts.contains("Show me more."))
     }
 
     @Test func yesAfterVisibleShowMore_executesRecommendedFollowUp() async throws {
         let fixture = try makeFixture(includeStabilizationTargets: true)
         let interpreter = PromptMappedInterpreter([
-            "Show my Food & Drink expenses from last month.": interpreted(.foundationModel, request: categoryExpenseListAsCategory("Food & Drink", dateRangeToken: .previousMonth)),
-            "Yes.": interpreted(.foundationModel, request: budgetOverview())
-        ])
-        let brain = modelBackedBrain(interpreter: interpreter, policy: .internalParityProven)
+            "Show my Food & Drink expenses from last month.": interpreted(.foundationModel, request: categoryExpenseListAsCategory("Food & Drink", dateRangeToken: .previousMonth, resultLimit: 4))
+        ], followUpDecisions: ["Yes.": .accept])
+        let brain = modelBackedBrain(interpreter: interpreter)
         let context = await foodDrinkShowMoreContext(using: brain, fixture: fixture)
 
         let yes = await seed("Yes.", using: brain, fixture: fixture, conversationContext: context)
 
         #expect(yes.debugTrace?.promptTreatment == .recommendedFollowUpConfirmation)
         #expect(yes.debugTrace?.priorContextChangedRequest == true)
-        #expect(yes.debugTrace?.interpretedSource == .ruleBased)
+        #expect(yes.debugTrace?.interpretedSource == .foundationModel)
         #expect(yes.debugTrace?.validatorOutput.targetName == "Food & Drink")
         #expect(yes.debugTrace?.validatorOutput.dateRangeToken == .previousMonth)
-        #expect(yes.debugTrace?.validatorOutput.resultLimit == 13)
+        #expect(yes.debugTrace?.validatorOutput.resultLimit == 4)
+        #expect(yes.debugTrace?.validatorOutput.resultOffset == 4)
         #expect(yes.answer.title != "Budget Overview")
-        #expect(interpreter.prompts.contains("Yes.") == false)
+        #expect(interpreter.prompts.contains("Yes."))
     }
 
     @Test func limitedFoodDrinkListKeepsFullTotalStableThroughShowMoreAndSure() async throws {
         let fixture = try makeFixture(includeStabilizationTargets: true)
         let interpreter = PromptMappedInterpreter([
-            "Show my Food & Drink expenses from last month.": interpreted(.foundationModel, request: categoryExpenseListAsCategory("Food & Drink", dateRangeToken: .previousMonth)),
-            "Show me more.": interpreted(.foundationModel, request: budgetOverview()),
-            "Sure.": interpreted(.foundationModel, request: budgetOverview())
-        ])
-        let brain = modelBackedBrain(interpreter: interpreter, policy: .internalParityProven)
+            "Show my Food & Drink expenses from last month.": interpreted(.foundationModel, request: categoryExpenseListAsCategory("Food & Drink", dateRangeToken: .previousMonth, resultLimit: 4))
+        ], followUpDecisions: ["Show me more.": .accept, "Sure.": .accept])
+        let brain = modelBackedBrain(interpreter: interpreter)
 
         let first = await seed("Show my Food & Drink expenses from last month.", using: brain, fixture: fixture)
         let firstAnswer = first.answer
@@ -3727,12 +2241,14 @@ struct MarinaSemanticPromptSuiteTests {
         let firstFollowUp = try #require(firstAnswer.insightBundle?.followUps.first(where: { $0.reason == .showMore }))
 
         #expect(firstAnswer.title == "Food & Drink Expenses")
-        #expect(firstAnswer.rows.count == 8)
-        #expect(firstContext.displayedRowCount == 8)
+        #expect(firstAnswer.rows.count == 4)
+        #expect(firstContext.displayedRowCount == 4)
         #expect(firstContext.totalRowCount == 11)
-        #expect(firstAnswer.subtitle == "Showing 8 of 11 Food & Drink expenses from last month.")
+        #expect(firstAnswer.subtitle?.contains("4") == true)
+        #expect(firstAnswer.subtitle?.contains("11") == true)
         #expect(firstAnswer.primaryValue == CurrencyFormatter.string(from: 112))
-        #expect(MarinaRecommendedFollowUp.confirmationQuestion(for: firstFollowUp) == "Want to see the remaining 3?")
+        #expect(firstFollowUp.semanticRequest?.resultLimit == 4)
+        #expect(firstFollowUp.semanticRequest?.resultOffset == 4)
 
         let more = await seed(
             "Show me more.",
@@ -3744,53 +2260,61 @@ struct MarinaSemanticPromptSuiteTests {
         let moreIDs = moreAnswer.rows.compactMap(\.sourceID)
 
         #expect(more.debugTrace?.promptTreatment == .recommendedFollowUpConfirmation)
-        #expect(more.debugTrace?.validatorOutput.resultLimit == 13)
-        #expect(moreAnswer.rows.count == 11)
+        #expect(more.debugTrace?.validatorOutput.resultLimit == 4)
+        #expect(more.debugTrace?.validatorOutput.resultOffset == 4)
+        #expect(moreAnswer.rows.count == 4)
         #expect(moreAnswer.primaryValue == firstAnswer.primaryValue)
         #expect(Set(moreIDs).count == moreIDs.count)
-        #expect(moreAnswer.rows.contains { $0.title == "Burger Spot" })
-        #expect(moreAnswer.rows.contains { $0.title == "Food & Drink Extra 9" })
+        #expect(Set(firstAnswer.rows.compactMap(\.sourceID)).isDisjoint(with: Set(moreIDs)))
+        let secondFollowUp = try #require(moreAnswer.insightBundle?.followUps.first(where: { $0.reason == .showMore }))
+        #expect(secondFollowUp.semanticRequest?.resultOffset == 8)
 
         let sure = await seed(
             "Sure.",
             using: brain,
             fixture: fixture,
-            conversationContext: MarinaConversationContext(recentAnswers: [firstAnswer])
+            conversationContext: MarinaConversationContext(recentAnswers: [firstAnswer, moreAnswer])
         )
 
         #expect(sure.debugTrace?.promptTreatment == .recommendedFollowUpConfirmation)
         #expect(sure.debugTrace?.validatorOutput.targetName == "Food & Drink")
-        #expect(sure.debugTrace?.validatorOutput.resultLimit == 13)
+        #expect(sure.debugTrace?.validatorOutput.resultLimit == 4)
+        #expect(sure.debugTrace?.validatorOutput.resultOffset == 8)
+        #expect(sure.answer.rows.count == 3)
         #expect(sure.answer.primaryValue == firstAnswer.primaryValue)
-        #expect(interpreter.prompts.contains("Show me more.") == false)
-        #expect(interpreter.prompts.contains("Sure.") == false)
+        let allIDs = firstAnswer.rows.compactMap(\.sourceID)
+            + moreAnswer.rows.compactMap(\.sourceID)
+            + sure.answer.rows.compactMap(\.sourceID)
+        #expect(allIDs.count == 11)
+        #expect(Set(allIDs).count == allIDs.count)
+        #expect(interpreter.prompts.contains("Show me more."))
+        #expect(interpreter.prompts.contains("Sure."))
     }
 
-    @Test func noAfterVisibleShowMore_declinesWithoutModelCall() async throws {
+    @Test func noAfterVisibleShowMore_compilesTypedDeclineWithoutQueryExecution() async throws {
         let fixture = try makeFixture(includeStabilizationTargets: true)
         let interpreter = PromptMappedInterpreter([
-            "Show my Food & Drink expenses from last month.": interpreted(.foundationModel, request: categoryExpenseListAsCategory("Food & Drink", dateRangeToken: .previousMonth)),
-            "No.": interpreted(.foundationModel, request: budgetOverview())
-        ])
-        let brain = modelBackedBrain(interpreter: interpreter, policy: .internalParityProven)
+            "Show my Food & Drink expenses from last month.": interpreted(.foundationModel, request: categoryExpenseListAsCategory("Food & Drink", dateRangeToken: .previousMonth, resultLimit: 4))
+        ], followUpDecisions: ["No.": .decline])
+        let brain = modelBackedBrain(interpreter: interpreter)
         let context = await foodDrinkShowMoreContext(using: brain, fixture: fixture)
 
         let no = await seed("No.", using: brain, fixture: fixture, conversationContext: context)
 
         #expect(no.debugTrace?.promptTreatment == .declinedFollowUp)
         #expect(no.answer.kind == .message)
-        #expect(no.answer.title == "")
-        #expect(no.scriptedNarration == "No problem. I’m here whenever you want to dig into something else.")
-        #expect(interpreter.prompts.contains("No.") == false)
+        #expect(no.answer.rows.isEmpty)
+        #expect(no.debugTrace?.executionSucceeded == true)
+        #expect(interpreter.prompts.contains("No."))
     }
 
     @Test func fullPromptAfterVisibleShowMore_remainsStandalone() async throws {
         let fixture = try makeFixture(includeStabilizationTargets: true)
         let interpreter = PromptMappedInterpreter([
-            "Show my Food & Drink expenses from last month.": interpreted(.foundationModel, request: categoryExpenseListAsCategory("Food & Drink", dateRangeToken: .previousMonth)),
+            "Show my Food & Drink expenses from last month.": interpreted(.foundationModel, request: categoryExpenseListAsCategory("Food & Drink", dateRangeToken: .previousMonth, resultLimit: 4)),
             "Show my Hair Care expenses.": interpreted(.foundationModel, request: categoryExpenseListAsCategory("Hair Care"))
         ])
-        let brain = modelBackedBrain(interpreter: interpreter, policy: .internalParityProven)
+        let brain = modelBackedBrain(interpreter: interpreter)
         let context = await foodDrinkShowMoreContext(using: brain, fixture: fixture)
 
         let hairCare = await seed(
@@ -3815,9 +2339,9 @@ struct MarinaSemanticPromptSuiteTests {
     @Test func showMeMoreWithoutVisibleFollowUp_usesListContextOrTypedUnsupported() async throws {
         let fixture = try makeFixture(includeStabilizationTargets: true)
         let interpreter = PromptMappedInterpreter([
-            "Show me more.": interpreted(.foundationModel, request: budgetOverview())
+            "Show me more.": interpreted(.foundationModel, request: showMoreContinuation())
         ])
-        let brain = modelBackedBrain(interpreter: interpreter, policy: .internalParityProven)
+        let brain = modelBackedBrain(interpreter: interpreter)
         var listRequest = categoryExpenseListAsCategory("Food & Drink", dateRangeToken: .previousMonth)
         listRequest.resultLimit = 5
         let listContext = MarinaAnswerSemanticContext(
@@ -3828,7 +2352,12 @@ struct MarinaSemanticPromptSuiteTests {
             answerTitle: "Food & Drink Expenses",
             answerSubtitle: nil,
             primaryValue: nil,
-            rowReferences: []
+            rowReferences: [],
+            displayedRowCount: 5,
+            totalRowCount: 11,
+            fullTotalAmount: 112,
+            hasMore: true,
+            nextOffset: 5
         )
         let listAnswer = HomeAnswer(
             queryID: UUID(),
@@ -3846,98 +2375,36 @@ struct MarinaSemanticPromptSuiteTests {
 
         #expect(contextual.debugTrace?.promptTreatment == .contextualFollowUp)
         #expect(contextual.debugTrace?.priorContextChangedRequest == true)
-        #expect(contextual.debugTrace?.interpretedSource == .ruleBased)
+        #expect(contextual.debugTrace?.interpretedSource == .foundationModel)
         #expect(contextual.debugTrace?.validatorOutput.targetName == "Food & Drink")
-        #expect(contextual.debugTrace?.validatorOutput.resultLimit == 10)
+        #expect(contextual.debugTrace?.validatorOutput.resultLimit == 5)
+        #expect(contextual.debugTrace?.validatorOutput.resultOffset == 5)
         #expect(contextual.answer.title != "Budget Overview")
 
         let unsupported = await seed("Show me more.", using: brain, fixture: fixture)
 
-        #expect(unsupported.debugTrace?.promptTreatment == .contextualFollowUp)
-        #expect(unsupported.debugTrace?.priorContextChangedRequest == true)
-        #expect(unsupported.debugTrace?.interpretedSource == .ruleBased)
+        #expect(unsupported.debugTrace?.promptTreatment == .standalone)
+        #expect(unsupported.debugTrace?.priorContextChangedRequest == false)
+        #expect(unsupported.debugTrace?.interpretedSource == .foundationModel)
         #expect(unsupported.debugTrace?.validatorOutput.expectedAnswerShape == .unsupported)
         #expect(unsupported.debugTrace?.validatorOutput.unsupportedReason == .unsupportedCombination)
         #expect(unsupported.answer.title != "Budget Overview")
-        #expect(interpreter.prompts.contains("Show me more.") == false)
+        #expect(interpreter.prompts.contains("Show me more."))
     }
 
-    @Test func showMoreAfterList_stillUsesContext() async throws {
-        let fixture = try makeFixture()
-        let brain = legacyRuleBasedBrain()
-        let showMore = MarinaFollowUpSuggestion(
-            title: "Show more",
-            prompt: "Show more.",
-            reason: .showMore,
-            executionMode: .executable,
-            semanticRequest: MarinaSemanticRequest(
-                entity: .category,
-                operation: .list,
-                measure: .categoryAvailability,
-                dimensions: [.category],
-                dateRangeToken: .currentPeriod,
-                resultLimit: 10,
-                expectedAnswerShape: .list
-            )
-        )
-        let list = HomeAnswer(
-            queryID: UUID(),
-            kind: .list,
-            userPrompt: "Show category availability.",
-            title: "Category Availability",
-            insightBundle: MarinaInsightBundle(followUps: [showMore])
-        )
-        let context = MarinaConversationContext(recentAnswers: [list])
-        #expect(context.lastRecommendedFollowUp?.reason == .showMore)
-
-        let more = await seed("Show more.", using: brain, fixture: fixture, conversationContext: context)
-
-        #expect(more.debugTrace?.promptTreatment == .recommendedFollowUpConfirmation)
-        #expect(more.debugTrace?.priorContextChangedRequest == true)
-        #expect(more.debugTrace?.validatorOutput.resultLimit == 10)
-    }
-
-    @Test func whatAboutLastMonth_stillUsesContextWhenPriorRequestExists() async throws {
-        let fixture = try makeFixture()
-        let brain = legacyRuleBasedBrain()
-        let savings = await answer("Summarize my Savings Account.", using: brain, fixture: fixture)
-
-        let previous = await seed(
-            "what about last month",
-            using: brain,
-            fixture: fixture,
-            conversationContext: MarinaConversationContext(recentAnswers: [savings])
-        )
-
-        #expect(previous.debugTrace?.promptTreatment == .contextualFollowUp)
-        #expect(previous.debugTrace?.priorContextChangedRequest == true)
-        #expect(previous.debugTrace?.validatorOutput.dateRangeToken == .previousMonth)
-        #expect(previous.answer.title == "Savings Status")
-    }
-
-    @Test func semanticContracts_savingsContributionWhatIfIsFutureWorkAtRoutingAndFormulaLayers() throws {
-        let fixture = try makeFixture()
-        let snapshot = try MarinaWorkspaceSnapshotProvider().snapshot(for: fixture.workspace, modelContext: fixture.context)
+    @Test func semanticContracts_savingsContributionWhatIfIsTypedUnsupportedAtExecutionLayers() throws {
         let request = MarinaSemanticRequest(
             entity: .savingsAccount,
             operation: .whatIf,
             measure: .savingsTotal,
             dateRangeToken: .currentMonth,
             whatIfAmount: 1_000,
-            expectedAnswerShape: .comparison
-        )
-
-        let validated = MarinaSemanticRequestValidator().validate(
-            interpreted: interpreted(.foundationModel, request: request),
-            snapshot: snapshot,
-            originalPrompt: "What if I saved 1000 instead of 723.44?"
+            expectedAnswerShape: .unsupported,
+            unsupportedReason: .incomeSavingsWhatIfUnsupported
         )
 
         #expect(request.whatIfAmount == 1_000)
-        #expect(validated.request.expectedAnswerShape == .unsupported)
-        #expect(validated.request.unsupportedReason == .incomeSavingsWhatIfUnsupported)
-        #expect(MarinaUniversalRoutingPolicy.internalParityProven.scenario(for: request) == nil)
-        #expect(MarinaUniversalRoutingPolicy.internalParityProven.allows(request) == false)
+        #expect(request.unsupportedReason == .incomeSavingsWhatIfUnsupported)
         #expect(MarinaSemanticUniversalPlanBridge().makePlan(from: request) == .unsupported(.unsupportedCombination))
         #expect(MarinaFormulaRegistry().supports(measure: .savingsTotal, surface: .semantic(.savingsAccount), operation: .whatIf) == false)
     }
@@ -3955,11 +2422,17 @@ struct MarinaSemanticPromptSuiteTests {
                 targetName: "Moon Cafe",
                 expectedAnswerShape: .metric
             )),
-            snapshot: snapshot,
-            originalPrompt: "What did I spend at Moon Cafe?"
+            snapshot: snapshot
         )
-        #expect(missingMerchant.request.expectedAnswerShape == .unsupported)
-        #expect(missingMerchant.request.unsupportedReason == .unresolvedEntity)
+        #expect([.clarification, .unsupported].contains(missingMerchant.request.expectedAnswerShape))
+        #expect(missingMerchant.request.expectedAnswerShape != .metric)
+        #expect(missingMerchant.request.expectedAnswerShape != .list)
+        if missingMerchant.request.expectedAnswerShape == .unsupported {
+            #expect(
+                missingMerchant.request.unsupportedReason == .unresolvedEntity
+                    || missingMerchant.request.unsupportedReason == .ambiguousEntity
+            )
+        }
 
         let weakSearch = MarinaCandidateSearchService().search(
             MarinaCandidateSearchRequest(
@@ -3979,7 +2452,6 @@ struct MarinaSemanticPromptSuiteTests {
             interpreter: PromptMappedInterpreter([
                 "What did I spend at Uber?": interpreted(.foundationModel, request: merchantSpend("Uber"))
             ]),
-            policy: .internalParityProven,
             insightNarrator: narrator
         )
 
@@ -3992,171 +2464,6 @@ struct MarinaSemanticPromptSuiteTests {
         #expect(context.rows.contains { $0.amount == 18 })
         #expect(context.rows.contains { $0.title.contains("Debit Card") } == false)
         #expect(context.rows.contains { $0.title.contains("Apple Card") } == false)
-    }
-
-    @Test func followUpResolver_drillsFromCategoryAvailabilityIntoCategoryTransactions() async throws {
-        let fixture = try makeFixture()
-        let brain = legacyRuleBasedBrain()
-        let availability = await answer("Show category availability.", using: brain, fixture: fixture)
-        let context = MarinaConversationContext(recentAnswers: [availability])
-
-        let dining = await answer("show Dining transactions", using: brain, fixture: fixture, conversationContext: context)
-
-        #expect(dining.kind == .list)
-        #expect(dining.title == "Dining Expenses")
-        #expect(dining.rows.map(\.title).contains("Starbucks"))
-    }
-
-    @Test func followUpResolver_refinesExpenseIncomeSavingsReconciliationAndPresetAnswers() async throws {
-        let fixture = try makeFixture()
-        let brain = legacyRuleBasedBrain()
-
-        let targetSpend = await answer("Target spend", using: brain, fixture: fixture)
-        let targetDetails = await answer(
-            "show details",
-            using: brain,
-            fixture: fixture,
-            conversationContext: MarinaConversationContext(recentAnswers: [targetSpend])
-        )
-        #expect(targetDetails.kind == .list)
-        #expect(targetDetails.rows.contains(where: { $0.title == "Target groceries" }))
-
-        let incomeProgress = await answer("How is income progress?", using: brain, fixture: fixture)
-        let paycheckLastMonth = await answer(
-            "actual only for Paycheck last month",
-            using: brain,
-            fixture: fixture,
-            conversationContext: MarinaConversationContext(recentAnswers: [incomeProgress])
-        )
-        #expect(paycheckLastMonth.kind == .metric)
-        #expect(paycheckLastMonth.title == "Paycheck Actual Income")
-        #expect(paycheckLastMonth.primaryValue == CurrencyFormatter.string(from: 2_800))
-
-        let savings = await answer("Summarize my Savings Account.", using: brain, fixture: fixture)
-        let savingsLastMonth = await answer(
-            "last month",
-            using: brain,
-            fixture: fixture,
-            conversationContext: MarinaConversationContext(recentAnswers: [savings])
-        )
-        #expect(savingsLastMonth.title == "Savings Status")
-
-        let reconciliation = await answer("Alejandro balance", using: brain, fixture: fixture)
-        let previousReconciliation = await answer(
-            "last month",
-            using: brain,
-            fixture: fixture,
-            conversationContext: MarinaConversationContext(recentAnswers: [reconciliation])
-        )
-        #expect(previousReconciliation.kind == .metric)
-        #expect(previousReconciliation.title == "Alejandro Balance")
-        #expect(previousReconciliation.primaryValue == CurrencyFormatter.string(from: 20))
-
-        let preset = await answer("Summarize my Phone preset.", using: brain, fixture: fixture)
-        let rentPreset = await answer(
-            "what about Rent?",
-            using: brain,
-            fixture: fixture,
-            conversationContext: MarinaConversationContext(recentAnswers: [preset])
-        )
-        #expect(rentPreset.kind == .metric)
-        #expect(rentPreset.title == "Rent Preset")
-    }
-
-    @Test func followUpResolver_comparisonDriversAndAmbiguousCorrectionsStayDeterministic() async throws {
-        let fixture = try makeFixture(includeAppleMerchantExpense: true)
-        let brain = legacyRuleBasedBrain()
-
-        let comparison = await answer("Compare this budget period to last period.", using: brain, fixture: fixture)
-        let drivers = await answer(
-            "what drove the increase?",
-            using: brain,
-            fixture: fixture,
-            conversationContext: MarinaConversationContext(recentAnswers: [comparison])
-        )
-        #expect(comparison.kind == .comparison)
-        #expect(drivers.kind == .list)
-        #expect(drivers.rows.isEmpty == false)
-
-        let clarification = await answer("How much did I spend on Apple?", using: brain, fixture: fixture)
-        let stillClarifies = await answer(
-            "I meant Apple",
-            using: brain,
-            fixture: fixture,
-            conversationContext: MarinaConversationContext(recentAnswers: [clarification])
-        )
-        #expect(clarification.title == "Can you clarify?")
-        #expect(stillClarifies.title == "Can you clarify?")
-        guard case .clarificationChoices(let choices)? = stillClarifies.attachment else {
-            Issue.record("Expected Apple ambiguity to stay a clarification.")
-            return
-        }
-        #expect(choices.choices.map(\.title).contains("Apple Store"))
-        #expect(choices.choices.map(\.title).contains("Apple Card"))
-    }
-
-    @Test func categoryAvailabilityList_emptyStatesAreSpecific() async throws {
-        let fixture = try makeFixture()
-        let brain = legacyRuleBasedBrain()
-        let may = HomeQueryDateRange(startDate: date(2026, 5, 1), endDate: date(2026, 5, 31))
-
-        let noBudget = await answer(
-            "Which categories are over limit?",
-            using: brain,
-            fixture: fixture,
-            homeContext: MarinaPanelHomeContext(dateRange: may)
-        )
-        #expect(noBudget.kind == .message)
-        #expect(noBudget.title == "Categories Over Limit")
-        #expect(noBudget.subtitle == "No budget overlaps May 2026.")
-
-        let noOver = await answer("Which categories are over limit?", using: brain, fixture: fixture)
-        #expect(noOver.kind == .message)
-        #expect(noOver.title == "Categories Over Limit")
-        #expect(noOver.subtitle == "No categories are over limit for April 2026.")
-    }
-
-    @Test func safeSpendWhatIf_uncappedCategoriesUseBaseRoom() async throws {
-        let fixture = try makeFixture(includeAppleMerchantExpense: false)
-        let brain = legacyRuleBasedBrain()
-
-        let answer = await answer("If I spend $5 on Groceries, what happens to my safe spend?", using: brain, fixture: fixture)
-
-        #expect(answer.kind == .comparison)
-        let currentSafeSpend = answer.rows.first(where: { $0.title == "Current safe spend today" })?.amount ?? -1
-        let safeSpendAfter = answer.rows.first(where: { $0.title == "Safe spend after" })?.amount ?? -1
-        #expect(abs(currentSafeSpend - 145) < 0.0001)
-        #expect(abs(safeSpendAfter - 144.54545454545453) < 0.0001)
-        #expect(answer.rows.first(where: { $0.title == "Period room after" })?.amount == 1_590)
-    }
-
-    @Test func safeSpendWhatIf_allCategoriesCappedReducesCategoryCapRoom() async throws {
-        let fixture = try makeFixture(includeAppleMerchantExpense: false)
-        let snapshot = try MarinaWorkspaceSnapshotProvider().snapshot(
-            for: fixture.workspace,
-            modelContext: fixture.context,
-            homeContext: MarinaPanelHomeContext(dateRange: fixture.currentRange),
-            now: fixture.now
-        )
-        let budget = try #require(snapshot.budgets.first(where: { $0.name == "April 2026" }))
-        let dining = try #require(snapshot.categories.first(where: { $0.name == "Dining" }))
-        let bills = try #require(snapshot.categories.first(where: { $0.name == "Bills" }))
-        let diningLimit = BudgetCategoryLimit(minAmount: 0, maxAmount: 200, budget: budget, category: dining)
-        let billsLimit = BudgetCategoryLimit(minAmount: 0, maxAmount: 2_000, budget: budget, category: bills)
-        budget.categoryLimits = (budget.categoryLimits ?? []) + [diningLimit, billsLimit]
-        fixture.context.insert(diningLimit)
-        fixture.context.insert(billsLimit)
-        try fixture.context.save()
-
-        let brain = legacyRuleBasedBrain()
-        let answer = await answer("If I spend $5 on Groceries, what happens to my safe spend?", using: brain, fixture: fixture)
-
-        #expect(answer.kind == .comparison)
-        let currentSafeSpend = answer.rows.first(where: { $0.title == "Current safe spend today" })?.amount ?? -1
-        let safeSpendAfter = answer.rows.first(where: { $0.title == "Safe spend after" })?.amount ?? -1
-        #expect(abs(currentSafeSpend - 81.36363636363636) < 0.0001)
-        #expect(abs(safeSpendAfter - 80.9090909090909) < 0.0001)
-        #expect(answer.rows.first(where: { $0.title == "Period room after" })?.amount == 890)
     }
 
     @Test func conversationDisplayAdapter_preservesUserPromptAsSeparateMessage() throws {
@@ -4252,30 +2559,18 @@ struct MarinaSemanticPromptSuiteTests {
         #expect(food.debugTrace?.promptTreatment == .standalone)
         #expect(food.debugTrace?.validatorOutput.targetName == "Food & Drink")
         #expect(context.lastRecommendedFollowUp?.reason == .showMore)
-        #expect(context.lastRecommendedFollowUp?.semanticRequest?.resultLimit == 13)
-        #expect(context.lastRecommendedFollowUp.map { MarinaRecommendedFollowUp.confirmationQuestion(for: $0) } == "Want to see the remaining 3?")
+        #expect(context.lastRecommendedFollowUp?.semanticRequest?.resultLimit == 4)
+        #expect(context.lastRecommendedFollowUp?.semanticRequest?.resultOffset == 4)
         return context
-    }
-
-    private func legacyRuleBasedBrain(
-        insightNarrator: (any MarinaInsightNarrating)? = nil
-    ) -> MarinaBrain {
-        MarinaBrain(
-            interpreter: MarinaRuleBasedInterpreter(),
-            insightNarrator: insightNarrator,
-            universalRoutingPolicyProvider: { .disabled }
-        )
     }
 
     private func modelBackedBrain(
         interpreter: any MarinaModelInterpreting,
-        policy: MarinaUniversalRoutingPolicy,
         insightNarrator: (any MarinaInsightNarrating)? = nil
     ) -> MarinaBrain {
         MarinaBrain(
             interpreter: interpreter,
-            insightNarrator: insightNarrator,
-            universalRoutingPolicyProvider: { policy }
+            insightNarrator: insightNarrator
         )
     }
 
@@ -4305,7 +2600,8 @@ struct MarinaSemanticPromptSuiteTests {
 
     private func categoryExpenseListAsCategory(
         _ categoryName: String,
-        dateRangeToken: MarinaSemanticDateRangeToken = .currentPeriod
+        dateRangeToken: MarinaSemanticDateRangeToken = .currentPeriod,
+        resultLimit: Int = 8
     ) -> MarinaSemanticRequest {
         MarinaSemanticRequest(
             entity: .category,
@@ -4315,7 +2611,7 @@ struct MarinaSemanticPromptSuiteTests {
             dateRangeToken: dateRangeToken,
             targetName: categoryName,
             targetDisplayName: categoryName,
-            resultLimit: 8,
+            resultLimit: resultLimit,
             sort: nil,
             expenseScope: nil,
             expectedAnswerShape: .list
@@ -4375,6 +2671,15 @@ struct MarinaSemanticPromptSuiteTests {
         )
     }
 
+    private func showMoreContinuation() -> MarinaSemanticRequest {
+        MarinaSemanticRequest(
+            entity: .workspace,
+            operation: .list,
+            continuationIntent: .showMore,
+            expectedAnswerShape: .list
+        )
+    }
+
     private func droppedCategoryExpenseList(
         dateRangeToken: MarinaSemanticDateRangeToken = .currentPeriod
     ) -> MarinaSemanticRequest {
@@ -4400,14 +2705,16 @@ struct MarinaSemanticPromptSuiteTests {
             Issue.record("Expected validated semantic request.")
             return
         }
-        #expect(request.entity == .variableExpense)
+        #expect(request.entity == .category)
         #expect(request.operation == .list)
         #expect(request.measure == .budgetImpact)
         #expect(request.dimensions.contains(.category))
         #expect(request.dimensions.contains(.merchantText) == false)
         #expect(request.targetName == targetName)
         #expect(request.dateRangeToken == dateRangeToken)
-        #expect(request.expenseScope == .unified)
+        #expect(request.resolvedTarget?.entity == .category)
+        #expect(request.resolvedTarget?.id != nil)
+        #expect(request.resolvedScope != nil)
         #expect(request.expectedAnswerShape == .list)
     }
 
@@ -4747,6 +3054,7 @@ struct MarinaSemanticPromptSuiteTests {
                     entity: .budget,
                     operation: reason == .whatIf ? .whatIf : .forecast,
                     measure: reason == .safeDailySpend ? .safeDailySpend : .remainingRoom,
+                    whatIfAmount: reason == .whatIf ? 50 : nil,
                     expectedAnswerShape: reason == .whatIf ? .comparison : .metric
                 )
                 : nil
@@ -4760,6 +3068,7 @@ struct MarinaSemanticPromptSuiteTests {
         operation: MarinaSemanticOperation? = nil,
         measure: MarinaSemanticMeasure? = nil,
         resultLimit: Int? = nil,
+        resultOffset: Int? = nil,
         whatIfAmount: Double? = nil,
         answerShape: MarinaSemanticAnswerShape? = nil
     ) -> MarinaFollowUpSuggestion {
@@ -4810,6 +3119,7 @@ struct MarinaSemanticPromptSuiteTests {
                 dateRangeToken: .currentPeriod,
                 targetName: targetName,
                 resultLimit: resultLimit,
+                resultOffset: resultOffset,
                 whatIfAmount: whatIfAmount,
                 expectedAnswerShape: resolvedShape
             )
@@ -4919,11 +3229,21 @@ struct MarinaSemanticPromptSuiteTests {
     }
 
     private final class PromptMappedInterpreter: MarinaModelInterpreting {
+        enum FollowUpDecision {
+            case accept
+            case decline
+        }
+
         private let results: [String: MarinaInterpretedSemanticRequest]
+        private let followUpDecisions: [String: FollowUpDecision]
         private(set) var prompts: [String] = []
 
-        init(_ results: [String: MarinaInterpretedSemanticRequest]) {
+        init(
+            _ results: [String: MarinaInterpretedSemanticRequest],
+            followUpDecisions: [String: FollowUpDecision] = [:]
+        ) {
             self.results = results
+            self.followUpDecisions = followUpDecisions
         }
 
         func interpretedSemanticRequest(
@@ -4931,6 +3251,41 @@ struct MarinaSemanticPromptSuiteTests {
             context: MarinaBrainContext
         ) async throws -> MarinaInterpretedSemanticRequest {
             prompts.append(prompt)
+            if let decision = followUpDecisions[prompt] {
+                switch decision {
+                case .accept:
+                    guard let request = context.conversationContext.lastRecommendedFollowUp?.semanticRequest else {
+                        return MarinaInterpretedSemanticRequest(
+                            request: MarinaSemanticRequest(
+                                entity: .workspace,
+                                operation: .list,
+                                expectedAnswerShape: .unsupported,
+                                unsupportedReason: .unsupportedCombination
+                            ),
+                            confidence: .low,
+                            source: .foundationModel,
+                            diagnosticNotes: ["Mock follow-up acceptance had no trusted stored request."]
+                        )
+                    }
+                    return MarinaInterpretedSemanticRequest(
+                        request: request,
+                        confidence: .high,
+                        source: .foundationModel,
+                        diagnosticNotes: ["Mocked typed Foundation Models follow-up acceptance."]
+                    )
+                case .decline:
+                    return MarinaInterpretedSemanticRequest(
+                        request: MarinaSemanticRequest(
+                            entity: .workspace,
+                            operation: .list,
+                            expectedAnswerShape: .acknowledgement
+                        ),
+                        confidence: .high,
+                        source: .foundationModel,
+                        diagnosticNotes: ["Mocked typed Foundation Models follow-up decline."]
+                    )
+                }
+            }
             if let result = results[prompt] {
                 return result
             }

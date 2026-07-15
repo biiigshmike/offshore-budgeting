@@ -1,0 +1,43 @@
+{
+  "configurations" : [
+    {
+      "id" : "16C821E3-26BE-42A4-B9D6-17C7EE1E52DB",
+      "name" : "Physical Device Blocking Gate",
+      "options" : {
+
+      }
+    }
+  ],
+  "defaultOptions" : {
+    "environmentVariableEntries" : [
+      {
+        "key" : "MARINA_SOURCE_DIRTY",
+        "value" : "$(MARINA_SOURCE_DIRTY)"
+      },
+      {
+        "key" : "MARINA_SOURCE_REVISION",
+        "value" : "$(MARINA_SOURCE_REVISION)"
+      }
+    ],
+    "performanceAntipatternCheckerEnabled" : true,
+    "targetForVariableExpansion" : {
+      "containerPath" : "container:OffshoreBudgeting.xcodeproj",
+      "identifier" : "4C96F8502F20523700541774",
+      "name" : "OffshoreBudgeting"
+    }
+  },
+  "testTargets" : [
+    {
+      "parallelizable" : false,
+      "selectedTests" : [
+        "MarinaFoundationModelDeviceGateTests/testBlockingStarterAndQAMatrixOnSupportedPhysicalDevice()"
+      ],
+      "target" : {
+        "containerPath" : "container:OffshoreBudgeting.xcodeproj",
+        "identifier" : "D30000000000000000000008",
+        "name" : "OffshoreBudgetingFoundationModelDeviceTests"
+      }
+    }
+  ],
+  "version" : 1
+}

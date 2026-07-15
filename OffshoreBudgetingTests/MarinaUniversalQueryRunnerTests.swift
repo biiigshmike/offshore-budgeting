@@ -120,6 +120,27 @@ struct MarinaUniversalQueryRunnerTests {
         #expect(rowNames(rows) == ["Coffee Stand"])
     }
 
+    @Test func listPaginationUsesOffsetWithoutChangingFullSetMetadata() throws {
+        let fixture = makeFixture()
+        let page = requireRowsPage(runner.run(
+            plan: MarinaUniversalQueryPlan(
+                entity: .variableExpense,
+                operation: .list,
+                measure: .budgetImpact,
+                offset: 2,
+                limit: 2
+            ),
+            snapshot: fixture.snapshot
+        ))
+
+        #expect(rowNames(page.rows) == ["Kroger", "Trader Joe's"])
+        #expect(page.totalRowCount == 6)
+        #expect(page.fullTotalAmount == 563)
+        #expect(page.offset == 2)
+        #expect(page.hasMore)
+        #expect(page.nextOffset == 4)
+    }
+
     @Test func groupsVariableExpensesByCategoryAndAggregatesBudgetImpact() throws {
         let fixture = makeFixture()
         let groups = requireGroups(runner.run(
@@ -353,6 +374,9 @@ struct MarinaUniversalQueryRunnerTests {
 
     @Test func missingAdapterReturnsTypedUnsupported() throws {
         let fixture = makeFixture()
+        let runner = MarinaUniversalQueryRunner(
+            adapterRegistry: MarinaEntityAdapterRegistry(adapters: [])
+        )
         let result = runner.run(
             plan: MarinaUniversalQueryPlan(entity: .workspace, operation: .list),
             snapshot: fixture.snapshot
@@ -610,6 +634,14 @@ struct MarinaUniversalQueryRunnerTests {
             Issue.record("Expected row result, got \(result).")
             return []
         }
+    }
+
+    private func requireRowsPage(_ result: MarinaUniversalQueryResult) -> MarinaUniversalRowsPage {
+        guard case let .rowsPage(page) = result else {
+            Issue.record("Expected paged row result, got \(result).")
+            return MarinaUniversalRowsPage(rows: [], totalRowCount: 0)
+        }
+        return page
     }
 
     private func requireMetric(_ result: MarinaUniversalQueryResult) -> MarinaUniversalMetricResult {
