@@ -167,14 +167,14 @@ struct MarinaUniversalCatalogValidatorTests {
         #expect(validator.validate(request) == .unsupported(.fieldNotSearchable))
     }
 
-    @Test func stableIDFieldIsFilterable() {
+    @Test func nonFilterableFieldReturnsFieldNotFilterable() {
         let request = MarinaUniversalValidationRequest(
             entity: .variableExpense,
             operation: .list,
             filterFields: [.id]
         )
 
-        #expect(validator.validate(request) == .supported)
+        #expect(validator.validate(request) == .unsupported(.fieldNotFilterable))
     }
 
     @Test func nonGroupableFieldReturnsFieldNotGroupable() {
@@ -188,14 +188,14 @@ struct MarinaUniversalCatalogValidatorTests {
         #expect(validator.validate(request) == .unsupported(.fieldNotGroupable))
     }
 
-    @Test func stableIDFieldIsSortable() {
+    @Test func nonSortableFieldReturnsFieldNotSortable() {
         let request = MarinaUniversalValidationRequest(
             entity: .variableExpense,
             operation: .list,
             sortFields: [.id]
         )
 
-        #expect(validator.validate(request) == .supported)
+        #expect(validator.validate(request) == .unsupported(.fieldNotSortable))
     }
 
     @Test func missingDateRequirementReturnsMissingDateField() {

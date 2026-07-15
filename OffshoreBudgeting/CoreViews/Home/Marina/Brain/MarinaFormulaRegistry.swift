@@ -2,7 +2,6 @@ import Foundation
 
 struct MarinaFormulaRequest: Equatable, Sendable {
     let surface: MarinaUniversalEntitySurface
-    let projection: MarinaSemanticProjection
     let operation: MarinaSemanticOperation
     let measure: MarinaSemanticMeasure
     let dateRange: HomeQueryDateRange?
@@ -10,52 +9,9 @@ struct MarinaFormulaRequest: Equatable, Sendable {
     let filters: [MarinaRowFilter]
     let search: MarinaRowSearchClause?
     let groupBy: MarinaRowGroupTarget?
-    let offset: Int
     let limit: Int?
     let whatIfAmount: Double?
     let categoryAvailabilityFilter: MarinaCategoryAvailabilityFilter?
-    let dateRangeSource: MarinaSemanticDateRangeSource
-    let resolvedTarget: MarinaResolvedEntityReference?
-    let resolvedComparisonTarget: MarinaResolvedEntityReference?
-    let resolvedScope: MarinaResolvedScope?
-
-    init(
-        surface: MarinaUniversalEntitySurface,
-        projection: MarinaSemanticProjection,
-        operation: MarinaSemanticOperation,
-        measure: MarinaSemanticMeasure,
-        dateRange: HomeQueryDateRange?,
-        comparisonDateRange: HomeQueryDateRange?,
-        filters: [MarinaRowFilter],
-        search: MarinaRowSearchClause?,
-        groupBy: MarinaRowGroupTarget?,
-        offset: Int,
-        limit: Int?,
-        whatIfAmount: Double?,
-        categoryAvailabilityFilter: MarinaCategoryAvailabilityFilter?,
-        dateRangeSource: MarinaSemanticDateRangeSource = .defaulted,
-        resolvedTarget: MarinaResolvedEntityReference? = nil,
-        resolvedComparisonTarget: MarinaResolvedEntityReference? = nil,
-        resolvedScope: MarinaResolvedScope? = nil
-    ) {
-        self.surface = surface
-        self.projection = projection
-        self.operation = operation
-        self.measure = measure
-        self.dateRange = dateRange
-        self.comparisonDateRange = comparisonDateRange
-        self.filters = filters
-        self.search = search
-        self.groupBy = groupBy
-        self.offset = max(0, offset)
-        self.limit = limit
-        self.whatIfAmount = whatIfAmount
-        self.categoryAvailabilityFilter = categoryAvailabilityFilter
-        self.dateRangeSource = dateRangeSource
-        self.resolvedTarget = resolvedTarget
-        self.resolvedComparisonTarget = resolvedComparisonTarget
-        self.resolvedScope = resolvedScope
-    }
 }
 
 enum MarinaFormulaResult: Equatable, Sendable {
@@ -122,7 +78,7 @@ struct MarinaFormulaRegistry: Sendable {
     let calendar: Calendar
 
     init(
-        now: Date = .now,
+        now: Date = Date(),
         calendar: Calendar = .current
     ) {
         self.now = now
@@ -153,12 +109,6 @@ struct MarinaFormulaRegistry: Sendable {
             return .unsupported(.measureNotAvailable)
         }
 
-        guard let scopedContext = budgetScopedContext(request: request, snapshot: snapshot) else {
-            return .unsupported(.unsupportedCombination)
-        }
-        let request = scopedContext.request
-        let snapshot = scopedContext.snapshot
-
         switch request.measure {
         case .savingsTotal:
             if request.surface == .semantic(.savingsAccount), request.operation == .forecast {
@@ -169,115 +119,26 @@ struct MarinaFormulaRegistry: Sendable {
             return reconciliationBalance(request: request, snapshot: snapshot)
         case .remainingRoom, .safeDailySpend:
             return safeSpendMetric(request: request, snapshot: snapshot)
-        case .projectedSavings where request.surface == .semantic(.budget) && request.operation == .whatIf:
-            return projectedSavingsWhatIfMetric(request: request, snapshot: snapshot)
         case .burnRate,
              .projectedSpend,
              .paceDifference,
              .coverageRatio:
             return budgetPaceMetric(request: request, snapshot: snapshot)
-        case .incomeAmount where request.surface == .semantic(.income) && request.operation == .share:
-            return incomeProgressMetric(request: request, snapshot: snapshot)
         case .categoryAvailability,
              .concentration:
             return categoryMetric(request: request, snapshot: snapshot)
         case .recurringBurden:
             return recurringBurdenMetric(request: request, snapshot: snapshot)
-        default:
+        case .amount,
+             .plannedAmount,
+             .actualAmount,
+             .effectiveAmount,
+             .budgetImpact,
+             .incomeAmount,
+             .color,
+             .name:
             return .unsupported(.measureNotAvailable)
         }
-    }
-
-    private func budgetScopedContext(
-        request: MarinaFormulaRequest,
-        snapshot: MarinaWorkspaceSnapshot
-    ) -> (request: MarinaFormulaRequest, snapshot: MarinaWorkspaceSnapshot)? {
-        guard case let .budget(budgetID)? = request.resolvedScope else {
-            return (request, snapshot)
-        }
-        guard let budget = snapshot.budgets.first(where: {
-            $0.id == budgetID && $0.workspace?.id == snapshot.workspace.id
-        }) else {
-            return nil
-        }
-
-        let requestedRange: DateRange?
-        switch request.dateRangeSource {
-        case .defaulted:
-            requestedRange = nil
-        case .explicit, .conversationContext:
-            requestedRange = request.dateRange.map {
-                DateRange(start: $0.startDate, end: $0.endDate, calendar: calendar)
-            }
-        }
-
-        guard let lens = BudgetLensService.makeLens(
-            workspace: snapshot.workspace,
-            budget: budget,
-            budgetCardLinks: snapshot.budgets.flatMap { $0.cardLinks ?? [] },
-            budgetPresetLinks: snapshot.budgets.flatMap { $0.presetLinks ?? [] },
-            budgetCategoryLimits: snapshot.budgets.flatMap { $0.categoryLimits ?? [] },
-            workspaceCategories: snapshot.categories,
-            workspaceIncomes: snapshot.incomes,
-            workspacePlannedExpenses: snapshot.homeCalculationPlannedExpenses,
-            workspaceVariableExpenses: snapshot.homeCalculationVariableExpenses,
-            workspaceSavingsEntries: snapshot.savingsEntries,
-            requestedDateRange: requestedRange,
-            futureCalculationPolicy: BudgetLensService.FutureCalculationPolicy(
-                excludeFuturePlannedExpenses: false,
-                excludeFutureVariableExpenses: false,
-                now: now
-            ),
-            calendar: calendar
-        ).resolvedLens else {
-            return nil
-        }
-
-        let effectiveDateRange = HomeQueryDateRange(
-            startDate: lens.dateRange.start,
-            endDate: lens.dateRange.end
-        )
-        let scopedRequest = MarinaFormulaRequest(
-            surface: request.surface,
-            projection: request.projection,
-            operation: request.operation,
-            measure: request.measure,
-            dateRange: effectiveDateRange,
-            comparisonDateRange: request.comparisonDateRange,
-            filters: request.filters,
-            search: request.search,
-            groupBy: request.groupBy,
-            offset: request.offset,
-            limit: request.limit,
-            whatIfAmount: request.whatIfAmount,
-            categoryAvailabilityFilter: request.categoryAvailabilityFilter,
-            dateRangeSource: request.dateRangeSource,
-            resolvedTarget: request.resolvedTarget,
-            resolvedComparisonTarget: request.resolvedComparisonTarget,
-            resolvedScope: request.resolvedScope
-        )
-        let scopedSnapshot = MarinaWorkspaceSnapshot(
-            workspace: snapshot.workspace,
-            budgets: [budget],
-            cards: lens.linkedCards,
-            categories: lens.categoriesInBudget,
-            presets: lens.linkedPresets,
-            plannedExpenses: lens.plannedExpensesInBudget,
-            variableExpenses: lens.variableExpensesInBudget,
-            homePlannedExpenses: lens.plannedExpensesInBudget,
-            homeCalculationPlannedExpenses: lens.plannedExpensesInBudget,
-            homeCalculationVariableExpenses: lens.variableExpensesInBudget,
-            reconciliationAccounts: snapshot.reconciliationAccounts,
-            expenseAllocations: snapshot.expenseAllocations,
-            allocationSettlements: snapshot.allocationSettlements,
-            savingsAccounts: snapshot.savingsAccounts,
-            savingsEntries: lens.savingsEntriesInBudget,
-            incomes: lens.incomesInBudget,
-            incomeSeries: snapshot.incomeSeries,
-            importMerchantRules: snapshot.importMerchantRules,
-            assistantAliasRules: snapshot.assistantAliasRules
-        )
-        return (scopedRequest, scopedSnapshot)
     }
 
     private func supportedOperations(
@@ -291,9 +152,7 @@ struct MarinaFormulaRegistry: Sendable {
             return [.sum]
         case (.semantic(.budget), .remainingRoom),
              (.semantic(.budget), .safeDailySpend):
-            return measure == .remainingRoom ? [.forecast, .whatIf] : [.forecast]
-        case (.semantic(.budget), .projectedSavings):
-            return [.whatIf]
+            return [.forecast]
         case (.semantic(.budget), .burnRate):
             return [.average]
         case (.semantic(.budget), .projectedSpend):
@@ -303,8 +162,6 @@ struct MarinaFormulaRegistry: Sendable {
         case (.semantic(.budget), .coverageRatio):
             return [.forecast]
         case (.semantic(.income), .coverageRatio):
-            return [.share]
-        case (.semantic(.income), .incomeAmount):
             return [.share]
         case (.semantic(.category), .categoryAvailability):
             return [.forecast, .list]
@@ -393,19 +250,26 @@ struct MarinaFormulaRegistry: Sendable {
         let value: Double
         switch request.measure {
         case .remainingRoom:
-            if request.operation == .whatIf {
-                guard let whatIfAmount = request.whatIfAmount,
-                      whatIfAmount.isFinite,
-                      whatIfAmount >= 0 else {
-                    return .unsupported(.unsupportedCombination)
-                }
-                value = summary.periodRemainingRoom - whatIfAmount
-            } else {
-                value = summary.periodRemainingRoom
-            }
+            value = summary.periodRemainingRoom
         case .safeDailySpend:
             value = summary.safeToSpendToday
-        default:
+        case .amount,
+             .plannedAmount,
+             .actualAmount,
+             .effectiveAmount,
+             .budgetImpact,
+             .savingsTotal,
+             .incomeAmount,
+             .reconciliationBalance,
+             .categoryAvailability,
+             .burnRate,
+             .projectedSpend,
+             .paceDifference,
+             .coverageRatio,
+             .recurringBurden,
+             .concentration,
+             .color,
+             .name:
             return .unsupported(.measureNotAvailable)
         }
 
@@ -416,67 +280,8 @@ struct MarinaFormulaRegistry: Sendable {
                 measure: request.measure,
                 source: .safeSpendTodayCalculator,
                 details: safeSpendDetails(summary),
-                presentationRows: request.operation == .whatIf
-                    ? [
-                        MarinaFormulaPresentationRow(
-                            title: "Current remaining room",
-                            primaryValue: .money(summary.periodRemainingRoom),
-                            primaryStyle: .money,
-                            amount: summary.periodRemainingRoom
-                        ),
-                        MarinaFormulaPresentationRow(
-                            title: "After additional spending",
-                            primaryValue: .money(value),
-                            primaryStyle: .money,
-                            amount: value
-                        )
-                    ]
-                    : safeSpendPresentationRows(summary, measure: request.measure)
+                presentationRows: safeSpendPresentationRows(summary, measure: request.measure)
             )
-        )
-    }
-
-    private func projectedSavingsWhatIfMetric(
-        request: MarinaFormulaRequest,
-        snapshot: MarinaWorkspaceSnapshot
-    ) -> MarinaFormulaResult {
-        guard let dateRange = request.dateRange,
-              let whatIfAmount = request.whatIfAmount,
-              whatIfAmount.isFinite,
-              whatIfAmount >= 0 else {
-            return .unsupported(.unsupportedCombination)
-        }
-        let summary = MarinaSavingsForecastCalculator.calculate(
-            range: dateRange,
-            incomes: snapshot.incomes,
-            plannedExpenses: snapshot.homeCalculationPlannedExpenses,
-            variableExpenses: snapshot.homeCalculationVariableExpenses,
-            savingsEntries: snapshot.savingsEntries
-        )
-        let adjustedSavings = summary.projectedSavings - whatIfAmount
-        return metric(
-            value: .money(adjustedSavings),
-            request: request,
-            evidenceRows: [],
-            details: [
-                .init(.projectedSavings, value: .money(summary.projectedSavings), style: .money),
-                .init(.difference, value: .money(-whatIfAmount), style: .deltaMoney)
-            ],
-            source: .marinaSavingsForecastCalculator,
-            presentationRows: [
-                MarinaFormulaPresentationRow(
-                    title: "Current projected savings",
-                    primaryValue: .money(summary.projectedSavings),
-                    primaryStyle: .money,
-                    amount: summary.projectedSavings
-                ),
-                MarinaFormulaPresentationRow(
-                    title: "After additional spending",
-                    primaryValue: .money(adjustedSavings),
-                    primaryStyle: .money,
-                    amount: adjustedSavings
-                )
-            ]
         )
     }
 
@@ -522,7 +327,23 @@ struct MarinaFormulaRegistry: Sendable {
                     amount: summary.safeToSpendToday
                 )
             ]
-        default:
+        case .amount,
+             .plannedAmount,
+             .actualAmount,
+             .effectiveAmount,
+             .budgetImpact,
+             .savingsTotal,
+             .incomeAmount,
+             .reconciliationBalance,
+             .categoryAvailability,
+             .burnRate,
+             .projectedSpend,
+             .paceDifference,
+             .coverageRatio,
+             .recurringBurden,
+             .concentration,
+             .color,
+             .name:
             return []
         }
     }
@@ -639,65 +460,22 @@ struct MarinaFormulaRegistry: Sendable {
                 ]
             )
 
-        default:
+        case .amount,
+             .plannedAmount,
+             .actualAmount,
+             .effectiveAmount,
+             .budgetImpact,
+             .savingsTotal,
+             .incomeAmount,
+             .reconciliationBalance,
+             .categoryAvailability,
+             .remainingRoom,
+             .safeDailySpend,
+             .recurringBurden,
+             .concentration,
+             .color,
+             .name:
             return .unsupported(.measureNotAvailable)
-        }
-    }
-
-    private func incomeProgressMetric(
-        request: MarinaFormulaRequest,
-        snapshot: MarinaWorkspaceSnapshot
-    ) -> MarinaFormulaResult {
-        guard request.dateRange != nil else {
-            return .unsupported(.missingDateField)
-        }
-
-        let rows = evidenceRows(surface: request.surface, request: request, snapshot: snapshot)
-        let actualTotal = incomeTotal(in: rows, planned: false)
-        let plannedTotal = incomeTotal(in: rows, planned: true)
-        let progress = plannedTotal > 0 ? actualTotal / plannedTotal : nil
-
-        return metric(
-            value: progress.map(MarinaValue.number) ?? .empty,
-            request: request,
-            evidenceRows: rows,
-            details: [],
-            source: .homeQueryEngine,
-            presentationRows: [
-                MarinaFormulaPresentationRow(
-                    title: "Actual",
-                    primaryValue: .money(actualTotal),
-                    primaryStyle: .money,
-                    amount: actualTotal
-                ),
-                MarinaFormulaPresentationRow(
-                    title: "Planned",
-                    primaryValue: .money(plannedTotal),
-                    primaryStyle: .money,
-                    amount: plannedTotal
-                ),
-                MarinaFormulaPresentationRow(
-                    title: "Progress",
-                    primaryValue: progress.map(MarinaValue.number) ?? .text("-"),
-                    primaryStyle: progress == nil ? .automatic : .percent
-                )
-            ]
-        )
-    }
-
-    private func incomeTotal(in rows: [MarinaQueryableRow], planned: Bool) -> Double {
-        rows.reduce(0.0) { partial, row in
-            guard row.fields[.isPlanned] == .boolean(planned) else {
-                return partial
-            }
-            switch row.fields[.incomeAmount] {
-            case let .money(value)?, let .number(value)?:
-                return partial + value
-            case let .integer(value)?:
-                return partial + Double(value)
-            case .text?, .date?, .boolean?, .colorHex?, .empty?, nil:
-                return partial
-            }
         }
     }
 
@@ -737,7 +515,23 @@ struct MarinaFormulaRegistry: Sendable {
             return categoryAvailabilityMetric(request: request, snapshot: snapshot, dateRange: dateRange)
         case .concentration:
             return categoryConcentrationMetric(request: request, snapshot: snapshot, dateRange: dateRange)
-        default:
+        case .amount,
+             .plannedAmount,
+             .actualAmount,
+             .effectiveAmount,
+             .budgetImpact,
+             .savingsTotal,
+             .incomeAmount,
+             .reconciliationBalance,
+             .remainingRoom,
+             .burnRate,
+             .projectedSpend,
+             .safeDailySpend,
+             .paceDifference,
+             .coverageRatio,
+             .recurringBurden,
+             .color,
+             .name:
             return .unsupported(.measureNotAvailable)
         }
     }
@@ -801,10 +595,17 @@ struct MarinaFormulaRegistry: Sendable {
             return .unsupported(.unsupportedCombination)
         }
 
+        let rowLimit = request.limit.map { max($0, 0) } ?? 5
         let rows = result.metrics
             .filter { categoryAvailabilityMetric($0, matches: filter) }
+            .prefix(rowLimit)
             .map { categoryAvailabilityRow(from: $0) }
-        return .rows(rows)
+
+        guard rows.isEmpty == false else {
+            return .unsupported(.unsupportedCombination)
+        }
+
+        return .rows(Array(rows))
     }
 
     private func categoryAvailabilityMetric(
@@ -884,8 +685,8 @@ struct MarinaFormulaRegistry: Sendable {
             return .unsupported(.unsupportedCombination)
         }
 
-        let rowLimit = request.limit.map { max($0, 0) } ?? 20
-        let presentationRows = result.metrics.dropFirst(max(0, request.offset)).prefix(rowLimit).map { metric in
+        let rowLimit = request.limit.map { max($0, 0) } ?? 5
+        let presentationRows = result.metrics.prefix(rowLimit).map { metric in
             MarinaFormulaPresentationRow(
                 title: metric.categoryName,
                 primaryValue: .money(metric.totalSpent),
@@ -993,32 +794,8 @@ struct MarinaFormulaRegistry: Sendable {
         request: MarinaFormulaRequest,
         snapshot: MarinaWorkspaceSnapshot
     ) -> [MarinaQueryableRow] {
-        guard let descriptor = MarinaEntityCatalog().executionDescriptor(
-            for: surface,
-            projection: request.projection
-        ),
-              var rows = MarinaScopedRowProvider().rows(
-                for: MarinaUniversalQueryPlan(
-                    surface: surface,
-                    projection: request.projection,
-                    operation: request.operation,
-                    measure: request.measure,
-                    search: request.search,
-                    filters: request.filters,
-                    groupBy: request.groupBy,
-                    offset: request.offset,
-                    limit: request.limit,
-                    dateRange: request.dateRange,
-                    dateRangeSource: request.dateRangeSource,
-                    comparisonDateRange: request.comparisonDateRange,
-                    resolvedTarget: request.resolvedTarget,
-                    resolvedComparisonTarget: request.resolvedComparisonTarget,
-                    resolvedScope: request.resolvedScope,
-                    whatIfAmount: request.whatIfAmount,
-                    categoryAvailabilityFilter: request.categoryAvailabilityFilter
-                ),
-                from: snapshot
-              ) else {
+        guard let descriptor = MarinaEntityCatalog().descriptor(for: surface),
+              var rows = MarinaEntityAdapterRegistry().rows(for: surface, from: snapshot) else {
             return []
         }
 
@@ -1027,8 +804,7 @@ struct MarinaFormulaRegistry: Sendable {
             rows = rowEngine.search(rows, clause: search, descriptor: descriptor)
         }
         rows = rowEngine.filter(rows, filters: request.filters)
-        guard request.operation == .list else { return rows }
-        return rowEngine.page(rows, offset: request.offset, limit: request.limit)
+        return rowEngine.limit(rows, to: request.limit)
     }
 
     private func resolvedAccount<Account>(

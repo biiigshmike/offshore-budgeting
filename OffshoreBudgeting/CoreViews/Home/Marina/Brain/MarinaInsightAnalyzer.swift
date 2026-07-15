@@ -179,14 +179,7 @@ struct MarinaInsightAnalyzer {
                     detail: MarinaL10n.string("marina.insight.signal.burnRate.detail", defaultValue: "This is the average daily spend based on spending so far in the selected period.", comment: "Insight signal detail for burn rate.")
                 )
             ]
-        case .amount, .plannedAmount, .actualAmount, .effectiveAmount, .budgetImpact,
-             .projectedBudgetImpact, .ledgerSignedAmount, .plannedIncomeTotal,
-             .actualIncomeTotal, .plannedExpenseProjectedTotal,
-             .plannedExpenseActualTotal, .plannedExpenseEffectiveTotal,
-             .variableExpenseTotal, .unifiedExpenseTotal, .savingsTotal,
-             .maximumSavings, .projectedSavings, .actualSavings, .incomeAmount,
-             .reconciliationBalance, .categoryAvailability, .remainingRoom,
-             .coverageRatio, .recurringBurden, .concentration, .color, .name:
+        case .amount, .plannedAmount, .actualAmount, .effectiveAmount, .budgetImpact, .savingsTotal, .incomeAmount, .reconciliationBalance, .categoryAvailability, .remainingRoom, .coverageRatio, .recurringBurden, .concentration, .color, .name:
             return []
         }
     }
@@ -316,14 +309,7 @@ struct MarinaInsightAnalyzer {
             return MarinaL10n.string("marina.insight.meaning.projectedSpend", defaultValue: "This projects total spending from actual spend so far plus planned spending still remaining in the selected period.", comment: "Meaning sentence for projected spend.")
         case .burnRate:
             return MarinaL10n.string("marina.insight.meaning.burnRate", defaultValue: "This shows average daily spending based on the selected period so far.", comment: "Meaning sentence for burn rate.")
-        case .amount, .plannedAmount, .actualAmount, .effectiveAmount, .budgetImpact,
-             .projectedBudgetImpact, .ledgerSignedAmount, .plannedIncomeTotal,
-             .actualIncomeTotal, .plannedExpenseProjectedTotal,
-             .plannedExpenseActualTotal, .plannedExpenseEffectiveTotal,
-             .variableExpenseTotal, .unifiedExpenseTotal, .savingsTotal,
-             .maximumSavings, .projectedSavings, .actualSavings, .incomeAmount,
-             .reconciliationBalance, .categoryAvailability, .remainingRoom,
-             .color, .name:
+        case .amount, .plannedAmount, .actualAmount, .effectiveAmount, .budgetImpact, .savingsTotal, .incomeAmount, .reconciliationBalance, .categoryAvailability, .remainingRoom, .color, .name:
             return nil
         }
     }
@@ -368,8 +354,6 @@ struct MarinaInsightAnalyzer {
             return MarinaL10n.common("savingsAccount", defaultValue: "savings account", comment: "Common label for savings account.")
         case .income:
             return MarinaL10n.common("income", defaultValue: "income", comment: "Common label for income.")
-        case .incomeSeries:
-            return MarinaL10n.string("marina.insight.entity.incomeSeries", defaultValue: "income series", comment: "Entity label for a recurring income series.")
         case .category:
             return MarinaL10n.common("category", defaultValue: "category", comment: "Common label for category.")
         case .preset:

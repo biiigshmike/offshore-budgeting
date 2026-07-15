@@ -2,7 +2,6 @@ import Foundation
 
 struct MarinaUniversalValidationRequest: Equatable, Sendable {
     let surface: MarinaUniversalEntitySurface
-    let projection: MarinaSemanticProjection
     let operation: MarinaSemanticOperation
     let measure: MarinaSemanticMeasure?
     let searchFields: Set<MarinaFieldKey>
@@ -21,7 +20,6 @@ struct MarinaUniversalValidationRequest: Equatable, Sendable {
 
     init(
         entity: MarinaSemanticEntity,
-        projection: MarinaSemanticProjection = .records,
         operation: MarinaSemanticOperation,
         measure: MarinaSemanticMeasure? = nil,
         searchFields: Set<MarinaFieldKey> = [],
@@ -36,7 +34,6 @@ struct MarinaUniversalValidationRequest: Equatable, Sendable {
     ) {
         self.init(
             surface: .semantic(entity),
-            projection: projection,
             operation: operation,
             measure: measure,
             searchFields: searchFields,
@@ -53,7 +50,6 @@ struct MarinaUniversalValidationRequest: Equatable, Sendable {
 
     init(
         surface: MarinaUniversalEntitySurface,
-        projection: MarinaSemanticProjection = .records,
         operation: MarinaSemanticOperation,
         measure: MarinaSemanticMeasure? = nil,
         searchFields: Set<MarinaFieldKey> = [],
@@ -67,7 +63,6 @@ struct MarinaUniversalValidationRequest: Equatable, Sendable {
         requiresAmountField: Bool = false
     ) {
         self.surface = surface
-        self.projection = projection
         self.operation = operation
         self.measure = measure
         self.searchFields = searchFields
@@ -95,24 +90,15 @@ struct MarinaUniversalCatalogValidator: Sendable {
     }
 
     func validate(_ request: MarinaUniversalValidationRequest) -> MarinaCapabilityResult {
-        guard let descriptor = catalog.executionDescriptor(
-            for: request.surface,
-            projection: request.projection
-        ) else {
+        guard let descriptor = catalog.descriptor(for: request.surface) else {
             return .unsupported(.missingEntityDescriptor)
         }
 
-        guard let semanticEntity = request.surface.semanticEntity,
-              catalog.supports(entity: semanticEntity, projection: request.projection) == .supported else {
-            return .unsupported(.unsupportedCombination)
-        }
-
-        guard descriptor.isInternalOnly == false || request.projection == .activity else {
+        guard descriptor.isInternalOnly == false else {
             return .unsupported(.internalOnly)
         }
 
         guard descriptor.supportedOperations.contains(request.operation)
-            || rowBackedComparisonSupports(request, descriptor: descriptor)
             || formulaSupports(request) else {
             return .unsupported(.operationNotSupported)
         }
@@ -163,93 +149,13 @@ struct MarinaUniversalCatalogValidator: Sendable {
         measure: MarinaSemanticMeasure,
         descriptor: MarinaUniversalSurfaceDescriptor
     ) -> Bool {
-        if formulaRegistry?.supports(
-            measure: measure,
-            surface: surface,
-            operation: operation
-        ) == true {
-            return true
-        }
-
-        guard descriptor.supportedMeasures.contains(measure),
-              let field = rowBackedField(for: measure, surface: surface) else {
-            return false
-        }
-        return descriptor.fields.contains { $0.key == field }
-    }
-
-    private func rowBackedField(
-        for measure: MarinaSemanticMeasure,
-        surface: MarinaUniversalEntitySurface
-    ) -> MarinaFieldKey? {
         switch surface {
         case let .semantic(entity):
-            switch measure {
-            case .budgetImpact:
-                return .budgetImpact
-            case .projectedBudgetImpact:
-                return .projectedBudgetImpact
-            case .ledgerSignedAmount:
-                return .ledgerSignedAmount
-            case .plannedIncomeTotal:
-                return .plannedIncomeTotal
-            case .actualIncomeTotal:
-                return .actualIncomeTotal
-            case .plannedExpenseProjectedTotal:
-                return .plannedExpenseProjectedTotal
-            case .plannedExpenseActualTotal:
-                return .plannedExpenseActualTotal
-            case .plannedExpenseEffectiveTotal:
-                return .plannedExpenseEffectiveTotal
-            case .variableExpenseTotal:
-                return .variableExpenseTotal
-            case .unifiedExpenseTotal:
-                return .unifiedExpenseTotal
-            case .maximumSavings:
-                return .maximumSavings
-            case .projectedSavings:
-                return .projectedSavings
-            case .actualSavings:
-                return .actualSavings
-            case .amount:
-                return .amount
-            case .plannedAmount:
-                return .plannedAmount
-            case .actualAmount:
-                return .actualAmount
-            case .effectiveAmount:
-                return .effectiveAmount
-            case .incomeAmount:
-                return .incomeAmount
-            case .name:
-                return entity == .preset ? .title : .name
-            case .color:
-                return .color
-            case .categoryAvailability:
-                return .amount
-            case .savingsTotal,
-                 .reconciliationBalance,
-                 .remainingRoom,
-                 .burnRate,
-                 .projectedSpend,
-                 .safeDailySpend,
-                 .paceDifference,
-                 .coverageRatio,
-                 .recurringBurden,
-                 .concentration:
-                return nil
-            }
-        case .unifiedExpenses:
-            switch measure {
-            case .budgetImpact, .unifiedExpenseTotal:
-                return .budgetImpact
-            case .projectedBudgetImpact:
-                return .projectedBudgetImpact
-            default:
-                return nil
-            }
-        case .savingsLedgerEntries, .reconciliationLedgerEntries:
-            return measure == .amount ? .amount : nil
+            return catalog.supports(entity: entity, measure: measure) == .supported
+                || formulaRegistry?.supports(measure: measure, surface: surface, operation: operation) == true
+        case .unifiedExpenses, .savingsLedgerEntries, .reconciliationLedgerEntries:
+            return descriptor.supportedMeasures.contains(measure)
+                || formulaRegistry?.supports(measure: measure, surface: surface, operation: operation) == true
         }
     }
 
@@ -262,29 +168,6 @@ struct MarinaUniversalCatalogValidator: Sendable {
             surface: request.surface,
             operation: request.operation
         ) == true
-    }
-
-    private func rowBackedComparisonSupports(
-        _ request: MarinaUniversalValidationRequest,
-        descriptor: MarinaUniversalSurfaceDescriptor
-    ) -> Bool {
-        guard request.operation == .compare,
-              let measure = request.measure,
-              descriptor.supportedMeasures.contains(measure),
-              let measureDescriptor = catalog.measureDescriptor(for: measure) else {
-            return false
-        }
-
-        if let defaultAmountField = descriptor.defaultAmountField,
-           descriptor.fields.contains(where: {
-               $0.key == defaultAmountField && $0.isAggregatable
-           }) {
-            return true
-        }
-
-        return measureDescriptor.requiredFields.contains { fieldKey in
-            descriptor.fields.contains { $0.key == fieldKey && $0.isAggregatable }
-        }
     }
 
     private func field(_ key: MarinaFieldKey, in descriptor: MarinaUniversalSurfaceDescriptor) -> MarinaFieldDescriptor? {
@@ -333,19 +216,7 @@ struct MarinaUniversalCatalogValidator: Sendable {
         .actualAmount,
         .effectiveAmount,
         .budgetImpact,
-        .projectedBudgetImpact,
-        .ledgerSignedAmount,
-        .plannedIncomeTotal,
-        .actualIncomeTotal,
-        .plannedExpenseProjectedTotal,
-        .plannedExpenseActualTotal,
-        .plannedExpenseEffectiveTotal,
-        .variableExpenseTotal,
-        .unifiedExpenseTotal,
         .savingsTotal,
-        .maximumSavings,
-        .projectedSavings,
-        .actualSavings,
         .incomeAmount,
         .reconciliationBalance,
         .categoryAvailability,

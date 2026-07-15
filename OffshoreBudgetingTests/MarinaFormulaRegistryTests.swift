@@ -16,14 +16,11 @@ struct MarinaFormulaRegistryTests {
         #expect(registry.supports(measure: .paceDifference, surface: .semantic(.budget), operation: .compare))
         #expect(registry.supports(measure: .coverageRatio, surface: .semantic(.budget), operation: .forecast))
         #expect(registry.supports(measure: .coverageRatio, surface: .semantic(.income), operation: .share))
-        #expect(registry.supports(measure: .incomeAmount, surface: .semantic(.income), operation: .share))
         #expect(registry.supports(measure: .categoryAvailability, surface: .semantic(.category), operation: .forecast))
         #expect(registry.supports(measure: .categoryAvailability, surface: .semantic(.category), operation: .list))
         #expect(registry.supports(measure: .concentration, surface: .semantic(.category), operation: .share))
         #expect(registry.supports(measure: .recurringBurden, surface: .semantic(.preset), operation: .sum))
         #expect(registry.supports(measure: .savingsTotal, surface: .semantic(.savingsAccount), operation: .forecast))
-        #expect(registry.supports(measure: .remainingRoom, surface: .semantic(.budget), operation: .whatIf))
-        #expect(registry.supports(measure: .projectedSavings, surface: .semantic(.budget), operation: .whatIf))
 
         #expect(registry.supports(measure: .concentration, surface: .semantic(.category), operation: .forecast) == false)
         #expect(registry.supports(measure: .recurringBurden, surface: .semantic(.preset), operation: .forecast) == false)
@@ -202,82 +199,6 @@ struct MarinaFormulaRegistryTests {
         ))
         #expect(incomeCoverage.value == .number(1_000.0 / 300.0))
         #expect(detailValue(.difference, in: incomeCoverage) == .money(700))
-    }
-
-    @Test func incomeProgressMatchesActualToPlannedHomeSemantics() {
-        let fixture = makeFixture()
-        let registry = MarinaFormulaRegistry(now: date(2026, 6, 15), calendar: calendar)
-        let range = HomeQueryDateRange(startDate: date(2026, 6, 1), endDate: date(2026, 6, 30))
-
-        let metric = requireMetric(registry.evaluate(
-            request: formulaRequest(
-                surface: .semantic(.income),
-                operation: .share,
-                measure: .incomeAmount,
-                dateRange: range
-            ),
-            snapshot: fixture.snapshot
-        ))
-
-        #expect(metric.value == .number(2))
-        #expect(metric.source == .homeQueryEngine)
-        #expect(metric.evidenceRows.map(\.displayName).sorted() == ["Bonus", "Paycheck"])
-        #expect(metric.presentationRows.map(\.title) == ["Actual", "Planned", "Progress"])
-        #expect(metric.presentationRows[0].primaryValue == .money(1_000))
-        #expect(metric.presentationRows[1].primaryValue == .money(500))
-        #expect(metric.presentationRows[2].primaryValue == .number(2))
-        #expect(metric.presentationRows[2].primaryStyle == .percent)
-    }
-
-    @Test func incomeProgressWithoutPlannedIncomeUsesEmptyMetricAndDashRow() {
-        let fixture = makeFixture(includePlannedIncome: false)
-        let registry = MarinaFormulaRegistry(now: date(2026, 6, 15), calendar: calendar)
-
-        let metric = requireMetric(registry.evaluate(
-            request: formulaRequest(
-                surface: .semantic(.income),
-                operation: .share,
-                measure: .incomeAmount,
-                dateRange: HomeQueryDateRange(startDate: date(2026, 6, 1), endDate: date(2026, 6, 30))
-            ),
-            snapshot: fixture.snapshot
-        ))
-
-        #expect(metric.value == .empty)
-        #expect(metric.presentationRows[1].primaryValue == .money(0))
-        #expect(metric.presentationRows[2].primaryValue == .text("-"))
-    }
-
-    @Test func budgetWhatIfFormulasApplyTypedAdditionalSpend() {
-        let fixture = makeFixture()
-        let registry = MarinaFormulaRegistry(now: date(2026, 6, 15), calendar: calendar)
-        let range = HomeQueryDateRange(startDate: date(2026, 6, 1), endDate: date(2026, 6, 30))
-
-        let remainingRoom = requireMetric(registry.evaluate(
-            request: formulaRequest(
-                surface: .semantic(.budget),
-                operation: .whatIf,
-                measure: .remainingRoom,
-                dateRange: range,
-                whatIfAmount: 50
-            ),
-            snapshot: fixture.snapshot
-        ))
-        let projectedSavings = requireMetric(registry.evaluate(
-            request: formulaRequest(
-                surface: .semantic(.budget),
-                operation: .whatIf,
-                measure: .projectedSavings,
-                dateRange: range,
-                whatIfAmount: 200
-            ),
-            snapshot: fixture.snapshot
-        ))
-
-        #expect(remainingRoom.value == .money(1_000))
-        #expect(remainingRoom.presentationRows.count == 2)
-        #expect(projectedSavings.presentationRows.count == 2)
-        #expect(detailValue(.difference, in: projectedSavings) == .money(-200))
     }
 
     @Test func categoryFormulasDelegateToDeterministicCategoryServices() throws {
@@ -608,12 +529,10 @@ struct MarinaFormulaRegistryTests {
         measure: MarinaSemanticMeasure,
         dateRange: HomeQueryDateRange? = nil,
         filters: [MarinaRowFilter] = [],
-        categoryAvailabilityFilter: MarinaCategoryAvailabilityFilter? = nil,
-        whatIfAmount: Double? = nil
+        categoryAvailabilityFilter: MarinaCategoryAvailabilityFilter? = nil
     ) -> MarinaFormulaRequest {
         MarinaFormulaRequest(
             surface: surface,
-            projection: .records,
             operation: operation,
             measure: measure,
             dateRange: dateRange,
@@ -621,9 +540,8 @@ struct MarinaFormulaRegistryTests {
             filters: filters,
             search: nil,
             groupBy: nil,
-            offset: 0,
             limit: nil,
-            whatIfAmount: whatIfAmount,
+            whatIfAmount: nil,
             categoryAvailabilityFilter: categoryAvailabilityFilter
         )
     }
@@ -660,7 +578,7 @@ struct MarinaFormulaRegistryTests {
         }
     }
 
-    private func makeFixture(includePlannedIncome: Bool = true) -> FormulaFixture {
+    private func makeFixture() -> FormulaFixture {
         let workspace = Workspace(name: "Personal", hexColor: "#3B82F6")
         let budget = Budget(name: "June", startDate: date(2026, 6, 1), endDate: date(2026, 6, 30), workspace: workspace)
         let card = Card(name: "Apple Card", theme: "ruby", effect: "plastic", workspace: workspace)
@@ -699,7 +617,7 @@ struct MarinaFormulaRegistryTests {
             allocationSettlements: [maySettlement, juneSettlement],
             savingsAccounts: [emergency, travelSavings],
             savingsEntries: [],
-            incomes: includePlannedIncome ? [incomeActual, incomePlanned] : [incomeActual]
+            incomes: [incomeActual, incomePlanned]
         )
 
         return FormulaFixture(snapshot: snapshot, emergency: emergency, roommate: roommate)

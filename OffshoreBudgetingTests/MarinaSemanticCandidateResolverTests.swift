@@ -5,8 +5,28 @@ import Testing
 struct MarinaSemanticCandidateResolverTests {
     private let resolver = MarinaSemanticCandidateResolver()
 
-    @Test func targetMerchantPrefixIsSuggestedWithoutExecution() {
+    @Test func targetMerchantOnlyResolvesToMerchantTextSearch() {
         let fixture = makeFixture()
+        let resolved = resolve(
+            MarinaSemanticRequest(
+                entity: .variableExpense,
+                operation: .sum,
+                measure: .budgetImpact,
+                targetName: "Target",
+                expectedAnswerShape: .metric
+            ),
+            snapshot: fixture.snapshot
+        )
+
+        #expect(resolved.request.entity == .variableExpense)
+        #expect(resolved.request.dimensions == [.merchantText])
+        #expect(resolved.request.textQuery == "Target groceries")
+        #expect(resolved.request.targetDisplayName == "Target groceries")
+        #expect(resolved.request.unsupportedReason == nil)
+    }
+
+    @Test func targetMerchantAndCategoryClarifiesInsteadOfGuessing() {
+        let fixture = makeFixture(includeTargetCategory: true)
         let resolved = resolve(
             MarinaSemanticRequest(
                 entity: .variableExpense,
@@ -20,27 +40,8 @@ struct MarinaSemanticCandidateResolverTests {
 
         #expect(resolved.request.expectedAnswerShape == .clarification)
         #expect(resolved.request.unsupportedReason == .ambiguousEntity)
-        #expect(resolved.clarificationChoices?.choices.count == 1)
-        #expect(resolved.clarificationChoices?.choices.first?.title == "Target groceries")
-    }
-
-    @Test func exactCategoryDominatesWeakerMerchantSuggestion() {
-        let fixture = makeFixture(includeTargetCategory: true)
-        let resolved = resolve(
-            MarinaSemanticRequest(
-                entity: .variableExpense,
-                operation: .sum,
-                measure: .budgetImpact,
-                targetName: "Target",
-                expectedAnswerShape: .metric
-            ),
-            snapshot: fixture.snapshot
-        )
-
-        #expect(resolved.request.expectedAnswerShape == .metric)
-        #expect(resolved.request.resolvedTarget?.entity == .category)
-        #expect(resolved.request.resolvedTarget?.displayName == "Target")
-        #expect(resolved.clarificationChoices == nil)
+        #expect(resolved.clarificationChoices?.choices.contains { $0.title == "Target" && $0.kindLabel == "Category" } == true)
+        #expect(resolved.clarificationChoices?.choices.contains { $0.title == "Target groceries" && $0.kindLabel == "Expense match" } == true)
     }
 
     @Test func appleMerchantAndCardClarifiesWhenExpenseTargetIsUntyped() {
@@ -61,7 +62,7 @@ struct MarinaSemanticCandidateResolverTests {
         #expect(resolved.clarificationChoices?.choices.contains { $0.title == "Apple Store" && $0.kindLabel == "Expense match" } == true)
     }
 
-    @Test func appleCardPrefixRequiresClarificationDespiteMerchantMatch() throws {
+    @Test func appleCardHintResolvesCardDespiteMerchantMatch() {
         let fixture = makeFixture(includeAppleMerchant: true)
         let resolved = resolve(
             MarinaSemanticRequest(
@@ -75,17 +76,10 @@ struct MarinaSemanticCandidateResolverTests {
             snapshot: fixture.snapshot
         )
 
-        let choice = try #require(resolved.clarificationChoices?.choices.first)
         #expect(resolved.request.entity == .card)
         #expect(resolved.request.dimensions == [.card])
-        #expect(resolved.request.targetName == "Apple")
-        #expect(resolved.request.expectedAnswerShape == .clarification)
-        #expect(resolved.request.resolvedTarget == nil)
-        #expect(choice.title == "Apple Card")
-        #expect(choice.kindLabel == "Card")
-        #expect(choice.executableRequest.resolvedTarget?.id == fixture.snapshot.cards.first(where: { $0.name == "Apple Card" })?.id)
-        #expect(choice.executableRequest.resolvedTarget?.provenance == .clarificationChoice)
-        #expect(choice.executableRequest.resolvedScope == .workspace(fixture.snapshot.workspace.id))
+        #expect(resolved.request.targetName == "Apple Card")
+        #expect(resolved.request.expectedAnswerShape == .metric)
     }
 
     @Test func groceriesCategoryHintResolvesCategorySpend() {
@@ -106,32 +100,6 @@ struct MarinaSemanticCandidateResolverTests {
         #expect(resolved.request.dimensions == [.category])
         #expect(resolved.request.targetName == "Groceries")
         #expect(resolved.request.expectedAnswerShape == .metric)
-        #expect(resolved.request.resolvedTarget?.id == fixture.snapshot.categories.first(where: { $0.name == "Groceries" })?.id)
-        #expect(resolved.request.resolvedTarget?.provenance == .candidateResolver)
-        #expect(resolved.request.resolvedScope == .workspace(fixture.snapshot.workspace.id))
-    }
-
-    @Test func exactCategoryAndExactMerchantRequireClarification() throws {
-        let fixture = makeFixture(includeExactGroceriesMerchant: true)
-        let resolved = resolve(
-            MarinaSemanticRequest(
-                entity: .variableExpense,
-                operation: .sum,
-                measure: .budgetImpact,
-                targetName: "Groceries",
-                expectedAnswerShape: .metric
-            ),
-            snapshot: fixture.snapshot
-        )
-
-        let choices = try #require(resolved.clarificationChoices)
-        let categoryChoice = try #require(choices.choices.first { $0.kindLabel == "Category" })
-        let merchantChoice = try #require(choices.choices.first { $0.kindLabel == "Expense match" })
-
-        #expect(resolved.request.expectedAnswerShape == .clarification)
-        #expect(categoryChoice.executableRequest.resolvedTarget?.id != nil)
-        #expect(merchantChoice.executableRequest.resolvedTarget?.id == nil)
-        #expect(categoryChoice.meaningKey != merchantChoice.meaningKey)
     }
 
     @Test func alejandroBalanceResolvesReconciliationAccount() {
@@ -170,7 +138,7 @@ struct MarinaSemanticCandidateResolverTests {
         #expect(resolved.request.unsupportedReason == .unresolvedEntity)
     }
 
-    @Test func exactTypedComparisonResolvesBothSlotsByID() {
+    @Test func comparisonTargetCanBeRepairedWithSameTypedHint() {
         let fixture = makeFixture()
         let resolved = resolve(
             MarinaSemanticRequest(
@@ -178,8 +146,8 @@ struct MarinaSemanticCandidateResolverTests {
                 operation: .compare,
                 measure: .budgetImpact,
                 dimensions: [.card],
-                targetName: "Apple Card",
-                comparisonTargetName: "Chase Card",
+                targetName: "Apple",
+                comparisonTargetName: "Chase",
                 expectedAnswerShape: .comparison
             ),
             snapshot: fixture.snapshot
@@ -189,11 +157,119 @@ struct MarinaSemanticCandidateResolverTests {
         #expect(resolved.request.targetName == "Apple Card")
         #expect(resolved.request.comparisonTargetName == "Chase Card")
         #expect(resolved.request.expectedAnswerShape == .comparison)
-        #expect(resolved.request.resolvedTarget?.id == fixture.snapshot.cards.first(where: { $0.name == "Apple Card" })?.id)
-        #expect(resolved.request.resolvedComparisonTarget?.id == fixture.snapshot.cards.first(where: { $0.name == "Chase Card" })?.id)
-        #expect(resolved.request.resolvedTarget?.provenance == .candidateResolver)
-        #expect(resolved.request.resolvedComparisonTarget?.provenance == .candidateResolver)
-        #expect(resolved.request.resolvedScope == .workspace(fixture.snapshot.workspace.id))
+    }
+
+    @Test func explicitPromptTargetFallbackRecoversDroppedCategoryAndTracesSearch() {
+        let fixture = makeFixture(includeHairCareCategory: true)
+        let validator = MarinaSemanticRequestValidator()
+        let interpreted = MarinaInterpretedSemanticRequest(
+            request: MarinaSemanticRequest(
+                entity: .variableExpense,
+                operation: .list,
+                measure: .budgetImpact,
+                dimensions: [.category, .merchantText],
+                dateRangeToken: .previousMonth,
+                resultLimit: 10,
+                expectedAnswerShape: .list
+            ),
+            confidence: .medium,
+            source: .foundationModel
+        )
+
+        let trace = validator.validateWithTrace(
+            interpreted: interpreted,
+            snapshot: fixture.snapshot,
+            originalPrompt: "What did I spend on Hair Care last month?"
+        )
+
+        #expect(trace.interpreted.request.entity == .variableExpense)
+        #expect(trace.interpreted.request.operation == .list)
+        #expect(trace.interpreted.request.measure == .budgetImpact)
+        #expect(trace.interpreted.request.dimensions == [.category])
+        #expect(trace.interpreted.request.dimensions.contains(.merchantText) == false)
+        #expect(trace.interpreted.request.dateRangeToken == .previousMonth)
+        #expect(trace.interpreted.request.targetName == "Hair Care")
+        #expect(trace.interpreted.request.targetDisplayName == "Hair Care")
+        #expect(trace.interpreted.request.expenseScope == .unified)
+        #expect(trace.interpreted.request.expectedAnswerShape == .list)
+        #expect(trace.candidateSearches.contains { $0.rawTargetText == "Hair Care" && $0.slot == "explicitPromptTarget" })
+    }
+
+    @Test func explicitPromptTargetFallbackDoesNotAutoSelectWeakMatches() {
+        let fixture = makeFixture(includeAppleMerchant: true)
+        let interpreted = MarinaInterpretedSemanticRequest(
+            request: MarinaSemanticRequest(
+                entity: .variableExpense,
+                operation: .sum,
+                measure: .budgetImpact,
+                dimensions: [.merchantText],
+                expectedAnswerShape: .metric
+            ),
+            confidence: .medium,
+            source: .foundationModel
+        )
+
+        let resolved = resolver.resolveExplicitPromptTargetsWithTrace(
+            interpreted: interpreted,
+            snapshot: fixture.snapshot,
+            explicitPromptTargets: ["Store Apple"]
+        )
+
+        #expect(resolved.interpreted.request == interpreted.request)
+        #expect(resolved.candidateSearches.first?.ambiguityStatus == .weakOnly)
+        #expect(resolved.candidateSearches.first?.recommendedDisplayName == nil)
+    }
+
+    @Test func explicitPromptTargetFallbackClarifiesAmbiguousStrongMatches() {
+        let fixture = makeFixture(includeTargetCategory: true)
+        let interpreted = MarinaInterpretedSemanticRequest(
+            request: MarinaSemanticRequest(
+                entity: .variableExpense,
+                operation: .sum,
+                measure: .budgetImpact,
+                expectedAnswerShape: .metric
+            ),
+            confidence: .medium,
+            source: .foundationModel
+        )
+
+        let resolved = resolver.resolveExplicitPromptTargetsWithTrace(
+            interpreted: interpreted,
+            snapshot: fixture.snapshot,
+            explicitPromptTargets: ["Target"]
+        )
+
+        #expect(resolved.interpreted.request.expectedAnswerShape == .clarification)
+        #expect(resolved.interpreted.request.unsupportedReason == .ambiguousEntity)
+        #expect(resolved.interpreted.clarificationChoices?.choices.contains { $0.title == "Target" && $0.kindLabel == "Category" } == true)
+        #expect(resolved.interpreted.clarificationChoices?.choices.contains { $0.title == "Target groceries" && $0.kindLabel == "Expense match" } == true)
+    }
+
+    @Test func explicitPromptTargetFallbackUsesCategoryHintAndDropsContradictoryMerchantDimension() {
+        let fixture = makeFixture(includeTargetCategory: true)
+        let interpreted = MarinaInterpretedSemanticRequest(
+            request: MarinaSemanticRequest(
+                entity: .variableExpense,
+                operation: .list,
+                measure: .budgetImpact,
+                dimensions: [.category, .merchantText],
+                expectedAnswerShape: .list
+            ),
+            confidence: .medium,
+            source: .foundationModel
+        )
+
+        let resolved = resolver.resolveExplicitPromptTargetsWithTrace(
+            interpreted: interpreted,
+            snapshot: fixture.snapshot,
+            explicitPromptTargets: ["Target"]
+        )
+
+        #expect(resolved.interpreted.request.entity == .variableExpense)
+        #expect(resolved.interpreted.request.dimensions == [.category])
+        #expect(resolved.interpreted.request.dimensions.contains(.merchantText) == false)
+        #expect(resolved.interpreted.request.targetName == "Target")
+        #expect(resolved.interpreted.request.textQuery == nil)
     }
 
     @Test func existingTargetPathStillResolvesCategoryHint() {
@@ -216,263 +292,390 @@ struct MarinaSemanticCandidateResolverTests {
         #expect(resolved.request.expectedAnswerShape == .list)
     }
 
-    @Test func typedComparisonClarificationChoiceRetainsResolvedFirstSlotWhenSecondIsAmbiguous() throws {
-        let fixture = makeFixture(
-            includeUberMerchant: true,
-            includeUberCard: true,
-            includeDuplicateUberCard: true
+    @Test func explicitPromptTargetsPreferLongestNonOverlappingCardMatch() {
+        let fixture = makeFixture(includeNestedAppleText: true)
+        let trace = validate(
+            MarinaSemanticRequest(
+                entity: .card,
+                operation: .list,
+                measure: .budgetImpact,
+                dimensions: [.card],
+                expectedAnswerShape: .list
+            ),
+            snapshot: fixture.snapshot,
+            originalPrompt: "Show my Apple Card expenses."
         )
-        let interpreted = MarinaInterpretedSemanticRequest(
-            request: MarinaSemanticRequest(
+
+        #expect(trace.explicitPromptTargets == ["Apple Card"])
+        #expect(trace.explicitPromptTargets.contains("Apple") == false)
+    }
+
+    @Test func explicitPromptTargetsKeepTwoPromptOrderedCardTargetsForComparison() {
+        let fixture = makeFixture(includeDebitCard: true, includeNestedAppleText: true)
+        let trace = validate(
+            MarinaSemanticRequest(
                 entity: .card,
                 operation: .compare,
                 measure: .budgetImpact,
                 dimensions: [.card],
-                dateRangeToken: .previousPeriod,
-                targetName: "Apple Card",
-                comparisonTargetName: "Uber",
+                dateRangeToken: .previousMonth,
                 expectedAnswerShape: .comparison
+            ),
+            snapshot: fixture.snapshot,
+            originalPrompt: "Compare Apple Card to Debit Card last month."
+        )
+
+        #expect(trace.explicitPromptTargets == ["Apple Card", "Debit Card"])
+        #expect(trace.explicitPromptTargets.contains("Apple") == false)
+    }
+
+    @Test func explicitPromptTargetFallbackRecoversDroppedCardComparisonTargets() {
+        let fixture = makeFixture(includeDebitCard: true, includeNestedAppleText: true)
+        let trace = validate(
+            MarinaSemanticRequest(
+                entity: .card,
+                operation: .compare,
+                dimensions: [.card],
+                dateRangeToken: .previousMonth,
+                expectedAnswerShape: .comparison
+            ),
+            snapshot: fixture.snapshot,
+            originalPrompt: "Which was higher last month, Apple Card or Debit Card?"
+        )
+
+        #expect(trace.interpreted.request.entity == .card)
+        #expect(trace.interpreted.request.operation == .compare)
+        #expect(trace.interpreted.request.measure == .budgetImpact)
+        #expect(trace.interpreted.request.dimensions == [.card])
+        #expect(trace.interpreted.request.dateRangeToken == .previousMonth)
+        #expect(trace.interpreted.request.targetName == "Apple Card")
+        #expect(trace.interpreted.request.comparisonTargetName == "Debit Card")
+        #expect(trace.interpreted.request.expectedAnswerShape == .comparison)
+        #expect(trace.candidateSearches.contains { $0.rawTargetText == "Apple Card" && $0.slot == "explicitPromptTarget" })
+        #expect(trace.candidateSearches.contains { $0.rawTargetText == "Debit Card" && $0.slot == "explicitPromptTarget" })
+    }
+
+    @Test func explicitPromptTargetFallbackRepairsNaturalCardComparisonListShape() {
+        let fixture = makeFixture(includeDebitCard: true)
+        let trace = validate(
+            MarinaSemanticRequest(
+                entity: .card,
+                operation: .list,
+                dimensions: [.card, .card],
+                dateRangeToken: .previousPeriod,
+                expectedAnswerShape: .list
+            ),
+            snapshot: fixture.snapshot,
+            originalPrompt: "Compare my debit card and Apple Card spend last month."
+        )
+
+        #expect(trace.interpreted.request.entity == .card)
+        #expect(trace.interpreted.request.operation == .compare)
+        #expect(trace.interpreted.request.measure == .budgetImpact)
+        #expect(trace.interpreted.request.dimensions == [.card])
+        #expect(trace.interpreted.request.dateRangeToken == .previousPeriod)
+        #expect(trace.interpreted.request.targetName == "Debit Card")
+        #expect(trace.interpreted.request.comparisonTargetName == "Apple Card")
+        #expect(trace.interpreted.request.expectedAnswerShape == .comparison)
+        #expect(trace.interpreted.request.unsupportedReason == nil)
+        #expect(trace.interpreted.clarificationChoices == nil)
+    }
+
+    @Test func explicitPromptTargetFallbackRepairsWhichCardHadMoreSpendComparison() {
+        let fixture = makeFixture(includeDebitCard: true)
+        let trace = validate(
+            MarinaSemanticRequest(
+                entity: .card,
+                operation: .list,
+                dimensions: [.card],
+                dateRangeToken: .previousPeriod,
+                expectedAnswerShape: .list
+            ),
+            snapshot: fixture.snapshot,
+            originalPrompt: "Which card had more spend last month, my debit card or Apple Card?"
+        )
+
+        #expect(trace.interpreted.request.entity == .card)
+        #expect(trace.interpreted.request.operation == .compare)
+        #expect(trace.interpreted.request.measure == .budgetImpact)
+        #expect(trace.interpreted.request.dimensions == [.card])
+        #expect(trace.interpreted.request.dateRangeToken == .previousPeriod)
+        #expect(trace.interpreted.request.targetName == "Debit Card")
+        #expect(trace.interpreted.request.comparisonTargetName == "Apple Card")
+        #expect(trace.interpreted.request.expectedAnswerShape == .comparison)
+        #expect(trace.interpreted.clarificationChoices == nil)
+    }
+
+    @Test func explicitPromptTargetFallbackRepairsWhichCardHadLessSpendComparison() {
+        let fixture = makeFixture(includeDebitCard: true)
+        let trace = validate(
+            MarinaSemanticRequest(
+                entity: .card,
+                operation: .list,
+                dimensions: [.card],
+                dateRangeToken: .previousPeriod,
+                expectedAnswerShape: .list
+            ),
+            snapshot: fixture.snapshot,
+            originalPrompt: "Which card had less spend last month, my debit card or Apple Card?"
+        )
+
+        #expect(trace.interpreted.request.entity == .card)
+        #expect(trace.interpreted.request.operation == .compare)
+        #expect(trace.interpreted.request.measure == .budgetImpact)
+        #expect(trace.interpreted.request.dimensions == [.card])
+        #expect(trace.interpreted.request.dateRangeToken == .previousPeriod)
+        #expect(trace.interpreted.request.targetName == "Debit Card")
+        #expect(trace.interpreted.request.comparisonTargetName == "Apple Card")
+        #expect(trace.interpreted.request.expectedAnswerShape == .comparison)
+        #expect(trace.interpreted.clarificationChoices == nil)
+    }
+
+    @Test func explicitPromptTargetFallbackDoesNotRepairMoreWithoutComparisonIntent() {
+        let fixture = makeFixture(includeDebitCard: true)
+        let trace = validate(
+            MarinaSemanticRequest(
+                entity: .card,
+                operation: .list,
+                dimensions: [.card],
+                dateRangeToken: .previousPeriod,
+                expectedAnswerShape: .list
+            ),
+            snapshot: fixture.snapshot,
+            originalPrompt: "Show me more card expenses."
+        )
+
+        #expect(trace.explicitPromptTargets.isEmpty)
+        #expect(trace.interpreted.request.operation == .list)
+        #expect(trace.interpreted.request.expectedAnswerShape == .list)
+        #expect(trace.interpreted.request.targetName == nil)
+        #expect(trace.interpreted.request.comparisonTargetName == nil)
+    }
+
+    @Test func explicitPromptTargetFallbackDoesNotRepairComparisonIntentWithoutTwoTargets() {
+        let fixture = makeFixture(includeDebitCard: true)
+        let trace = validate(
+            MarinaSemanticRequest(
+                entity: .card,
+                operation: .list,
+                dimensions: [.card],
+                dateRangeToken: .previousPeriod,
+                expectedAnswerShape: .list
+            ),
+            snapshot: fixture.snapshot,
+            originalPrompt: "Which card had more spend last month?"
+        )
+
+        #expect(trace.explicitPromptTargets.isEmpty)
+        #expect(trace.interpreted.request.operation == .list)
+        #expect(trace.interpreted.request.expectedAnswerShape == .list)
+        #expect(trace.interpreted.request.targetName == nil)
+        #expect(trace.interpreted.request.comparisonTargetName == nil)
+    }
+
+    @Test func explicitPromptTargetFallbackDoesNotRepairDuplicateExactCardTargets() {
+        let fixture = makeFixture(includeDebitCard: true)
+        let interpreted = MarinaInterpretedSemanticRequest(
+            request: MarinaSemanticRequest(
+                entity: .card,
+                operation: .list,
+                dimensions: [.card],
+                dateRangeToken: .previousPeriod,
+                expectedAnswerShape: .list
             ),
             confidence: .medium,
             source: .foundationModel
         )
 
-        let resolved = resolver.resolveWithTrace(
+        let resolved = resolver.resolveExplicitPromptTargetsWithTrace(
             interpreted: interpreted,
-            snapshot: fixture.snapshot
+            snapshot: fixture.snapshot,
+            explicitPromptTargets: ["Apple Card", "Apple Card"],
+            hasExplicitCardComparisonIntent: true
+        )
+
+        #expect(resolved.interpreted.request.expectedAnswerShape != .comparison)
+        #expect(resolved.interpreted.request.comparisonTargetName == nil)
+    }
+
+    @Test func explicitPromptTargetFallbackKeepsSimplerCardComparisonRecovery() {
+        let fixture = makeFixture(includeDebitCard: true)
+        let trace = validate(
+            MarinaSemanticRequest(
+                entity: .card,
+                operation: .compare,
+                measure: .budgetImpact,
+                dimensions: [.card],
+                dateRangeToken: .previousMonth,
+                expectedAnswerShape: .comparison
+            ),
+            snapshot: fixture.snapshot,
+            originalPrompt: "Compare Debit Card and Apple Card last month."
+        )
+
+        #expect(trace.interpreted.request.entity == .card)
+        #expect(trace.interpreted.request.operation == .compare)
+        #expect(trace.interpreted.request.measure == .budgetImpact)
+        #expect(trace.interpreted.request.dimensions == [.card])
+        #expect(trace.interpreted.request.targetName == "Debit Card")
+        #expect(trace.interpreted.request.comparisonTargetName == "Apple Card")
+        #expect(trace.interpreted.request.expectedAnswerShape == .comparison)
+        #expect(trace.interpreted.clarificationChoices == nil)
+    }
+
+    @Test func explicitPromptTargetFallbackDoesNotRepairWeakSecondCardComparisonTarget() {
+        let fixture = makeFixture()
+        let interpreted = MarinaInterpretedSemanticRequest(
+            request: MarinaSemanticRequest(
+                entity: .card,
+                operation: .list,
+                dimensions: [.card, .card],
+                dateRangeToken: .previousPeriod,
+                expectedAnswerShape: .list
+            ),
+            confidence: .medium,
+            source: .foundationModel
+        )
+
+        let resolved = resolver.resolveExplicitPromptTargetsWithTrace(
+            interpreted: interpreted,
+            snapshot: fixture.snapshot,
+            explicitPromptTargets: ["Apple Card", "Store Apple"],
+            hasExplicitCardComparisonIntent: true
+        )
+
+        #expect(resolved.interpreted.request.expectedAnswerShape != .comparison)
+        #expect(resolved.interpreted.request.comparisonTargetName == nil)
+        #expect(resolved.candidateSearches.contains { $0.rawTargetText == "Store Apple" && $0.ambiguityStatus == .weakOnly })
+    }
+
+    @Test func comparisonClarificationChoiceKeepsComparisonShapeForSingleCardSelection() {
+        let fixture = makeFixture(includeUberMerchant: true, includeUberCard: true)
+        let interpreted = MarinaInterpretedSemanticRequest(
+            request: MarinaSemanticRequest(
+                entity: .card,
+                operation: .list,
+                dimensions: [.card, .card],
+                dateRangeToken: .previousPeriod,
+                expectedAnswerShape: .list
+            ),
+            confidence: .medium,
+            source: .foundationModel
+        )
+
+        let resolved = resolver.resolveExplicitPromptTargetsWithTrace(
+            interpreted: interpreted,
+            snapshot: fixture.snapshot,
+            explicitPromptTargets: ["Apple Card", "Uber"],
+            hasExplicitCardComparisonIntent: true
         )
 
         #expect(resolved.interpreted.request.expectedAnswerShape == .clarification)
-        let appleCardID: UUID? = fixture.snapshot.cards.first(where: {
-            $0.name == "Apple Card"
-        })?.id
-        let uberCards = fixture.snapshot.cards.filter { $0.name == "Uber" }
-        let uberCardIDs: Set<UUID> = Set(uberCards.map(\.id))
-        #expect(resolved.interpreted.request.targetName == "Apple Card")
-        #expect(resolved.interpreted.request.resolvedTarget?.id == appleCardID)
-        #expect(resolved.interpreted.request.resolvedComparisonTarget == nil)
-
-        let uberCardChoices = resolved.interpreted.clarificationChoices?.choices.filter {
-            $0.title == "Uber" && $0.kindLabel == "Card"
-        } ?? []
-        let executableRequest: MarinaSemanticRequest = try #require(
-            uberCardChoices.first?.executableRequest
-        )
-        let comparisonTargetID: UUID = try #require(
-            executableRequest.resolvedComparisonTarget?.id
-        )
-        let resolvedUberCardIDs: Set<UUID> = Set(
-            uberCardChoices.compactMap { choice -> UUID? in
-                choice.executableRequest.resolvedComparisonTarget?.id
-            }
-        )
-        #expect(uberCardChoices.count == 2)
-        #expect(resolvedUberCardIDs == uberCardIDs)
-        #expect(executableRequest.entity == .card)
-        #expect(executableRequest.operation == .compare)
-        #expect(executableRequest.measure == .budgetImpact)
-        #expect(executableRequest.dimensions == [.card])
-        #expect(executableRequest.targetName == "Apple Card")
-        #expect(executableRequest.comparisonTargetName == "Uber")
-        #expect(executableRequest.resolvedTarget?.id == appleCardID)
-        #expect(uberCardIDs.contains(comparisonTargetID))
-        #expect(executableRequest.resolvedTarget?.provenance == .candidateResolver)
-        #expect(executableRequest.resolvedComparisonTarget?.provenance == .clarificationChoice)
-        #expect(executableRequest.expectedAnswerShape == .comparison)
+        let appleChoice = resolved.interpreted.clarificationChoices?.choices.first {
+            $0.title == "Apple Card" && $0.kindLabel == "Card"
+        }
+        #expect(appleChoice?.request.entity == .card)
+        #expect(appleChoice?.request.operation == .compare)
+        #expect(appleChoice?.request.measure == .budgetImpact)
+        #expect(appleChoice?.request.dimensions == [.card])
+        #expect(appleChoice?.request.targetName == "Apple Card")
+        #expect(appleChoice?.request.comparisonTargetName == nil)
+        #expect(appleChoice?.request.expectedAnswerShape == .comparison)
     }
 
-    @Test func groceryLemmaCategoryDominatesWeakerMerchantSuggestions() throws {
-        let fixture = makeFixture()
-        let resolved = resolve(
+    @Test func explicitPromptTargetFallbackRecoversAppleCardExpenseList() {
+        let fixture = makeFixture(includeNestedAppleText: true)
+        let trace = validate(
             MarinaSemanticRequest(
-                entity: .variableExpense,
-                operation: .sum,
-                measure: .budgetImpact,
-                targetName: "Grocery",
-                expectedAnswerShape: .metric
-            ),
-            snapshot: fixture.snapshot
-        )
-
-        let categoryID = try #require(fixture.snapshot.categories.first(where: { $0.name == "Groceries" })?.id)
-
-        #expect(resolved.clarificationChoices == nil)
-        #expect(resolved.request.resolvedTarget?.id == categoryID)
-        #expect(resolved.request.resolvedTarget?.displayName == "Groceries")
-        #expect(resolved.request.resolvedScope == .workspace(fixture.snapshot.workspace.id))
-    }
-
-    @Test func duplicateExactCategoryNamesRemainDistinctIDBackedChoices() throws {
-        let fixture = makeFixture(includeDuplicateGroceriesCategory: true)
-        let resolved = resolve(
-            MarinaSemanticRequest(
-                entity: .category,
-                operation: .sum,
-                measure: .budgetImpact,
-                dimensions: [.category],
-                targetName: "Groceries",
-                expectedAnswerShape: .metric
-            ),
-            snapshot: fixture.snapshot
-        )
-
-        let choices = try #require(resolved.clarificationChoices)
-        let categoryChoices = choices.choices.filter { $0.kindLabel == "Category" }
-        let sourceIDs = Set(categoryChoices.compactMap { $0.executableRequest.resolvedTarget?.id })
-        let expectedIDs = Set(fixture.snapshot.categories.filter { $0.name == "Groceries" }.map(\.id))
-
-        #expect(categoryChoices.count == 2)
-        #expect(sourceIDs == expectedIDs)
-        #expect(Set(categoryChoices.map(\.meaningKey)).count == 2)
-        #expect(choices.choice(matching: "Groceries") == nil)
-        #expect(categoryChoices.allSatisfy {
-            $0.executableRequest.resolvedTarget?.provenance == .clarificationChoice
-        })
-    }
-
-    @Test func resolvedBudgetCandidateSelectsBudgetScope() {
-        let fixture = makeFixture()
-        let budget = fixture.snapshot.budgets[0]
-        let resolved = resolve(
-            MarinaSemanticRequest(
-                entity: .budget,
-                operation: .forecast,
-                measure: .budgetImpact,
-                dimensions: [.budget],
-                targetName: budget.name,
-                expectedAnswerShape: .metric
-            ),
-            snapshot: fixture.snapshot
-        )
-
-        #expect(resolved.request.resolvedTarget?.id == budget.id)
-        #expect(resolved.request.resolvedTarget?.provenance == .candidateResolver)
-        #expect(resolved.request.resolvedScope == .budget(budget.id))
-    }
-
-    @Test func constraintOnlyNamedBudgetResolvesStableScopeAndUsesWholeBudgetRangeByDefault() throws {
-        let fixture = makeFixture()
-        let budget = try #require(fixture.snapshot.budgets.first)
-        let resolved = resolve(
-            MarinaSemanticRequest(
-                entity: .budget,
+                entity: .card,
                 operation: .list,
-                projection: .summary,
-                constraints: [
-                    MarinaSemanticConstraint(
-                        dimension: .budget,
-                        value: "July 2026",
-                        kindSource: .explicit
-                    )
-                ],
+                measure: .budgetImpact,
+                dimensions: [.card],
+                resultLimit: 20,
                 expectedAnswerShape: .list
             ),
-            snapshot: fixture.snapshot
-        )
-
-        #expect(resolved.request.expectedAnswerShape == .list)
-        #expect(resolved.request.constraints.first?.resolvedReference?.id == budget.id)
-        #expect(resolved.request.resolvedScope == .budget(budget.id))
-        #expect(resolved.request.dateRangeToken == .allTime)
-        #expect(resolved.request.dateRangeSource == .defaulted)
-    }
-
-    @Test func multipleTypedConstraintsResolveIndependently() throws {
-        let fixture = makeFixture()
-        let category = try #require(fixture.snapshot.categories.first { $0.name == "Groceries" })
-        let card = try #require(fixture.snapshot.cards.first { $0.name == "Apple Card" })
-        let resolved = resolve(
-            MarinaSemanticRequest(
-                entity: .variableExpense,
-                operation: .sum,
-                measure: .budgetImpact,
-                constraints: [
-                    MarinaSemanticConstraint(dimension: .category, value: "Grocery", kindSource: .explicit),
-                    MarinaSemanticConstraint(dimension: .card, value: "Apple Card", kindSource: .explicit)
-                ],
-                expectedAnswerShape: .metric
-            ),
-            snapshot: fixture.snapshot
-        )
-
-        #expect(resolved.request.expectedAnswerShape == .metric)
-        #expect(resolved.request.constraints.first { $0.dimension == .category }?.resolvedReference?.id == category.id)
-        #expect(resolved.request.constraints.first { $0.dimension == .card }?.resolvedReference?.id == card.id)
-        #expect(resolved.request.resolvedScope == .workspace(fixture.snapshot.workspace.id))
-    }
-
-    @Test func duplicateSameTypeConstraintRequiresIDBackedClarification() throws {
-        let fixture = makeFixture(includeDuplicateGroceriesCategory: true)
-        let resolved = resolve(
-            MarinaSemanticRequest(
-                entity: .variableExpense,
-                operation: .sum,
-                measure: .budgetImpact,
-                constraints: [
-                    MarinaSemanticConstraint(dimension: .category, value: "Groceries", kindSource: .explicit)
-                ],
-                expectedAnswerShape: .metric
-            ),
-            snapshot: fixture.snapshot
-        )
-
-        let choices = try #require(resolved.clarificationChoices?.choices)
-        #expect(resolved.request.expectedAnswerShape == .clarification)
-        #expect(choices.count == 2)
-        #expect(Set(choices.compactMap { $0.executableRequest.constraints.first?.resolvedReference?.id }).count == 2)
-        #expect(choices.allSatisfy { $0.subtitle?.isEmpty == false })
-    }
-
-    @Test func expenseCandidateEvidenceRespectsDateAndResolvedBudgetScope() {
-        let fixture = makeFixture(includeUberMerchant: true)
-        let interpreted = MarinaInterpretedSemanticRequest(
-            request: MarinaSemanticRequest(
-                entity: .variableExpense,
-                operation: .sum,
-                measure: .budgetImpact,
-                constraints: [
-                    MarinaSemanticConstraint(dimension: .budget, value: "July 2026", kindSource: .explicit),
-                    MarinaSemanticConstraint(dimension: .merchantText, value: "Target groceries", kindSource: .explicit)
-                ],
-                dateRangeSource: .explicit,
-                expectedAnswerShape: .metric
-            ),
-            confidence: .medium,
-            source: .foundationModel
-        )
-        let resolved = resolver.resolve(
-            interpreted: interpreted,
             snapshot: fixture.snapshot,
-            candidateDateRange: HomeQueryDateRange(startDate: date(2026, 7, 1), endDate: date(2026, 7, 10))
+            originalPrompt: "Show my Apple Card expenses."
         )
 
-        // Target groceries is on the unlinked Apple Card, so a budget-scoped
-        // candidate search must not use it as merchant evidence.
-        #expect(resolved.request.expectedAnswerShape == .unsupported)
-        #expect(resolved.request.unsupportedReason == .unresolvedEntity)
+        #expect(trace.interpreted.request.entity == .variableExpense)
+        #expect(trace.interpreted.request.operation == .list)
+        #expect(trace.interpreted.request.measure == .budgetImpact)
+        #expect(trace.interpreted.request.dimensions == [.card])
+        #expect(trace.interpreted.request.targetName == "Apple Card")
+        #expect(trace.interpreted.request.targetDisplayName == "Apple Card")
+        #expect(trace.interpreted.request.resultLimit == 20)
+        #expect(trace.interpreted.request.expenseScope == .unified)
+        #expect(trace.interpreted.request.expectedAnswerShape == .list)
     }
 
-    @Test func explicitMerchantPrefixExecutesOneAggregateExpenseTextMeaning() {
-        let fixture = makeFixture()
-        let resolved = resolve(
+    @Test func explicitPromptTargetFallbackRecoversUberListFromBadCardHint() {
+        let fixture = makeFixture(includeUberMerchant: true)
+        let trace = validate(
+            MarinaSemanticRequest(
+                entity: .card,
+                operation: .list,
+                measure: .budgetImpact,
+                dimensions: [.card],
+                expectedAnswerShape: .list
+            ),
+            snapshot: fixture.snapshot,
+            originalPrompt: "Show my Uber expenses."
+        )
+
+        #expect(trace.interpreted.request.entity == .variableExpense)
+        #expect(trace.interpreted.request.operation == .list)
+        #expect(trace.interpreted.request.measure == .budgetImpact)
+        #expect(trace.interpreted.request.dimensions == [.merchantText])
+        #expect(trace.interpreted.request.textQuery == "Uber")
+        #expect(trace.interpreted.request.targetDisplayName == "Uber")
+        #expect(trace.interpreted.request.targetName == nil)
+        #expect(trace.interpreted.request.expenseScope == .unified)
+        #expect(trace.interpreted.request.expectedAnswerShape == .list)
+        #expect(trace.candidateSearches.contains { $0.rawTargetText == "Uber" && $0.slot == "explicitPromptTarget" })
+    }
+
+    @Test func explicitPromptTargetFallbackRecoversUberMetricFromBadCardHint() {
+        let fixture = makeFixture(includeUberMerchant: true)
+        let trace = validate(
+            MarinaSemanticRequest(
+                entity: .card,
+                operation: .sum,
+                measure: .budgetImpact,
+                dimensions: [.card],
+                expectedAnswerShape: .metric
+            ),
+            snapshot: fixture.snapshot,
+            originalPrompt: "What did I spend at Uber?"
+        )
+
+        #expect(trace.interpreted.request.entity == .variableExpense)
+        #expect(trace.interpreted.request.operation == .sum)
+        #expect(trace.interpreted.request.measure == .budgetImpact)
+        #expect(trace.interpreted.request.dimensions == [.merchantText])
+        #expect(trace.interpreted.request.textQuery == "Uber")
+        #expect(trace.interpreted.request.targetDisplayName == "Uber")
+        #expect(trace.interpreted.request.expenseScope == .unified)
+        #expect(trace.interpreted.request.expectedAnswerShape == .metric)
+    }
+
+    @Test func explicitPromptTargetFallbackClarifiesExactCardAndExpenseTextWhenUntyped() {
+        let fixture = makeFixture(includeUberMerchant: true, includeUberCard: true)
+        let trace = validate(
             MarinaSemanticRequest(
                 entity: .variableExpense,
                 operation: .sum,
                 measure: .budgetImpact,
-                dimensions: [.merchantText],
-                targetName: "Grocery",
-                textQuery: "Grocery",
-                targetKindSource: .explicit,
                 expectedAnswerShape: .metric
             ),
-            snapshot: fixture.snapshot
+            snapshot: fixture.snapshot,
+            originalPrompt: "Show my Uber expenses."
         )
 
-        #expect(resolved.request.expectedAnswerShape == .metric)
-        #expect(resolved.request.textQuery == "Grocery")
-        #expect(resolved.request.resolvedTarget?.entity == .variableExpense)
-        #expect(resolved.request.resolvedTarget?.id == nil)
-        #expect(resolved.clarificationChoices == nil)
+        #expect(trace.interpreted.request.expectedAnswerShape == .clarification)
+        #expect(trace.interpreted.request.unsupportedReason == .ambiguousEntity)
+        #expect(trace.interpreted.clarificationChoices?.choices.contains { $0.title == "Uber" && $0.kindLabel == "Card" } == true)
+        #expect(trace.interpreted.clarificationChoices?.choices.contains { $0.title == "Uber" && $0.kindLabel == "Expense match" } == true)
     }
 
     private func resolve(
@@ -489,6 +692,23 @@ struct MarinaSemanticCandidateResolverTests {
         )
     }
 
+    private func validate(
+        _ request: MarinaSemanticRequest,
+        snapshot: MarinaWorkspaceSnapshot,
+        originalPrompt: String
+    ) -> MarinaSemanticValidationTrace {
+        let validator = MarinaSemanticRequestValidator()
+        return validator.validateWithTrace(
+            interpreted: MarinaInterpretedSemanticRequest(
+                request: request,
+                confidence: .medium,
+                source: .foundationModel
+            ),
+            snapshot: snapshot,
+            originalPrompt: originalPrompt
+        )
+    }
+
     private func makeFixture(
         includeTargetCategory: Bool = false,
         includeAppleMerchant: Bool = false,
@@ -496,10 +716,7 @@ struct MarinaSemanticCandidateResolverTests {
         includeDebitCard: Bool = false,
         includeNestedAppleText: Bool = false,
         includeUberMerchant: Bool = false,
-        includeUberCard: Bool = false,
-        includeDuplicateUberCard: Bool = false,
-        includeDuplicateGroceriesCategory: Bool = false,
-        includeExactGroceriesMerchant: Bool = false
+        includeUberCard: Bool = false
     ) -> ResolverFixture {
         let workspace = Workspace(name: "Personal", hexColor: "#3B82F6")
         let appleCard = Card(name: "Apple Card", workspace: workspace)
@@ -510,13 +727,7 @@ struct MarinaSemanticCandidateResolverTests {
         let uberCard = includeUberCard
             ? Card(name: "Uber", workspace: workspace)
             : nil
-        let duplicateUberCard = includeDuplicateUberCard
-            ? Card(name: "Uber", workspace: workspace)
-            : nil
         let groceries = Offshore.Category(name: "Groceries", hexColor: "#22C55E", workspace: workspace)
-        let duplicateGroceries = includeDuplicateGroceriesCategory
-            ? Offshore.Category(name: "Groceries", hexColor: "#16A34A", workspace: workspace)
-            : nil
         let hairCare = includeHairCareCategory
             ? Offshore.Category(name: "Hair Care", hexColor: "#DB2777", workspace: workspace)
             : nil
@@ -524,16 +735,11 @@ struct MarinaSemanticCandidateResolverTests {
             ? Offshore.Category(name: "Target", hexColor: "#0EA5E9", workspace: workspace)
             : nil
         let budget = Budget(name: "July 2026", startDate: date(2026, 7, 1), endDate: date(2026, 7, 31), workspace: workspace)
-        let budgetCardLink = BudgetCardLink(budget: budget, card: chaseCard)
-        budget.cardLinks = [budgetCardLink]
         let preset = Preset(title: "Grocery Envelope", plannedAmount: 200, workspace: workspace, defaultCard: chaseCard, defaultCategory: groceries)
         let savings = SavingsAccount(name: "Emergency Fund", workspace: workspace)
         let alejandro = AllocationAccount(name: "Alejandro", workspace: workspace)
         let target = VariableExpense(descriptionText: "Target groceries", amount: 80, transactionDate: date(2026, 7, 7), workspace: workspace, card: appleCard, category: groceries)
         let groceryOutlet = VariableExpense(descriptionText: "Grocery Outlet", amount: 42, transactionDate: date(2026, 7, 8), workspace: workspace, card: chaseCard, category: groceries)
-        let exactGroceriesMerchant = includeExactGroceriesMerchant
-            ? VariableExpense(descriptionText: "Groceries", amount: 24, transactionDate: date(2026, 7, 8), workspace: workspace, card: chaseCard, category: groceries)
-            : nil
         let appleStore = includeAppleMerchant
             ? VariableExpense(descriptionText: "Apple Store", amount: 120, transactionDate: date(2026, 7, 9), workspace: workspace, card: appleCard, category: groceries)
             : nil
@@ -548,9 +754,9 @@ struct MarinaSemanticCandidateResolverTests {
             ]
             : []
         let planned = PlannedExpense(title: "Grocery Envelope", plannedAmount: 200, expenseDate: date(2026, 7, 10), workspace: workspace, card: chaseCard, category: groceries)
-        let categories = [groceries] + [targetCategory, hairCare, duplicateGroceries].compactMap { $0 }
-        let cards = [appleCard, chaseCard] + [debitCard, uberCard, duplicateUberCard].compactMap { $0 }
-        let variableExpenses = [target, groceryOutlet] + [appleStore, apple, exactGroceriesMerchant].compactMap { $0 } + uberExpenses
+        let categories = [groceries] + [targetCategory, hairCare].compactMap { $0 }
+        let cards = [appleCard, chaseCard] + [debitCard, uberCard].compactMap { $0 }
+        let variableExpenses = [target, groceryOutlet] + [appleStore, apple].compactMap { $0 } + uberExpenses
         let snapshot = MarinaWorkspaceSnapshot(
             workspace: workspace,
             budgets: [budget],

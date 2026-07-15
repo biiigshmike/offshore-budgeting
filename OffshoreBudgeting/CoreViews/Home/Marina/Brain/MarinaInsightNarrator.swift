@@ -164,6 +164,7 @@ struct MarinaAnswerFactsDigest: Equatable {
 
     func text() -> String {
         var lines: [String] = [
+            "Prompt: \(context.prompt ?? "None")",
             "Answer kind: \(context.answerKind.rawValue)",
             "Title: \(context.title)",
             "Date range: \(context.dateRangeLabel)",
@@ -390,9 +391,6 @@ enum MarinaNarrationFinalizer {
         guard let sanitized = MarinaVoiceSanitizer.sanitizedFinal(value, context: context) else {
             return nil
         }
-        guard generatedNumbersAreGrounded(sanitized, context: context) else {
-            return nil
-        }
         guard let followUp = context.recommendedFollowUp else {
             return sanitized
         }
@@ -407,24 +405,6 @@ enum MarinaNarrationFinalizer {
 
     private static func containsFollowUpQuestion(_ value: String, question: String) -> Bool {
         value.range(of: question, options: [.caseInsensitive, .diacriticInsensitive]) != nil
-    }
-
-    private static func generatedNumbersAreGrounded(
-        _ value: String,
-        context: MarinaInsightContext
-    ) -> Bool {
-        let facts = MarinaAnswerFactsDigest(context: context).text()
-        let factTokens = Set(numericTokens(in: facts))
-        return numericTokens(in: value).allSatisfy(factTokens.contains)
-    }
-
-    private static func numericTokens(in value: String) -> [String] {
-        let pattern = #"[-+]?\$?\d[\d,]*(?:\.\d+)?%?"#
-        guard let regex = try? NSRegularExpression(pattern: pattern) else { return [] }
-        let range = NSRange(value.startIndex..., in: value)
-        return regex.matches(in: value, range: range).compactMap { match in
-            Range(match.range, in: value).map { String(value[$0]) }
-        }
     }
 }
 
@@ -622,9 +602,7 @@ extension MarinaExecutionResult {
             explanation: combined,
             displayedRowCount: displayedRowCount,
             totalRowCount: totalRowCount,
-            fullTotalAmount: fullTotalAmount,
-            hasMore: hasMore,
-            nextOffset: nextOffset
+            fullTotalAmount: fullTotalAmount
         )
     }
 }
