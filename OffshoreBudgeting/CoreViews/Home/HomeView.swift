@@ -64,12 +64,8 @@ struct HomeView: View {
 
     @State private var pinnedItems: [HomePinnedItem]
     @State private var isApplyingSyncedPinnedItems: Bool = false
-    @State private var dashboardSnapshot: HomeDashboardSnapshot = .empty
-    @State private var hasLoadedDashboardSnapshot: Bool = false
-    @State private var needsDashboardSnapshotRefresh: Bool = false
-    @State private var dashboardSnapshotRefreshTask: Task<Void, Never>? = nil
+    @State private var viewModel: HomeViewModel
     @State private var postSettleHousekeepingTask: Task<Void, Never>? = nil
-    @State private var activationEnrichmentTask: Task<Void, Never>? = nil
     @State private var masonryMeasuredHeights: [String: CGFloat] = [:]
     @State private var lastMeasuredUsableWidth: CGFloat = 0
 
@@ -77,50 +73,14 @@ struct HomeView: View {
     @State private var whatIfInitialScenarioID: UUID? = nil
     @State private var whatIfInitialDraft: WhatIfPlannerDraft? = nil
 
-    // MARK: - Data Fixups
-
-    private struct HomeDashboardSnapshot {
-        let plannedExpensesForHome: [PlannedExpense]
-        let calculationPlannedExpensesForHome: [PlannedExpense]
-        let calculationVariableExpensesForHome: [VariableExpense]
-        let nextPlannedExpense: PlannedExpense?
-
-        static let empty = HomeDashboardSnapshot(
-            plannedExpensesForHome: [],
-            calculationPlannedExpensesForHome: [],
-            calculationVariableExpensesForHome: [],
-            nextPlannedExpense: nil
-        )
-    }
-
-    private func computePlannedExpensesForHome() -> [PlannedExpense] {
-        // I filter out budget-generated planned expenses whose source budget no longer exists,
-        // because deleting a budget can leave orphan planned expenses behind.
-        let existingBudgetIDs = Set(budgets.map(\.id))
-
-        return plannedExpenses.filter { expense in
-            guard let sourceBudgetID = expense.sourceBudgetID else {
-                return true
-            }
-            return existingBudgetIDs.contains(sourceBudgetID)
-        }
-    }
+    // MARK: - Prepared Data
 
     private var plannedExpensesForHome: [PlannedExpense] {
-        if hasLoadedDashboardSnapshot {
-            return dashboardSnapshot.plannedExpensesForHome
-        }
-        return computePlannedExpensesForHome()
+        viewModel.snapshot(for: dashboardData).plannedExpensesForHome
     }
 
     private var calculationPlannedExpensesForHome: [PlannedExpense] {
-        if hasLoadedDashboardSnapshot {
-            return dashboardSnapshot.calculationPlannedExpensesForHome
-        }
-        return PlannedExpenseFuturePolicy.filteredForCalculations(
-            plannedExpensesForHome,
-            excludeFuture: excludeFuturePlannedExpensesFromCalculationsInView
-        )
+        viewModel.snapshot(for: dashboardData).calculationPlannedExpensesForHome
     }
 
     private var visiblePlannedExpensesForHome: [PlannedExpense] {
@@ -131,13 +91,7 @@ struct HomeView: View {
     }
 
     private var calculationVariableExpensesForHome: [VariableExpense] {
-        if hasLoadedDashboardSnapshot {
-            return dashboardSnapshot.calculationVariableExpensesForHome
-        }
-        return VariableExpenseFuturePolicy.filteredForCalculations(
-            variableExpenses,
-            excludeFuture: excludeFutureVariableExpensesFromCalculationsInView
-        )
+        viewModel.snapshot(for: dashboardData).calculationVariableExpensesForHome
     }
 
     private var visibleVariableExpensesForHome: [VariableExpense] {
@@ -171,6 +125,7 @@ struct HomeView: View {
     init(workspace: Workspace) {
         self.workspace = workspace
         let workspaceID = workspace.id
+        _viewModel = State(initialValue: HomeViewModel(workspaceID: workspaceID))
         let defaults = UserDefaults.standard
         let defaultBudgetingPeriodRaw = defaults.string(forKey: "general_defaultBudgetingPeriod")
             ?? BudgetingPeriod.monthly.rawValue
@@ -360,23 +315,12 @@ struct HomeView: View {
             syncAppliedRangeToCurrentDefaultBudgetingPeriodIfNeeded()
             applyDefaultBudgetingPeriodIfSettingsChanged()
             syncDraftToAppliedIfNeeded()
-            if hasLoadedDashboardSnapshot == false {
-                hydrateDashboardSnapshotIfAvailable()
-                if hasLoadedDashboardSnapshot == false {
-                    rebuildDashboardSnapshot(reason: "onAppearInitial")
-                    hasLoadedDashboardSnapshot = true
-                }
-                needsDashboardSnapshotRefresh = false
-            } else if needsDashboardSnapshotRefresh {
-                scheduleDashboardSnapshotRefresh(reason: "onAppearRefresh")
-            }
+            viewModel.appear(data: dashboardData, activation: tabActivationContext, cache: detailSnapshotCache)
             schedulePostSettleHousekeeping(reason: "onAppear")
-            scheduleActivationEnrichment(reason: "onAppear")
         }
         .onDisappear {
-            cancelDashboardSnapshotRefresh(reason: "onDisappear")
+            viewModel.disappear()
             cancelPostSettleHousekeeping()
-            cancelActivationEnrichment()
             if shouldSyncCommandSurface {
                 commandHub.deactivate(.home)
             }
@@ -421,23 +365,16 @@ struct HomeView: View {
             excludeFutureVariableExpensesFromCalculationsInView = newValue
         }
         .onChange(of: tabActivationContext) { _, newValue in
-            guard newValue.sectionRawValue == AppSection.home.rawValue else { return }
-            if newValue.phase == .active, needsDashboardSnapshotRefresh {
-                scheduleDashboardSnapshotRefresh(reason: "tabActivationSettled")
+            let neededRefresh = viewModel.needsDashboardSnapshotRefresh
+            viewModel.activationChanged(to: newValue)
+            if newValue.sectionRawValue == AppSection.home.rawValue, newValue.phase == .active, neededRefresh {
                 schedulePostSettleHousekeeping(reason: "tabActivationSettled")
-                scheduleActivationEnrichment(reason: "tabActivationSettled")
-            } else if newValue.phase != .active {
-                cancelDashboardSnapshotRefresh(reason: "tabPhaseChanged")
+            } else if newValue.sectionRawValue != AppSection.home.rawValue || newValue.phase != .active {
                 cancelPostSettleHousekeeping()
-                cancelActivationEnrichment()
             }
         }
-        .onChange(of: dashboardSnapshotInputs) { _, _ in
-            if tabActivationContext.phase == .active {
-                scheduleDashboardSnapshotRefresh(reason: "inputsChanged")
-            } else {
-                needsDashboardSnapshotRefresh = true
-            }
+        .onChange(of: dashboardData.signature) { _, _ in
+            viewModel.update(data: dashboardData)
         }
     }
 
@@ -825,164 +762,18 @@ struct HomeView: View {
         return defaultUsableWidth
     }
 
-    private struct DashboardSnapshotInputs: Equatable {
-        let appliedStartTimestamp: Double
-        let appliedEndTimestamp: Double
-        let excludeFuturePlannedExpensesFromCalculationsInView: Bool
-        let excludeFutureVariableExpensesFromCalculationsInView: Bool
-        let budgetsSignature: Int
-        let plannedExpensesSignature: Int
-        let variableExpensesSignature: Int
-    }
-
-    private var dashboardSnapshotInputs: DashboardSnapshotInputs {
-        DashboardSnapshotInputs(
-            appliedStartTimestamp: appliedStartTimestamp,
-            appliedEndTimestamp: appliedEndTimestamp,
-            excludeFuturePlannedExpensesFromCalculationsInView: excludeFuturePlannedExpensesFromCalculationsInView,
-            excludeFutureVariableExpensesFromCalculationsInView: excludeFutureVariableExpensesFromCalculationsInView,
-            budgetsSignature: SnapshotContentSignature.budgets(budgets),
-            plannedExpensesSignature: SnapshotContentSignature.plannedExpenses(plannedExpenses),
-            variableExpensesSignature: SnapshotContentSignature.variableExpenses(variableExpenses)
+    private var dashboardData: HomeDashboardData {
+        HomeDashboardData(
+            workspaceID: workspace.id, budgets: budgets,
+            plannedExpenses: plannedExpenses, variableExpenses: variableExpenses,
+            startDate: appliedStartDate, endDate: appliedEndDate,
+            excludeFuturePlannedExpenses: excludeFuturePlannedExpensesFromCalculationsInView,
+            excludeFutureVariableExpenses: excludeFutureVariableExpensesFromCalculationsInView
         )
     }
 
     private var nextPlannedExpenseForHome: PlannedExpense? {
-        if hasLoadedDashboardSnapshot {
-            return dashboardSnapshot.nextPlannedExpense
-        }
-
-        return HomeNextPlannedExpenseFinder.nextExpense(
-            from: plannedExpensesForHome,
-            in: appliedStartDate,
-            to: appliedEndDate
-        )
-    }
-
-    private var dashboardSnapshotCacheKey: String {
-        [
-            "home-dashboard",
-            workspace.id.uuidString,
-            String(Int64(appliedStartTimestamp)),
-            String(Int64(appliedEndTimestamp)),
-            excludeFuturePlannedExpensesFromCalculationsInView ? "1" : "0",
-            excludeFutureVariableExpensesFromCalculationsInView ? "1" : "0",
-            String(SnapshotContentSignature.budgets(budgets)),
-            String(SnapshotContentSignature.plannedExpenses(plannedExpenses)),
-            String(SnapshotContentSignature.variableExpenses(variableExpenses))
-        ].joined(separator: "|")
-    }
-
-    private func buildDashboardSnapshot() -> HomeDashboardSnapshot {
-        RootActivationDiagnostics.measure(
-            "homeRootDerived",
-            metadata: [
-                "phase": tabActivationContext.phase.rawValue,
-                "token": String(tabActivationContext.token)
-            ]
-        ) {
-            let plannedExpensesForHome = computePlannedExpensesForHome()
-            let calculationPlannedExpensesForHome = PlannedExpenseFuturePolicy.filteredForCalculations(
-                plannedExpensesForHome,
-                excludeFuture: excludeFuturePlannedExpensesFromCalculationsInView
-            )
-            let calculationVariableExpensesForHome = VariableExpenseFuturePolicy.filteredForCalculations(
-                variableExpenses,
-                excludeFuture: excludeFutureVariableExpensesFromCalculationsInView
-            )
-            let nextPlannedExpense = HomeNextPlannedExpenseFinder.nextExpense(
-                from: plannedExpensesForHome,
-                in: appliedStartDate,
-                to: appliedEndDate
-            )
-
-            return HomeDashboardSnapshot(
-                plannedExpensesForHome: plannedExpensesForHome,
-                calculationPlannedExpensesForHome: calculationPlannedExpensesForHome,
-                calculationVariableExpensesForHome: calculationVariableExpensesForHome,
-                nextPlannedExpense: nextPlannedExpense
-            )
-        }
-    }
-
-    private func rebuildDashboardSnapshot(reason: String) {
-        let start = DispatchTime.now().uptimeNanoseconds
-        dashboardSnapshot = buildDashboardSnapshot()
-        detailSnapshotCache.store(dashboardSnapshot, for: dashboardSnapshotCacheKey)
-        let elapsedMillis = Double(DispatchTime.now().uptimeNanoseconds - start) / 1_000_000
-        TabFlickerDiagnostics.markEvent(
-            "homeDashboardSnapshotFinished",
-            metadata: [
-                "reason": reason,
-                "elapsedMs": String(format: "%.1f", elapsedMillis)
-            ]
-        )
-    }
-
-    private func hydrateDashboardSnapshotIfAvailable() {
-        guard let cached: HomeDashboardSnapshot = detailSnapshotCache.snapshot(for: dashboardSnapshotCacheKey) else {
-            return
-        }
-
-        dashboardSnapshot = cached
-        hasLoadedDashboardSnapshot = true
-        TabFlickerDiagnostics.markEvent("homeDashboardSnapshotHydrated")
-    }
-
-    private func scheduleDashboardSnapshotRefresh(reason: String) {
-        cancelDashboardSnapshotRefresh(reason: "reschedule")
-        let activationToken = tabActivationContext.token
-        let activationPhase = tabActivationContext.phase
-        TabFlickerDiagnostics.markEvent(
-            "homeDashboardSnapshotScheduled",
-            metadata: [
-                "reason": reason,
-                "phase": activationPhase.rawValue,
-                "token": String(activationToken)
-            ]
-        )
-
-        if activationPhase == .active {
-            rebuildDashboardSnapshot(reason: reason)
-            hasLoadedDashboardSnapshot = true
-            needsDashboardSnapshotRefresh = false
-            return
-        }
-
-        needsDashboardSnapshotRefresh = true
-        dashboardSnapshotRefreshTask = Task {
-            try? await Task.sleep(nanoseconds: 220_000_000)
-            guard Task.isCancelled == false else { return }
-
-            await MainActor.run {
-                guard tabActivationContext.sectionRawValue == AppSection.home.rawValue,
-                      tabActivationContext.phase == .active,
-                      tabActivationContext.token == activationToken else {
-                    TabFlickerDiagnostics.markEvent(
-                        "homeDashboardSnapshotCancelled",
-                        metadata: [
-                            "reason": reason,
-                            "cancel": "activationChanged"
-                        ]
-                    )
-                    return
-                }
-
-                rebuildDashboardSnapshot(reason: reason)
-                hasLoadedDashboardSnapshot = true
-                needsDashboardSnapshotRefresh = false
-            }
-        }
-    }
-
-    private func cancelDashboardSnapshotRefresh(reason: String) {
-        guard dashboardSnapshotRefreshTask != nil else { return }
-        dashboardSnapshotRefreshTask?.cancel()
-        dashboardSnapshotRefreshTask = nil
-        TabFlickerDiagnostics.markEvent(
-            "homeDashboardSnapshotCancelled",
-            metadata: ["reason": reason]
-        )
+        viewModel.snapshot(for: dashboardData).nextPlannedExpense
     }
 
     private func schedulePostSettleHousekeeping(reason: String) {
@@ -1013,38 +804,6 @@ struct HomeView: View {
     private func cancelPostSettleHousekeeping() {
         postSettleHousekeepingTask?.cancel()
         postSettleHousekeepingTask = nil
-    }
-
-    private func scheduleActivationEnrichment(reason: String) {
-        cancelActivationEnrichment()
-        let activationToken = tabActivationContext.token
-
-        activationEnrichmentTask = Task {
-            try? await Task.sleep(nanoseconds: 170_000_000)
-            guard Task.isCancelled == false else { return }
-
-            await MainActor.run {
-                guard tabActivationContext.sectionRawValue == AppSection.home.rawValue,
-                      tabActivationContext.phase == .active,
-                      tabActivationContext.token == activationToken else {
-                    return
-                }
-
-                if needsDashboardSnapshotRefresh {
-                    scheduleDashboardSnapshotRefresh(reason: "postSettleEnrichment")
-                }
-
-                TabFlickerDiagnostics.markEvent(
-                    "homeActivationEnrichmentFinished",
-                    metadata: ["reason": reason]
-                )
-            }
-        }
-    }
-
-    private func cancelActivationEnrichment() {
-        activationEnrichmentTask?.cancel()
-        activationEnrichmentTask = nil
     }
 
     private func buildPinnedLayoutItems(columns: Int) -> [PinnedLayoutCell] {

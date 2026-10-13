@@ -705,6 +705,7 @@ struct AppRootView: View {
 
     private var homeRootView: some View {
         HomeView(workspace: workspace)
+            .id(workspace.id)
     }
 
     private func traceTabSelection(from oldValue: String, to newValue: String) {
