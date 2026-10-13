@@ -8,6 +8,7 @@
 import SwiftUI
 import SwiftData
 import Foundation
+import Combine
 
 struct HomeView: View {
 
@@ -20,27 +21,6 @@ struct HomeView: View {
     @Query private var categories: [Category]
     @Query private var variableExpenses: [VariableExpense]
     @Query private var savingsEntries: [SavingsLedgerEntry]
-
-    // MARK: - Date Range Storage (per workspace)
-
-    private static func appliedStartKey(workspaceID: UUID) -> String {
-        "home_appliedStartTimestamp_\(workspaceID.uuidString)"
-    }
-
-    private static func appliedEndKey(workspaceID: UUID) -> String {
-        "home_appliedEndTimestamp_\(workspaceID.uuidString)"
-    }
-
-    private static func lastSyncedDefaultBudgetingPeriodKey(workspaceID: UUID) -> String {
-        "home_lastSyncedDefaultBudgetingPeriod_\(workspaceID.uuidString)"
-    }
-
-    private static let legacyAppliedStartKey = "home_appliedStartTimestamp"
-    private static let legacyAppliedEndKey = "home_appliedEndTimestamp"
-
-    @AppStorage private var appliedStartTimestamp: Double
-    @AppStorage private var appliedEndTimestamp: Double
-    @AppStorage private var lastSyncedDefaultBudgetingPeriodRaw: String
 
     @AppStorage("general_defaultBudgetingPeriod")
     private var defaultBudgetingPeriodRaw: String = BudgetingPeriod.monthly.rawValue
@@ -125,7 +105,6 @@ struct HomeView: View {
     init(workspace: Workspace) {
         self.workspace = workspace
         let workspaceID = workspace.id
-        _viewModel = State(initialValue: HomeViewModel(workspaceID: workspaceID))
         let defaults = UserDefaults.standard
         let defaultBudgetingPeriodRaw = defaults.string(forKey: "general_defaultBudgetingPeriod")
             ?? BudgetingPeriod.monthly.rawValue
@@ -134,26 +113,13 @@ struct HomeView: View {
             fallbackCardIDs: (workspace.cards ?? []).map(\.id),
             defaults: defaults
         )
-        let appliedRangeSeed = HomeViewBootstrap.initialAppliedRangeSeed(
-            workspaceID: workspaceID,
-            defaultBudgetingPeriodRaw: defaultBudgetingPeriodRaw,
-            defaults: defaults
+        let model = HomeViewModel(
+            workspaceID: workspaceID, defaults: defaults,
+            defaultBudgetingPeriodRaw: defaultBudgetingPeriodRaw
         )
-
-        _appliedStartTimestamp = AppStorage(
-            wrappedValue: appliedRangeSeed.start.timeIntervalSince1970,
-            Self.appliedStartKey(workspaceID: workspaceID)
-        )
-        _appliedEndTimestamp = AppStorage(
-            wrappedValue: appliedRangeSeed.end.timeIntervalSince1970,
-            Self.appliedEndKey(workspaceID: workspaceID)
-        )
-        _lastSyncedDefaultBudgetingPeriodRaw = AppStorage(
-            wrappedValue: appliedRangeSeed.lastSyncedDefaultBudgetingPeriodRaw,
-            Self.lastSyncedDefaultBudgetingPeriodKey(workspaceID: workspaceID)
-        )
-        _draftStartDate = State(initialValue: appliedRangeSeed.start)
-        _draftEndDate = State(initialValue: appliedRangeSeed.end)
+        _viewModel = State(initialValue: model)
+        _draftStartDate = State(initialValue: model.appliedStartDate)
+        _draftEndDate = State(initialValue: model.appliedEndDate)
         _hideFuturePlannedExpensesInView = State(
             initialValue: defaults.bool(forKey: "general_hideFuturePlannedExpenses")
         )
@@ -311,9 +277,7 @@ struct HomeView: View {
             if shouldSyncCommandSurface {
                 commandHub.activate(.home)
             }
-            bootstrapAppliedDatesIfNeeded()
-            syncAppliedRangeToCurrentDefaultBudgetingPeriodIfNeeded()
-            applyDefaultBudgetingPeriodIfSettingsChanged()
+            viewModel.synchronizeAppliedRangeForAppearance(defaultBudgetingPeriodRaw: defaultBudgetingPeriodRaw)
             syncDraftToAppliedIfNeeded()
             viewModel.appear(data: dashboardData, activation: tabActivationContext, cache: detailSnapshotCache)
             schedulePostSettleHousekeeping(reason: "onAppear")
@@ -343,9 +307,11 @@ struct HomeView: View {
         .onChange(of: cardIDSet) { _, _ in
             prunePinnedCardsIfNeeded()
         }
+        .onReceive(NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification).receive(on: RunLoop.main)) { _ in
+            viewModel.reloadAppliedRangeFromDefaults()
+        }
         .onChange(of: defaultBudgetingPeriodRaw) { _, _ in
-            applyDefaultBudgetingPeriodToApplied()
-            lastSyncedDefaultBudgetingPeriodRaw = defaultBudgetingPeriodRaw
+            viewModel.applyDefaultBudgetingPeriod(defaultBudgetingPeriodRaw)
             syncDraftToAppliedIfNeeded()
         }
         .onChange(of: hideFuturePlannedExpensesDefault) { _, newValue in
@@ -1045,11 +1011,11 @@ struct HomeView: View {
     }
 
     private var appliedStartDate: Date {
-        Date(timeIntervalSince1970: appliedStartTimestamp)
+        viewModel.appliedStartDate
     }
 
     private var appliedEndDate: Date {
-        Date(timeIntervalSince1970: appliedEndTimestamp)
+        viewModel.appliedEndDate
     }
 
     private var dateRangeSubtitle: String {
@@ -1062,81 +1028,11 @@ struct HomeView: View {
         draftEndDate = appliedEndDate
     }
 
-    private func bootstrapAppliedDatesIfNeeded() {
-        guard isAppliedRangeInitialized == false else { return }
-
-        if migrateLegacyAppliedRangeIfNeeded() {
-            lastSyncedDefaultBudgetingPeriodRaw = defaultBudgetingPeriodRaw
-            return
-        }
-
-        applyDefaultBudgetingPeriodToApplied()
-        lastSyncedDefaultBudgetingPeriodRaw = defaultBudgetingPeriodRaw
-    }
-
-    private var isAppliedRangeInitialized: Bool {
-        appliedStartTimestamp > 0 && appliedEndTimestamp > 0
-    }
-
-    @discardableResult
-    private func migrateLegacyAppliedRangeIfNeeded() -> Bool {
-        let defaults = UserDefaults.standard
-
-        let legacyStart = defaults.double(forKey: Self.legacyAppliedStartKey)
-        let legacyEnd = defaults.double(forKey: Self.legacyAppliedEndKey)
-
-        guard legacyStart > 0, legacyEnd > 0 else { return false }
-
-        appliedStartTimestamp = legacyStart
-        appliedEndTimestamp = legacyEnd
-        return true
-    }
-
-    private func applyDefaultBudgetingPeriodToApplied() {
-        let canonicalSeed = HomeViewBootstrap.canonicalAppliedRangeSeed(
-            defaultBudgetingPeriodRaw: defaultBudgetingPeriodRaw,
-            now: Date(),
-            calendar: .current
-        )
-        setAppliedRange(start: canonicalSeed.start, end: canonicalSeed.end)
-    }
-
-    private func applyDefaultBudgetingPeriodIfSettingsChanged() {
-        guard lastSyncedDefaultBudgetingPeriodRaw != defaultBudgetingPeriodRaw else { return }
-        applyDefaultBudgetingPeriodToApplied()
-        lastSyncedDefaultBudgetingPeriodRaw = defaultBudgetingPeriodRaw
-    }
-
-    private func syncAppliedRangeToCurrentDefaultBudgetingPeriodIfNeeded() {
-        let canonicalSeed = HomeViewBootstrap.canonicalAppliedRangeSeed(
-            defaultBudgetingPeriodRaw: defaultBudgetingPeriodRaw,
-            now: Date(),
-            calendar: .current
-        )
-
-        guard appliedStartDate != canonicalSeed.start || appliedEndDate != canonicalSeed.end else { return }
-
-        setAppliedRange(start: canonicalSeed.start, end: canonicalSeed.end)
-        lastSyncedDefaultBudgetingPeriodRaw = defaultBudgetingPeriodRaw
-    }
-
-    private func setAppliedRange(start: Date, end: Date) {
-        let clampedEnd = max(end, start)
-        appliedStartTimestamp = start.timeIntervalSince1970
-        appliedEndTimestamp = clampedEnd.timeIntervalSince1970
-    }
-
     private func applyDraftRange() {
-        let start = draftStartDate
-        let end = draftEndDate
-
-        if end < start {
-            draftEndDate = start
-            setAppliedRange(start: start, end: start)
-            return
+        viewModel.applyRange(start: draftStartDate, end: draftEndDate)
+        if draftEndDate < draftStartDate {
+            draftEndDate = viewModel.appliedEndDate
         }
-
-        setAppliedRange(start: start, end: end)
     }
 
     private func formattedDate(_ date: Date) -> String {

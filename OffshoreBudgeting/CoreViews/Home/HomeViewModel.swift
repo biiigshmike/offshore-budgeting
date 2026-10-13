@@ -6,6 +6,9 @@ import Observation
 @Observable
 final class HomeViewModel {
     let workspaceID: UUID
+    private(set) var appliedStartDate: Date
+    private(set) var appliedEndDate: Date
+    private(set) var lastSyncedDefaultBudgetingPeriodRaw: String
     private(set) var dashboardSnapshot: HomeDashboardSnapshot = .empty
     private(set) var hasLoadedDashboardSnapshot = false
     private(set) var needsDashboardSnapshotRefresh = false
@@ -18,21 +21,81 @@ final class HomeViewModel {
     @ObservationIgnored private var generation = 0
     @ObservationIgnored private var refreshTask: Task<Void, Never>?
     @ObservationIgnored private var enrichmentTask: Task<Void, Never>?
+    @ObservationIgnored private let defaults: UserDefaults
     @ObservationIgnored private let now: () -> Date
     @ObservationIgnored private let calendar: Calendar
     @ObservationIgnored private let sleep: (UInt64) async throws -> Void
 
     init(
         workspaceID: UUID,
+        defaults: UserDefaults = .standard,
+        defaultBudgetingPeriodRaw: String? = nil,
         now: @escaping () -> Date = Date.init,
         calendar: Calendar = .current,
         sleep: @escaping (UInt64) async throws -> Void = { try await Task.sleep(nanoseconds: $0) }
     ) {
         self.workspaceID = workspaceID
+        self.defaults = defaults
+        let period = defaultBudgetingPeriodRaw
+            ?? defaults.string(forKey: "general_defaultBudgetingPeriod") ?? BudgetingPeriod.monthly.rawValue
+        let range = HomeViewBootstrap.initialAppliedRangeSeed(
+            workspaceID: workspaceID, defaultBudgetingPeriodRaw: period,
+            defaults: defaults, now: now(), calendar: calendar
+        )
+        appliedStartDate = range.start
+        appliedEndDate = range.end
+        lastSyncedDefaultBudgetingPeriodRaw = range.lastSyncedDefaultBudgetingPeriodRaw
         self.now = now
         self.calendar = calendar
         self.sleep = sleep
     }
+
+    // MARK: - Applied date range
+
+    func synchronizeAppliedRangeForAppearance(defaultBudgetingPeriodRaw: String) {
+        // Existing Home behavior deliberately resets custom ranges on appearance.
+        applyDefaultBudgetingPeriod(defaultBudgetingPeriodRaw)
+    }
+
+    func applyDefaultBudgetingPeriod(_ rawValue: String) {
+        let range = HomeViewBootstrap.canonicalAppliedRangeSeed(
+            defaultBudgetingPeriodRaw: rawValue, now: now(), calendar: calendar
+        )
+        lastSyncedDefaultBudgetingPeriodRaw = rawValue
+        applyRange(start: range.start, end: range.end)
+    }
+
+    func applyRange(start: Date, end: Date) {
+        setAppliedDates(start: start, end: max(start, end))
+        HomeViewBootstrap.saveAppliedRangeSeed(
+            HomeViewBootstrap.AppliedRangeSeed(
+                start: appliedStartDate, end: appliedEndDate,
+                lastSyncedDefaultBudgetingPeriodRaw: lastSyncedDefaultBudgetingPeriodRaw
+            ), workspaceID: workspaceID, defaults: defaults
+        )
+    }
+
+    func reloadAppliedRangeFromDefaults() {
+        guard let stored = HomeViewBootstrap.storedAppliedRangeSeed(workspaceID: workspaceID, defaults: defaults) else { return }
+        lastSyncedDefaultBudgetingPeriodRaw = stored.lastSyncedDefaultBudgetingPeriodRaw
+        setAppliedDates(start: stored.start, end: stored.end)
+    }
+
+    private func setAppliedDates(start: Date, end: Date) {
+        guard appliedStartDate != start || appliedEndDate != end else { return }
+        appliedStartDate = start
+        appliedEndDate = end
+        guard let data else { return }
+        update(data: HomeDashboardData(
+            workspaceID: workspaceID, budgets: data.budgets,
+            plannedExpenses: data.plannedExpenses, variableExpenses: data.variableExpenses,
+            startDate: start, endDate: end,
+            excludeFuturePlannedExpenses: data.excludeFuturePlannedExpenses,
+            excludeFutureVariableExpenses: data.excludeFutureVariableExpenses
+        ))
+    }
+
+    // MARK: - Dashboard lifecycle
 
     func snapshot(for data: HomeDashboardData) -> HomeDashboardSnapshot {
         guard data.workspaceID == workspaceID else { return .empty }
