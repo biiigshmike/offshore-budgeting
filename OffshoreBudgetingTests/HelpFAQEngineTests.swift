@@ -7,28 +7,8 @@ struct HelpFAQEngineTests {
 
     // MARK: - Answering
 
-    @Test func answer_exactTopicQuestion_returnsMarinaTopic() {
-        let engine = HelpFAQEngine()
-
-        let answer = engine.answer(
-            prompt: "How does Marina assistant work in Home?",
-            topics: GeneratedHelpContent.allLeafTopics
-        )
-
-        #expect(answer != nil)
-        #expect(answer?.match.topicID == "home-marina")
-    }
-
-    @Test func answer_marinaCapabilityQuestion_returnsMarinaTopic() {
-        let engine = HelpFAQEngine()
-
-        let answer = engine.answer(
-            prompt: "What kinds of questions should I ask Marina?",
-            topics: GeneratedHelpContent.allLeafTopics
-        )
-
-        #expect(answer != nil)
-        #expect(answer?.match.topicID == "home-marina")
+    @Test func topics_excludeRetiredFeatures() {
+        #expect(!GeneratedHelpContent.allLeafTopics.contains { $0.id == "home-marina" || $0.id == "introduction-excursion-mode" })
     }
 
     @Test func answer_sectionHeaderLanguage_resolvesBudgetOverviewTopic() {

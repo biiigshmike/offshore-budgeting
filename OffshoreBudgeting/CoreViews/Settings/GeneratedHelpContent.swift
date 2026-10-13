@@ -240,8 +240,7 @@ enum GeneratedHelpContent {
                 "introduction-budgets",
                 "introduction-calculations",
                 "introduction-import",
-                "introduction-quick-actions",
-                "introduction-excursion-mode"
+                "introduction-quick-actions"
             ]
         ),
         GeneratedHelpDestination(
@@ -253,7 +252,6 @@ enum GeneratedHelpContent {
             leafTopicIDs: [
                 "home-overview",
                 "home-customization",
-                "home-marina",
                 "home-widgets"
             ]
         ),
@@ -582,39 +580,6 @@ enum GeneratedHelpContent {
             title: "Quick Actions",
             sections: quickActionsGuideSections(prefix: "introduction-quick-actions", isSettingsVariant: false)
         ),
-        GeneratedHelpLeafTopic(
-            id: "introduction-excursion-mode",
-            destinationID: "introduction",
-            title: "Excursion Mode",
-            sections: [
-                textSection(
-                    id: "introduction-excursion-mode-1",
-                    header: "What Excursion Mode Is",
-                    body: "Excursion Mode is a focused tracking mode for high-activity windows when transactions are happening quickly. It prioritizes fast capture so you can stay present while still logging spending accurately.\n\nUse it when real-time awareness matters more than deep entry detail in the moment."
-                ),
-                textSection(
-                    id: "introduction-excursion-mode-2",
-                    header: "When To Use It",
-                    body: "Use Excursion Mode during travel, outings, event days, or any period with many small transactions. It is especially helpful when waiting until later would cause details to be forgotten.\n\nShort bursts of consistent capture can dramatically improve data quality and reduce end-of-day guesswork."
-                ),
-                textSection(
-                    id: "introduction-excursion-mode-3",
-                    header: "How To Work In It",
-                    body: "Capture each transaction quickly, then return later for deeper cleanup if needed, such as notes or category refinement. Keep the process simple so you keep momentum.\n\nThe goal in this mode is completeness first, refinement second. A complete draft record is better than a missing one."
-                ),
-                textSection(
-                    id: "introduction-excursion-mode-4",
-                    header: "Verify After A Session",
-                    body: "When the high-activity window ends, do a short closeout review. Confirm totals align with what you expected and fix obvious mislabels while memory is still fresh.\n\nThis quick wrap-up step keeps excursion sessions accurate and prevents cleanup from piling up later."
-                ),
-                textSection(
-                    id: "introduction-excursion-mode-5",
-                    header: "Excursion Mode Pitfalls",
-                    body: "Avoid over-editing entries in the moment, because that usually leads to skipped capture. Focus on fast capture first.\n\nAlso avoid skipping the post-session review. Fast entry is great for speed, but the short cleanup pass is what locks in long-term accuracy."
-                )
-            ]
-        ),
-
         // MARK: Home
 
         GeneratedHelpLeafTopic(
@@ -664,26 +629,6 @@ enum GeneratedHelpContent {
                             assetName: "Help/CoreScreens/Home/Customization/edit-home-3",
                             bodyText: "This final step confirms and saves your updated Home layout. After saving, perform a quick scan to verify the new order feels right in real use. If a tile is still out of place, adjust it now while the workflow is fresh. Regular small refinements keep the Home experience aligned with your budgeting habits.",
                             fullscreenCaptionText: "Save and test the new layout, then make small tweaks until the flow feels natural."
-                        )
-                    ]
-                )
-            ]
-        ),
-        GeneratedHelpLeafTopic(
-            id: "home-marina",
-            destinationID: "home",
-            title: "Marina",
-            sections: [
-                mediaSection(
-                    id: "home-marina-1",
-                    header: "Marina",
-                    body: "Open Marina from Home for workspace-scoped read-only chat about spending, income, categories, cards, budgets, and savings. Use the + menu for explicit create forms.\n\nFor edits, deletes, and deeper review flows, use the owning app screens so records stay clear and traceable.",
-                    media: [
-                        mediaItem(
-                            id: "home-marina-1-image-1",
-                            assetName: "Help/CoreScreens/Home/Marina/marina",
-                            bodyText: "Open Marina from Home for read-only chat. Use Marina's + menu for explicit create forms, and use owning screens for edits, deletes, and review.",
-                            fullscreenCaptionText: "Marina keeps chat read-only and creation explicit."
                         )
                     ]
                 )

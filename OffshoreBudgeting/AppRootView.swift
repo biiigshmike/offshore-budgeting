@@ -473,10 +473,6 @@ struct AppRootView: View {
             .environment(\.appTabActivationContext, context)
             .id(selectedSection)
         }
-        .marinaHost(
-            workspace: workspace,
-            isEnabled: selectedSection == .home
-        )
         .background {
             MacWindowSceneTitleHost(title: macWindowSceneTitle)
         }

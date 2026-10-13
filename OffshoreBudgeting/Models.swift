@@ -1188,7 +1188,9 @@ final class ImportMerchantRule {
     }
 }
 
-// MARK: - Assistant Alias Rule
+// MARK: - Retired Assistant Storage (SwiftData / CloudKit Compatibility)
+// Keep these model names, fields, and relationships stable for existing stores.
+// Runtime retirement deletes their records; rebuilding Marina must remove that cleanup first.
 
 enum MarinaAliasEntityType: String, Codable, CaseIterable, Identifiable {
     case card
