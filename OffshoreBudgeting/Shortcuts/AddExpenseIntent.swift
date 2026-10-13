@@ -5,7 +5,7 @@ import Foundation
 
 struct AddExpenseIntent: AppIntent {
     static var title: LocalizedStringResource = "Add Expense"
-    static var description = IntentDescription("Create a new expense in your selected Offshore workspace.")
+    static var description = IntentDescription("Add an expense in your selected Offshore workspace using the fields in Shortcuts.")
     static var openAppWhenRun: Bool = false
 
     @Parameter(
@@ -19,12 +19,6 @@ struct AddExpenseIntent: AppIntent {
         requestValueDialog: IntentDialog("Which Offshore card should this expense use?")
     )
     var card: OffshoreCardEntity?
-
-    @Parameter(
-        title: "Wallet Card",
-        requestValueDialog: IntentDialog("What Wallet card or pass name should I use?")
-    )
-    var walletCardName: String?
 
     @Parameter(
         title: "Category",
@@ -47,17 +41,20 @@ struct AddExpenseIntent: AppIntent {
     init() {
         self.amountText = nil
         self.card = nil
-        self.walletCardName = nil
         self.category = nil
         self.merchant = nil
         self.date = nil
     }
 
     func perform() async throws -> some IntentResult & ProvidesDialog {
+        guard let card, !card.id.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            throw $card.needsValueError("Please choose an Offshore card.")
+        }
+
         let request = AddExpenseShortcutExecutor.Request(
             amountText: amountText,
-            offshoreCardID: card?.id,
-            walletCardName: walletCardName,
+            offshoreCardID: card.id,
+            walletCardName: nil,
             categoryID: category?.id,
             merchant: merchant,
             date: date
@@ -76,12 +73,7 @@ struct AddExpenseIntent: AppIntent {
                     IntentDialog(stringLiteral: requestError.errorDescription ?? "Please provide a valid amount.")
                 )
             case .missingCard:
-                throw $walletCardName.needsValueError(
-                    IntentDialog(
-                        stringLiteral: requestError.errorDescription
-                            ?? "Please choose an Offshore card or provide the Wallet card name."
-                    )
-                )
+                throw $card.needsValueError("Please choose an Offshore card.")
             case .missingMerchant:
                 throw $merchant.needsValueError(
                     IntentDialog(

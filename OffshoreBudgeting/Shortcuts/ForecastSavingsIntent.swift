@@ -5,7 +5,7 @@ import Foundation
 
 struct ForecastSavingsIntent: AppIntent {
     static var title: LocalizedStringResource = "Forecast Savings"
-    static var description = IntentDescription("Return projected end-of-month savings and an overspend warning when applicable.")
+    static var description = IntentDescription("Return a projected end-of-month savings text summary and any overspend warning for use in subsequent shortcut actions.")
     static var openAppWhenRun: Bool = false
 
     func perform() async throws -> some IntentResult & ProvidesDialog & ReturnsValue<String> {

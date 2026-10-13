@@ -18,7 +18,7 @@ private struct OpenOffshoreAppIntent: AppIntent {
 
 struct ReviewTodaysSpendingIntent: AppIntent {
     static var title: LocalizedStringResource = "Review Today's Spending"
-    static var description = IntentDescription("Summarize today's spending and optionally open Offshore to the Cards tab for review.")
+    static var description = IntentDescription("Return today's spending summary as a dialog and optionally open Offshore to the Cards tab for review.")
     static var openAppWhenRun: Bool = false
 
     @Parameter(title: "Open in Offshore")

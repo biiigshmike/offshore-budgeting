@@ -23,32 +23,5 @@ struct OffshoreAppShortcuts: AppShortcutsProvider {
             shortTitle: "Add Income",
             systemImageName: "banknote"
         )
-        AppShortcut(
-            intent: ReviewTodaysSpendingIntent(),
-            phrases: [
-                "Review today's spending in \(.applicationName)",
-                "Check today's spending in \(.applicationName)"
-            ],
-            shortTitle: "Review Today",
-            systemImageName: "list.bullet.clipboard"
-        )
-        AppShortcut(
-            intent: WhatCanISpendTodayIntent(),
-            phrases: [
-                "What can I spend today in \(.applicationName)",
-                "Check safe spending in \(.applicationName)"
-            ],
-            shortTitle: "Safe Spend Today",
-            systemImageName: "dollarsign.circle"
-        )
-        AppShortcut(
-            intent: ForecastSavingsIntent(),
-            phrases: [
-                "Forecast savings in \(.applicationName)",
-                "Check projected savings in \(.applicationName)"
-            ],
-            shortTitle: "Forecast Savings",
-            systemImageName: "chart.line.uptrend.xyaxis"
-        )
     }
 }

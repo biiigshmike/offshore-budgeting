@@ -17,6 +17,7 @@ enum OffshoreWidgetDeepLink {
 struct WidgetOpenAddExpenseIntent: AppIntent {
     static var title: LocalizedStringResource = "Add Expense"
     static var description = IntentDescription("Open Offshore directly to quick add expense.")
+    static var isDiscoverable: Bool = false
     static var openAppWhenRun: Bool = true
 
     func perform() async throws -> some IntentResult {
@@ -28,6 +29,7 @@ struct WidgetOpenAddExpenseIntent: AppIntent {
 struct WidgetOpenAddIncomeIntent: AppIntent {
     static var title: LocalizedStringResource = "Add Income"
     static var description = IntentDescription("Open Offshore directly to quick add income.")
+    static var isDiscoverable: Bool = false
     static var openAppWhenRun: Bool = true
 
     func perform() async throws -> some IntentResult {
@@ -39,6 +41,7 @@ struct WidgetOpenAddIncomeIntent: AppIntent {
 struct WidgetReviewTodayIntent: AppIntent {
     static var title: LocalizedStringResource = "Review Today"
     static var description = IntentDescription("Open Offshore for a review of today's spending.")
+    static var isDiscoverable: Bool = false
     static var openAppWhenRun: Bool = true
 
     func perform() async throws -> some IntentResult {
@@ -50,6 +53,7 @@ struct WidgetReviewTodayIntent: AppIntent {
 struct WidgetOpenSafeSpendTodayIntent: AppIntent {
     static var title: LocalizedStringResource = "Safe Spend Today"
     static var description = IntentDescription("Open Offshore to review safe spending guidance for today.")
+    static var isDiscoverable: Bool = false
     static var openAppWhenRun: Bool = true
 
     func perform() async throws -> some IntentResult {
@@ -61,6 +65,7 @@ struct WidgetOpenSafeSpendTodayIntent: AppIntent {
 struct WidgetOpenForecastSavingsIntent: AppIntent {
     static var title: LocalizedStringResource = "Forecast Savings"
     static var description = IntentDescription("Open Offshore to review your savings outlook.")
+    static var isDiscoverable: Bool = false
     static var openAppWhenRun: Bool = true
 
     func perform() async throws -> some IntentResult {

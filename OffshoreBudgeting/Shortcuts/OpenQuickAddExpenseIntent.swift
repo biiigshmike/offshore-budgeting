@@ -4,8 +4,9 @@ import Foundation
 // MARK: - OpenQuickAddExpenseIntent
 
 struct OpenQuickAddExpenseIntent: AppIntent {
-    static var title: LocalizedStringResource = "Log Expense"
-    static var description = IntentDescription("Open Offshore directly to a quick add expense sheet.")
+    static var title: LocalizedStringResource = "Add Expense"
+    static var description = IntentDescription("Open Offshore to the expense entry form in your selected workspace.")
+    static var isDiscoverable: Bool = false
     static var openAppWhenRun: Bool = false
 
     func perform() async throws -> some IntentResult & ProvidesDialog & OpensIntent {

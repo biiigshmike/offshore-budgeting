@@ -12,7 +12,8 @@ import AppKit
 
 struct ImportScreenshotIntent: AppIntent {
     static var title: LocalizedStringResource = "Import Screenshot"
-    static var description = IntentDescription("Parse a screenshot image and return an import preview summary.")
+    static var description = IntentDescription("Return an import preview text summary from a screenshot for subsequent shortcut actions, or open the review in Offshore.")
+    static var isDiscoverable: Bool = false
     static var openAppWhenRun: Bool = false
 
     @Parameter(
