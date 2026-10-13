@@ -299,6 +299,7 @@
       }
     },
     "30 min" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -345,6 +346,7 @@
       }
     },
     "Active until %@" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -610,6 +612,18 @@
     "Card Filter" : {
       "comment" : "Type of entity used to filter the list of cards.",
       "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تصفية البطاقة"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kartenfilter"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
@@ -626,18 +640,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Filtre de carte"
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Kartenfilter"
-          }
-        },
-        "ar" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "تصفية البطاقة"
           }
         },
         "pt-BR" : {
@@ -777,6 +779,18 @@
     "Current Month" : {
       "comment" : "Display representation of the current month period.",
       "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "الشهر الحالي"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aktueller Monat"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
@@ -793,18 +807,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Mois en cours"
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Aktueller Monat"
-          }
-        },
-        "ar" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "الشهر الحالي"
           }
         },
         "pt-BR" : {
@@ -824,6 +826,18 @@
     "Current Quarter" : {
       "comment" : "Display representation of the current quarter period.",
       "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "الربع الحالي"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aktuelles Quartal"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
@@ -840,18 +854,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Trimestre en cours"
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Aktuelles Quartal"
-          }
-        },
-        "ar" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "الربع الحالي"
           }
         },
         "pt-BR" : {
@@ -871,6 +873,18 @@
     "Current Week" : {
       "comment" : "Display representation of the current week period.",
       "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "الأسبوع الحالي"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aktuelle Woche"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
@@ -887,18 +901,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Semaine en cours"
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Aktuelle Woche"
-          }
-        },
-        "ar" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "الأسبوع الحالي"
           }
         },
         "pt-BR" : {
@@ -918,6 +920,18 @@
     "Current Year" : {
       "comment" : "Display representation of the current year period.",
       "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "السنة الحالية"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aktuelles Jahr"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
@@ -934,18 +948,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Année en cours"
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Aktuelles Jahr"
-          }
-        },
-        "ar" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "السنة الحالية"
           }
         },
         "pt-BR" : {
@@ -1003,6 +1005,7 @@
       }
     },
     "Done" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -1049,6 +1052,7 @@
       }
     },
     "Ended" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -1095,6 +1099,7 @@
       }
     },
     "Ends %@" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -2060,6 +2065,7 @@
       }
     },
     "Offshore" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -3191,6 +3197,7 @@
       }
     },
     "Session ended" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -3518,6 +3525,7 @@
       }
     },
     "Stop" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -3810,6 +3818,7 @@
       }
     },
     "Until %@" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
