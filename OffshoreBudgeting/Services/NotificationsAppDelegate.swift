@@ -65,12 +65,6 @@ final class NotificationsAppDelegate: NSObject, UIApplicationDelegate, UNUserNot
             options: [.foreground]
         )
 
-        let openAction = UNNotificationAction(
-            identifier: LocalNotificationService.NotificationAction.openQuickAddExpenseFromShoppingMode.rawValue,
-            title: "Add Expense",
-            options: [.foreground]
-        )
-
         let dailyExpenseCategory = UNNotificationCategory(
             identifier: LocalNotificationService.NotificationCategory.dailyExpenseReminder,
             actions: [openCardsAction],
@@ -92,18 +86,10 @@ final class NotificationsAppDelegate: NSObject, UIApplicationDelegate, UNUserNot
             options: []
         )
 
-        let shoppingSuggestionCategory = UNNotificationCategory(
-            identifier: LocalNotificationService.NotificationCategory.shoppingModeSuggestion,
-            actions: [openAction],
-            intentIdentifiers: [],
-            options: []
-        )
-
         return [
             dailyExpenseCategory,
             plannedIncomeCategory,
-            presetDueCategory,
-            shoppingSuggestionCategory
+            presetDueCategory
         ]
     }
 
@@ -135,8 +121,6 @@ final class NotificationsAppDelegate: NSObject, UIApplicationDelegate, UNUserNot
             routeToQuickAddIncome()
         case .presetDueReminder:
             routeToBudgets()
-        case .shoppingModeSuggestion:
-            routeToQuickAddExpense(userInfo: userInfo)
         }
     }
 
@@ -148,8 +132,6 @@ final class NotificationsAppDelegate: NSObject, UIApplicationDelegate, UNUserNot
             routeToBudgets()
         case .openQuickAddIncome:
             routeToQuickAddIncome()
-        case .openQuickAddExpenseFromShoppingMode:
-            routeToQuickAddExpense(userInfo: userInfo)
         }
     }
 
@@ -183,28 +165,6 @@ final class NotificationsAppDelegate: NSObject, UIApplicationDelegate, UNUserNot
         UserDefaults.standard.removeObject(forKey: AppShortcutNavigationStore.pendingExpenseDescriptionKey)
     }
 
-    private static func routeToQuickAddExpense(userInfo: [AnyHashable: Any]) {
-        let merchantName = (userInfo[LocalNotificationService.UserInfoKey.merchantName] as? String)?
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-
-        UserDefaults.standard.set(
-            AppSection.cards.rawValue,
-            forKey: AppShortcutNavigationStore.pendingSectionKey
-        )
-        UserDefaults.standard.set(
-            AppShortcutNavigationStore.PendingAction.openQuickAddExpenseFromShoppingMode.rawValue,
-            forKey: AppShortcutNavigationStore.pendingActionKey
-        )
-
-        if let merchantName, !merchantName.isEmpty {
-            UserDefaults.standard.set(
-                merchantName,
-                forKey: AppShortcutNavigationStore.pendingExpenseDescriptionKey
-            )
-        } else {
-            UserDefaults.standard.removeObject(forKey: AppShortcutNavigationStore.pendingExpenseDescriptionKey)
-        }
-    }
 
 }
 #endif

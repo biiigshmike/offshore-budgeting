@@ -28,6 +28,8 @@ struct OffshoreBudgetingApp: App {
 
     init() {
         configureLegacyTabBarAppearanceIfNeeded()
+        // Also retire legacy monitoring when iOS launches the app in the background.
+        Task { await ExcursionRetirementService.retireLegacyState() }
     }
 
     // MARK: - Notifications Delegate
@@ -88,7 +90,6 @@ struct OffshoreBudgetingApp: App {
                 .onAppear {
                     consumePendingWidgetActionIfNeeded()
                     retireLegacyFeatureData()
-                    refreshShoppingModeForForeground(reason: "sceneOnAppear")
                 }
                 .task {
                     #if DEBUG
@@ -104,7 +105,6 @@ struct OffshoreBudgetingApp: App {
                     guard newValue == .active else { return }
                     consumePendingWidgetActionIfNeeded()
                     retireLegacyFeatureData()
-                    refreshShoppingModeForForeground(reason: "sceneBecameActive")
                 }
                 .onReceive(NotificationCenter.default.publisher(
                     for: NSPersistentCloudKitContainer.eventChangedNotification
@@ -164,55 +164,6 @@ struct OffshoreBudgetingApp: App {
     private func consumePendingWidgetActionIfNeeded() {
         guard let pendingURL = WidgetActionRequestStore.consumePendingURL() else { return }
         _ = OffshoreDeepLinkHandler.handle(pendingURL)
-    }
-
-    @MainActor
-    private func refreshShoppingModeForForeground(reason: String) {
-        let start = DispatchTime.now().uptimeNanoseconds
-        traceShoppingModeForeground("starting reason=\(reason)")
-        TabFlickerDiagnostics.markEvent(
-            "shoppingModeForegroundStart",
-            metadata: ["reason": reason]
-        )
-
-        ShoppingModeManager.shared.refreshIfExpired()
-        let isActive = ShoppingModeManager.shared.status.isActive
-        traceShoppingModeForeground("refreshed reason=\(reason) isActive=\(isActive)")
-        TabFlickerDiagnostics.markEvent(
-            "shoppingModeForegroundRefreshed",
-            metadata: [
-                "reason": reason,
-                "isActive": isActive ? "true" : "false"
-            ]
-        )
-
-        if isActive {
-            ShoppingModeLocationService.shared.startMonitoringIfPossible()
-            traceShoppingModeForeground("monitoring restarted reason=\(reason)")
-            TabFlickerDiagnostics.markEvent(
-                "shoppingModeMonitoringRestarted",
-                metadata: ["reason": reason]
-            )
-        }
-
-        let elapsedMillis = Double(DispatchTime.now().uptimeNanoseconds - start) / 1_000_000
-        traceShoppingModeForeground(
-            "completed reason=\(reason) elapsedMs=\(String(format: "%.1f", elapsedMillis))"
-        )
-        TabFlickerDiagnostics.markEvent(
-            "shoppingModeForegroundCompleted",
-            metadata: [
-                "reason": reason,
-                "elapsedMs": String(format: "%.1f", elapsedMillis)
-            ]
-        )
-    }
-
-    private func traceShoppingModeForeground(_ message: String) {
-        #if DEBUG
-        guard UserDefaults.standard.bool(forKey: "debug_shoppingModeForegroundTraceEnabled") else { return }
-        print("[ShoppingModeForeground] \(message)")
-        #endif
     }
 
     @MainActor

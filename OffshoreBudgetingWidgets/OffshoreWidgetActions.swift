@@ -10,9 +10,6 @@ enum OffshoreWidgetDeepLink {
     static let openSafeSpendTodayURL = URL(string: "offshore://open/safe-spend-today")!
     static let openForecastSavingsURL = URL(string: "offshore://open/forecast-savings")!
 
-    static func startExcursionModeURL(hours: Int = 2) -> URL {
-        URL(string: "offshore://action/excursion-mode/start?hours=\(hours)")!
-    }
 }
 
 // MARK: - Widget Launch Intents
@@ -68,17 +65,6 @@ struct WidgetOpenForecastSavingsIntent: AppIntent {
 
     func perform() async throws -> some IntentResult {
         WidgetActionLaunchStore.queue(OffshoreWidgetDeepLink.openForecastSavingsURL)
-        return .result()
-    }
-}
-
-struct WidgetStartExcursionModeIntent: AppIntent {
-    static var title: LocalizedStringResource = "Excursion Mode"
-    static var description = IntentDescription("Start a 2-hour Excursion Mode session in Offshore.")
-    static var openAppWhenRun: Bool = true
-
-    func perform() async throws -> some IntentResult {
-        WidgetActionLaunchStore.queue(OffshoreWidgetDeepLink.startExcursionModeURL(hours: 2))
         return .result()
     }
 }

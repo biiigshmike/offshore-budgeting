@@ -364,6 +364,8 @@ plist_supported_locales = {"es", "fr", "de", "ar", "pt-BR", "zh-Hans"}
 app_plist_required_keys = {
     "CFBundleDisplayName",
     "NSFaceIDUsageDescription",
+    "NSLocationAlwaysAndWhenInUseUsageDescription",
+    "NSLocationWhenInUseUsageDescription",
     "NSPhotoLibraryUsageDescription",
 }
 widget_plist_required_keys = {

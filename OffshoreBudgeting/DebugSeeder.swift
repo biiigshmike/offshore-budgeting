@@ -336,7 +336,6 @@ enum DebugSeeder {
     // MARK: - Wipe
 
     private static func wipeAllData(context: ModelContext) {
-        SpendingSessionStore.end()
 
         deleteAll(Income.self, context: context)
         deleteAll(IncomeSeries.self, context: context)
@@ -659,7 +658,6 @@ enum DebugSeeder {
         )
 
         seedScreenshotSavingsLedger(context: context, workspace: workspace, now: now)
-        seedExcursionModeActive(now: now)
     }
 
     // MARK: - Budgets helpers
@@ -1418,16 +1416,5 @@ enum DebugSeeder {
         (value * 100).rounded() / 100
     }
 
-    // MARK: - Excursion
-
-    private static func seedExcursionModeActive(now: Date) {
-        #if !targetEnvironment(macCatalyst)
-        SpendingSessionStore.activate(hours: 2, now: now)
-
-        Task { @MainActor in
-            ShoppingModeManager.shared.refreshIfExpired(now: now)
-        }
-        #endif
-    }
 }
 #endif

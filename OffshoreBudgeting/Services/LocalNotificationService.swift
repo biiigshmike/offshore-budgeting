@@ -23,7 +23,6 @@ final class LocalNotificationService: ObservableObject {
         static let dailyExpenseReminder = "daily_expense_reminder"
         static let plannedIncomeReminder = "planned_income_reminder"
         static let presetDueReminder = "preset_due_reminder"
-        static let shoppingModeSuggestion = "shopping_mode_suggestion"
         static let testNotification = "local_test_notification"
     }
 
@@ -31,27 +30,23 @@ final class LocalNotificationService: ObservableObject {
         case openCards = "open_cards"
         case openBudgets = "open_budgets"
         case openQuickAddIncome = "open_quick_add_income"
-        case openQuickAddExpenseFromShoppingMode = "open_quick_add_expense_from_shopping_mode"
     }
 
     enum NotificationCategory {
         static let dailyExpenseReminder = "daily_expense_reminder_category"
         static let plannedIncomeReminder = "planned_income_reminder_category"
         static let presetDueReminder = "preset_due_reminder_category"
-        static let shoppingModeSuggestion = "shopping_mode_suggestion_category"
     }
 
     enum NotificationKind: String {
         case dailyExpenseReminder = "daily_expense_reminder"
         case plannedIncomeReminder = "planned_income_reminder"
         case presetDueReminder = "preset_due_reminder"
-        case shoppingModeSuggestion = "shopping_mode_suggestion"
     }
 
     enum UserInfoKey {
         static let action = "offshore_action"
         static let notificationKind = "offshore_notification_kind"
-        static let merchantName = "offshore_merchant_name"
     }
 
     // MARK: - Constants
@@ -205,32 +200,6 @@ final class LocalNotificationService: ObservableObject {
     /// Cancels a scheduled daily reminder by identifier.
     func cancelNotification(identifier: String) {
         removeScheduledNotifications(identifiers: [identifier])
-    }
-
-    func scheduleShoppingModeSuggestionNotification(merchantName: String) async throws {
-        let trimmed = merchantName.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return }
-
-        let content = UNMutableNotificationContent()
-        content.title = Self.localizedAppName
-        let bodyTemplate = String(
-            localized: "notification.shoppingModeSuggestion.body",
-            defaultValue: "Want to log your %@ purchase to keep your books tidy?",
-            comment: "Notification body asking user to log a nearby purchase. Placeholder is merchant name."
-        )
-        content.body = String(format: bodyTemplate, locale: .current, trimmed)
-        content.sound = .default
-        content.categoryIdentifier = NotificationCategory.shoppingModeSuggestion
-        content.userInfo = [
-            UserInfoKey.notificationKind: NotificationKind.shoppingModeSuggestion.rawValue,
-            UserInfoKey.action: NotificationAction.openQuickAddExpenseFromShoppingMode.rawValue,
-            UserInfoKey.merchantName: trimmed
-        ]
-
-        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 1, repeats: false)
-        let identifier = "\(NotificationID.shoppingModeSuggestion)_\(UUID().uuidString)"
-        let request = UNNotificationRequest(identifier: identifier, content: content, trigger: trigger)
-        try await addNotificationRequest(request)
     }
 
     /// Syncs the three reminder types based on toggles + reminder time + SwiftData.

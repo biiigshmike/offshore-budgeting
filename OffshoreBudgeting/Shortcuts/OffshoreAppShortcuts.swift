@@ -23,21 +23,6 @@ struct OffshoreAppShortcuts: AppShortcutsProvider {
             shortTitle: "Add Income",
             systemImageName: "banknote"
         )
-        #if !targetEnvironment(macCatalyst)
-        AppShortcut(
-            intent: EnableSpendingSessionIntent(),
-            phrases: [
-                "Start excursion mode in \(.applicationName)",
-                "Enable excursion mode in \(.applicationName)",
-                "Start shopping mode in \(.applicationName)",
-                "Enable shopping mode in \(.applicationName)",
-                "Enable spending session in \(.applicationName)",
-                "Start spending mode in \(.applicationName)"
-            ],
-            shortTitle: "Excursion Mode",
-            systemImageName: "sailboat.fill"
-        )
-        #endif
         AppShortcut(
             intent: ReviewTodaysSpendingIntent(),
             phrases: [

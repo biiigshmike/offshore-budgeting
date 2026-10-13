@@ -21,6 +21,5 @@ enum AppShortcutNavigationStore {
         case openCardImportReview = "open_card_import_review"
         case openQuickAddIncome = "open_quick_add_income"
         case openQuickAddExpense = "open_quick_add_expense"
-        case openQuickAddExpenseFromShoppingMode = "open_quick_add_expense_from_shopping_mode"
     }
 }
