@@ -47,6 +47,7 @@
             }
           ],
           "glass" : true,
+          "hidden" : false,
           "image-name" : "Wave.png",
           "name" : "Wave",
           "opacity-specializations" : [
