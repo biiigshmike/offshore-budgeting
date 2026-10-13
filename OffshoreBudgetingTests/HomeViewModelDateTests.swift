@@ -113,6 +113,32 @@ struct HomeViewModelDateTests {
         }
     }
 
+    @Test func rapidRangeChangesAndOwnPreferenceReplayKeepLatestSnapshot() {
+        withDefaults { defaults in
+            let workspace = Workspace(name: "Personal", hexColor: "#FFFFFF")
+            let viewModel = model(workspace.id, defaults: defaults)
+            let near = PlannedExpense(title: "Near", plannedAmount: 5, expenseDate: day(1), workspace: workspace)
+            let later = PlannedExpense(title: "Later", plannedAmount: 7, expenseDate: day(5), workspace: workspace)
+            let cache = DetailViewSnapshotCache()
+            viewModel.appear(data: HomeDashboardData(workspaceID: workspace.id, budgets: [], plannedExpenses: [near, later], variableExpenses: [],
+                startDate: viewModel.appliedStartDate, endDate: viewModel.appliedEndDate, excludeFuturePlannedExpenses: false, excludeFutureVariableExpenses: false),
+                activation: .init(sectionRawValue: AppSection.home.rawValue, phase: .active, token: 1), cache: cache)
+            viewModel.applyRange(start: today, end: day(2))
+            #expect(viewModel.dashboardSnapshot.nextPlannedExpense?.id == near.id)
+            viewModel.applyRange(start: day(4), end: day(8))
+            viewModel.reloadAppliedRangeFromDefaults()
+            #expect(viewModel.appliedStartDate == day(4))
+            #expect(viewModel.appliedEndDate == day(8))
+            #expect(viewModel.dashboardSnapshot.nextPlannedExpense?.id == later.id)
+            let latest = HomeDashboardData(workspaceID: workspace.id, budgets: [], plannedExpenses: [near, later], variableExpenses: [],
+                startDate: day(4), endDate: day(8), excludeFuturePlannedExpenses: false, excludeFutureVariableExpenses: false)
+            let stored: HomeDashboardSnapshot? = cache.snapshot(for: latest.cacheKey)
+            #expect(stored?.nextPlannedExpense?.id == later.id)
+            #expect(!viewModel.needsDashboardSnapshotRefresh)
+            viewModel.disappear()
+        }
+    }
+
     @Test func workspaceRangePreferencesStayIsolated() {
         withDefaults { defaults in
             let firstID = UUID()

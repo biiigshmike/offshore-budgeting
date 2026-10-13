@@ -9,10 +9,20 @@ final class HomeViewModel {
     private(set) var appliedStartDate: Date
     private(set) var appliedEndDate: Date
     private(set) var lastSyncedDefaultBudgetingPeriodRaw: String
+    var pinnedItems: [HomePinnedItem] {
+        didSet {
+            guard pinnedItems != oldValue, !isApplyingSyncedPinnedItems else { return }
+            persistPinnedItems()
+        }
+    }
     private(set) var dashboardSnapshot: HomeDashboardSnapshot = .empty
     private(set) var hasLoadedDashboardSnapshot = false
     private(set) var needsDashboardSnapshotRefresh = false
 
+    @ObservationIgnored private var isApplyingSyncedPinnedItems = false
+    @ObservationIgnored private var availableCardIDs: Set<UUID> = []
+    @ObservationIgnored private var housekeepingTask: Task<Void, Never>?
+    @ObservationIgnored private let pushHomeLayout: @MainActor (UUID) -> Void
     @ObservationIgnored private var data: HomeDashboardData?
     @ObservationIgnored private var inputSignature: HomeDashboardData.Signature?
     @ObservationIgnored private var snapshotCache: DetailViewSnapshotCache?
@@ -30,12 +40,20 @@ final class HomeViewModel {
         workspaceID: UUID,
         defaults: UserDefaults = .standard,
         defaultBudgetingPeriodRaw: String? = nil,
+        fallbackCardIDs: [UUID] = [],
+        pushHomeLayout: @escaping @MainActor (UUID) -> Void = {
+            ICloudPreferenceSyncService().pushHomeLayoutIfEnabled(workspaceID: $0)
+        },
         now: @escaping () -> Date = Date.init,
-        calendar: Calendar = .current,
+        calendar: Calendar = .autoupdatingCurrent,
         sleep: @escaping (UInt64) async throws -> Void = { try await Task.sleep(nanoseconds: $0) }
     ) {
         self.workspaceID = workspaceID
         self.defaults = defaults
+        self.pushHomeLayout = pushHomeLayout
+        pinnedItems = HomeViewBootstrap.initialPinnedItems(
+            workspaceID: workspaceID, fallbackCardIDs: fallbackCardIDs, defaults: defaults
+        )
         let period = defaultBudgetingPeriodRaw
             ?? defaults.string(forKey: "general_defaultBudgetingPeriod") ?? BudgetingPeriod.monthly.rawValue
         let range = HomeViewBootstrap.initialAppliedRangeSeed(
@@ -95,6 +113,56 @@ final class HomeViewModel {
         ))
     }
 
+    // MARK: - Pinned items
+
+    func persistPinnedItems() {
+        HomePinnedItemsStore(workspaceID: workspaceID, defaults: defaults).save(pinnedItems)
+        pushHomeLayout(workspaceID)
+    }
+
+    func reloadSyncedPinnedItems() {
+        let synced = HomePinnedItemsStore(workspaceID: workspaceID, defaults: defaults).load()
+        guard synced != pinnedItems else { return }
+        // The property observer runs synchronously; remote changes never become local pushes.
+        isApplyingSyncedPinnedItems = true
+        pinnedItems = synced
+        isApplyingSyncedPinnedItems = false
+    }
+
+    func updateAvailableCards(_ cards: [Card], prune: Bool = true) {
+        availableCardIDs = Set(cards.filter { $0.workspace?.id == workspaceID }.map(\.id))
+        if prune { prunePinnedCardsIfNeeded() }
+    }
+
+    private func persistPinnedItemsMigrationIfNeeded() {
+        let store = HomePinnedItemsStore(workspaceID: workspaceID, defaults: defaults)
+        guard store.load().isEmpty, !pinnedItems.isEmpty else { return }
+        store.save(pinnedItems)
+    }
+
+    private func prunePinnedCardsIfNeeded() {
+        let pruned = pinnedItems.filter { item in
+            guard case .card(let id, _) = item else { return true }
+            return availableCardIDs.contains(id)
+        }
+        if pruned != pinnedItems { pinnedItems = pruned }
+    }
+
+    private func schedulePostSettleHousekeeping(reason: String) {
+        housekeepingTask?.cancel()
+        let expectedToken = activation.token
+        let sleep = sleep
+        housekeepingTask = Task { [weak self] in
+            do { try await sleep(180_000_000) } catch { return }
+            guard !Task.isCancelled, let self, self.isVisible, self.isHomeActive,
+                  self.activation.token == expectedToken else { return }
+            self.persistPinnedItemsMigrationIfNeeded()
+            self.prunePinnedCardsIfNeeded()
+            TabFlickerDiagnostics.markEvent("homePostSettleHousekeepingFinished", metadata: ["reason": reason])
+            self.housekeepingTask = nil
+        }
+    }
+
     // MARK: - Dashboard lifecycle
 
     func snapshot(for data: HomeDashboardData) -> HomeDashboardSnapshot {
@@ -121,6 +189,7 @@ final class HomeViewModel {
         } else if needsDashboardSnapshotRefresh {
             requestRefresh(reason: "onAppearRefresh")
         }
+        schedulePostSettleHousekeeping(reason: "onAppear")
         scheduleActivationEnrichment(reason: "onAppear")
     }
 
@@ -144,6 +213,7 @@ final class HomeViewModel {
         guard isVisible, isHomeActive else { return }
         if needsDashboardSnapshotRefresh {
             requestRefresh(reason: "tabActivationSettled")
+            schedulePostSettleHousekeeping(reason: "tabActivationSettled")
             scheduleActivationEnrichment(reason: "tabActivationSettled")
         }
     }
@@ -233,5 +303,7 @@ final class HomeViewModel {
         cancelRefresh(reason: reason)
         enrichmentTask?.cancel()
         enrichmentTask = nil
+        housekeepingTask?.cancel()
+        housekeepingTask = nil
     }
 }

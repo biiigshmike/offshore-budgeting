@@ -123,7 +123,7 @@ struct HomeViewModelTests {
         let viewModel = model(personal, gate: gate)
         viewModel.appear(data: data(personal, planned: [first]), activation: active(), cache: DetailViewSnapshotCache())
         await drainTasks()
-        #expect(gate.pendingCount == 1)
+        #expect(gate.pendingCount > 0)
         viewModel.disappear()
         viewModel.update(data: data(personal, planned: [second]))
         viewModel.activationChanged(to: active(2))

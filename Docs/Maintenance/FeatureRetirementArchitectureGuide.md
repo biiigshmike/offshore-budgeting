@@ -14,13 +14,13 @@ The app already has useful separation: SwiftData classes represent stored record
 
 SwiftUI views are value types that describe what to display. Their being structs is normal; converting them to classes is not the route to OOP. `@State` gives the screen state that persists across view updates, and `@Query` keeps SwiftData results current. Classes are appropriate for identity, shared mutable state, and long-lived workflows. Composition and narrow protocols can provide the dependency boundaries familiar from Java without a base-class hierarchy.
 
-## Improve Home first, in a separate change
+## Home now has a focused ViewModel
 
-`HomeView` currently combines layout, date-range preferences, pinned-item management, snapshot construction/cache access, and three cancellable tasks for refresh, housekeeping, and activation enrichment. That is a concrete maintenance concern, rather than evidence that every screen needs MVVM.
+`HomeViewModel` is a `@MainActor @Observable final class` that owns dashboard preparation and caching, three cancellable refresh/housekeeping tasks, applied date-range preferences, and pinned-item loading, editing persistence, migration, and sync handling. The view owns it with `@State`, and the Home root has an explicit workspace identity so work and state cannot follow the user into another workspace.
 
-Extract the snapshot and task orchestration into a focused `@MainActor @Observable` Home controller. Give it explicit inputs for workspace identity, date range, future-expense policies, and activation state; keep existing snapshot and financial helpers. Cancel pending work when its inputs or owning screen change, and reject results for an obsolete workspace or activation token. Start by retaining `@Query` in the view and passing its scoped results to the controller; do not introduce a second database-observation system merely to satisfy MVVM.
+`HomeView` retains workspace-scoped `@Query` results and passes them into the ViewModel. It also retains rendering, sheets, draft date-picker values, global `@AppStorage` settings observation, and measured layout sizes. Applied dates are read-only ViewModel outputs; pins use `@Bindable` to keep the existing editor working while the ViewModel handles persistence. Incoming synced pins do not trigger an immediate outgoing push.
 
-Leave rendering, sheets, draft form values, and measured layout sizes in the view. Keep `@AppStorage` preferences in the view or an explicit preferences adapter; do not move the wrapper into an observable class. Test the extracted controller for rapid range/workspace changes, cancellation, and preservation of current future-expense behavior before separately considering date preferences or layout extraction.
+The refactor preserves current Home behavior, including resetting a custom applied range to the current default budgeting period on appearance. It does not centralize tile formulas or change financial math. Use the focused ViewModel tests as examples for cancellation, workspace isolation, date preferences, and pin sync. Any later preference-policy or formula changes should be separate, deliberate work.
 
 ## Preserve the useful domain boundaries
 
@@ -38,4 +38,4 @@ For Excursion, begin with a manually started session and explicit states. Keep s
 
 Retained Marina model definitions and Excursion Activity attributes are upgrade-compatibility code, not an active feature architecture. **Before a rebuilt feature saves records or starts sessions, disable or replace its retirement cleanup:** otherwise that cleanup may delete new conversations/aliases or end new sessions. Review the retained storage and CloudKit compatibility before changing model shape, and verify upgrades as well as fresh installs.
 
-Prioritize Home orchestration first, then whichever remaining workflow is hardest to change. Make each extraction independently buildable and reviewable, with no financial behavior change bundled into it.
+Use the completed Home refactor as a reference for whichever remaining workflow is hardest to change. Make each extraction independently buildable and reviewable, with no financial behavior change bundled into it.

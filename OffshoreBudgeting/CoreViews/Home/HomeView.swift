@@ -42,10 +42,7 @@ struct HomeView: View {
 
     @State private var isEditingWidgets: Bool = false
 
-    @State private var pinnedItems: [HomePinnedItem]
-    @State private var isApplyingSyncedPinnedItems: Bool = false
     @State private var viewModel: HomeViewModel
-    @State private var postSettleHousekeepingTask: Task<Void, Never>? = nil
     @State private var masonryMeasuredHeights: [String: CGFloat] = [:]
     @State private var lastMeasuredUsableWidth: CGFloat = 0
 
@@ -108,14 +105,10 @@ struct HomeView: View {
         let defaults = UserDefaults.standard
         let defaultBudgetingPeriodRaw = defaults.string(forKey: "general_defaultBudgetingPeriod")
             ?? BudgetingPeriod.monthly.rawValue
-        let initialPinnedItems = HomeViewBootstrap.initialPinnedItems(
-            workspaceID: workspaceID,
-            fallbackCardIDs: (workspace.cards ?? []).map(\.id),
-            defaults: defaults
-        )
         let model = HomeViewModel(
             workspaceID: workspaceID, defaults: defaults,
-            defaultBudgetingPeriodRaw: defaultBudgetingPeriodRaw
+            defaultBudgetingPeriodRaw: defaultBudgetingPeriodRaw,
+            fallbackCardIDs: (workspace.cards ?? []).map(\.id)
         )
         _viewModel = State(initialValue: model)
         _draftStartDate = State(initialValue: model.appliedStartDate)
@@ -132,7 +125,6 @@ struct HomeView: View {
         _excludeFutureVariableExpensesFromCalculationsInView = State(
             initialValue: defaults.bool(forKey: "general_excludeFutureVariableExpensesFromCalculations")
         )
-        _pinnedItems = State(initialValue: initialPinnedItems)
 
         _budgets = Query(
             filter: #Predicate<Budget> { $0.workspace?.id == workspaceID },
@@ -171,6 +163,7 @@ struct HomeView: View {
     }
 
     var body: some View {
+        @Bindable var model = viewModel
         ZStack {
             HomeBackgroundView()
 
@@ -267,10 +260,10 @@ struct HomeView: View {
                 cards: cards,
                 workspaceID: workspace.id,
                 showsTileSizePicker: showsTileSizePicker,
-                pinnedItems: $pinnedItems
+                pinnedItems: $model.pinnedItems
             )
             .onDisappear {
-                persistPinnedItems()
+                viewModel.persistPinnedItems()
             }
         }
         .onAppear {
@@ -279,12 +272,11 @@ struct HomeView: View {
             }
             viewModel.synchronizeAppliedRangeForAppearance(defaultBudgetingPeriodRaw: defaultBudgetingPeriodRaw)
             syncDraftToAppliedIfNeeded()
+            viewModel.updateAvailableCards(cards, prune: false)
             viewModel.appear(data: dashboardData, activation: tabActivationContext, cache: detailSnapshotCache)
-            schedulePostSettleHousekeeping(reason: "onAppear")
         }
         .onDisappear {
             viewModel.disappear()
-            cancelPostSettleHousekeeping()
             if shouldSyncCommandSurface {
                 commandHub.deactivate(.home)
             }
@@ -298,14 +290,10 @@ struct HomeView: View {
                 for: HomePinnedItemsStore.pinnedItemsDidChangeName(workspaceID: workspace.id)
             )
         ) { _ in
-            reloadSyncedPinnedItemsIfNeeded()
-        }
-        .onChange(of: pinnedItems) { _, _ in
-            guard isApplyingSyncedPinnedItems == false else { return }
-            persistPinnedItems()
+            viewModel.reloadSyncedPinnedItems()
         }
         .onChange(of: cardIDSet) { _, _ in
-            prunePinnedCardsIfNeeded()
+            viewModel.updateAvailableCards(cards)
         }
         .onReceive(NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification).receive(on: RunLoop.main)) { _ in
             viewModel.reloadAppliedRangeFromDefaults()
@@ -331,13 +319,7 @@ struct HomeView: View {
             excludeFutureVariableExpensesFromCalculationsInView = newValue
         }
         .onChange(of: tabActivationContext) { _, newValue in
-            let neededRefresh = viewModel.needsDashboardSnapshotRefresh
             viewModel.activationChanged(to: newValue)
-            if newValue.sectionRawValue == AppSection.home.rawValue, newValue.phase == .active, neededRefresh {
-                schedulePostSettleHousekeeping(reason: "tabActivationSettled")
-            } else if newValue.sectionRawValue != AppSection.home.rawValue || newValue.phase != .active {
-                cancelPostSettleHousekeeping()
-            }
         }
         .onChange(of: dashboardData.signature) { _, _ in
             viewModel.update(data: dashboardData)
@@ -742,36 +724,6 @@ struct HomeView: View {
         viewModel.snapshot(for: dashboardData).nextPlannedExpense
     }
 
-    private func schedulePostSettleHousekeeping(reason: String) {
-        cancelPostSettleHousekeeping()
-        let activationToken = tabActivationContext.token
-
-        postSettleHousekeepingTask = Task {
-            try? await Task.sleep(nanoseconds: 180_000_000)
-            guard Task.isCancelled == false else { return }
-
-            await MainActor.run {
-                guard tabActivationContext.sectionRawValue == AppSection.home.rawValue,
-                      tabActivationContext.phase == .active,
-                      tabActivationContext.token == activationToken else {
-                    return
-                }
-
-                persistPinnedItemsMigrationIfNeeded()
-                prunePinnedCardsIfNeeded()
-                TabFlickerDiagnostics.markEvent(
-                    "homePostSettleHousekeepingFinished",
-                    metadata: ["reason": reason]
-                )
-            }
-        }
-    }
-
-    private func cancelPostSettleHousekeeping() {
-        postSettleHousekeepingTask?.cancel()
-        postSettleHousekeepingTask = nil
-    }
-
     private func buildPinnedLayoutItems(columns: Int) -> [PinnedLayoutCell] {
         let columns = max(1, columns)
         var result: [PinnedLayoutCell] = []
@@ -1039,54 +991,10 @@ struct HomeView: View {
         AppDateFormat.abbreviatedDate(date)
     }
 
-    // MARK: - Persistence: Unified pins + Migration
+    private var pinnedItems: [HomePinnedItem] { viewModel.pinnedItems }
 
-    private func persistPinnedItems() {
-        let store = HomePinnedItemsStore(workspaceID: workspace.id)
-        store.save(pinnedItems)
-        ICloudPreferenceSyncService().pushHomeLayoutIfEnabled(workspaceID: workspace.id)
-    }
+    private var cardIDSet: Set<UUID> { Set(cards.map(\.id)) }
 
-    private func reloadSyncedPinnedItemsIfNeeded() {
-        let store = HomePinnedItemsStore(workspaceID: workspace.id)
-        let syncedItems = store.load()
-        guard syncedItems != pinnedItems else { return }
-
-        isApplyingSyncedPinnedItems = true
-        pinnedItems = syncedItems
-        DispatchQueue.main.async {
-            isApplyingSyncedPinnedItems = false
-        }
-    }
-
-    private func persistPinnedItemsMigrationIfNeeded() {
-        let store = HomePinnedItemsStore(workspaceID: workspace.id)
-        guard store.load().isEmpty else { return }
-        guard pinnedItems.isEmpty == false else { return }
-        store.save(pinnedItems)
-    }
-
-    // MARK: - Pin fixups
-
-    private var cardIDSet: Set<UUID> {
-        Set(cards.map(\.id))
-    }
-
-    private func prunePinnedCardsIfNeeded() {
-        let existingCardIDs = cardIDSet
-
-        let pruned = pinnedItems.filter { item in
-            switch item {
-            case .widget:
-                return true
-            case .card(let id, _):
-                return existingCardIDs.contains(id)
-            }
-        }
-
-        guard pruned != pinnedItems else { return }
-        pinnedItems = pruned
-    }
 }
 
 // MARK: Preview
