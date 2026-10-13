@@ -184,7 +184,7 @@ struct MarinaFoundationModelRuntime {
     init(
         model: SystemLanguageModel = SystemLanguageModel(useCase: .general, guardrails: .default),
         options: GenerationOptions = GenerationOptions(
-            sampling: .greedy,
+            samplingMode: .greedy,
             temperature: 0.0,
             maximumResponseTokens: 512
         )

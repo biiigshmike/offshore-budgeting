@@ -59,7 +59,7 @@ struct MarinaFoundationModelsInsightRuntime {
     init(
         model: SystemLanguageModel = SystemLanguageModel(useCase: .general, guardrails: .default),
         options: GenerationOptions = GenerationOptions(
-            sampling: .greedy,
+            samplingMode: .greedy,
             temperature: 0.2,
             maximumResponseTokens: 160
         ),
