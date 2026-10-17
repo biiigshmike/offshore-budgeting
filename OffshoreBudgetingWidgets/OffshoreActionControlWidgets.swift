@@ -39,3 +39,16 @@ struct ReviewTodayControlWidget: ControlWidget {
         .description("Open Offshore to review today's spending.")
     }
 }
+
+@available(iOS 18.0, *)
+struct ExcursionModeControlWidget: ControlWidget {
+    var body: some ControlWidgetConfiguration {
+        StaticControlConfiguration(kind: "com.mb.offshore.control.excursion-mode") {
+            ControlWidgetButton(action: WidgetStartExcursionModeIntent()) {
+                Label("Excursion Mode", systemImage: "sailboat.fill")
+            }
+        }
+        .displayName("Excursion Mode")
+        .description("Start a 2-hour Excursion Mode session.")
+    }
+}

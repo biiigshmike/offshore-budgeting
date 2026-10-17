@@ -11,6 +11,9 @@ enum OffshoreDeepLink {
     static let openSafeSpendTodayURL = URL(string: "offshore://open/safe-spend-today")!
     static let openForecastSavingsURL = URL(string: "offshore://open/forecast-savings")!
 
+    static func startExcursionModeURL(hours: Int = 2) -> URL {
+        URL(string: "offshore://action/excursion-mode/start?hours=\(hours)")!
+    }
 }
 
 // MARK: - OffshoreDeepLinkHandler
@@ -19,6 +22,10 @@ enum OffshoreDeepLink {
 enum OffshoreDeepLinkHandler {
     @discardableResult
     static func handle(_ url: URL) -> Bool {
+        if ShoppingModeManager.shared.handleDeepLink(url) {
+            return true
+        }
+
         guard url.scheme == OffshoreDeepLink.scheme else { return false }
 
         let path: String
@@ -55,6 +62,19 @@ enum OffshoreDeepLinkHandler {
 
         case ("open", "/forecast-savings"):
             UserDefaults.standard.set(AppSection.home.rawValue, forKey: AppShortcutNavigationStore.pendingSectionKey)
+            return true
+
+        case ("action", "/excursion-mode/start"):
+            let requestedHours = URLComponents(url: url, resolvingAgainstBaseURL: false)?
+                .queryItems?
+                .first(where: { $0.name == "hours" })?
+                .value
+                .flatMap(Int.init) ?? 2
+
+            let hours = min(max(1, requestedHours), 4)
+            Task {
+                _ = await ShoppingModeManager.shared.start(hours: hours)
+            }
             return true
 
         default:

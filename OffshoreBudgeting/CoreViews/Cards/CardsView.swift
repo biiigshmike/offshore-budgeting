@@ -268,7 +268,8 @@ struct CardsView: View {
         let pending = pendingShortcutActionRaw.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !pending.isEmpty else { return }
 
-        if pending == AppShortcutNavigationStore.PendingAction.openQuickAddExpense.rawValue {
+        if pending == AppShortcutNavigationStore.PendingAction.openQuickAddExpense.rawValue
+            || pending == AppShortcutNavigationStore.PendingAction.openQuickAddExpenseFromShoppingMode.rawValue {
             let prefill = pendingExpenseDescription.trimmingCharacters(in: .whitespacesAndNewlines)
             shortcutExpenseDescription = prefill.isEmpty ? nil : prefill
             showingAddExpenseSheet = true

@@ -21,6 +21,10 @@ struct OffshoreBudgetingWidgetsBundle: WidgetBundle {
             AddExpenseControlWidget()
             AddIncomeControlWidget()
             ReviewTodayControlWidget()
+            ExcursionModeControlWidget()
         }
+        #if canImport(ActivityKit) && !targetEnvironment(macCatalyst)
+        ShoppingModeLiveActivity()
+        #endif
     }
 }

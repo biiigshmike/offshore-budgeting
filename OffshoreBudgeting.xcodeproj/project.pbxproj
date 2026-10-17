@@ -66,6 +66,8 @@
 				Cards/CardWidgetModels.swift,
 				Cards/CardWidgetPeriod.swift,
 				Cards/CardWidgetSnapshotStore.swift,
+				ExcursionStopIntent.swift,
+				ExtendExcursionIntent.swift,
 				Income/IncomeWidgetPeriod.swift,
 				Income/IncomeWidgetsModel.swift,
 				Income/IncomeWidgetSnapshotStore.swift,

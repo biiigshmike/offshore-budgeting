@@ -24,10 +24,10 @@ struct DebugFeatureFlagResolverTests {
         defer { defaults.removePersistentDomain(forName: "DebugFeatureFlagResolverTests.launchArguments") }
 
         #expect(DebugFeatureFlagResolver.isEnabled(
-            key: "debug_secondary_feature_enabled",
+            key: "marina_ai_opt_in_enabled",
             fallback: false,
             defaults: defaults,
-            arguments: ["App", "-debug_secondary_feature_enabled", "on"]
+            arguments: ["App", "-marina_ai_opt_in_enabled", "on"]
         ))
 
         #expect(DebugFeatureFlagResolver.isEnabled(
@@ -48,19 +48,19 @@ struct DebugFeatureFlagResolverTests {
             defaults: defaults,
             arguments: ["App", "debug_test_feature_enabled"]
         )
-        let secondaryFeature = DebugFeatureFlagResolver.resolve(
-            key: "debug_secondary_feature_enabled",
+        let aiOptIn = DebugFeatureFlagResolver.resolve(
+            key: "marina_ai_opt_in_enabled",
             fallback: false,
             defaults: defaults,
-            arguments: ["App", "-debug_secondary_feature_enabled"]
+            arguments: ["App", "-marina_ai_opt_in_enabled"]
         )
 
         #expect(testFeature.isEnabled)
         #expect(testFeature.source == .arguments)
         #expect(testFeature.argumentValueWasPresent)
-        #expect(secondaryFeature.isEnabled)
-        #expect(secondaryFeature.source == .arguments)
-        #expect(secondaryFeature.argumentValueWasPresent)
+        #expect(aiOptIn.isEnabled)
+        #expect(aiOptIn.source == .arguments)
+        #expect(aiOptIn.argumentValueWasPresent)
     }
 
     @Test func isEnabled_acceptsSchemeEnvironmentEnabledValues() throws {
@@ -79,11 +79,11 @@ struct DebugFeatureFlagResolverTests {
         #expect(testFeature.environmentValueWasPresent)
 
         #expect(DebugFeatureFlagResolver.isEnabled(
-            key: "debug_secondary_feature_enabled",
+            key: "marina_ai_opt_in_enabled",
             fallback: false,
             defaults: defaults,
             arguments: [],
-            environment: ["debug_secondary_feature_enabled": "on"]
+            environment: ["marina_ai_opt_in_enabled": "on"]
         ))
     }
 

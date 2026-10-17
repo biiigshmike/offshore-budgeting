@@ -4,8 +4,8 @@ import Foundation
 // MARK: - WhatCanISpendTodayIntent
 
 struct WhatCanISpendTodayIntent: AppIntent {
-    static var title: LocalizedStringResource = "Safe Spend Today"
-    static var description = IntentDescription("Return a safe-to-spend text summary for today that you can display or use in subsequent shortcut actions.")
+    static var title: LocalizedStringResource = "What Can I Spend Today?"
+    static var description = IntentDescription("Get a safe-to-spend amount for today based on your default budgeting period.")
     static var openAppWhenRun: Bool = false
 
     func perform() async throws -> some IntentResult & ProvidesDialog & ReturnsValue<String> {

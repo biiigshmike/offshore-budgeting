@@ -1,0 +1,79 @@
+{
+  "sourceOfTruth": {
+    "swiftRegistry": "OffshoreBudgeting/CoreViews/Home/NLQ/Boundary/MarinaQueryCapabilityMatrix.swift",
+    "testSuite": "OffshoreBudgetingTests/MarinaEntityParityInventoryTests.swift"
+  },
+  "modelEntities": [
+    "Workspace",
+    "Budget",
+    "BudgetCategoryLimit",
+    "Card",
+    "BudgetCardLink",
+    "BudgetPresetLink",
+    "Category",
+    "Preset",
+    "PlannedExpense",
+    "VariableExpense",
+    "AllocationAccount",
+    "ExpenseAllocation",
+    "AllocationSettlement",
+    "SavingsAccount",
+    "SavingsLedgerEntry",
+    "ImportMerchantRule",
+    "AssistantAliasRule",
+    "IncomeSeries",
+    "Income"
+  ],
+  "virtualQueryObjects": [
+    "Virtual: Merchant",
+    "Virtual: IncomeSource",
+    "Virtual: Uncategorized"
+  ],
+  "appSurfaceMetrics": [
+    {
+      "id": "home.savings.status",
+      "surface": "Home savings status card",
+      "sourcePath": "OffshoreBudgeting/CoreViews/Home/HomeQueryEngine.swift",
+      "sourceType": "HomeQueryEngine",
+      "sourceFunction": "savingsStatusAnswer(_:context:now:calendar:)",
+      "marinaSupport": "supportedRoute",
+      "route": "HomeQueryMetric.savingsStatus"
+    },
+    {
+      "id": "home.forecast.savings",
+      "surface": "Home forecast savings card",
+      "sourcePath": "OffshoreBudgeting/CoreViews/Home/HomeQueryEngine.swift",
+      "sourceType": "HomeQueryEngine",
+      "sourceFunction": "forecastSavingsAnswer(_:context:now:calendar:)",
+      "marinaSupport": "supportedRoute",
+      "route": "HomeQueryMetric.forecastSavings"
+    },
+    {
+      "id": "home.next.planned.expense",
+      "surface": "Home next planned expense tile",
+      "sourcePath": "OffshoreBudgeting/CoreViews/Home/HomeQueryEngine.swift",
+      "sourceType": "HomeQueryEngine",
+      "sourceFunction": "nextPlannedExpenseAnswer(_:context:now:calendar:)",
+      "marinaSupport": "supportedRoute",
+      "route": "HomeQueryMetric.nextPlannedExpense"
+    },
+    {
+      "id": "home.safe.spend.today",
+      "surface": "Home safe spend today card",
+      "sourcePath": "OffshoreBudgeting/CoreViews/Home/HomeQueryEngine.swift",
+      "sourceType": "HomeQueryEngine",
+      "sourceFunction": "safeSpendTodayAnswer(_:context:now:calendar:)",
+      "marinaSupport": "supportedRoute",
+      "route": "HomeQueryMetric.safeSpendToday"
+    },
+    {
+      "id": "budget.linked.summary",
+      "surface": "Budget linked summary",
+      "sourcePath": "OffshoreBudgeting/CoreViews/Home/NLQ/Boundary/MarinaComposableWorkspaceQueryExecutor.swift",
+      "sourceType": "MarinaComposableWorkspaceQueryExecutor",
+      "sourceFunction": "budgetLinkedSummary(budget:plan:provider:)",
+      "marinaSupport": "supportedRoute",
+      "route": "MarinaComposableWorkspaceQueryExecutor.budgetLinkedSummary"
+    }
+  ]
+}

@@ -56,6 +56,7 @@ struct HelpFAQEngine {
     ]
 
     private let fallbackTopicIDs: [String] = [
+        "home-marina",
         "introduction-building-blocks",
         "budgets-overview",
         "accounts-overview",

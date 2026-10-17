@@ -25,8 +25,7 @@ enum MixedClipboardRowsRoute: String, AppEnum {
 
 struct ImportFromClipboardIntent: AppIntent {
     static var title: LocalizedStringResource = "Import From Clipboard"
-    static var description = IntentDescription("Return an import preview text summary from clipboard-style input for subsequent shortcut actions, or open the review in Offshore.")
-    static var isDiscoverable: Bool = false
+    static var description = IntentDescription("Parse entry text from clipboard-style input and return an import preview summary.")
     static var openAppWhenRun: Bool = false
 
     @Parameter(

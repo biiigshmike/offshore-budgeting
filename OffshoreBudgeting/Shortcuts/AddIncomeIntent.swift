@@ -26,7 +26,7 @@ enum IncomeKind: String, AppEnum {
 
 struct AddIncomeIntent: AppIntent {
     static var title: LocalizedStringResource = "Add Income"
-    static var description = IntentDescription("Add an income entry in your selected Offshore workspace using the fields in Shortcuts.")
+    static var description = IntentDescription("Create a new income entry in your selected Offshore workspace.")
     static var openAppWhenRun: Bool = false
 
     @Parameter(

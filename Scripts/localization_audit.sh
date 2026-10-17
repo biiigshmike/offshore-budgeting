@@ -335,6 +335,36 @@ equals_key_allowlist = {
     "zh-Hans": zh_hans_equals_key_allowlist,
 }.get(target_locale, set())
 
+marina_equals_key_allowlist = {
+    "es": {
+        "marina.common.color",
+        "marina.common.total",
+        "marina.common.variable",
+    },
+    "fr": {
+        "marina.common.budget",
+        "marina.common.budgets",
+        "marina.common.description",
+        "marina.common.source",
+        "marina.common.total",
+        "marina.common.type",
+        "marina.common.variable",
+        "marina.inlineCreate.entity.budget",
+    },
+    "de": {
+        "marina.common.budget",
+        "marina.common.budgets",
+        "marina.common.name",
+        "marina.common.status",
+        "marina.inlineCreate.entity.budget",
+    },
+    "pt-BR": {
+        "marina.common.status",
+        "marina.common.total",
+    },
+}.get(target_locale, set())
+equals_key_allowlist = set(equals_key_allowlist).union(marina_equals_key_allowlist)
+
 variant_pairs = [
     ("A-Z", "A–Z"),
     ("Z-A", "Z–A"),
@@ -438,6 +468,32 @@ def extract_about_strings(source_path: Path) -> list[str]:
         for match in pattern.finditer(content):
             value = json.loads(f'"{match.group(1)}"')
             seen.setdefault(value, None)
+
+    return list(seen.keys())
+
+
+def extract_marina_l10n_keys(source_root: Path) -> list[str]:
+    if not source_root.exists():
+        return []
+
+    seen: dict[str, None] = {}
+    for source_path in sorted(source_root.rglob("*.swift")):
+        content = source_path.read_text(encoding="utf-8")
+        for pattern in [
+            re.compile(
+                r'MarinaL10n\.(?:string|format)\(\s*"((?:[^"\\]|\\.)*)"\s*,\s*defaultValue:\s*"((?:[^"\\]|\\.)*)"',
+                re.MULTILINE | re.DOTALL,
+            ),
+            re.compile(
+                r'MarinaL10n\.common\(\s*"((?:[^"\\]|\\.)*)"\s*,\s*defaultValue:\s*"((?:[^"\\]|\\.)*)"',
+                re.MULTILINE | re.DOTALL,
+            ),
+        ]:
+            for match in pattern.finditer(content):
+                key = json.loads(f'"{match.group(1)}"')
+                if "MarinaL10n.common" in match.group(0):
+                    key = f"marina.common.{key}"
+                seen.setdefault(key, None)
 
     return list(seen.keys())
 
@@ -595,6 +651,14 @@ if target_locale in plist_supported_locales:
                 plist_issue_items.append(f"{plist_path} missing {required_key}")
 
 if catalog_path == app_catalog_path:
+    for key in extract_marina_l10n_keys(Path("OffshoreBudgeting/CoreViews/Home/Marina")):
+        entry = strings.get(key)
+        if entry is None:
+            source_coverage_issues += 1
+            source_issue_items.append(
+                f"OffshoreBudgeting/CoreViews/Home/Marina missing catalog key for {key!r}"
+            )
+
     for source_text in extract_generated_help_strings(generated_help_path):
         entry = strings.get(source_text)
         if entry is None:
@@ -723,6 +787,15 @@ source_regex_watchlist = {
     "OffshoreBudgeting/CoreViews/Settings/SettingsView.swift": [
         r'SettingsRow\(\s*title:\s*"',
     ],
+    "OffshoreBudgeting/CoreViews/Home/Marina/Brain/MarinaQueryExecutor.swift": [
+        r'MarinaExecutionResult\(\s*title:\s*"',
+        r'MarinaAnswerRow\(\s*label:\s*"',
+        r'MarinaClarificationChoice\([^)]*(?:kindLabel|subtitle):\s*"',
+    ],
+    "OffshoreBudgeting/CoreViews/Home/Marina/Surface/MarinaCreateService.swift": [
+        r'MarinaExecutionResult\(\s*title:\s*"',
+        r'MarinaAnswerRow\(\s*label:\s*"',
+    ],
 }
 
 for relative_path, blocked_values in source_watchlist.items():
@@ -744,6 +817,16 @@ for relative_path, blocked_patterns in source_regex_watchlist.items():
         if re.search(blocked_pattern, content, re.MULTILINE | re.DOTALL):
             source_coverage_issues += 1
             source_issue_items.append(f"{relative_path} matches /{blocked_pattern}/")
+
+marina_locale_phrase = "The person's locale is"
+marina_locale_helper = Path("OffshoreBudgeting/CoreViews/Home/Marina/Brain/MarinaFoundationModelLocaleConfiguration.swift")
+for source_path in Path("OffshoreBudgeting/CoreViews/Home/Marina").rglob("*.swift"):
+    content = source_path.read_text(encoding="utf-8")
+    if marina_locale_phrase in content and source_path != marina_locale_helper:
+        source_coverage_issues += 1
+        source_issue_items.append(
+            f"{source_path} contains direct Foundation Models locale phrase outside the locale helper"
+        )
 
 print(f"catalog: {catalog_path}")
 print(f"total keys: {total}")

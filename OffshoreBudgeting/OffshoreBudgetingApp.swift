@@ -6,9 +6,6 @@
 
 import SwiftUI
 import SwiftData
-import CoreData
-import Combine
-import OSLog
 #if canImport(UIKit)
 import UIKit
 #endif
@@ -28,8 +25,6 @@ struct OffshoreBudgetingApp: App {
 
     init() {
         configureLegacyTabBarAppearanceIfNeeded()
-        // Also retire legacy monitoring when iOS launches the app in the background.
-        Task { await ExcursionRetirementService.retireLegacyState() }
     }
 
     // MARK: - Notifications Delegate
@@ -89,7 +84,7 @@ struct OffshoreBudgetingApp: App {
                 .id(rootResetToken)
                 .onAppear {
                     consumePendingWidgetActionIfNeeded()
-                    retireLegacyFeatureData()
+                    refreshShoppingModeForForeground(reason: "sceneOnAppear")
                 }
                 .task {
                     #if DEBUG
@@ -104,17 +99,7 @@ struct OffshoreBudgetingApp: App {
                 .onChange(of: scenePhase) { _, newValue in
                     guard newValue == .active else { return }
                     consumePendingWidgetActionIfNeeded()
-                    retireLegacyFeatureData()
-                }
-                .onReceive(NotificationCenter.default.publisher(
-                    for: NSPersistentCloudKitContainer.eventChangedNotification
-                ).receive(on: RunLoop.main)) { notification in
-                    guard let event = notification.userInfo?[
-                        NSPersistentCloudKitContainer.eventNotificationUserInfoKey
-                    ] as? NSPersistentCloudKitContainer.Event,
-                          event.type == .import, event.endDate != nil else { return }
-                    // Old clients may sync retired records after this app has launched.
-                    retireLegacyFeatureData()
+                    refreshShoppingModeForForeground(reason: "sceneBecameActive")
                 }
                 .onOpenURL { url in
                     _ = OffshoreDeepLinkHandler.handle(url)
@@ -167,13 +152,52 @@ struct OffshoreBudgetingApp: App {
     }
 
     @MainActor
-    private func retireLegacyFeatureData() {
-        do {
-            try MarinaRetirementService.purgeLegacyRecords(in: modelContainer)
-        } catch {
-            Logger(subsystem: "com.mb.offshore-budgeting", category: "FeatureRetirement")
-                .error("Could not retire assistant records; will retry: \(error.localizedDescription, privacy: .public)")
+    private func refreshShoppingModeForForeground(reason: String) {
+        let start = DispatchTime.now().uptimeNanoseconds
+        traceShoppingModeForeground("starting reason=\(reason)")
+        TabFlickerDiagnostics.markEvent(
+            "shoppingModeForegroundStart",
+            metadata: ["reason": reason]
+        )
+
+        ShoppingModeManager.shared.refreshIfExpired()
+        let isActive = ShoppingModeManager.shared.status.isActive
+        traceShoppingModeForeground("refreshed reason=\(reason) isActive=\(isActive)")
+        TabFlickerDiagnostics.markEvent(
+            "shoppingModeForegroundRefreshed",
+            metadata: [
+                "reason": reason,
+                "isActive": isActive ? "true" : "false"
+            ]
+        )
+
+        if isActive {
+            ShoppingModeLocationService.shared.startMonitoringIfPossible()
+            traceShoppingModeForeground("monitoring restarted reason=\(reason)")
+            TabFlickerDiagnostics.markEvent(
+                "shoppingModeMonitoringRestarted",
+                metadata: ["reason": reason]
+            )
         }
+
+        let elapsedMillis = Double(DispatchTime.now().uptimeNanoseconds - start) / 1_000_000
+        traceShoppingModeForeground(
+            "completed reason=\(reason) elapsedMs=\(String(format: "%.1f", elapsedMillis))"
+        )
+        TabFlickerDiagnostics.markEvent(
+            "shoppingModeForegroundCompleted",
+            metadata: [
+                "reason": reason,
+                "elapsedMs": String(format: "%.1f", elapsedMillis)
+            ]
+        )
+    }
+
+    private func traceShoppingModeForeground(_ message: String) {
+        #if DEBUG
+        guard UserDefaults.standard.bool(forKey: "debug_shoppingModeForegroundTraceEnabled") else { return }
+        print("[ShoppingModeForeground] \(message)")
+        #endif
     }
 
     // MARK: - Container Factory

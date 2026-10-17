@@ -10,6 +10,9 @@ import SwiftUI
 import UIKit
 #endif
 
+#if canImport(CoreLocation)
+import CoreLocation
+#endif
 
 #if canImport(Photos)
 import Photos
@@ -19,10 +22,14 @@ import Photos
 import PhotosUI
 #endif
 
+#if canImport(ActivityKit) && !targetEnvironment(macCatalyst)
+import ActivityKit
+#endif
 
 @MainActor
 struct SettingsPrivacyView: View {
     private enum SystemPermissionKind {
+        case location
         case photos
     }
 
@@ -38,6 +45,9 @@ struct SettingsPrivacyView: View {
     // Toggle UI state to authenticate before committing to AppStorage.
     @State private var requireBiometricsToggle: Bool = false
 
+    #if canImport(CoreLocation)
+    @State private var locationPermissionState: CLAuthorizationStatus = .notDetermined
+    #endif
 
     #if canImport(Photos)
     @State private var photosPermissionState: PHAuthorizationStatus = .notDetermined
@@ -97,7 +107,26 @@ struct SettingsPrivacyView: View {
             // MARK: - System Permissions
 
             Section {
+                locationPermissionRow
                 photosPermissionRow
+
+                permissionRow(
+                    title: "Live Activities",
+                    status: liveActivitiesStatus,
+                    description: "Shows Excursion Mode status and timing on your Lock Screen while the session is active."
+                )
+
+                permissionRow(
+                    title: "Background App Refresh",
+                    status: backgroundAppRefreshStatus,
+                    description: "Helps Excursion Mode continue monitoring reliably when Offshore is not in the foreground."
+                )
+
+                permissionRow(
+                    title: "Cellular Data",
+                    status: cellularDataStatus,
+                    description: "Allows Offshore to use mobile data during Excursion Mode when Wi-Fi may be unavailable.\nNote: Cellular Data is not needed to use the core functionalities of Offshore."
+                )
 
                 Button {
                     openAppOrSystemSettings()
@@ -122,6 +151,9 @@ struct SettingsPrivacyView: View {
         }
         .onChange(of: scenePhase) { _, newValue in
             guard newValue == .active else { return }
+            refreshPermissionStates()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: ShoppingModeLocationService.authorizationDidChangeNotification)) { _ in
             refreshPermissionStates()
         }
         .onChange(of: requireBiometrics) { _, newValue in
@@ -150,6 +182,53 @@ struct SettingsPrivacyView: View {
     }
 
     // MARK: - Permission Rows
+
+    @ViewBuilder
+    private var locationPermissionRow: some View {
+        #if canImport(CoreLocation)
+        VStack(alignment: .leading, spacing: 8) {
+            LabeledContent("Location", value: locationPermissionStatusText)
+
+            Text("Allows Offshore to use Location Services during Excursion Mode to nudge you to log expenses before you forget.\nNote: Location Services are not needed to use the core functionalities of Offshore.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+
+            switch locationPermissionState {
+            case .notDetermined:
+                Button(isMacCatalyst ? "Allow Location Access" : "Enable for Excursion Mode") {
+                    ShoppingModeLocationService.shared.requestAuthorizationForExcursionMode()
+                }
+            case .authorizedWhenInUse:
+                if !isMacCatalyst {
+                    Button("Upgrade in App Settings") {
+                        openAppOrSystemSettings()
+                    }
+                }
+            case .denied, .restricted:
+                Button(isMacCatalyst ? "Open Location Settings" : "Manage in App Settings") {
+                    openSystemSettings(for: .location)
+                }
+            case .authorizedAlways:
+                EmptyView()
+            @unknown default:
+                EmptyView()
+            }
+
+            if isMacCatalyst,
+               let instructions = systemSettingsInstructions(for: .location) {
+                Text("If Offshore is turned off, enable it in \(instructions).")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        #else
+        permissionRow(
+            title: "Location",
+            status: "Unavailable",
+            description: "Allows Offshore to use Location Services during Excursion Mode to nudge you to log expenses before you forget.\nNote: Location Services are not needed to use the core functionalities of Offshore."
+        )
+        #endif
+    }
 
     @ViewBuilder
     private var photosPermissionRow: some View {
@@ -285,6 +364,8 @@ struct SettingsPrivacyView: View {
 
         let urlString: String
         switch permission {
+        case .location:
+            urlString = "x-apple.systempreferences:com.apple.preference.security?Privacy_LocationServices"
         case .photos:
             urlString = "x-apple.systempreferences:com.apple.preference.security?Privacy_Photos"
         case nil:
@@ -298,6 +379,8 @@ struct SettingsPrivacyView: View {
         guard isMacCatalyst else { return nil }
 
         switch permission {
+        case .location:
+            return "System Settings > Privacy & Security > Location Services"
         case .photos:
             return "System Settings > Privacy & Security > Photos"
         }
@@ -306,9 +389,48 @@ struct SettingsPrivacyView: View {
     // MARK: - Permission Status
 
     private func refreshPermissionStates() {
+        #if canImport(CoreLocation)
+        locationPermissionState = ShoppingModeLocationService.shared.currentAuthorizationStatus()
+        #endif
 
         #if canImport(Photos)
         photosPermissionState = PhotoLibraryAccessManager.shared.authorizationStatus()
+        #endif
+    }
+
+    private var locationPermissionStatusText: String {
+        #if canImport(CoreLocation)
+        if isMacCatalyst {
+            switch locationPermissionState {
+            case .authorizedAlways, .authorizedWhenInUse:
+                return String(localized: "privacy.permissionStatus.allowed", defaultValue: "Allowed", comment: "Permission status when a capability is allowed.")
+            case .denied:
+                return String(localized: "privacy.permissionStatus.denied", defaultValue: "Denied", comment: "Permission status when access has been denied.")
+            case .restricted:
+                return String(localized: "privacy.permissionStatus.restricted", defaultValue: "Restricted", comment: "Permission status when access is restricted by the system.")
+            case .notDetermined:
+                return String(localized: "privacy.permissionStatus.notRequestedYet", defaultValue: "Not Requested Yet", comment: "Permission status when access has not been requested yet.")
+            @unknown default:
+                return String(localized: "privacy.permissionStatus.unknown", defaultValue: "Unknown", comment: "Fallback permission status when the system returns an unknown value.")
+            }
+        }
+
+        switch locationPermissionState {
+        case .authorizedAlways:
+            return String(localized: "privacy.permissionStatus.alwaysAllow", defaultValue: "Always Allow", comment: "Permission status when location access is always allowed.")
+        case .authorizedWhenInUse:
+            return String(localized: "privacy.permissionStatus.whileUsingApp", defaultValue: "While Using App", comment: "Permission status when location access is only allowed while using the app.")
+        case .denied:
+            return String(localized: "privacy.permissionStatus.denied", defaultValue: "Denied", comment: "Permission status when access has been denied.")
+        case .restricted:
+            return String(localized: "privacy.permissionStatus.restricted", defaultValue: "Restricted", comment: "Permission status when access is restricted by the system.")
+        case .notDetermined:
+            return String(localized: "privacy.permissionStatus.notRequestedYet", defaultValue: "Not Requested Yet", comment: "Permission status when access has not been requested yet.")
+        @unknown default:
+            return String(localized: "privacy.permissionStatus.unknown", defaultValue: "Unknown", comment: "Fallback permission status when the system returns an unknown value.")
+        }
+        #else
+        return String(localized: "privacy.permissionStatus.unavailable", defaultValue: "Unavailable", comment: "Permission status shown when a capability is unavailable on the current platform.")
         #endif
     }
 
@@ -348,6 +470,43 @@ struct SettingsPrivacyView: View {
         #else
         return String(localized: "privacy.permissionStatus.unavailable", defaultValue: "Unavailable", comment: "Permission status shown when a capability is unavailable on the current platform.")
         #endif
+    }
+
+    private var liveActivitiesStatus: String {
+        #if canImport(ActivityKit) && !targetEnvironment(macCatalyst)
+        if #available(iOS 16.1, *) {
+            if ActivityAuthorizationInfo().areActivitiesEnabled {
+                return String(localized: "privacy.permissionStatus.allowed", defaultValue: "Allowed", comment: "Permission status when a capability is allowed.")
+            } else {
+                return String(localized: "privacy.permissionStatus.off", defaultValue: "Off", comment: "Permission status when a capability is turned off.")
+            }
+        } else {
+            return String(localized: "privacy.permissionStatus.unavailable", defaultValue: "Unavailable", comment: "Permission status shown when a capability is unavailable on the current platform.")
+        }
+        #else
+        return String(localized: "privacy.permissionStatus.unavailable", defaultValue: "Unavailable", comment: "Permission status shown when a capability is unavailable on the current platform.")
+        #endif
+    }
+
+    private var backgroundAppRefreshStatus: String {
+        #if canImport(UIKit)
+        switch UIApplication.shared.backgroundRefreshStatus {
+        case .available:
+            return String(localized: "privacy.permissionStatus.allowed", defaultValue: "Allowed", comment: "Permission status when a capability is allowed.")
+        case .denied:
+            return String(localized: "privacy.permissionStatus.off", defaultValue: "Off", comment: "Permission status when a capability is turned off.")
+        case .restricted:
+            return String(localized: "privacy.permissionStatus.restricted", defaultValue: "Restricted", comment: "Permission status when access is restricted by the system.")
+        @unknown default:
+            return String(localized: "privacy.permissionStatus.unknown", defaultValue: "Unknown", comment: "Fallback permission status when the system returns an unknown value.")
+        }
+        #else
+        return String(localized: "privacy.permissionStatus.unavailable", defaultValue: "Unavailable", comment: "Permission status shown when a capability is unavailable on the current platform.")
+        #endif
+    }
+
+    private var cellularDataStatus: String {
+        String(localized: "Manage in App Settings", defaultValue: "Manage in App Settings", comment: "Button-like status text shown when the user must manage a permission in App Settings.")
     }
 
     @ViewBuilder

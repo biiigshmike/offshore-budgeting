@@ -1,19 +1,19 @@
 # Offshore Budgeting Agent Playbook
 
-Offshore Budgeting is a personal finance app built around separate budgeting contexts, flexible budget periods, card-ledger tracking, planned-vs-actual money flow. Future agents should treat this project as a lived financial system: preserve user intent, preserve historical records, and respect the domain math before changing UI or storage.
+Offshore Budgeting is a personal finance app built around separate budgeting contexts, flexible budget periods, card-ledger tracking, planned-vs-actual money flow, and Marina, a conversational budgeting assistant. Future agents should treat this project as a lived financial system: preserve user intent, preserve historical records, and respect the domain math before changing UI or storage.
 
 This document combines the product manifesto with the current SwiftData model and app behavior. When code and desired product policy do not fully agree, document the current behavior and flag the decision instead of silently flattening it.
 
 ## How To Work In This Repo
 
 - Read existing code before editing. Prefer local patterns, existing services, and tests over new abstractions.
-- Treat workspace boundaries as a hard data boundary. Reads, writes, queries, widgets and shortcuts should be scoped to the selected or explicitly provided workspace unless an existing cross-workspace feature intentionally says otherwise. Most reads and writes must be scoped by `workspace.id`.
+- Treat workspace boundaries as a hard data boundary. Reads, writes, queries, widgets, shortcuts, and Marina responses should be scoped to the selected or explicitly provided workspace unless an existing cross-workspace feature intentionally says otherwise. Most reads and writes must be scoped by `workspace.id`.
 - Prefer preserving financial history. Never introduce destructive cleanup as a side effect of a UI convenience change. Archive, unlink, nil out optional classifications, or route to review before deleting historical expenses, incomes, or ledger entries.
 - Do not collapse product concepts just because names sound similar. In particular, `VariableExpense` and `PlannedExpense` are different models with different business meaning.
-- Avoid duplicate user-facing names inside one workspace. The model often allows duplicates, but Shortcuts rely on clear resolution.
+- Avoid duplicate user-facing names inside one workspace. The model often allows duplicates, but Marina and Shortcuts rely on clear resolution.
 - Keep Savings and Reconciliation separate. Savings is true saved money; Reconciliation/Allocation accounts track shared balances. Do not revive legacy mirrored reconciliation savings entries. If old data requires cleanup, write an explicit normalization/migration plan before changing behavior.
 - Use model-aware deletion helpers where they exist, especially `PlannedExpenseDeletionService`, `VariableExpenseDeletionService`, `BudgetDeletionService`, `SavingsAccountService`, and allocation ledger helpers.
-- For SwiftData relationship changes, verify the app schema in `OffshoreBudgeting/OffshoreBudgetingApp.swift` and test schemas. The live app schema currently includes 20 models.
+- For SwiftData relationship changes, verify the app schema in `OffshoreBudgeting/OffshoreBudgetingApp.swift` and test schemas. The live app schema currently includes 19 models.
 
 ## Agent Workflow
 
@@ -43,7 +43,7 @@ Use separate agents/workers when the task benefits from independent investigatio
 
 - SwiftData model or relationship changes
 - CloudKit compatibility risks
-- future assistant / NLQ routing or query-shape changes
+- Marina / NLQ routing or query-shape changes
 - financial aggregation math
 - savings, reconciliation, or allocation behavior
 - WidgetKit, AppIntents, or Shortcut changes
@@ -92,7 +92,7 @@ COMMAND 2>&1 | head -c 4000
 
 The confirmed model schema is:
 
-`Workspace`, `Budget`, `BudgetCategoryLimit`, `Card`, `BudgetCardLink`, `BudgetPresetLink`, `Category`, `Preset`, `PlannedExpense`, `VariableExpense`, `AllocationAccount`, `ExpenseAllocation`, `AllocationSettlement`, `SavingsAccount`, `SavingsLedgerEntry`, `ImportMerchantRule`, `AssistantAliasRule`, `MarinaChatSession`, `IncomeSeries`, `Income`.
+`Workspace`, `Budget`, `BudgetCategoryLimit`, `Card`, `BudgetCardLink`, `BudgetPresetLink`, `Category`, `Preset`, `PlannedExpense`, `VariableExpense`, `AllocationAccount`, `ExpenseAllocation`, `AllocationSettlement`, `SavingsAccount`, `SavingsLedgerEntry`, `ImportMerchantRule`, `AssistantAliasRule`, `IncomeSeries`, `Income`.
 
 Grouped by domain:
 
@@ -103,17 +103,16 @@ Grouped by domain:
 - Reconciliation: `AllocationAccount`, `ExpenseAllocation`, `AllocationSettlement`.
 - Savings: `SavingsAccount`, `SavingsLedgerEntry`.
 - Income: `Income`, `IncomeSeries`.
-- Import learning: `ImportMerchantRule`.
-- Retired assistant storage compatibility: `AssistantAliasRule`, `MarinaChatSession`.
+- Import and assistant memory: `ImportMerchantRule`, `AssistantAliasRule`.
 
 ## Workspace
 
-A workspace owns a complete budgeting context. Personal and Work can live in the same app without sharing cards, budgets, categories, income, expenses, savings, import rules, or legacy assistant records.
+A workspace owns a complete budgeting context. Personal and Work can live in the same app without sharing cards, budgets, categories, income, expenses, savings, import rules, or Marina context.
 
 Rules:
 
 - A workspace needs a name and hex color in product flows.
-- Most screens, shortcuts, and widgets must filter by workspace.
+- Most screens, shortcuts, widgets, and Marina queries must filter by workspace.
 - The app expects at least one workspace after onboarding.
 - Deleting a workspace is intentionally broad because SwiftData cascades its owned graph. Guard against deleting the final workspace and make destructive impact obvious.
 - Workspace names should be treated as user-facing identifiers; avoid duplicates even when the model permits them.
@@ -135,12 +134,12 @@ Rules:
 
 ## Cards
 
-A card is the spending account/card ledger used by expenses, card detail, budget scoping, widgets and shortcuts. Expenses should have a card in normal product flows.
+A card is the spending account/card ledger used by expenses, card detail, budget scoping, widgets, shortcuts, and Marina queries. Expenses should have a card in normal product flows.
 
 Rules:
 
 - A card needs a non-empty name, theme, and effect in product flows.
-- UI currently defaults new cards to Ruby/Plastic style, while the model has fallback storage defaults.
+- UI and Marina currently default new cards to Ruby/Plastic style, while the model has fallback storage defaults.
 - Duplicate normalized card names are risky because Wallet-name shortcut resolution can become ambiguous.
 - Deleting a card currently deletes linked planned expenses, variable expenses, incomes, and budget links in several app paths. Treat this as destructive financial history and prefer archive/unassign/review patterns for future work.
 
@@ -183,15 +182,15 @@ Rules:
 
 ## Categories
 
-Categories organize spending and power category analytics, budget limits, imports, widgets.
+Categories organize spending and power category analytics, budget limits, imports, widgets, and Marina queries.
 
 Rules:
 
 - A category needs non-empty name and hex color in product flows.
 - Category is optional on expenses and presets. "Uncategorized" is currently a virtual nil category, not a guaranteed stored category.
-- Category names should be unique enough within a workspace for import matching and future assistant resolution.
+- Category names should be unique enough within a workspace for Marina and import matching.
 - Budget category limits are period-scoped; there is no global category budget.
-- Deleting a category should preserve historical expenses by clearing category references and deleting/repairing dependent limit rows. Verify settings/onboarding cleanup before changing behavior.
+- Deleting a category should preserve historical expenses by clearing category references and deleting/repairing dependent limit rows. Current settings and Marina paths differ; flag this before changing behavior.
 
 ## Presets
 
@@ -204,7 +203,7 @@ Rules:
 - Materialization is budget-window scoped and should be idempotent.
 - Generated planned expenses copy preset title, planned amount, default category, and default card only when the card is linked to the budget.
 - Unlinking a preset from a budget deletes generated rows for that budget/preset in current flows.
-- Preserve current UI preset deletion and edit-sync behavior unless implementing a deliberate product decision.
+- Preset deletion and edit-sync behavior differ across UI and Marina paths. Document and preserve current behavior unless implementing a deliberate product decision.
 
 ## Income
 
@@ -213,7 +212,7 @@ Income represents money expected or received. `isPlanned` is the semantic split:
 Rules:
 
 - Product creation requires source, amount greater than zero, date, planned/actual state, and workspace.
-- Dates are generally normalized to start of day for manual, shortcut, and recurrence-generated entries.
+- Dates are generally normalized to start of day for manual, shortcut, Marina, and recurrence-generated entries.
 - Actual income drives received-income analytics.
 - Planned income drives forecasts, safe-spend, reminders, and projected savings.
 - `IncomeSeries` stores bounded recurrence rules and materializes concrete `Income` rows. Downstream features generally consume `Income`, not recurrence rules.
@@ -260,16 +259,18 @@ Rules:
 - Learned rules are workspace-scoped and text/category based; category deletion and renames can stale them.
 - There is currently no main settings UI for learned import rules. Treat edits/deletes as a product decision, not a casual cleanup.
 
-## Retired Features and Future Rebuilds
+## Marina
 
-Marina and Excursion Mode have been removed from active app behavior. Do not restore old runtime, UI, location monitoring, or assistant routing as incidental cleanup. Rebuild each feature deliberately and incrementally.
+Marina is the conversational layer over the user's current workspace. It answers budget questions, handles some CRUD, and should ask clarifying questions when names or target types are ambiguous.
 
-- `AssistantAliasRule`, `MarinaAliasEntityType`, `MarinaChatSession`, their Workspace relationships, and app/test schema entries remain for SwiftData and CloudKit compatibility. These are dormant storage definitions.
-- Existing assistant conversations and aliases are cleared by the explicit retirement service. Financial records remain intact.
-- Excursion Activity attributes remain only so the retirement service can end sessions created by older versions; ordinary Quick Add remains available.
-- Before a rebuilt feature creates conversations, aliases, or sessions, replace or disable its retirement cleanup so new data is not removed.
-- Future assistant queries and writes must remain workspace-scoped and clarify ambiguous entity names. Use existing domain services instead of duplicating financial math.
-- Review `Docs/Maintenance/FeatureRetirementArchitectureGuide.md` for maintainability guidance and rebuild boundaries.
+Rules:
+
+- Marina must be workspace-scoped.
+- Marina should distinguish cards, merchants, categories, budgets, presets, income sources, savings accounts, and reconciliation accounts.
+- If a prompt can mean both a card and merchant/expense text, ask for clarification.
+- Marina supports CRUD for core user-facing entities, but not every supporting ledger entity.
+- `AssistantAliasRule` stores workspace-scoped text aliases for assistant resolution. It points to text, not stable entity IDs, so renames/deletes can make aliases stale.
+- Alias uniqueness should be normalized/case-insensitive in product thinking, even though current upsert is more literal.
 
 ## Home, Widgets, And Shortcuts
 
@@ -302,12 +303,13 @@ Rules:
 These are current behavior mismatches or product choices future agents should not resolve accidentally:
 
 - Preset deletion and generated planned-expense cleanup differ across paths.
-- Verify category deletion cleanup across settings/onboarding before changing behavior.
+- Preset edits sync generated planned expenses in some Marina flows but not every UI flow.
+- Category deletion cleanup differs between Marina and settings/onboarding.
 - Card deletion currently destroys linked expenses/incomes in several paths.
 - Budgets can overlap; the app tolerates this, but overlapping active budget semantics should be intentional.
 - Budgets with zero linked cards are possible but disable some budget-scoped expense behavior.
 - Savings offsets may exceed available savings total today.
-- `ImportMerchantRule` is text-based and can stale after renames/deletes. Legacy `AssistantAliasRule` records remain only for compatibility.
+- `AssistantAliasRule` and `ImportMerchantRule` are text-based and can stale after renames/deletes.
 - There is no guaranteed uniqueness constraint for workspace, card, category, budget, preset, or alias names.
 
 ## Useful Verification Targets
@@ -322,5 +324,7 @@ When changing business logic, look for or add focused tests near:
 - `OffshoreBudgetingTests/AllocationLedgerServiceTests.swift`
 - `OffshoreBudgetingTests/AddExpenseShortcutExecutorTests.swift`
 - `OffshoreBudgetingTests/OffshoreIntentDataStoreResolutionTests.swift`
+- `OffshoreBudgetingTests/MarinaCrudParityTests.swift`
+- `OffshoreBudgetingTests/HomeQueryEngineTests.swift`
 
 For model/schema work, verify `OffshoreBudgeting/Models.swift`, `OffshoreBudgeting/OffshoreBudgetingApp.swift`, and any in-memory test schemas together.

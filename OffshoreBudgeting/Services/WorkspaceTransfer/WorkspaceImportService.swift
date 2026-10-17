@@ -359,8 +359,18 @@ struct WorkspaceImportService {
                 modelContext.insert(rule)
             }
 
-            // Older archives may contain assistant aliases. Decode them for compatibility,
-            // but do not restore records belonging to the retired feature.
+            for payload in archive.assistantAliasRules {
+                let alias = AssistantAliasRule(
+                    id: UUID(),
+                    aliasKey: payload.aliasKey,
+                    targetValue: payload.targetValue,
+                    entityType: MarinaAliasEntityType(rawValue: payload.entityTypeRaw) ?? .category,
+                    workspace: importedWorkspace,
+                    createdAt: payload.createdAt,
+                    updatedAt: payload.updatedAt
+                )
+                modelContext.insert(alias)
+            }
 
             for account in savingsAccountsByOldID.values {
                 SavingsAccountService.recalculateAccountTotal(account)

@@ -65,8 +65,7 @@ struct WorkspaceTransferServiceTests {
         #expect(archive.savingsAccounts.count == 1)
         #expect(archive.savingsLedgerEntries.count == 1)
         #expect(archive.importMerchantRules.count == 1)
-        #expect(archive.assistantAliasRules.isEmpty)
-        #expect(!archive.selectedSections.contains(.marinaAliases))
+        #expect(archive.assistantAliasRules.count == 1)
         #expect(archive.incomeSeries.count == 1)
         #expect(archive.incomes.count == 1)
 
@@ -153,36 +152,13 @@ struct WorkspaceTransferServiceTests {
         #expect(importedRules.first?.preferredCategory?.id == importedCategory.id)
 
         let importedAliases = try fetchAll(AssistantAliasRule.self, in: context).filter { $0.workspace?.id == imported.id }
-        #expect(importedAliases.isEmpty)
+        #expect(importedAliases.first?.entityType == .card)
 
         let importedIncomeSeries = try fetchAll(IncomeSeries.self, in: context).filter { $0.workspace?.id == imported.id }
         let importedSeries = try #require(importedIncomeSeries.first)
         let importedIncomes = try fetchAll(Income.self, in: context).filter { $0.workspace?.id == imported.id }
         #expect(importedIncomes.first?.series?.id == importedSeries.id)
         #expect(importedIncomes.first?.card?.id == importedCard.id)
-    }
-
-    @Test func legacyArchive_importsFinancialRecordsWithoutRetiredAliases() throws {
-        let context = try makeContext()
-        let source = try seedTransferWorkspace(in: context)
-        var archive = try WorkspaceExportService().exportArchive(
-            for: source.workspace,
-            sections: Set(WorkspaceTransferSection.allCases),
-            modelContext: context
-        )
-        archive.selectedSections.append(.marinaAliases)
-        archive.assistantAliasRules = [AssistantAliasRulePayload(
-            id: UUID(), aliasKey: "visa", targetValue: "Visa", entityTypeRaw: "card",
-            createdAt: .now, updatedAt: .now
-        )]
-        let decoded = try WorkspaceArchiveCoding.decode(WorkspaceArchiveCoding.encode(archive))
-        let imported = try WorkspaceImportService().importArchive(
-            decoded, existingWorkspaces: try fetchAll(Workspace.self, in: context),
-            modelContext: context
-        )
-        #expect(try fetchAll(AssistantAliasRule.self, in: context).allSatisfy { $0.workspace?.id != imported.id })
-        #expect(try fetchAll(VariableExpense.self, in: context).filter { $0.workspace?.id == imported.id }.count == 1)
-        #expect(try fetchAll(Income.self, in: context).filter { $0.workspace?.id == imported.id }.count == 1)
     }
 
     @Test func export_skipsOtherWorkspaceRecords() throws {

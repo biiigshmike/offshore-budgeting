@@ -160,29 +160,6 @@ struct AddExpenseShortcutExecutorTests {
         #expect(expense.category?.id == groceries.id)
     }
 
-    @Test func execute_missingCard_createsNoExpense() throws {
-        let context = try makeContext()
-        let workspace = Workspace(name: "Personal", hexColor: "#3B82F6")
-        context.insert(workspace)
-        try context.save()
-
-        #expect(throws: AddExpenseShortcutExecutor.RequestValidationError.missingCard) {
-            _ = try AddExpenseShortcutExecutor.execute(
-                request: .init(
-                    amountText: "12.00",
-                    offshoreCardID: nil,
-                    walletCardName: nil,
-                    categoryID: nil,
-                    merchant: "Store",
-                    date: Date(timeIntervalSince1970: 1_700_000_000)
-                ),
-                in: workspace,
-                modelContext: context
-            )
-        }
-        #expect(try context.fetch(FetchDescriptor<VariableExpense>()).isEmpty)
-    }
-
     @Test func execute_invalidAmount_throwsValidationError() throws {
         let context = try makeContext()
         let workspace = Workspace(name: "Personal", hexColor: "#3B82F6")

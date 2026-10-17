@@ -29,33 +29,6 @@ struct HomeViewBootstrap {
     private static let legacyAppliedStartKey = "home_appliedStartTimestamp"
     private static let legacyAppliedEndKey = "home_appliedEndTimestamp"
 
-    static func storedAppliedRangeSeed(workspaceID: UUID, defaults: UserDefaults) -> AppliedRangeSeed? {
-        let start = defaults.double(forKey: appliedStartKey(workspaceID: workspaceID))
-        let end = defaults.double(forKey: appliedEndKey(workspaceID: workspaceID))
-        guard start > 0, end > 0 else { return nil }
-        return AppliedRangeSeed(
-            start: Date(timeIntervalSince1970: start),
-            end: Date(timeIntervalSince1970: max(start, end)),
-            lastSyncedDefaultBudgetingPeriodRaw: defaults.string(
-                forKey: lastSyncedDefaultBudgetingPeriodKey(workspaceID: workspaceID)
-            ) ?? ""
-        )
-    }
-
-    static func saveAppliedRangeSeed(_ seed: AppliedRangeSeed, workspaceID: UUID, defaults: UserDefaults) {
-        let values = [
-            (appliedStartKey(workspaceID: workspaceID), seed.start.timeIntervalSince1970),
-            (appliedEndKey(workspaceID: workspaceID), seed.end.timeIntervalSince1970)
-        ]
-        for (key, value) in values where defaults.object(forKey: key) == nil || defaults.double(forKey: key) != value {
-            defaults.set(value, forKey: key)
-        }
-        let syncedKey = lastSyncedDefaultBudgetingPeriodKey(workspaceID: workspaceID)
-        if defaults.string(forKey: syncedKey) != seed.lastSyncedDefaultBudgetingPeriodRaw {
-            defaults.set(seed.lastSyncedDefaultBudgetingPeriodRaw, forKey: syncedKey)
-        }
-    }
-
     static func canonicalAppliedRangeSeed(
         defaultBudgetingPeriodRaw: String,
         now: Date = .now,

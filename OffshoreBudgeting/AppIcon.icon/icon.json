@@ -1,83 +1,75 @@
 {
-  "fill-specializations" : [
-    {
-      "value" : "system-light"
-    },
-    {
-      "appearance" : "dark",
-      "value" : "system-dark"
-    }
-  ],
+  "fill" : {
+    "linear-gradient" : [
+      "srgb:0.46202,0.83828,1.00000,1.00000",
+      "srgb:1.00000,1.00000,1.00000,1.00000"
+    ]
+  },
   "groups" : [
     {
+      "blend-mode" : "normal",
       "layers" : [
         {
-          "blend-mode" : "normal",
-          "fill" : "none",
-          "glass" : false,
-          "hidden" : false,
-          "image-name" : "Vault-Door.png",
-          "name" : "Vault door",
-          "position-specializations" : [
+          "blend-mode-specializations" : [
             {
-              "idiom" : "square",
-              "value" : {
-                "scale" : 0.5388583509513742,
-                "translation-in-points" : [
-                  0.22001234105829326,
-                  49.27220894827883
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "blend-mode" : "normal",
-          "fill-specializations" : [
-            {
-              "value" : "none"
+              "value" : "normal"
             },
             {
               "appearance" : "dark",
-              "value" : "none"
-            },
-            {
-              "appearance" : "tinted",
-              "value" : "none"
+              "value" : "normal"
             }
           ],
+          "fill" : "none",
           "glass" : true,
-          "hidden" : false,
-          "image-name" : "Wave.png",
-          "name" : "Wave",
+          "hidden-specializations" : [
+            {
+              "idiom" : "square",
+              "value" : false
+            }
+          ],
+          "image-name" : "ChatGPT Image Sep 30, 2025 at 11_32_01 AM.png",
+          "name" : "ChatGPT Image Sep 30, 2025 at 11_32_01 AM",
           "opacity-specializations" : [
             {
               "appearance" : "dark",
               "value" : 1
             }
           ],
-          "position" : {
-            "scale" : 0.85,
-            "translation-in-points" : [
-              0,
-              0
-            ]
-          }
-        },
-        {
-          "blend-mode" : "normal",
-          "fill" : "none",
-          "glass" : false,
-          "image-name" : "Lighthouse-Without-Door.png",
-          "name" : "Lighthouse (no door)",
           "position-specializations" : [
             {
               "idiom" : "square",
               "value" : {
-                "scale" : 0.72,
+                "scale" : 1.25,
                 "translation-in-points" : [
                   0,
-                  25
+                  0
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "glass" : true,
+          "hidden" : false,
+          "image-name" : "ChatGPT Image Sep 30, 2025 at 11_44_38 AM 2.png",
+          "name" : "ChatGPT Image Sep 30, 2025 at 11_44_38 AM 2",
+          "opacity-specializations" : [
+            {
+              "value" : 0
+            },
+            {
+              "appearance" : "dark",
+              "value" : 1
+            }
+          ],
+          "position-specializations" : [
+            {
+              "idiom" : "square",
+              "value" : {
+                "scale" : 1.25,
+                "translation-in-points" : [
+                  0,
+                  0
                 ]
               }
             }
@@ -85,10 +77,10 @@
         }
       ],
       "lighting" : "individual",
-      "name" : "Separate lighthouse, door and wave",
+      "name" : "Group",
       "shadow" : {
         "kind" : "neutral",
-        "opacity" : 0.2
+        "opacity" : 0.5
       },
       "specular" : true,
       "translucency" : {

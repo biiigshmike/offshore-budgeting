@@ -8,7 +8,6 @@
 import SwiftUI
 import SwiftData
 import Foundation
-import Combine
 
 struct HomeView: View {
 
@@ -21,6 +20,27 @@ struct HomeView: View {
     @Query private var categories: [Category]
     @Query private var variableExpenses: [VariableExpense]
     @Query private var savingsEntries: [SavingsLedgerEntry]
+
+    // MARK: - Date Range Storage (per workspace)
+
+    private static func appliedStartKey(workspaceID: UUID) -> String {
+        "home_appliedStartTimestamp_\(workspaceID.uuidString)"
+    }
+
+    private static func appliedEndKey(workspaceID: UUID) -> String {
+        "home_appliedEndTimestamp_\(workspaceID.uuidString)"
+    }
+
+    private static func lastSyncedDefaultBudgetingPeriodKey(workspaceID: UUID) -> String {
+        "home_lastSyncedDefaultBudgetingPeriod_\(workspaceID.uuidString)"
+    }
+
+    private static let legacyAppliedStartKey = "home_appliedStartTimestamp"
+    private static let legacyAppliedEndKey = "home_appliedEndTimestamp"
+
+    @AppStorage private var appliedStartTimestamp: Double
+    @AppStorage private var appliedEndTimestamp: Double
+    @AppStorage private var lastSyncedDefaultBudgetingPeriodRaw: String
 
     @AppStorage("general_defaultBudgetingPeriod")
     private var defaultBudgetingPeriodRaw: String = BudgetingPeriod.monthly.rawValue
@@ -42,22 +62,67 @@ struct HomeView: View {
 
     @State private var isEditingWidgets: Bool = false
 
-    @State private var viewModel: HomeViewModel
+    @State private var pinnedItems: [HomePinnedItem]
+    @State private var isApplyingSyncedPinnedItems: Bool = false
+    @State private var dashboardSnapshot: HomeDashboardSnapshot = .empty
+    @State private var hasLoadedDashboardSnapshot: Bool = false
+    @State private var needsDashboardSnapshotRefresh: Bool = false
+    @State private var dashboardSnapshotRefreshTask: Task<Void, Never>? = nil
+    @State private var postSettleHousekeepingTask: Task<Void, Never>? = nil
+    @State private var activationEnrichmentTask: Task<Void, Never>? = nil
     @State private var masonryMeasuredHeights: [String: CGFloat] = [:]
     @State private var lastMeasuredUsableWidth: CGFloat = 0
 
     @State private var isShowingWhatIfPlanner: Bool = false
     @State private var whatIfInitialScenarioID: UUID? = nil
     @State private var whatIfInitialDraft: WhatIfPlannerDraft? = nil
+    @State private var isShowingAssistantPanel: Bool = false
+    @State private var assistantPanelHomeContext: MarinaPanelHomeContext? = nil
 
-    // MARK: - Prepared Data
+    // MARK: - Data Fixups
+
+    private struct HomeDashboardSnapshot {
+        let plannedExpensesForHome: [PlannedExpense]
+        let calculationPlannedExpensesForHome: [PlannedExpense]
+        let calculationVariableExpensesForHome: [VariableExpense]
+        let nextPlannedExpense: PlannedExpense?
+
+        static let empty = HomeDashboardSnapshot(
+            plannedExpensesForHome: [],
+            calculationPlannedExpensesForHome: [],
+            calculationVariableExpensesForHome: [],
+            nextPlannedExpense: nil
+        )
+    }
+
+    private func computePlannedExpensesForHome() -> [PlannedExpense] {
+        // I filter out budget-generated planned expenses whose source budget no longer exists,
+        // because deleting a budget can leave orphan planned expenses behind.
+        let existingBudgetIDs = Set(budgets.map(\.id))
+
+        return plannedExpenses.filter { expense in
+            guard let sourceBudgetID = expense.sourceBudgetID else {
+                return true
+            }
+            return existingBudgetIDs.contains(sourceBudgetID)
+        }
+    }
 
     private var plannedExpensesForHome: [PlannedExpense] {
-        viewModel.snapshot(for: dashboardData).plannedExpensesForHome
+        if hasLoadedDashboardSnapshot {
+            return dashboardSnapshot.plannedExpensesForHome
+        }
+        return computePlannedExpensesForHome()
     }
 
     private var calculationPlannedExpensesForHome: [PlannedExpense] {
-        viewModel.snapshot(for: dashboardData).calculationPlannedExpensesForHome
+        if hasLoadedDashboardSnapshot {
+            return dashboardSnapshot.calculationPlannedExpensesForHome
+        }
+        return PlannedExpenseFuturePolicy.filteredForCalculations(
+            plannedExpensesForHome,
+            excludeFuture: excludeFuturePlannedExpensesFromCalculationsInView
+        )
     }
 
     private var visiblePlannedExpensesForHome: [PlannedExpense] {
@@ -68,7 +133,13 @@ struct HomeView: View {
     }
 
     private var calculationVariableExpensesForHome: [VariableExpense] {
-        viewModel.snapshot(for: dashboardData).calculationVariableExpensesForHome
+        if hasLoadedDashboardSnapshot {
+            return dashboardSnapshot.calculationVariableExpensesForHome
+        }
+        return VariableExpenseFuturePolicy.filteredForCalculations(
+            variableExpenses,
+            excludeFuture: excludeFutureVariableExpensesFromCalculationsInView
+        )
     }
 
     private var visibleVariableExpensesForHome: [VariableExpense] {
@@ -82,6 +153,7 @@ struct HomeView: View {
 
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.accessibilityVoiceOverEnabled) private var voiceOverEnabled
+    @Environment(\.marinaToolbarContext) private var assistantToolbarContext
     @Environment(\.appTabActivationContext) private var tabActivationContext
     @Environment(\.appCommandHub) private var commandHub
     @Environment(\.modelContext) private var modelContext
@@ -105,14 +177,31 @@ struct HomeView: View {
         let defaults = UserDefaults.standard
         let defaultBudgetingPeriodRaw = defaults.string(forKey: "general_defaultBudgetingPeriod")
             ?? BudgetingPeriod.monthly.rawValue
-        let model = HomeViewModel(
-            workspaceID: workspaceID, defaults: defaults,
-            defaultBudgetingPeriodRaw: defaultBudgetingPeriodRaw,
-            fallbackCardIDs: (workspace.cards ?? []).map(\.id)
+        let initialPinnedItems = HomeViewBootstrap.initialPinnedItems(
+            workspaceID: workspaceID,
+            fallbackCardIDs: (workspace.cards ?? []).map(\.id),
+            defaults: defaults
         )
-        _viewModel = State(initialValue: model)
-        _draftStartDate = State(initialValue: model.appliedStartDate)
-        _draftEndDate = State(initialValue: model.appliedEndDate)
+        let appliedRangeSeed = HomeViewBootstrap.initialAppliedRangeSeed(
+            workspaceID: workspaceID,
+            defaultBudgetingPeriodRaw: defaultBudgetingPeriodRaw,
+            defaults: defaults
+        )
+
+        _appliedStartTimestamp = AppStorage(
+            wrappedValue: appliedRangeSeed.start.timeIntervalSince1970,
+            Self.appliedStartKey(workspaceID: workspaceID)
+        )
+        _appliedEndTimestamp = AppStorage(
+            wrappedValue: appliedRangeSeed.end.timeIntervalSince1970,
+            Self.appliedEndKey(workspaceID: workspaceID)
+        )
+        _lastSyncedDefaultBudgetingPeriodRaw = AppStorage(
+            wrappedValue: appliedRangeSeed.lastSyncedDefaultBudgetingPeriodRaw,
+            Self.lastSyncedDefaultBudgetingPeriodKey(workspaceID: workspaceID)
+        )
+        _draftStartDate = State(initialValue: appliedRangeSeed.start)
+        _draftEndDate = State(initialValue: appliedRangeSeed.end)
         _hideFuturePlannedExpensesInView = State(
             initialValue: defaults.bool(forKey: "general_hideFuturePlannedExpenses")
         )
@@ -125,6 +214,7 @@ struct HomeView: View {
         _excludeFutureVariableExpensesFromCalculationsInView = State(
             initialValue: defaults.bool(forKey: "general_excludeFutureVariableExpensesFromCalculations")
         )
+        _pinnedItems = State(initialValue: initialPinnedItems)
 
         _budgets = Query(
             filter: #Predicate<Budget> { $0.workspace?.id == workspaceID },
@@ -163,7 +253,6 @@ struct HomeView: View {
     }
 
     var body: some View {
-        @Bindable var model = viewModel
         ZStack {
             HomeBackgroundView()
 
@@ -228,6 +317,14 @@ struct HomeView: View {
                 initialDraft: whatIfInitialDraft
             )
         }
+        .fullScreenCover(isPresented: $isShowingAssistantPanel, onDismiss: dismissAssistantPanel) {
+            MarinaPanelView(
+                workspace: workspace,
+                onDismiss: dismissAssistantPanel,
+                shouldUseLargeMinimumSize: false,
+                homeContext: assistantPanelHomeContext ?? currentMarinaHomeContext
+            )
+        }
         .postBoardingTip(
             key: "tip.home.v1",
             title: String(localized: "app.section.home", defaultValue: "Home", comment: "Main tab title for the Home section."),
@@ -251,8 +348,28 @@ struct HomeView: View {
         )
         .navigationTitle(String(localized: "app.section.home", defaultValue: "Home", comment: "Main tab title for the Home section."))
         .toolbar {
-            ToolbarItemGroup(placement: .primaryAction) {
-                homeActionsToolbarButton
+            if #available(iOS 26.0, macCatalyst 26.0, *) {
+                ToolbarItemGroup(placement: .primaryAction) {
+                    homeActionsToolbarButton
+                }
+
+                if showsAssistantToolbarButton {
+                    ToolbarSpacer(.flexible, placement: .primaryAction)
+
+                    ToolbarItemGroup(placement: .primaryAction) {
+                        assistantToolbarButtoniOS26
+                    }
+                }
+            } else {
+                ToolbarItemGroup(placement: .primaryAction) {
+                    homeActionsToolbarButton
+                }
+
+                if showsAssistantToolbarButton {
+                    ToolbarItem(placement: .primaryAction) {
+                        assistantToolbarButtonLegacy
+                    }
+                }
             }
         }
         .sheet(isPresented: $isEditingWidgets) {
@@ -260,23 +377,38 @@ struct HomeView: View {
                 cards: cards,
                 workspaceID: workspace.id,
                 showsTileSizePicker: showsTileSizePicker,
-                pinnedItems: $model.pinnedItems
+                pinnedItems: $pinnedItems
             )
             .onDisappear {
-                viewModel.persistPinnedItems()
+                persistPinnedItems()
             }
         }
         .onAppear {
             if shouldSyncCommandSurface {
                 commandHub.activate(.home)
             }
-            viewModel.synchronizeAppliedRangeForAppearance(defaultBudgetingPeriodRaw: defaultBudgetingPeriodRaw)
+            bootstrapAppliedDatesIfNeeded()
+            syncAppliedRangeToCurrentDefaultBudgetingPeriodIfNeeded()
+            applyDefaultBudgetingPeriodIfSettingsChanged()
             syncDraftToAppliedIfNeeded()
-            viewModel.updateAvailableCards(cards, prune: false)
-            viewModel.appear(data: dashboardData, activation: tabActivationContext, cache: detailSnapshotCache)
+            if hasLoadedDashboardSnapshot == false {
+                hydrateDashboardSnapshotIfAvailable()
+                if hasLoadedDashboardSnapshot == false {
+                    rebuildDashboardSnapshot(reason: "onAppearInitial")
+                    hasLoadedDashboardSnapshot = true
+                }
+                needsDashboardSnapshotRefresh = false
+            } else if needsDashboardSnapshotRefresh {
+                scheduleDashboardSnapshotRefresh(reason: "onAppearRefresh")
+            }
+            schedulePostSettleHousekeeping(reason: "onAppear")
+            scheduleActivationEnrichment(reason: "onAppear")
         }
         .onDisappear {
-            viewModel.disappear()
+            dismissAssistantPanel()
+            cancelDashboardSnapshotRefresh(reason: "onDisappear")
+            cancelPostSettleHousekeeping()
+            cancelActivationEnrichment()
             if shouldSyncCommandSurface {
                 commandHub.deactivate(.home)
             }
@@ -290,16 +422,18 @@ struct HomeView: View {
                 for: HomePinnedItemsStore.pinnedItemsDidChangeName(workspaceID: workspace.id)
             )
         ) { _ in
-            viewModel.reloadSyncedPinnedItems()
+            reloadSyncedPinnedItemsIfNeeded()
+        }
+        .onChange(of: pinnedItems) { _, _ in
+            guard isApplyingSyncedPinnedItems == false else { return }
+            persistPinnedItems()
         }
         .onChange(of: cardIDSet) { _, _ in
-            viewModel.updateAvailableCards(cards)
-        }
-        .onReceive(NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification).receive(on: RunLoop.main)) { _ in
-            viewModel.reloadAppliedRangeFromDefaults()
+            prunePinnedCardsIfNeeded()
         }
         .onChange(of: defaultBudgetingPeriodRaw) { _, _ in
-            viewModel.applyDefaultBudgetingPeriod(defaultBudgetingPeriodRaw)
+            applyDefaultBudgetingPeriodToApplied()
+            lastSyncedDefaultBudgetingPeriodRaw = defaultBudgetingPeriodRaw
             syncDraftToAppliedIfNeeded()
         }
         .onChange(of: hideFuturePlannedExpensesDefault) { _, newValue in
@@ -319,10 +453,23 @@ struct HomeView: View {
             excludeFutureVariableExpensesFromCalculationsInView = newValue
         }
         .onChange(of: tabActivationContext) { _, newValue in
-            viewModel.activationChanged(to: newValue)
+            guard newValue.sectionRawValue == AppSection.home.rawValue else { return }
+            if newValue.phase == .active, needsDashboardSnapshotRefresh {
+                scheduleDashboardSnapshotRefresh(reason: "tabActivationSettled")
+                schedulePostSettleHousekeeping(reason: "tabActivationSettled")
+                scheduleActivationEnrichment(reason: "tabActivationSettled")
+            } else if newValue.phase != .active {
+                cancelDashboardSnapshotRefresh(reason: "tabPhaseChanged")
+                cancelPostSettleHousekeeping()
+                cancelActivationEnrichment()
+            }
         }
-        .onChange(of: dashboardData.signature) { _, _ in
-            viewModel.update(data: dashboardData)
+        .onChange(of: dashboardSnapshotInputs) { _, _ in
+            if tabActivationContext.phase == .active {
+                scheduleDashboardSnapshotRefresh(reason: "inputsChanged")
+            } else {
+                needsDashboardSnapshotRefresh = true
+            }
         }
     }
 
@@ -337,7 +484,40 @@ struct HomeView: View {
     private func openWhatIfPlanner(_ draft: WhatIfPlannerDraft) {
         whatIfInitialScenarioID = nil
         whatIfInitialDraft = draft
-        isShowingWhatIfPlanner = true
+        if isShowingAssistantPanel {
+            dismissAssistantPanel()
+            DispatchQueue.main.async {
+                isShowingWhatIfPlanner = true
+            }
+        } else {
+            isShowingWhatIfPlanner = true
+        }
+    }
+
+    private func presentAssistantPanel() {
+        let context = currentMarinaHomeContext
+        if isPhone {
+            assistantPanelHomeContext = context
+            isShowingAssistantPanel = true
+        } else {
+            assistantToolbarContext.openAssistant(context)
+        }
+    }
+
+    private func dismissAssistantPanel() {
+        isShowingAssistantPanel = false
+        assistantPanelHomeContext = nil
+    }
+
+    private var currentMarinaHomeContext: MarinaPanelHomeContext {
+        MarinaPanelHomeContext(
+            dateRange: HomeQueryDateRange(
+                startDate: appliedStartDate,
+                endDate: appliedEndDate
+            ),
+            excludeFuturePlannedExpensesFromCalculations: excludeFuturePlannedExpensesFromCalculationsInView,
+            excludeFutureVariableExpensesFromCalculations: excludeFutureVariableExpensesFromCalculationsInView
+        )
     }
 
     private func handleCommand(_ commandID: String) {
@@ -710,18 +890,226 @@ struct HomeView: View {
         return defaultUsableWidth
     }
 
-    private var dashboardData: HomeDashboardData {
-        HomeDashboardData(
-            workspaceID: workspace.id, budgets: budgets,
-            plannedExpenses: plannedExpenses, variableExpenses: variableExpenses,
-            startDate: appliedStartDate, endDate: appliedEndDate,
-            excludeFuturePlannedExpenses: excludeFuturePlannedExpensesFromCalculationsInView,
-            excludeFutureVariableExpenses: excludeFutureVariableExpensesFromCalculationsInView
+    private struct DashboardSnapshotInputs: Equatable {
+        let appliedStartTimestamp: Double
+        let appliedEndTimestamp: Double
+        let excludeFuturePlannedExpensesFromCalculationsInView: Bool
+        let excludeFutureVariableExpensesFromCalculationsInView: Bool
+        let budgetsSignature: Int
+        let plannedExpensesSignature: Int
+        let variableExpensesSignature: Int
+    }
+
+    private var dashboardSnapshotInputs: DashboardSnapshotInputs {
+        DashboardSnapshotInputs(
+            appliedStartTimestamp: appliedStartTimestamp,
+            appliedEndTimestamp: appliedEndTimestamp,
+            excludeFuturePlannedExpensesFromCalculationsInView: excludeFuturePlannedExpensesFromCalculationsInView,
+            excludeFutureVariableExpensesFromCalculationsInView: excludeFutureVariableExpensesFromCalculationsInView,
+            budgetsSignature: SnapshotContentSignature.budgets(budgets),
+            plannedExpensesSignature: SnapshotContentSignature.plannedExpenses(plannedExpenses),
+            variableExpensesSignature: SnapshotContentSignature.variableExpenses(variableExpenses)
         )
     }
 
     private var nextPlannedExpenseForHome: PlannedExpense? {
-        viewModel.snapshot(for: dashboardData).nextPlannedExpense
+        if hasLoadedDashboardSnapshot {
+            return dashboardSnapshot.nextPlannedExpense
+        }
+
+        return HomeNextPlannedExpenseFinder.nextExpense(
+            from: plannedExpensesForHome,
+            in: appliedStartDate,
+            to: appliedEndDate
+        )
+    }
+
+    private var dashboardSnapshotCacheKey: String {
+        [
+            "home-dashboard",
+            workspace.id.uuidString,
+            String(Int64(appliedStartTimestamp)),
+            String(Int64(appliedEndTimestamp)),
+            excludeFuturePlannedExpensesFromCalculationsInView ? "1" : "0",
+            excludeFutureVariableExpensesFromCalculationsInView ? "1" : "0",
+            String(SnapshotContentSignature.budgets(budgets)),
+            String(SnapshotContentSignature.plannedExpenses(plannedExpenses)),
+            String(SnapshotContentSignature.variableExpenses(variableExpenses))
+        ].joined(separator: "|")
+    }
+
+    private func buildDashboardSnapshot() -> HomeDashboardSnapshot {
+        RootActivationDiagnostics.measure(
+            "homeRootDerived",
+            metadata: [
+                "phase": tabActivationContext.phase.rawValue,
+                "token": String(tabActivationContext.token)
+            ]
+        ) {
+            let plannedExpensesForHome = computePlannedExpensesForHome()
+            let calculationPlannedExpensesForHome = PlannedExpenseFuturePolicy.filteredForCalculations(
+                plannedExpensesForHome,
+                excludeFuture: excludeFuturePlannedExpensesFromCalculationsInView
+            )
+            let calculationVariableExpensesForHome = VariableExpenseFuturePolicy.filteredForCalculations(
+                variableExpenses,
+                excludeFuture: excludeFutureVariableExpensesFromCalculationsInView
+            )
+            let nextPlannedExpense = HomeNextPlannedExpenseFinder.nextExpense(
+                from: plannedExpensesForHome,
+                in: appliedStartDate,
+                to: appliedEndDate
+            )
+
+            return HomeDashboardSnapshot(
+                plannedExpensesForHome: plannedExpensesForHome,
+                calculationPlannedExpensesForHome: calculationPlannedExpensesForHome,
+                calculationVariableExpensesForHome: calculationVariableExpensesForHome,
+                nextPlannedExpense: nextPlannedExpense
+            )
+        }
+    }
+
+    private func rebuildDashboardSnapshot(reason: String) {
+        let start = DispatchTime.now().uptimeNanoseconds
+        dashboardSnapshot = buildDashboardSnapshot()
+        detailSnapshotCache.store(dashboardSnapshot, for: dashboardSnapshotCacheKey)
+        let elapsedMillis = Double(DispatchTime.now().uptimeNanoseconds - start) / 1_000_000
+        TabFlickerDiagnostics.markEvent(
+            "homeDashboardSnapshotFinished",
+            metadata: [
+                "reason": reason,
+                "elapsedMs": String(format: "%.1f", elapsedMillis)
+            ]
+        )
+    }
+
+    private func hydrateDashboardSnapshotIfAvailable() {
+        guard let cached: HomeDashboardSnapshot = detailSnapshotCache.snapshot(for: dashboardSnapshotCacheKey) else {
+            return
+        }
+
+        dashboardSnapshot = cached
+        hasLoadedDashboardSnapshot = true
+        TabFlickerDiagnostics.markEvent("homeDashboardSnapshotHydrated")
+    }
+
+    private func scheduleDashboardSnapshotRefresh(reason: String) {
+        cancelDashboardSnapshotRefresh(reason: "reschedule")
+        let activationToken = tabActivationContext.token
+        let activationPhase = tabActivationContext.phase
+        TabFlickerDiagnostics.markEvent(
+            "homeDashboardSnapshotScheduled",
+            metadata: [
+                "reason": reason,
+                "phase": activationPhase.rawValue,
+                "token": String(activationToken)
+            ]
+        )
+
+        if activationPhase == .active {
+            rebuildDashboardSnapshot(reason: reason)
+            hasLoadedDashboardSnapshot = true
+            needsDashboardSnapshotRefresh = false
+            return
+        }
+
+        needsDashboardSnapshotRefresh = true
+        dashboardSnapshotRefreshTask = Task {
+            try? await Task.sleep(nanoseconds: 220_000_000)
+            guard Task.isCancelled == false else { return }
+
+            await MainActor.run {
+                guard tabActivationContext.sectionRawValue == AppSection.home.rawValue,
+                      tabActivationContext.phase == .active,
+                      tabActivationContext.token == activationToken else {
+                    TabFlickerDiagnostics.markEvent(
+                        "homeDashboardSnapshotCancelled",
+                        metadata: [
+                            "reason": reason,
+                            "cancel": "activationChanged"
+                        ]
+                    )
+                    return
+                }
+
+                rebuildDashboardSnapshot(reason: reason)
+                hasLoadedDashboardSnapshot = true
+                needsDashboardSnapshotRefresh = false
+            }
+        }
+    }
+
+    private func cancelDashboardSnapshotRefresh(reason: String) {
+        guard dashboardSnapshotRefreshTask != nil else { return }
+        dashboardSnapshotRefreshTask?.cancel()
+        dashboardSnapshotRefreshTask = nil
+        TabFlickerDiagnostics.markEvent(
+            "homeDashboardSnapshotCancelled",
+            metadata: ["reason": reason]
+        )
+    }
+
+    private func schedulePostSettleHousekeeping(reason: String) {
+        cancelPostSettleHousekeeping()
+        let activationToken = tabActivationContext.token
+
+        postSettleHousekeepingTask = Task {
+            try? await Task.sleep(nanoseconds: 180_000_000)
+            guard Task.isCancelled == false else { return }
+
+            await MainActor.run {
+                guard tabActivationContext.sectionRawValue == AppSection.home.rawValue,
+                      tabActivationContext.phase == .active,
+                      tabActivationContext.token == activationToken else {
+                    return
+                }
+
+                persistPinnedItemsMigrationIfNeeded()
+                prunePinnedCardsIfNeeded()
+                TabFlickerDiagnostics.markEvent(
+                    "homePostSettleHousekeepingFinished",
+                    metadata: ["reason": reason]
+                )
+            }
+        }
+    }
+
+    private func cancelPostSettleHousekeeping() {
+        postSettleHousekeepingTask?.cancel()
+        postSettleHousekeepingTask = nil
+    }
+
+    private func scheduleActivationEnrichment(reason: String) {
+        cancelActivationEnrichment()
+        let activationToken = tabActivationContext.token
+
+        activationEnrichmentTask = Task {
+            try? await Task.sleep(nanoseconds: 170_000_000)
+            guard Task.isCancelled == false else { return }
+
+            await MainActor.run {
+                guard tabActivationContext.sectionRawValue == AppSection.home.rawValue,
+                      tabActivationContext.phase == .active,
+                      tabActivationContext.token == activationToken else {
+                    return
+                }
+
+                if needsDashboardSnapshotRefresh {
+                    scheduleDashboardSnapshotRefresh(reason: "postSettleEnrichment")
+                }
+
+                TabFlickerDiagnostics.markEvent(
+                    "homeActivationEnrichmentFinished",
+                    metadata: ["reason": reason]
+                )
+            }
+        }
+    }
+
+    private func cancelActivationEnrichment() {
+        activationEnrichmentTask?.cancel()
+        activationEnrichmentTask = nil
     }
 
     private func buildPinnedLayoutItems(columns: Int) -> [PinnedLayoutCell] {
@@ -933,6 +1321,34 @@ struct HomeView: View {
         .accessibilityLabel(String(localized: "home.actions", defaultValue: "Home Actions", comment: "Accessibility label for home actions menu."))
     }
 
+    private var showsAssistantToolbarButton: Bool {
+        if isPhone {
+            return true
+        }
+
+        return assistantToolbarContext.isToolbarButtonVisible
+    }
+
+    @available(iOS 26.0, macCatalyst 26.0, *)
+    private var assistantToolbarButtoniOS26: some View {
+        Button(action: presentAssistantPanel) {
+            Image(systemName: "figure.wave")
+        }
+        .glassProminentButtonStyleCompat()
+        .accessibilityLabel(String(localized: "assistant.open", defaultValue: "Open Assistant", comment: "Accessibility label for opening assistant."))
+        .accessibilityIdentifier("home.assistant.openButton")
+    }
+
+    private var assistantToolbarButtonLegacy: some View {
+        Button(action: presentAssistantPanel) {
+            Image(systemName: "figure.wave")
+        }
+        .buttonStyle(.borderedProminent)
+        .tint(Color("AccentColor"))
+        .accessibilityLabel(String(localized: "assistant.open", defaultValue: "Open Assistant", comment: "Accessibility label for opening assistant."))
+        .accessibilityIdentifier("home.assistant.openButton")
+    }
+
     private var widgetsHeader: some View {
         HStack(alignment: .firstTextBaseline) {
             Text(String(localized: "home.widgets.header", defaultValue: "Widgets", comment: "Header title for home widgets section."))
@@ -963,11 +1379,11 @@ struct HomeView: View {
     }
 
     private var appliedStartDate: Date {
-        viewModel.appliedStartDate
+        Date(timeIntervalSince1970: appliedStartTimestamp)
     }
 
     private var appliedEndDate: Date {
-        viewModel.appliedEndDate
+        Date(timeIntervalSince1970: appliedEndTimestamp)
     }
 
     private var dateRangeSubtitle: String {
@@ -980,21 +1396,135 @@ struct HomeView: View {
         draftEndDate = appliedEndDate
     }
 
-    private func applyDraftRange() {
-        viewModel.applyRange(start: draftStartDate, end: draftEndDate)
-        if draftEndDate < draftStartDate {
-            draftEndDate = viewModel.appliedEndDate
+    private func bootstrapAppliedDatesIfNeeded() {
+        guard isAppliedRangeInitialized == false else { return }
+
+        if migrateLegacyAppliedRangeIfNeeded() {
+            lastSyncedDefaultBudgetingPeriodRaw = defaultBudgetingPeriodRaw
+            return
         }
+
+        applyDefaultBudgetingPeriodToApplied()
+        lastSyncedDefaultBudgetingPeriodRaw = defaultBudgetingPeriodRaw
+    }
+
+    private var isAppliedRangeInitialized: Bool {
+        appliedStartTimestamp > 0 && appliedEndTimestamp > 0
+    }
+
+    @discardableResult
+    private func migrateLegacyAppliedRangeIfNeeded() -> Bool {
+        let defaults = UserDefaults.standard
+
+        let legacyStart = defaults.double(forKey: Self.legacyAppliedStartKey)
+        let legacyEnd = defaults.double(forKey: Self.legacyAppliedEndKey)
+
+        guard legacyStart > 0, legacyEnd > 0 else { return false }
+
+        appliedStartTimestamp = legacyStart
+        appliedEndTimestamp = legacyEnd
+        return true
+    }
+
+    private func applyDefaultBudgetingPeriodToApplied() {
+        let canonicalSeed = HomeViewBootstrap.canonicalAppliedRangeSeed(
+            defaultBudgetingPeriodRaw: defaultBudgetingPeriodRaw,
+            now: Date(),
+            calendar: .current
+        )
+        setAppliedRange(start: canonicalSeed.start, end: canonicalSeed.end)
+    }
+
+    private func applyDefaultBudgetingPeriodIfSettingsChanged() {
+        guard lastSyncedDefaultBudgetingPeriodRaw != defaultBudgetingPeriodRaw else { return }
+        applyDefaultBudgetingPeriodToApplied()
+        lastSyncedDefaultBudgetingPeriodRaw = defaultBudgetingPeriodRaw
+    }
+
+    private func syncAppliedRangeToCurrentDefaultBudgetingPeriodIfNeeded() {
+        let canonicalSeed = HomeViewBootstrap.canonicalAppliedRangeSeed(
+            defaultBudgetingPeriodRaw: defaultBudgetingPeriodRaw,
+            now: Date(),
+            calendar: .current
+        )
+
+        guard appliedStartDate != canonicalSeed.start || appliedEndDate != canonicalSeed.end else { return }
+
+        setAppliedRange(start: canonicalSeed.start, end: canonicalSeed.end)
+        lastSyncedDefaultBudgetingPeriodRaw = defaultBudgetingPeriodRaw
+    }
+
+    private func setAppliedRange(start: Date, end: Date) {
+        let clampedEnd = max(end, start)
+        appliedStartTimestamp = start.timeIntervalSince1970
+        appliedEndTimestamp = clampedEnd.timeIntervalSince1970
+    }
+
+    private func applyDraftRange() {
+        let start = draftStartDate
+        let end = draftEndDate
+
+        if end < start {
+            draftEndDate = start
+            setAppliedRange(start: start, end: start)
+            return
+        }
+
+        setAppliedRange(start: start, end: end)
     }
 
     private func formattedDate(_ date: Date) -> String {
         AppDateFormat.abbreviatedDate(date)
     }
 
-    private var pinnedItems: [HomePinnedItem] { viewModel.pinnedItems }
+    // MARK: - Persistence: Unified pins + Migration
 
-    private var cardIDSet: Set<UUID> { Set(cards.map(\.id)) }
+    private func persistPinnedItems() {
+        let store = HomePinnedItemsStore(workspaceID: workspace.id)
+        store.save(pinnedItems)
+        ICloudPreferenceSyncService().pushHomeLayoutIfEnabled(workspaceID: workspace.id)
+    }
 
+    private func reloadSyncedPinnedItemsIfNeeded() {
+        let store = HomePinnedItemsStore(workspaceID: workspace.id)
+        let syncedItems = store.load()
+        guard syncedItems != pinnedItems else { return }
+
+        isApplyingSyncedPinnedItems = true
+        pinnedItems = syncedItems
+        DispatchQueue.main.async {
+            isApplyingSyncedPinnedItems = false
+        }
+    }
+
+    private func persistPinnedItemsMigrationIfNeeded() {
+        let store = HomePinnedItemsStore(workspaceID: workspace.id)
+        guard store.load().isEmpty else { return }
+        guard pinnedItems.isEmpty == false else { return }
+        store.save(pinnedItems)
+    }
+
+    // MARK: - Pin fixups
+
+    private var cardIDSet: Set<UUID> {
+        Set(cards.map(\.id))
+    }
+
+    private func prunePinnedCardsIfNeeded() {
+        let existingCardIDs = cardIDSet
+
+        let pruned = pinnedItems.filter { item in
+            switch item {
+            case .widget:
+                return true
+            case .card(let id, _):
+                return existingCardIDs.contains(id)
+            }
+        }
+
+        guard pruned != pinnedItems else { return }
+        pinnedItems = pruned
+    }
 }
 
 // MARK: Preview

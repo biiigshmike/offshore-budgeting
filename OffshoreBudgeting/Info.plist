@@ -17,7 +17,6 @@
 	</array>
 	<key>UIBackgroundModes</key>
 	<array>
-		<!-- Temporary compatibility for retiring monitoring from older versions. -->
 		<string>location</string>
 		<string>remote-notification</string>
 	</array>
