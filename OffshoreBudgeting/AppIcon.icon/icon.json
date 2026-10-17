@@ -2,12 +2,7 @@
   "features" : [
     "refractivity"
   ],
-  "fill" : {
-    "linear-gradient" : [
-      "srgb:0.46202,0.83828,1.00000,1.00000",
-      "srgb:1.00000,1.00000,1.00000,1.00000"
-    ]
-  },
+  "fill" : "automatic",
   "groups" : [
     {
       "blur-material" : null,
