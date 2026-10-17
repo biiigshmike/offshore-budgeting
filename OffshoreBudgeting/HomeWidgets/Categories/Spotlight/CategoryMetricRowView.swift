@@ -8,6 +8,7 @@
 import SwiftUI
 
 struct CategoryMetricRowView: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     let name: String
     let color: Color
@@ -15,11 +16,19 @@ struct CategoryMetricRowView: View {
     let percentValue: Double
 
     var showsProgressBar: Bool = true
+    var showsPercentage: Bool = true
+
+    private var metricLayout: AnyLayout {
+        dynamicTypeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 6))
+            : AnyLayout(HStackLayout(alignment: .firstTextBaseline, spacing: 8))
+    }
 
     var body: some View {
         HStack(alignment: .center, spacing: 10) {
             VStack(alignment: .leading, spacing: 6) {
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                metricLayout {
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Circle()
                         .fill(color)
                         .frame(width: 10, height: 10)
@@ -27,21 +36,26 @@ struct CategoryMetricRowView: View {
                     Text(name)
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(.primary)
-                        .lineLimit(2)
+                        .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
                         .minimumScaleFactor(0.85)
+                    }
 
-                    Spacer(minLength: 8)
+                    if !dynamicTypeSize.isAccessibilitySize {
+                        Spacer(minLength: 8)
+                    }
 
-                    VStack(alignment: .trailing, spacing: 2) {
+                    VStack(alignment: dynamicTypeSize.isAccessibilitySize ? .leading : .trailing, spacing: 2) {
                         Text(amountText)
                             .font(.subheadline.weight(.semibold))
                             .foregroundStyle(.primary)
-                            .lineLimit(2)
+                            .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
                             .minimumScaleFactor(0.75)
 
-                        Text(percentText(percentValue))
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(.secondary)
+                        if showsPercentage {
+                            Text(percentText(percentValue))
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(.secondary)
+                        }
                     }
                 }
 
@@ -56,7 +70,7 @@ struct CategoryMetricRowView: View {
         .padding(.vertical, 4)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(name)
-        .accessibilityValue("\(amountText), \(percentText(percentValue))")
+        .accessibilityValue(showsPercentage ? "\(amountText), \(percentText(percentValue))" : amountText)
     }
 
     // MARK: - Helpers

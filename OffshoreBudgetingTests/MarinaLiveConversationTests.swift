@@ -31,10 +31,14 @@ struct MarinaLiveConversationTests {
         let biggest = try await ask("Which purchase was biggest in that month on that card?", runtime: runtime, fixture: fixture, history: &history)
         #expect(runtime.toolRequests.contains { $0.tool == .expenses && $0.cardID == fixture.card.id.uuidString })
         #expect(biggest.rows.contains { $0.sourceID == fixture.biggest.id && $0.amount == 70 })
-        #expect(biggest.explanation?.contains("70") == true)
+        #expect(biggest.presentations?.contains { $0.records.contains { $0.amount == 70 } } == true)
 
         let income = try await ask("How much actual income have I received this month across the whole workspace?", runtime: runtime, fixture: fixture, history: &history)
-        #expect(runtime.toolRequests.contains { $0.tool == .income && $0.state == .actual && $0.cardID == nil })
+        #expect(runtime.toolRequests.contains {
+            $0.tool == .income && $0.state == .actual && $0.cardID == nil
+                && $0.operation == .summary && $0.comparisonFilter == nil
+        })
+        #expect(income.presentations?.contains { $0.operation == .summary } == true)
         expectTotal(500, in: income)
 
         fixture.context.insert(VariableExpense(descriptionText: "New grocery purchase", amount: 15,
@@ -82,7 +86,7 @@ struct MarinaLiveConversationTests {
         print("Marina evaluation prompt: \(prompt)")
         print("Marina evaluation requests: \(String(data: try JSONEncoder().encode(runtime.toolRequests), encoding: .utf8) ?? "")")
         print("Marina evaluation answer: \(answer.explanation ?? "")")
-        #expect(runtime.lastErrorDescription == nil, "Model runtime failed: \(runtime.lastErrorDescription ?? "")")
+        try #require(runtime.lastErrorDescription == nil, "Model runtime failed: \(runtime.lastErrorDescription ?? "")")
         #expect(answer.explanation?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false)
         #expect(answer.explanation?.contains("couldn’t finish") != true)
         history.append(answer)

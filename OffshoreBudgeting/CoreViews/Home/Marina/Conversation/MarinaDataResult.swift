@@ -1,8 +1,8 @@
 import Foundation
 
-struct MarinaDataResult: Codable, Sendable {
-    struct Metric: Codable, Sendable {
-        enum Unit: String, Codable, Sendable { case money, number, percent }
+struct MarinaDataResult: Codable, Equatable, Sendable {
+    struct Metric: Codable, Equatable, Sendable {
+        enum Unit: String, Codable, Equatable, Sendable { case money, number, percent }
         let label: String
         let value: Double
         var unit: Unit = .money
@@ -14,7 +14,7 @@ struct MarinaDataResult: Codable, Sendable {
             }
         }
     }
-    struct Record: Codable, Sendable {
+    struct Record: Codable, Equatable, Sendable {
         let id: String
         let kind: String
         let title: String
@@ -22,6 +22,7 @@ struct MarinaDataResult: Codable, Sendable {
         var amount: Double? = nil
         var detail: String? = nil
     }
+    var presentation: MarinaPresentation? = nil
     var status: String = "success"
     var scope: String
     var metrics: [Metric] = []
@@ -32,7 +33,41 @@ struct MarinaDataResult: Codable, Sendable {
     var appliedFilters: String? = nil
 
     var modelFactsJSON: String {
-        guard let data = try? JSONEncoder().encode(self), let text = String(data: data, encoding: .utf8) else {
+        // UI snapshots and pagination are not model context. Include exact formatted money facts.
+        struct Facts: Encodable {
+            struct MetricFact: Encodable { let label: String; let value: Double; let formatted: String; let unit: Metric.Unit }
+            struct SelectionFact: Encodable { let type = "expenseMatching"; let filters: [[String: String]] }
+            struct RecordFact: Encodable { let id: String; let kind: String; let title: String; let date: String?; let amount: Double?; let detail: String?; let formattedAmount: String?; let filter: [String: String]?; let selection: SelectionFact? }
+            let status: String; let scope: String; let metrics: [MetricFact]; let records: [RecordFact]?
+            let totalCount: Int; let nextOffset: Int?; let explanation: String?; let appliedFilters: String?
+        }
+        let isSummary = presentation?.operation == .summary
+        func resolvedFilter(_ record: Record) -> [String: String]? {
+            guard presentation?.operation == .inventory else { return nil }
+            switch record.kind {
+            case "savingsAccount", "reconciliationAccount": return ["accountID": record.id]
+            case "incomeSource": return ["source": record.title]
+            default: return nil
+            }
+        }
+        func expenseFilters(_ record: Record) -> [[String: String]]? {
+            guard presentation?.operation == .inventory else { return nil }
+            switch record.kind {
+            case "card": return [["type": "expenseCard", "id": record.id]]
+            case "category": return [["type": "expenseCategory", "id": record.id]]
+            case "budget": return [["type": "expenseBudget", "id": record.id]]
+            case "preset": return [["type": "expensePreset", "id": record.id]]
+            case "merchant": return [["type": "expenseMerchant", "name": record.title]]
+            default: return nil
+            }
+        }
+        let facts = Facts(status: status, scope: scope,
+                          metrics: metrics.map { .init(label: $0.label, value: $0.value, formatted: $0.formatted, unit: $0.unit) },
+                          records: isSummary ? nil : records.map { .init(id: $0.id, kind: $0.kind, title: $0.title, date: $0.date, amount: $0.amount, detail: $0.detail, formattedAmount: $0.amount.map { CurrencyFormatter.string(from: $0) }, filter: resolvedFilter($0), selection: expenseFilters($0).map { .init(filters: $0) }) },
+                          totalCount: totalCount, nextOffset: isSummary ? nil : nextOffset, explanation: explanation, appliedFilters: appliedFilters)
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = .sortedKeys
+        guard let data = try? encoder.encode(facts), let text = String(data: data, encoding: .utf8) else {
             return "{\"status\":\"error\",\"explanation\":\"Result encoding failed\"}"
         }
         return text
@@ -40,7 +75,7 @@ struct MarinaDataResult: Codable, Sendable {
 
     var homeAnswer: HomeAnswer {
         HomeAnswer(queryID: UUID(), kind: records.isEmpty ? .metric : .list,
-                   title: "Verified budget data", subtitle: scope,
+                   title: presentation?.title ?? "", subtitle: scope,
                    primaryValue: nil,
                    rows: metrics.map { HomeAnswerRow(title: $0.label, value: $0.formatted, amount: $0.value) }
                    + records.map { record in

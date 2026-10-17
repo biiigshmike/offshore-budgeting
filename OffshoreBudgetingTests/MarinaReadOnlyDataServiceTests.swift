@@ -44,7 +44,7 @@ struct MarinaReadOnlyDataServiceTests {
         invalid.cardID = UUID().uuidString
         _ = try bridge.call(invalid)
         let errorAnswer = bridge.answer(id: UUID(), prompt: "Total", narration: "")
-        #expect(errorAnswer.title == "Query needs attention")
+        #expect(errorAnswer.presentations?.isEmpty == true)
         #expect(!errorAnswer.rows.contains { $0.title == "Total" })
         bridge.end()
         #expect(throws: CancellationError.self) { try bridge.call(spending) }

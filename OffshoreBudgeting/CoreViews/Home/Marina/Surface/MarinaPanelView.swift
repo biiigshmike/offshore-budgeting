@@ -64,6 +64,10 @@ struct MarinaPanelView: View {
     @State private var promptText = ""
     @State private var hasLoadedConversation = false
     @State private var isResponding = false
+    @State private var activeTurnID: UUID?
+    @State private var followsLatestMessage = true
+    @State private var isUserScrolling = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var isShowingChatHistory = false
     @State private var isShowingClearConversationAlert = false
     @State private var isShowingRenameChatAlert = false
@@ -155,18 +159,40 @@ struct MarinaPanelView: View {
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(20)
-                    .padding(.bottom, isPromptFieldFocused ? 128 : 96)
+                    .padding(.bottom, 16)
                 }
                 .scrollDismissesKeyboard(.interactively)
+                .onScrollGeometryChange(for: Bool.self) { geometry in
+                    geometry.contentOffset.y + geometry.containerSize.height >= geometry.contentSize.height - 100
+                } action: { _, nearBottom in
+                    if isUserScrolling { followsLatestMessage = nearBottom }
+                }
+                .onScrollPhaseChange { _, phase in
+                    isUserScrolling = phase == .interacting || phase == .decelerating
+                }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                 .safeAreaInset(edge: .bottom) {
-                    inputSection
+                    VStack(spacing: 0) {
+                        if let contextStatus {
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text(contextStatus.message)
+                                    .foregroundStyle(.secondary)
+                                Button("Start new chat", action: startNewChat)
+                                    .accessibilityIdentifier("marina.contextNewChat")
+                            }
+                            .font(.footnote)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, 20)
+                            .padding(.top, 8)
+                        }
+                        inputSection
+                    }
                 }
                 .onChange(of: answers.count) { _, _ in
                     scrollToLatestMessage(using: proxy, animated: true)
                 }
                 .onChange(of: answerUpdateTick) { _, _ in
-                    scrollToLatestMessage(using: proxy, animated: true)
+                    if followsLatestMessage { scrollToLatestMessage(using: proxy, animated: false) }
                 }
                 .onAppear {
                     loadConversationIfNeeded()
@@ -247,7 +273,7 @@ struct MarinaPanelView: View {
         } message: {
             Text(deleteChatMessage)
         }
-        .alert("Chat could not be saved", isPresented: Binding(
+        .alert("Marina", isPresented: Binding(
             get: { persistenceErrorMessage != nil },
             set: { if !$0 { persistenceErrorMessage = nil } }
         )) {
@@ -306,6 +332,10 @@ struct MarinaPanelView: View {
         }
     }
 
+    private var contextStatus: MarinaContextStatus? {
+        MarinaContextStatus.status(in: answers)
+    }
+
     private var inputControls: some View {
         HStack(spacing: 8) {
             createMenu
@@ -316,11 +346,11 @@ struct MarinaPanelView: View {
 
     private var submitButton: some View {
         Button {
-            submitPrompt()
+            if isResponding { cancelResponseTask() } else { submitPrompt() }
         } label: {
             if isResponding {
-                ProgressView()
-                    .controlSize(.small)
+                Image(systemName: "stop.fill")
+                    .font(.subheadline.weight(.semibold))
                     .frame(width: 33, height: 33)
             } else {
                 Image(systemName: "paperplane.fill")
@@ -329,8 +359,8 @@ struct MarinaPanelView: View {
             }
         }
         .modifier(AssistantIconButtonModifier())
-        .disabled(trimmedPromptText.isEmpty || isResponding || conversation.availabilityMessage != nil)
-        .accessibilityLabel(String(localized: "assistant.submitQuestion", defaultValue: "Submit Question", comment: "Accessibility label for submitting assistant question."))
+        .disabled(!isResponding && (trimmedPromptText.isEmpty || contextStatus == .reached || conversation.availabilityMessage != nil))
+        .accessibilityLabel(isResponding ? "Stop response" : String(localized: "assistant.submitQuestion", defaultValue: "Submit Question", comment: "Accessibility label for submitting assistant question."))
         .accessibilityIdentifier("marina.submitButton")
     }
 
@@ -385,6 +415,7 @@ struct MarinaPanelView: View {
 
     private var promptTextField: some View {
         TextField(String(localized: "assistant.messagePrompt", defaultValue: "Message Marina", comment: "Prompt placeholder for assistant message input."), text: $promptText)
+            .disabled(contextStatus == .reached)
             .textFieldStyle(.plain)
             .focused($isPromptFieldFocused)
             .submitLabel(.send)
@@ -522,8 +553,37 @@ struct MarinaPanelView: View {
     }
 
     private func assistantMessageBubble(for answer: HomeAnswer, index: Int) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            if Self.hasAssistantCardContent(answer) {
+        VStack(alignment: .leading, spacing: 10) {
+            if let presentations = answer.presentations {
+                ForEach(presentations.filter { MarinaPresentationDisplayPolicy.isVisible($0, in: answer) }) { presentation in
+                    MarinaPresentationView(presentation: presentation) {
+                        loadMore(presentation, answerID: answer.id)
+                    }
+                }
+            }
+            if let explanation = answer.explanation?.trimmingCharacters(in: .whitespacesAndNewlines), !explanation.isEmpty {
+                Text((try? AttributedString(markdown: explanation, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace))) ?? AttributedString(explanation))
+                    .font(.subheadline)
+                    .foregroundStyle(.primary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .textSelection(.enabled)
+                    .accessibilityIdentifier("marina.answerExplanation.\(index)")
+            }
+            if let state = answer.responseState, state != .complete, state != .contextLimit,
+               !(state.isActive && activeTurnID == answer.id &&
+                 !(answer.explanation?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true)) {
+                HStack(spacing: 8) {
+                    if state.isActive && activeTurnID == answer.id { ProgressView().controlSize(.small) }
+                    Text(state.isActive && activeTurnID != answer.id ? MarinaResponseState.cancelled.message : state.message)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                    if contextStatus != .reached && state.canRetry && !isResponding && answer.id == answers.last?.id {
+                        Button("Retry") { retryResponse(answer) }
+                    }
+                }
+                .accessibilityIdentifier("marina.responseStatus")
+            }
+            if answer.presentations == nil && Self.hasAssistantCardContent(answer) {
                 VStack(alignment: .leading, spacing: 10) {
                     Text(answer.title)
                         .font(.headline)
@@ -582,16 +642,6 @@ struct MarinaPanelView: View {
                 .accessibilityIdentifier("marina.answer.\(index)")
             }
 
-            if let explanation = answer.explanation?.trimmingCharacters(in: .whitespacesAndNewlines),
-               explanation.isEmpty == false {
-                Text(explanation)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .textSelection(.enabled)
-                    .padding(.horizontal, 4)
-                    .accessibilityIdentifier("marina.answerExplanation.\(index)")
-            }
 
             Text(timestampText(for: answer.generatedAt))
                 .font(.caption2)
@@ -703,32 +753,71 @@ struct MarinaPanelView: View {
 
     private func submitPrompt(_ promptOverride: String? = nil) {
         let prompt = (promptOverride ?? trimmedPromptText).trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !prompt.isEmpty, !isResponding, conversation.availabilityMessage == nil else { return }
-        if promptOverride == nil { promptText = "" }
+        guard contextStatus != .reached, !prompt.isEmpty, !isResponding, conversation.availabilityMessage == nil else { return }
+        promptText = ""
+        startResponse(prompt: prompt, answerID: UUID())
+    }
+
+    private func retryResponse(_ answer: HomeAnswer) {
+        guard contextStatus != .reached, let prompt = answer.userPrompt, !isResponding, answer.id == answers.last?.id else { return }
+        conversation.reset()
+        startResponse(prompt: prompt, answerID: answer.id)
+    }
+
+    private func startResponse(prompt: String, answerID: UUID) {
+        let previousIndex = answers.firstIndex { $0.id == answerID }
+        let history = previousIndex.map { Array(answers.prefix($0)) } ?? answers
+        let sentAt = previousIndex.map { answers[$0].generatedAt } ?? Date()
+        let priorContextStatus = contextStatus
+        var placeholder = HomeAnswer(id: answerID, queryID: answerID, kind: .message,
+            userPrompt: prompt, title: "", generatedAt: sentAt, presentations: [], responseState: .thinking)
+        placeholder.contextStatus = priorContextStatus
+        if let previousIndex { answers[previousIndex] = placeholder } else { answers.append(placeholder) }
+        followsLatestMessage = true
+        activeTurnID = answerID
         isResponding = true
-        let history = answers
+        answerUpdateTick += 1
         let sessionID = activeSessionID
         responseTask = Task { @MainActor in
+            await Task.yield()
+            guard !Task.isCancelled, activeSessionID == sessionID, activeTurnID == answerID else { return }
+            saveCurrentSession()
             await conversation.respond(
-                prompt: prompt,
-                history: history,
-                workspace: workspace,
-                modelContext: modelContext,
-                homeContext: homeContext,
+                prompt: prompt, answerID: answerID, history: history, workspace: workspace,
+                modelContext: modelContext, homeContext: homeContext,
                 defaultBudgetingPeriod: defaultBudgetingPeriod
             ) { answer in
-                guard !Task.isCancelled, activeSessionID == sessionID else { return }
-                if let index = answers.firstIndex(where: { $0.id == answer.id }) {
-                    answers[index] = answer
-                } else {
-                    answers.append(answer)
-                }
+                guard !Task.isCancelled, activeSessionID == sessionID, activeTurnID == answerID,
+                      let index = answers.firstIndex(where: { $0.id == answerID }) else { return }
+                var update = answer
+                update.generatedAt = sentAt
+                update.contextStatus = update.contextStatus ?? priorContextStatus
+                answers[index] = update
                 answerUpdateTick += 1
             }
-            guard !Task.isCancelled, activeSessionID == sessionID else { return }
+            guard !Task.isCancelled, activeSessionID == sessionID, activeTurnID == answerID else { return }
             saveCurrentSession()
             isResponding = false
+            activeTurnID = nil
             responseTask = nil
+        }
+    }
+
+    private func loadMore(_ presentation: MarinaPresentation, answerID: UUID) {
+        guard let answerIndex = answers.firstIndex(where: { $0.id == answerID }),
+              let index = answers[answerIndex].presentations?.firstIndex(where: { $0.id == presentation.id }) else { return }
+        do {
+            let service = MarinaReadOnlyDataService(workspace: workspace, modelContext: modelContext,
+                homeContext: homeContext, defaultBudgetingPeriod: defaultBudgetingPeriod)
+            let result = try service.loadMore(presentation: presentation)
+            guard let updated = result.presentation else {
+                persistenceErrorMessage = "Marina couldn’t refresh this saved result. Please ask the question again."
+                return
+            }
+            answers[answerIndex].presentations?[index] = updated
+            saveCurrentSession()
+        } catch {
+            persistenceErrorMessage = "Marina couldn’t load more records. Please try again."
         }
     }
 
@@ -1084,7 +1173,12 @@ struct MarinaPanelView: View {
 
     private func loadSession(_ session: MarinaChatSession) {
         activeSessionID = session.id
-        answers = chatSessionStore.visibleAnswers(for: session)
+        answers = chatSessionStore.visibleAnswers(for: session).map { answer in
+            var restored = answer
+            if restored.responseState?.isActive == true { restored.responseState = .cancelled }
+            return restored
+        }
+        activeTurnID = nil
         conversation.reset()
         if answers.isEmpty {
             resetStarterPrompts()
@@ -1096,6 +1190,10 @@ struct MarinaPanelView: View {
         isResponding = false
 
         do {
+            if let activeSessionID {
+                try chatSessionStore.saveTranscript(answers, sessionID: activeSessionID,
+                    workspaceID: workspace.id, modelContext: modelContext)
+            }
             let session = try chatSessionStore.createSession(
                 workspace: workspace,
                 modelContext: modelContext
@@ -1229,7 +1327,11 @@ struct MarinaPanelView: View {
     }
 
     private func cancelResponseTask() {
-        if responseTask != nil { saveCurrentSession() }
+        if let activeTurnID, let index = answers.firstIndex(where: { $0.id == activeTurnID }) {
+            answers[index].responseState = .cancelled
+            saveCurrentSession()
+        }
+        activeTurnID = nil
         responseTask?.cancel()
         responseTask = nil
         isResponding = false
@@ -1244,7 +1346,7 @@ struct MarinaPanelView: View {
         let action = {
             proxy.scrollTo(ScrollTarget.bottomAnchor, anchor: .bottom)
         }
-        if animated {
+        if animated && !reduceMotion {
             withAnimation(.easeOut(duration: 0.2), action)
         } else {
             action()

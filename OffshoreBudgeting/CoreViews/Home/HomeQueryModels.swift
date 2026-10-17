@@ -240,7 +240,11 @@ struct HomeAnswer: Identifiable, Codable, Equatable {
     let explanation: String?
     let semanticContext: MarinaAnswerSemanticContext?
     let insightBundle: MarinaInsightBundle?
-    let generatedAt: Date
+    var generatedAt: Date
+    var presentations: [MarinaPresentation]?
+    var responseState: MarinaResponseState?
+    var contextStatus: MarinaContextStatus? = nil
+    var suppressedPresentationIDs: [String]? = nil
 
     init(
         id: UUID = UUID(),
@@ -255,7 +259,9 @@ struct HomeAnswer: Identifiable, Codable, Equatable {
         explanation: String? = nil,
         semanticContext: MarinaAnswerSemanticContext? = nil,
         insightBundle: MarinaInsightBundle? = nil,
-        generatedAt: Date = Date()
+        generatedAt: Date = Date(),
+        presentations: [MarinaPresentation]? = nil,
+        responseState: MarinaResponseState? = nil
     ) {
         self.id = id
         self.queryID = queryID
@@ -270,6 +276,8 @@ struct HomeAnswer: Identifiable, Codable, Equatable {
         self.semanticContext = semanticContext
         self.insightBundle = insightBundle
         self.generatedAt = generatedAt
+        self.presentations = presentations
+        self.responseState = responseState
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -286,6 +294,10 @@ struct HomeAnswer: Identifiable, Codable, Equatable {
         case semanticContext
         case insightBundle
         case generatedAt
+        case presentations
+        case responseState
+        case contextStatus
+        case suppressedPresentationIDs
     }
 
     init(from decoder: Decoder) throws {
@@ -303,6 +315,10 @@ struct HomeAnswer: Identifiable, Codable, Equatable {
         semanticContext = try? container.decodeIfPresent(MarinaAnswerSemanticContext.self, forKey: .semanticContext)
         insightBundle = try? container.decodeIfPresent(MarinaInsightBundle.self, forKey: .insightBundle)
         generatedAt = try container.decodeIfPresent(Date.self, forKey: .generatedAt) ?? Date()
+        presentations = try? container.decodeIfPresent([MarinaPresentation].self, forKey: .presentations)
+        responseState = try? container.decodeIfPresent(MarinaResponseState.self, forKey: .responseState)
+        contextStatus = try? container.decodeIfPresent(MarinaContextStatus.self, forKey: .contextStatus)
+        suppressedPresentationIDs = try? container.decodeIfPresent([String].self, forKey: .suppressedPresentationIDs)
     }
 
     func encode(to encoder: Encoder) throws {
@@ -320,6 +336,10 @@ struct HomeAnswer: Identifiable, Codable, Equatable {
         try container.encodeIfPresent(semanticContext, forKey: .semanticContext)
         try container.encodeIfPresent(insightBundle, forKey: .insightBundle)
         try container.encode(generatedAt, forKey: .generatedAt)
+        try container.encodeIfPresent(presentations, forKey: .presentations)
+        try container.encodeIfPresent(responseState, forKey: .responseState)
+        try container.encodeIfPresent(contextStatus, forKey: .contextStatus)
+        try container.encodeIfPresent(suppressedPresentationIDs, forKey: .suppressedPresentationIDs)
     }
 }
 

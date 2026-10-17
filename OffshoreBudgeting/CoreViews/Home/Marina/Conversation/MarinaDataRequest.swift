@@ -1,15 +1,20 @@
 import Foundation
 
 /// A database request, never a natural-language interpretation or executable query.
-struct MarinaDataRequest: Codable, Sendable {
-    enum Tool: String, Codable, Sendable { case findRecords, expenses, income, budgetSummary, accounts }
-    enum Scope: String, Codable, Sendable { case all, variable, planned, savings, reconciliation }
-    enum State: String, Codable, Sendable { case all, actual, planned }
-    enum Grouping: String, Codable, Sendable { case none, card, category, merchant, source }
-    enum Sort: String, Codable, Sendable { case newest, oldest, largest, smallest }
-    enum ExpenseMeasure: String, Codable, Sendable { case budgetImpact, ledger, spending, planned, actual }
-    enum PeriodUnit: String, Codable, Sendable { case day, week, month, quarter, year }
-    enum RelativePeriod: String, Codable, Sendable { case selectedPeriod, previousPeriod, currentMonth, previousMonth, yearToDate, nextSevenDays }
+struct MarinaDataRequest: Codable, Equatable, Sendable {
+    enum Tool: String, Codable, Equatable, Sendable { case findRecords, expenses, income, budgetSummary, accounts }
+    enum Scope: String, Codable, Equatable, Sendable { case all, variable, planned, savings, reconciliation }
+    enum State: String, Codable, Equatable, Sendable { case all, actual, planned }
+    enum Grouping: String, Codable, Equatable, Sendable { case none, card, category, merchant, source }
+    enum Sort: String, Codable, Equatable, Sendable { case newest, oldest, largest, smallest }
+    enum ExpenseMeasure: String, Codable, Equatable, Sendable { case budgetImpact, ledger, spending, planned, actual }
+    enum PeriodUnit: String, Codable, Equatable, Sendable { case day, week, month, quarter, year }
+    enum RelativePeriod: String, Codable, Equatable, Sendable { case selectedPeriod, previousPeriod, currentMonth, previousMonth, yearToDate, nextSevenDays }
+    enum Operation: String, Codable, Equatable, Sendable { case summary, transactions, ranking, comparison, trend, share, inventory }
+    enum Purpose: String, Codable, Equatable, Sendable { case budgetPace, incomeProgress, upcomingPresets }
+    var purpose: Purpose? = nil
+    var forcePresentation: Bool? = nil
+    var operation: Operation = .summary
     var relativePeriod: RelativePeriod? = nil
     var periodUnit: PeriodUnit? = nil
     var tool: Tool
@@ -33,7 +38,7 @@ struct MarinaDataRequest: Codable, Sendable {
     var limit: Int = 20
     var comparisonAllTime: Bool = false
     var comparisonPeriod: RelativePeriod? = nil
-    struct Filter: Codable, Sendable {
+    struct Filter: Codable, Equatable, Sendable {
         var cardID: String? = nil
         var categoryID: String? = nil
         var budgetID: String? = nil

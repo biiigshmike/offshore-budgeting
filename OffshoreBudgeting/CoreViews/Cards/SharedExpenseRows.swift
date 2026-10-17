@@ -65,40 +65,16 @@ struct SharedPlannedExpenseRow: View {
     }
 
     var body: some View {
-        HStack(alignment: .top, spacing: 12) {
-            VStack(spacing: 4) {
-                SharedCategoryDotView(category: expense.category)
-
-                if let indicatorSymbolName {
-                    Image(systemName: indicatorSymbolName)
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                        .accessibilityLabel(indicatorAccessibilityLabel)
-                }
-            }
-            .frame(width: 12)
-            .padding(.top, 6)
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text(expense.title)
-                    .font(.body)
-
-                HStack(spacing: 6) {
-                    Text(expense.displaySubtitle(includeCardName: showsCardName))
-                }
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-            }
-
-            Spacer(minLength: 0)
-
-            Text(amountToShow, format: CurrencyFormatter.currencyStyle())
-                .font(.headline.weight(.semibold))
-                .foregroundStyle(.primary)
-                .multilineTextAlignment(.trailing)
-        }
-        .padding(.vertical, 4)
+        SharedExpenseRowContent(
+            title: expense.title,
+            subtitle: expense.displaySubtitle(includeCardName: showsCardName),
+            amount: CurrencyFormatter.string(from: amountToShow),
+            categoryColorHex: expense.category?.hexColor,
+            indicatorSymbolName: indicatorSymbolName,
+            indicatorAccessibilityLabel: indicatorAccessibilityLabel
+        )
     }
+
 }
 
 // MARK: - Shared Variable Expense Row
@@ -170,57 +146,30 @@ struct SharedVariableExpenseRow: View {
         }
     }
 
-    var body: some View {
-        HStack(alignment: .top, spacing: 12) {
-            VStack(spacing: 4) {
-                SharedCategoryDotView(category: expense.category)
-
-                if let indicatorSymbolName {
-                    Image(systemName: indicatorSymbolName)
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                        .accessibilityLabel(indicatorAccessibilityLabel)
-                }
-            }
-            .frame(width: 12)
-            .padding(.top, 6)
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text(expense.descriptionText)
-                    .font(.body)
-
-                HStack(spacing: 6) {
-                    Text(
-                        "\(expense.transactionDate.formatted(date: .abbreviated, time: .omitted)) • \(expense.kind.displayTitle)"
-                    )
-
-                    if showsCardName, let cardName = expense.card?.name {
-                        Text("•")
-                        Text(cardName)
-                    }
-                }
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-            }
-
-            Spacer(minLength: 0)
-
-            VStack(alignment: .trailing, spacing: 2) {
-                Text(originalChargeAmount, format: CurrencyFormatter.currencyStyle())
-                    .font(.headline.weight(.semibold))
-                    .foregroundStyle(expense.kind == .credit ? .green : .primary)
-                    .multilineTextAlignment(.trailing)
-
-                if let secondaryAmountSummary {
-                    Text(secondaryAmountSummary)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.trailing)
-                }
-            }
+    private var subtitle: String {
+        var parts = [
+            expense.transactionDate.formatted(date: .abbreviated, time: .omitted),
+            expense.kind.displayTitle
+        ]
+        if showsCardName, let cardName = expense.card?.name {
+            parts.append(cardName)
         }
-        .padding(.vertical, 4)
+        return parts.joined(separator: " • ")
     }
+
+    var body: some View {
+        SharedExpenseRowContent(
+            title: expense.descriptionText,
+            subtitle: subtitle,
+            amount: CurrencyFormatter.string(from: originalChargeAmount),
+            categoryColorHex: expense.category?.hexColor,
+            isCredit: expense.kind == .credit,
+            indicatorSymbolName: indicatorSymbolName,
+            indicatorAccessibilityLabel: indicatorAccessibilityLabel,
+            secondaryAmountSummary: secondaryAmountSummary
+        )
+    }
+
 }
 
 // MARK: - Shared Category Dot

@@ -33,6 +33,7 @@ final class MarinaConversationController {
 
     func respond(
         prompt: String,
+        answerID: UUID = UUID(),
         history: [HomeAnswer],
         workspace: Workspace,
         modelContext: ModelContext,
@@ -47,13 +48,14 @@ final class MarinaConversationController {
         generation = turn
         isResponding = true
         defer { if generation == turn { isResponding = false } }
-        let answerID = UUID()
         let emit: (HomeAnswer) -> Void = { [weak self] answer in
             guard let self, self.generation == turn, !Task.isCancelled else { return }
             onUpdate(answer)
         }
         if let message = availabilityMessage {
-            emit(Self.message(message, prompt: prompt, id: answerID))
+            var answer = Self.message(message, prompt: prompt, id: answerID)
+            answer.responseState = .unavailable
+            emit(answer)
             return
         }
         #if canImport(FoundationModels)
@@ -86,9 +88,23 @@ enum MarinaConversationHistory {
         var exchanges: [(prompt: String, response: String)] = []
         for answer in answers.reversed() {
             guard let prompt = answer.userPrompt, !prompt.isEmpty else { continue }
+            var facts: [String] = []
+            if let presentations = answer.presentations {
+                for presentation in presentations.suffix(2) {
+                    facts.append(presentation.title + " · " + presentation.scopeLabel)
+                    for metric in presentation.metrics.prefix(2) {
+                        facts.append(metric.label + ": " + metric.formatted)
+                    }
+                    for record in presentation.records.prefix(2) {
+                        let amount = record.amount.map { CurrencyFormatter.string(from: $0) } ?? ""
+                        facts.append(record.title + ": " + amount)
+                    }
+                }
+            } else {
+                facts = answer.rows.prefix(3).map { $0.title + ": " + $0.value }
+            }
             let response = ([answer.title, answer.subtitle, answer.primaryValue, answer.explanation]
-                .compactMap { $0 }.filter { !$0.isEmpty }
-                + answer.rows.prefix(3).map { "\($0.title): \($0.value)" }).joined(separator: "\n")
+                .compactMap { $0 }.filter { !$0.isEmpty } + facts).joined(separator: "\n")
             guard prompt.count + response.count <= remaining else { break }
             exchanges.append((prompt, response))
             remaining -= prompt.count + response.count
