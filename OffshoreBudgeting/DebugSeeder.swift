@@ -1521,7 +1521,7 @@ enum DebugSeeder {
             session.title = answers.first?.userPrompt ?? MarinaChatSessionStore.defaultTitle
             session.hasCustomTitle = false
             session.visibleAnswersData = try encoder.encode(answers)
-            session.followUpContextData = try encoder.encode(MarinaConversationContext(recentAnswers: answers))
+            session.followUpContextData = Data()
             session.updatedAt = now
             session.lastOpenedAt = now
             try modelContext.save()

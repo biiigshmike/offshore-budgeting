@@ -43,11 +43,6 @@ struct MarinaPanelView: View {
         case category
     }
 
-    private struct PendingClarification {
-        let answerID: UUID
-        let choices: MarinaClarificationChoices
-    }
-
     private struct PendingDeleteSession: Identifiable {
         let id: UUID
         let title: String
@@ -64,7 +59,7 @@ struct MarinaPanelView: View {
     @Query private var presets: [Preset]
 
     @State private var answers: [HomeAnswer] = []
-    @State private var followUpContext = MarinaConversationContext.empty
+    @State private var conversation = MarinaConversationController()
     @State private var activeSessionID: UUID?
     @State private var promptText = ""
     @State private var hasLoadedConversation = false
@@ -76,8 +71,8 @@ struct MarinaPanelView: View {
     @State private var renameChatText = ""
     @State private var renamingSessionID: UUID?
     @State private var pendingDeleteSession: PendingDeleteSession?
-    @State private var pendingClarification: PendingClarification?
     @State private var responseTask: Task<Void, Never>?
+    @State private var persistenceErrorMessage: String?
     @State private var answerUpdateTick = 0
     @State private var starterPrompts: [String] = []
     @FocusState private var isPromptFieldFocused: Bool
@@ -85,13 +80,13 @@ struct MarinaPanelView: View {
     @AppStorage("general_defaultBudgetingPeriod")
     private var defaultBudgetingPeriodRaw: String = BudgetingPeriod.monthly.rawValue
 
+    @Environment(\.scenePhase) private var scenePhase
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     private let chatSessionStore = MarinaChatSessionStore()
     private let createService = MarinaCreateService()
-    private let brain = MarinaBrain()
 
     static func hasAssistantCardContent(_ answer: HomeAnswer) -> Bool {
         if answer.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false {
@@ -144,7 +139,11 @@ struct MarinaPanelView: View {
             ScrollViewReader { proxy in
                 ScrollView {
                     VStack(alignment: .leading, spacing: 14) {
-                        if answers.isEmpty {
+                        if let message = conversation.availabilityMessage {
+                            ContentUnavailableView("Marina is unavailable", systemImage: "sparkles", description: Text(message))
+                        }
+
+                        if answers.isEmpty && conversation.availabilityMessage == nil {
                             marinaEmptyState
                         } else {
                             answersSection
@@ -248,6 +247,17 @@ struct MarinaPanelView: View {
         } message: {
             Text(deleteChatMessage)
         }
+        .alert("Chat could not be saved", isPresented: Binding(
+            get: { persistenceErrorMessage != nil },
+            set: { if !$0 { persistenceErrorMessage = nil } }
+        )) {
+            Button("OK", role: .cancel) { persistenceErrorMessage = nil }
+        } message: {
+            Text(persistenceErrorMessage ?? "")
+        }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { conversation.refreshAvailability() }
+        }
         .onDisappear {
             cancelResponseTask()
         }
@@ -319,7 +329,7 @@ struct MarinaPanelView: View {
             }
         }
         .modifier(AssistantIconButtonModifier())
-        .disabled(trimmedPromptText.isEmpty || isResponding)
+        .disabled(trimmedPromptText.isEmpty || isResponding || conversation.availabilityMessage != nil)
         .accessibilityLabel(String(localized: "assistant.submitQuestion", defaultValue: "Submit Question", comment: "Accessibility label for submitting assistant question."))
         .accessibilityIdentifier("marina.submitButton")
     }
@@ -559,9 +569,6 @@ struct MarinaPanelView: View {
                         )
                     }
 
-                    if let choices = clarificationChoices(for: answer) {
-                        clarificationChoicesView(choices, answerID: answer.id)
-                    }
                 }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 10)
@@ -690,163 +697,39 @@ struct MarinaPanelView: View {
         )
     }
 
-    private var shouldStackClarificationChoices: Bool {
-        horizontalSizeClass == .compact || dynamicTypeSize.isAccessibilitySize
-    }
-
-    private var clarificationChoiceColumns: [GridItem] {
-        if shouldStackClarificationChoices {
-            return [GridItem(.flexible(), spacing: 8)]
-        }
-        return [GridItem(.adaptive(minimum: 190, maximum: 280), spacing: 8)]
-    }
-
     private static func randomStarterPrompts(cards: [Card]) -> [String] {
         MarinaStarterPromptFactory.randomPrompts(cardNames: cards.map(\.name))
     }
 
     private func submitPrompt(_ promptOverride: String? = nil) {
         let prompt = (promptOverride ?? trimmedPromptText).trimmingCharacters(in: .whitespacesAndNewlines)
-        guard prompt.isEmpty == false else { return }
-        guard isResponding == false else { return }
-        guard MarinaPromptSubmissionPolicy.shouldHandleFreeText(prompt) else {
-            if promptOverride == nil {
-                promptText = ""
-            }
-            return
-        }
-        let submittedPrompt = prompt
-        if promptOverride == nil {
-            promptText = ""
-        }
-
-        if let pendingClarification,
-           let choice = pendingClarification.choices.choice(matching: submittedPrompt) {
-            resolveClarification(
-                pendingClarification,
-                choice: choice,
-                replyPrompt: submittedPrompt
-            )
-            return
-        }
-
-        cancelResponseTask()
+        guard !prompt.isEmpty, !isResponding, conversation.availabilityMessage == nil else { return }
+        if promptOverride == nil { promptText = "" }
         isResponding = true
-        let conversationContext = followUpContext
-        responseTask = Task {
-            let seed = await brain.answerSeed(
-                prompt: submittedPrompt,
+        let history = answers
+        let sessionID = activeSessionID
+        responseTask = Task { @MainActor in
+            await conversation.respond(
+                prompt: prompt,
+                history: history,
                 workspace: workspace,
                 modelContext: modelContext,
-                ambientDateRange: homeContext?.dateRange,
-                homeContext: homeContext,
-                defaultBudgetingPeriod: defaultBudgetingPeriod,
-                conversationContext: conversationContext
-            )
-            guard Task.isCancelled == false else { return }
-            await handleAnswerSeed(seed)
-            isResponding = false
-            responseTask = nil
-        }
-    }
-
-    @ViewBuilder
-    private func clarificationChoicesView(_ choices: MarinaClarificationChoices, answerID: UUID) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            LazyVGrid(columns: clarificationChoiceColumns, alignment: .leading, spacing: 8) {
-                ForEach(choices.choices) { choice in
-                    Button {
-                        resolveClarification(
-                            PendingClarification(answerID: answerID, choices: choices),
-                            choice: choice,
-                            replyPrompt: choice.title
-                        )
-                    } label: {
-                        MarinaClarificationChoiceButton(
-                            choice: choice,
-                            isResolved: choices.resolvedChoiceID == choice.id
-                        )
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(isResponding || choices.isResolved)
-                    .accessibilityLabel(accessibilityLabel(for: choice))
-                }
-            }
-
-            if let resolvedChoiceID = choices.resolvedChoiceID,
-               let choice = choices.choices.first(where: { $0.id == resolvedChoiceID }) {
-                Text(MarinaL10n.format("marina.clarification.usingChoice", defaultValue: "Using %@.", comment: "Status text shown after resolving a Marina clarification choice.", choice.title))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-        }
-    }
-
-    private func accessibilityLabel(for choice: MarinaClarificationChoice) -> String {
-        let parts = [choice.title, choice.kindLabel, choice.subtitle]
-            .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { $0.isEmpty == false }
-        return parts.joined(separator: ", ")
-    }
-
-    private func clarificationChoices(for answer: HomeAnswer) -> MarinaClarificationChoices? {
-        guard case .clarificationChoices(let choices)? = answer.attachment else {
-            return nil
-        }
-        return choices
-    }
-
-    private func resolveClarification(
-        _ pending: PendingClarification,
-        choice: MarinaClarificationChoice,
-        replyPrompt: String
-    ) {
-        guard isResponding == false else { return }
-        markClarificationResolved(answerID: pending.answerID, choiceID: choice.id)
-        pendingClarification = nil
-
-        cancelResponseTask()
-        isResponding = true
-        responseTask = Task {
-            let seed = await brain.answerSeed(
-                resolvedRequest: choice.request,
-                prompt: replyPrompt,
-                workspace: workspace,
-                modelContext: modelContext,
-                ambientDateRange: homeContext?.dateRange,
                 homeContext: homeContext,
                 defaultBudgetingPeriod: defaultBudgetingPeriod
-            )
-            guard Task.isCancelled == false else { return }
-            await handleAnswerSeed(seed)
+            ) { answer in
+                guard !Task.isCancelled, activeSessionID == sessionID else { return }
+                if let index = answers.firstIndex(where: { $0.id == answer.id }) {
+                    answers[index] = answer
+                } else {
+                    answers.append(answer)
+                }
+                answerUpdateTick += 1
+            }
+            guard !Task.isCancelled, activeSessionID == sessionID else { return }
+            saveCurrentSession()
             isResponding = false
             responseTask = nil
         }
-    }
-
-    private func markClarificationResolved(answerID: UUID, choiceID: UUID) {
-        guard let index = answers.firstIndex(where: { $0.id == answerID }),
-              case .clarificationChoices(var choices)? = answers[index].attachment else {
-            return
-        }
-        choices.resolvedChoiceID = choiceID
-        let answer = answers[index]
-        answers[index] = HomeAnswer(
-            id: answer.id,
-            queryID: answer.queryID,
-            kind: answer.kind,
-            userPrompt: answer.userPrompt,
-            title: answer.title,
-            subtitle: answer.subtitle,
-            primaryValue: answer.primaryValue,
-            rows: answer.rows,
-            attachment: .clarificationChoices(choices),
-            explanation: answer.explanation,
-            semanticContext: answer.semanticContext,
-            insightBundle: answer.insightBundle,
-            generatedAt: answer.generatedAt
-        )
-        saveCurrentSession()
     }
 
     private func handleCreateMenuSelection(_ kind: MarinaCreateEntityKind) {
@@ -1165,152 +1048,20 @@ struct MarinaPanelView: View {
 
     private func appendAnswer(_ answer: HomeAnswer) {
         answers.append(answer)
-        updatePendingClarification(afterAppending: answer)
         saveCurrentSession()
     }
 
-    private func handleAnswerSeed(_ seed: MarinaAnswerSeed) async {
-        appendAnswer(seed.answer)
-        if let scriptedNarration = seed.scriptedNarration,
-           seed.insightContext == nil {
-            await streamScriptedNarration(scriptedNarration, for: seed)
-            return
-        }
-
-        guard let insightContext = seed.insightContext else { return }
-
-        var latestNarration: String?
-        do {
-            for try await partial in brain.insightNarrationStream(for: insightContext) {
-                guard Task.isCancelled == false else { return }
-                latestNarration = partial
-                replaceAnswerExplanation(
-                    answerID: seed.answer.id,
-                    baseExplanation: seed.answer.explanation,
-                    insight: partial,
-                    suffix: nil,
-                    shouldSave: false
-                )
-            }
-
-            guard Task.isCancelled == false else { return }
-            let finalAnswer = brain.completedAnswer(
-                from: seed,
-                streamingNarration: latestNarration
-            )
-            replaceAnswer(finalAnswer, shouldSave: true)
-        } catch {
-            guard Task.isCancelled == false else { return }
-            replaceAnswer(seed.answer, shouldSave: true)
-        }
-    }
-
-    private func streamScriptedNarration(_ narration: String, for seed: MarinaAnswerSeed) async {
-        var latestNarration: String?
-        for partial in scriptedNarrationPartials(for: narration) {
-            guard Task.isCancelled == false else { return }
-            latestNarration = partial
-            replaceAnswerExplanation(
-                answerID: seed.answer.id,
-                baseExplanation: seed.answer.explanation,
-                insight: partial,
-                suffix: nil,
-                shouldSave: false
-            )
-            try? await Task.sleep(nanoseconds: 18_000_000)
-        }
-
-        guard Task.isCancelled == false else { return }
-        let finalAnswer = brain.completedAnswer(
-            from: seed,
-            streamingNarration: latestNarration
-        )
-        replaceAnswer(finalAnswer, shouldSave: true)
-    }
-
-    private func scriptedNarrationPartials(for narration: String) -> [String] {
-        let words = narration.split(separator: " ", omittingEmptySubsequences: false)
-        guard words.isEmpty == false else { return [narration] }
-
-        var partials: [String] = []
-        var current = ""
-        for word in words {
-            current = current.isEmpty ? String(word) : "\(current) \(word)"
-            partials.append(current)
-        }
-        if partials.last != narration {
-            partials.append(narration)
-        }
-        return partials
-    }
-
-    private func replaceAnswerExplanation(
-        answerID: UUID,
-        baseExplanation: String?,
-        insight: String?,
-        suffix: String?,
-        shouldSave: Bool
-    ) {
-        guard let index = answers.firstIndex(where: { $0.id == answerID }) else { return }
-        let answer = answers[index]
-        let explanation = combinedExplanation(
-            base: baseExplanation,
-            insight: insight,
-            suffix: suffix
-        )
-        answers[index] = HomeAnswer(
-            id: answer.id,
-            queryID: answer.queryID,
-            kind: answer.kind,
-            userPrompt: answer.userPrompt,
-            title: answer.title,
-            subtitle: answer.subtitle,
-            primaryValue: answer.primaryValue,
-            rows: answer.rows,
-            attachment: answer.attachment,
-            explanation: explanation,
-            semanticContext: answer.semanticContext,
-            insightBundle: answer.insightBundle,
-            generatedAt: answer.generatedAt
-        )
-        answerUpdateTick += 1
-        if shouldSave {
-            saveCurrentSession()
-        }
-    }
-
-    private func replaceAnswer(_ answer: HomeAnswer, shouldSave: Bool) {
-        guard let index = answers.firstIndex(where: { $0.id == answer.id }) else { return }
-        answers[index] = answer
-        updatePendingClarification(afterAppending: answer)
-        answerUpdateTick += 1
-        if shouldSave {
-            saveCurrentSession()
-        }
-    }
-
-    private func combinedExplanation(base: String?, insight: String?, suffix: String?) -> String? {
-        let pieces = [base, insight, suffix]
-            .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { $0.isEmpty == false }
-        return pieces.isEmpty ? nil : pieces.joined(separator: "\n\n")
-    }
-
     private func saveCurrentSession() {
-        guard let activeSessionID else {
-            followUpContext = MarinaConversationContext(recentAnswers: answers)
-            return
-        }
-
+        guard let activeSessionID else { return }
         do {
-            followUpContext = try chatSessionStore.saveTranscript(
+            try chatSessionStore.saveTranscript(
                 answers,
                 sessionID: activeSessionID,
                 workspaceID: workspace.id,
                 modelContext: modelContext
             )
         } catch {
-            followUpContext = MarinaConversationContext(recentAnswers: answers)
+            persistenceErrorMessage = "Your messages are still visible here, but Marina could not save this chat. Please try again before closing it."
         }
     }
 
@@ -1323,10 +1074,9 @@ struct MarinaPanelView: View {
             )
             loadSession(session)
         } catch {
+            persistenceErrorMessage = "Marina could not load your saved chats. Please close and reopen Marina to try again."
             activeSessionID = nil
             answers = []
-            followUpContext = .empty
-            pendingClarification = nil
             resetStarterPrompts()
         }
         hasLoadedConversation = true
@@ -1335,8 +1085,7 @@ struct MarinaPanelView: View {
     private func loadSession(_ session: MarinaChatSession) {
         activeSessionID = session.id
         answers = chatSessionStore.visibleAnswers(for: session)
-        followUpContext = chatSessionStore.followUpContext(for: session)
-        pendingClarification = pendingClarification(from: answers.last)
+        conversation.reset()
         if answers.isEmpty {
             resetStarterPrompts()
         }
@@ -1354,6 +1103,7 @@ struct MarinaPanelView: View {
             loadSession(session)
             isShowingChatHistory = false
         } catch {
+            persistenceErrorMessage = "Marina could not update your saved chats. Please try again."
             return
         }
     }
@@ -1367,6 +1117,7 @@ struct MarinaPanelView: View {
             loadSession(session)
             isShowingChatHistory = false
         } catch {
+            persistenceErrorMessage = "Marina could not update your saved chats. Please try again."
             return
         }
     }
@@ -1396,6 +1147,7 @@ struct MarinaPanelView: View {
                 modelContext: modelContext
             )
         } catch {
+            persistenceErrorMessage = "Marina could not update your saved chats. Please try again."
             return
         }
 
@@ -1431,6 +1183,7 @@ struct MarinaPanelView: View {
         do {
             try deleteChat(id: pendingDeleteSession.id)
         } catch {
+            persistenceErrorMessage = "Marina could not update your saved chats. Please try again."
             return
         }
 
@@ -1441,12 +1194,14 @@ struct MarinaPanelView: View {
         do {
             try deleteChat(id: id)
         } catch {
+            persistenceErrorMessage = "Marina could not update your saved chats. Please try again."
             return
         }
     }
 
     private func deleteChat(id: UUID) throws {
         let deletingActiveSession = id == activeSessionID
+        if deletingActiveSession { cancelResponseTask() }
         let fallback = try chatSessionStore.deleteSession(
             id: id,
             workspace: workspace,
@@ -1459,12 +1214,6 @@ struct MarinaPanelView: View {
 
     private func clearConversation() {
         cancelResponseTask()
-        answers = []
-        followUpContext = .empty
-        pendingClarification = nil
-        isResponding = false
-        resetStarterPrompts()
-
         guard let activeSessionID else { return }
         do {
             _ = try chatSessionStore.clearSession(
@@ -1472,31 +1221,23 @@ struct MarinaPanelView: View {
                 workspaceID: workspace.id,
                 modelContext: modelContext
             )
+            answers = []
+            resetStarterPrompts()
         } catch {
-            return
+            persistenceErrorMessage = "Marina could not clear your saved chat. Please try again."
         }
     }
 
     private func cancelResponseTask() {
+        if responseTask != nil { saveCurrentSession() }
         responseTask?.cancel()
         responseTask = nil
+        isResponding = false
+        conversation.reset()
     }
 
     private func resetStarterPrompts() {
         starterPrompts = Self.randomStarterPrompts(cards: cards)
-    }
-
-    private func updatePendingClarification(afterAppending answer: HomeAnswer) {
-        pendingClarification = pendingClarification(from: answer)
-    }
-
-    private func pendingClarification(from answer: HomeAnswer?) -> PendingClarification? {
-        guard let answer,
-              case .clarificationChoices(let choices)? = answer.attachment,
-              choices.isResolved == false else {
-            return nil
-        }
-        return PendingClarification(answerID: answer.id, choices: choices)
     }
 
     private func scrollToLatestMessage(using proxy: ScrollViewProxy, animated: Bool) {
@@ -1700,54 +1441,6 @@ private struct MarinaChatHistoryView: View {
         guard let pendingDeleteSession else { return }
         onDelete(pendingDeleteSession.id)
         self.pendingDeleteSession = nil
-    }
-}
-
-private struct MarinaClarificationChoiceButton: View {
-    let choice: MarinaClarificationChoice
-    let isResolved: Bool
-
-    @Environment(\.isEnabled) private var isEnabled
-
-    var body: some View {
-        HStack(alignment: .top, spacing: 8) {
-            Image(systemName: isResolved ? "checkmark.circle.fill" : "arrow.turn.down.right")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(Color("AccentColor"))
-                .frame(width: 18, height: 20, alignment: .center)
-                .padding(.top, 1)
-
-            VStack(alignment: .leading, spacing: 3) {
-                Text(choice.title)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(Color("AccentColor"))
-                    .lineLimit(2)
-                    .fixedSize(horizontal: false, vertical: true)
-
-                if let kindLabel = choice.kindLabel, kindLabel.isEmpty == false {
-                    Text(kindLabel)
-                        .font(.caption2.weight(.medium))
-                        .foregroundStyle(.secondary)
-                        .lineLimit(2)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-
-            Spacer(minLength: 0)
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
-        .frame(maxWidth: .infinity, minHeight: 58, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(Color("AccentColor").opacity(isResolved ? 0.18 : 0.12))
-        )
-        .overlay {
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .stroke(Color("AccentColor").opacity(isResolved ? 0.32 : 0.16), lineWidth: 1)
-        }
-        .opacity(isEnabled ? 1 : 0.62)
-        .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 }
 

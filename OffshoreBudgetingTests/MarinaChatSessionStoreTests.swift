@@ -50,11 +50,11 @@ struct MarinaChatSessionStoreTests {
         #expect(session.workspace?.id == workspace.id)
         #expect(session.title == MarinaChatSessionStore.defaultTitle)
         #expect(store.visibleAnswers(for: session).isEmpty)
-        #expect(store.followUpContext(for: session) == .empty)
+        #expect(session.followUpContextData.isEmpty)
         #expect(try store.sessions(workspaceID: workspace.id, modelContext: context).count == 1)
     }
 
-    @Test func saveTranscript_generatesTitleAndPersistsSeparateFollowUpContext() throws {
+    @Test func saveTranscript_generatesTitleWithoutSemanticFollowUpState() throws {
         let context = try makeContext()
         let workspace = Workspace(name: "Personal", hexColor: "#3B82F6")
         context.insert(workspace)
@@ -70,7 +70,7 @@ struct MarinaChatSessionStoreTests {
             primaryValue: "$42.00"
         )
 
-        let savedContext = try store.saveTranscript(
+        try store.saveTranscript(
             [answer],
             sessionID: session.id,
             workspaceID: workspace.id,
@@ -80,7 +80,40 @@ struct MarinaChatSessionStoreTests {
 
         #expect(session.title == "What is my safe spend today?")
         #expect(store.visibleAnswers(for: session).first?.userPrompt == "What is my safe spend today?")
-        #expect(store.followUpContext(for: session) == savedContext)
+        #expect(session.followUpContextData.isEmpty)
+    }
+
+    @Test func saveTranscript_preservesFullHistoryAndLegacyStateWithoutInterpretingIt() throws {
+        let context = try makeContext()
+        let workspace = Workspace(name: "Personal", hexColor: "#3B82F6")
+        context.insert(workspace)
+        let store = MarinaChatSessionStore()
+        let session = try store.createSession(workspace: workspace, modelContext: context)
+        let legacyState = Data("opaque legacy semantic state".utf8)
+        session.followUpContextData = legacyState
+        let answers = (0..<75).map { index in
+            HomeAnswer(queryID: UUID(), kind: .message, userPrompt: "Question \(index)", title: "Answer \(index)")
+        }
+
+        try store.saveTranscript(answers, sessionID: session.id, workspaceID: workspace.id, modelContext: context)
+
+        #expect(store.visibleAnswers(for: session) == answers)
+        #expect(session.followUpContextData == legacyState)
+    }
+
+    @Test func saveTranscript_cannotWriteAnotherWorkspaceSession() throws {
+        let context = try makeContext()
+        let personal = Workspace(name: "Personal", hexColor: "#3B82F6")
+        let work = Workspace(name: "Work", hexColor: "#3B82F6")
+        context.insert(personal)
+        context.insert(work)
+        let store = MarinaChatSessionStore()
+        let session = try store.createSession(workspace: personal, modelContext: context)
+        let answer = HomeAnswer(queryID: UUID(), kind: .message, title: "Private answer")
+
+        try store.saveTranscript([answer], sessionID: session.id, workspaceID: work.id, modelContext: context)
+
+        #expect(store.visibleAnswers(for: session).isEmpty)
     }
 
     @Test func renameAndClear_preservesCustomTitleAndResetsGeneratedTitle() throws {
@@ -97,27 +130,13 @@ struct MarinaChatSessionStoreTests {
             workspaceID: workspace.id,
             modelContext: context
         )
-        _ = try store.saveFollowUpContext(
-            MarinaConversationContext(recentTurns: [
-                MarinaConversationTurn(
-                    title: "Apple Card Spend",
-                    kind: .metric,
-                    subtitle: nil,
-                    primaryValue: "$100.00",
-                    rowTitles: [],
-                    semanticContext: nil,
-                    recommendedFollowUp: nil
-                )
-            ]),
-            sessionID: custom.id,
-            workspaceID: workspace.id,
-            modelContext: context
-        )
+        // Legacy semantic state remains schema-compatible, but the rebuilt chat never reads it.
+        custom.followUpContextData = Data("legacy-context".utf8)
 
         _ = try store.clearSession(id: custom.id, workspaceID: workspace.id, modelContext: context)
         #expect(custom.title == "Budget Deep Dive")
         #expect(store.visibleAnswers(for: custom).isEmpty)
-        #expect(store.followUpContext(for: custom) == .empty)
+        #expect(custom.followUpContextData.isEmpty)
 
         let generated = try store.createSession(
             workspace: workspace,

@@ -365,11 +365,6 @@ struct HomeView: View {
                     homeActionsToolbarButton
                 }
 
-                if showsAssistantToolbarButton {
-                    ToolbarItem(placement: .primaryAction) {
-                        assistantToolbarButtonLegacy
-                    }
-                }
             }
         }
         .sheet(isPresented: $isEditingWidgets) {
@@ -495,6 +490,7 @@ struct HomeView: View {
     }
 
     private func presentAssistantPanel() {
+        guard #available(iOS 26.0, macCatalyst 26.0, *) else { return }
         let context = currentMarinaHomeContext
         if isPhone {
             assistantPanelHomeContext = context
@@ -1322,6 +1318,7 @@ struct HomeView: View {
     }
 
     private var showsAssistantToolbarButton: Bool {
+        guard #available(iOS 26.0, macCatalyst 26.0, *) else { return false }
         if isPhone {
             return true
         }
@@ -1335,16 +1332,6 @@ struct HomeView: View {
             Image(systemName: "figure.wave")
         }
         .glassProminentButtonStyleCompat()
-        .accessibilityLabel(String(localized: "assistant.open", defaultValue: "Open Assistant", comment: "Accessibility label for opening assistant."))
-        .accessibilityIdentifier("home.assistant.openButton")
-    }
-
-    private var assistantToolbarButtonLegacy: some View {
-        Button(action: presentAssistantPanel) {
-            Image(systemName: "figure.wave")
-        }
-        .buttonStyle(.borderedProminent)
-        .tint(Color("AccentColor"))
         .accessibilityLabel(String(localized: "assistant.open", defaultValue: "Open Assistant", comment: "Accessibility label for opening assistant."))
         .accessibilityIdentifier("home.assistant.openButton")
     }

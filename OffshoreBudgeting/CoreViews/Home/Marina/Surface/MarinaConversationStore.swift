@@ -186,7 +186,6 @@ final class MarinaChatSessionStore {
         workspace: Workspace,
         title: String? = nil,
         answers: [HomeAnswer] = [],
-        followUpContext: MarinaConversationContext? = nil,
         hasCustomTitle: Bool = false,
         modelContext: ModelContext,
         now: Date = Date()
@@ -195,12 +194,11 @@ final class MarinaChatSessionStore {
         let resolvedTitle = titleFromInput(title)
             ?? generatedTitle(from: trimmedAnswers)
             ?? Self.defaultTitle
-        let context = followUpContext ?? MarinaConversationContext(recentAnswers: trimmedAnswers)
         let session = MarinaChatSession(
             title: resolvedTitle,
             hasCustomTitle: hasCustomTitle,
             visibleAnswersData: try encodedAnswers(trimmedAnswers),
-            followUpContextData: try encodedContext(context),
+            followUpContextData: Data(),
             workspace: workspace,
             createdAt: now,
             updatedAt: now,
@@ -227,15 +225,13 @@ final class MarinaChatSessionStore {
         workspaceID: UUID,
         modelContext: ModelContext,
         now: Date = Date()
-    ) throws -> MarinaConversationContext {
+    ) throws {
         guard let session = try session(id: sessionID, workspaceID: workspaceID, modelContext: modelContext) else {
-            return .empty
+            return
         }
 
         let trimmedAnswers = trimmed(answers)
-        let context = MarinaConversationContext(recentAnswers: trimmedAnswers)
         session.visibleAnswersData = try encodedAnswers(trimmedAnswers)
-        session.followUpContextData = try encodedContext(context)
         session.updatedAt = now
         session.lastOpenedAt = now
 
@@ -244,22 +240,6 @@ final class MarinaChatSessionStore {
             session.title = generated
         }
 
-        try modelContext.save()
-        return context
-    }
-
-    func saveFollowUpContext(
-        _ context: MarinaConversationContext,
-        sessionID: UUID,
-        workspaceID: UUID,
-        modelContext: ModelContext,
-        now: Date = Date()
-    ) throws {
-        guard let session = try session(id: sessionID, workspaceID: workspaceID, modelContext: modelContext) else {
-            return
-        }
-        session.followUpContextData = try encodedContext(context)
-        session.updatedAt = now
         try modelContext.save()
     }
 
@@ -295,7 +275,7 @@ final class MarinaChatSessionStore {
         }
 
         session.visibleAnswersData = try encodedAnswers([])
-        session.followUpContextData = try encodedContext(.empty)
+        session.followUpContextData = Data()
         if session.hasCustomTitle == false {
             session.title = Self.defaultTitle
         }
@@ -333,14 +313,6 @@ final class MarinaChatSessionStore {
         return trimmed(answers)
     }
 
-    func followUpContext(for session: MarinaChatSession) -> MarinaConversationContext {
-        guard session.followUpContextData.isEmpty == false,
-              let context = try? decoder.decode(MarinaConversationContext.self, from: session.followUpContextData) else {
-            return MarinaConversationContext(recentAnswers: visibleAnswers(for: session))
-        }
-        return context
-    }
-
     func markLegacyMigrationComplete(workspaceID: UUID) {
         userDefaults.set(true, forKey: migrationKey(for: workspaceID))
     }
@@ -371,7 +343,6 @@ final class MarinaChatSessionStore {
         _ = try createSession(
             workspace: workspace,
             answers: legacyAnswers,
-            followUpContext: MarinaConversationContext(recentAnswers: legacyAnswers),
             modelContext: modelContext,
             now: now
         )
@@ -384,10 +355,6 @@ final class MarinaChatSessionStore {
         try encoder.encode(trimmed(answers))
     }
 
-    private func encodedContext(_ context: MarinaConversationContext) throws -> Data {
-        try encoder.encode(context)
-    }
-
     // MARK: - Helpers
 
     private func migrationKey(for workspaceID: UUID) -> String {
@@ -395,8 +362,7 @@ final class MarinaChatSessionStore {
     }
 
     private func trimmed(_ answers: [HomeAnswer]) -> [HomeAnswer] {
-        guard answers.count > MarinaConversationStore.maxStoredAnswers else { return answers }
-        return Array(answers.suffix(MarinaConversationStore.maxStoredAnswers))
+        answers
     }
 
     private func titleFromInput(_ title: String?) -> String? {

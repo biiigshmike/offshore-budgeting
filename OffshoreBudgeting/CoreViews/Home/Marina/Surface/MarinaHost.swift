@@ -63,6 +63,7 @@ struct MarinaHostModifier: ViewModifier {
                     shouldUseLargeMinimumSize: assistantPresentationPlan.usesExpandedPanelSizing,
                     homeContext: activeHomeContext
                 )
+                .id(workspace.id)
                 .presentationDetents(assistantPresentationPlan.detents)
                 .presentationDragIndicator(.visible)
             }
@@ -76,6 +77,7 @@ struct MarinaHostModifier: ViewModifier {
                     shouldUseLargeMinimumSize: false,
                     homeContext: activeHomeContext
                 )
+                .id(workspace.id)
                 .inspectorColumnWidth(min: 340, ideal: 420, max: 520)
             }
             .fullScreenCover(
@@ -101,6 +103,9 @@ struct MarinaHostModifier: ViewModifier {
                 }
             }
             .environment(\.marinaToolbarContext, assistantToolbarContext)
+            .onChange(of: workspace.id) { _, _ in
+                dismissAssistant()
+            }
             .onChange(of: isEnabled) { _, enabled in
                 if enabled == false {
                     dismissAssistant()
@@ -139,6 +144,7 @@ struct MarinaHostModifier: ViewModifier {
     }
 
     private func presentAssistant(homeContext: MarinaPanelHomeContext?) {
+        guard #available(iOS 26.0, macCatalyst 26.0, *) else { return }
         guard isEnabled else { return }
         guard assistantRoute == nil else { return }
         activeHomeContext = homeContext
@@ -207,6 +213,7 @@ struct MarinaHostModifier: ViewModifier {
     }
 
     private var shouldShowToolbarButton: Bool {
+        guard #available(iOS 26.0, macCatalyst 26.0, *) else { return false }
         guard isEnabled, assistantPresentationPlan.showsToolbarButton else {
             return false
         }
