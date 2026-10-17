@@ -89,6 +89,7 @@ struct OffshoreBudgetingApp: App {
                 .id(rootResetToken)
                 .onAppear {
                     consumePendingWidgetActionIfNeeded()
+                    retireLegacyFeatureData()
                 }
                 .task {
                     #if DEBUG
@@ -103,6 +104,17 @@ struct OffshoreBudgetingApp: App {
                 .onChange(of: scenePhase) { _, newValue in
                     guard newValue == .active else { return }
                     consumePendingWidgetActionIfNeeded()
+                    retireLegacyFeatureData()
+                }
+                .onReceive(NotificationCenter.default.publisher(
+                    for: NSPersistentCloudKitContainer.eventChangedNotification
+                ).receive(on: RunLoop.main)) { notification in
+                    guard let event = notification.userInfo?[
+                        NSPersistentCloudKitContainer.eventNotificationUserInfoKey
+                    ] as? NSPersistentCloudKitContainer.Event,
+                          event.type == .import, event.endDate != nil else { return }
+                    // Old clients may sync retired records after this app has launched.
+                    retireLegacyFeatureData()
                 }
                 .onOpenURL { url in
                     _ = OffshoreDeepLinkHandler.handle(url)
@@ -152,6 +164,16 @@ struct OffshoreBudgetingApp: App {
     private func consumePendingWidgetActionIfNeeded() {
         guard let pendingURL = WidgetActionRequestStore.consumePendingURL() else { return }
         _ = OffshoreDeepLinkHandler.handle(pendingURL)
+    }
+
+    @MainActor
+    private func retireLegacyFeatureData() {
+        do {
+            try MarinaRetirementService.purgeLegacyRecords(in: modelContainer)
+        } catch {
+            Logger(subsystem: "com.mb.offshore-budgeting", category: "FeatureRetirement")
+                .error("Could not retire assistant records; will retry: \(error.localizedDescription, privacy: .public)")
+        }
     }
 
     // MARK: - Container Factory

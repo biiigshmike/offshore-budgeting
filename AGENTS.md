@@ -104,7 +104,7 @@ Grouped by domain:
 - Savings: `SavingsAccount`, `SavingsLedgerEntry`.
 - Income: `Income`, `IncomeSeries`.
 - Import learning: `ImportMerchantRule`.
-- Assistant storage: active `MarinaChatSession`; dormant compatibility-only `AssistantAliasRule`.
+- Retired assistant storage compatibility: `AssistantAliasRule`, `MarinaChatSession`.
 
 ## Workspace
 
@@ -260,15 +260,16 @@ Rules:
 - Learned rules are workspace-scoped and text/category based; category deletion and renames can stale them.
 - There is currently no main settings UI for learned import rules. Treat edits/deletes as a product decision, not a casual cleanup.
 
-## Marina and Retired Features
+## Retired Features and Future Rebuilds
 
-Marina is rebuilt as a read-only, on-device Foundation Models assistant. Its query service retrieves workspace-scoped records and performs deterministic financial calculations. Do not restore the old assistant router, phrase dictionary, or alias runtime.
+Marina and Excursion Mode have been removed from active app behavior. Do not restore old runtime, UI, location monitoring, or assistant routing as incidental cleanup. Rebuild each feature deliberately and incrementally.
 
-- `MarinaChatSession` stores versioned conversation and result snapshots. `AssistantAliasRule` and `MarinaAliasEntityType` remain dormant for SwiftData and CloudKit compatibility. The 20-model schema remains intact.
-- Marina's retirement service and launch/sync purge hooks have been removed. Never purge active conversations as incidental cleanup. Older installed releases still contain the purge; all syncing devices must be updated before relying on saved history.
-- Assistant tools must remain read-only and workspace-scoped. Clarify ambiguous names and reuse existing financial math. Generated prose cannot supply figures for result cards or charts.
-- Excursion Mode remains retired. Do not restore location monitoring or its runtime incidentally. Existing Activity retirement behavior and ordinary Quick Add remain available.
-- See `README.md` and `OffshoreBudgeting/Marina/` for the active implementation. The previously referenced feature-retirement architecture guide is absent from this checkout.
+- `AssistantAliasRule`, `MarinaAliasEntityType`, `MarinaChatSession`, their Workspace relationships, and app/test schema entries remain for SwiftData and CloudKit compatibility. These are dormant storage definitions.
+- Existing assistant conversations and aliases are cleared by the explicit retirement service. Financial records remain intact.
+- Excursion Activity attributes remain only so the retirement service can end sessions created by older versions; ordinary Quick Add remains available.
+- Before a rebuilt feature creates conversations, aliases, or sessions, replace or disable its retirement cleanup so new data is not removed.
+- Future assistant queries and writes must remain workspace-scoped and clarify ambiguous entity names. Use existing domain services instead of duplicating financial math.
+- Review `Docs/Maintenance/FeatureRetirementArchitectureGuide.md` for maintainability guidance and rebuild boundaries.
 
 ## Home, Widgets, And Shortcuts
 
