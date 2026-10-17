@@ -46,6 +46,7 @@ struct HomeView: View {
     @State private var masonryMeasuredHeights: [String: CGFloat] = [:]
     @State private var lastMeasuredUsableWidth: CGFloat = 0
 
+    @State private var isShowingMarina: Bool = false
     @State private var isShowingWhatIfPlanner: Bool = false
     @State private var whatIfInitialScenarioID: UUID? = nil
     @State private var whatIfInitialDraft: WhatIfPlannerDraft? = nil
@@ -213,6 +214,12 @@ struct HomeView: View {
                 }
             }
         }
+        .navigationDestination(isPresented: $isShowingMarina) {
+            if #available(iOS 26.0, macOS 26.0, *) {
+                MarinaView(workspace: workspace, startDate: appliedStartDate, endDate: appliedEndDate)
+                    .id(workspace.id)
+            }
+        }
         .navigationDestination(isPresented: $isShowingWhatIfPlanner) {
             WhatIfScenarioPlannerView(
                 workspace: workspace,
@@ -252,6 +259,10 @@ struct HomeView: View {
         .navigationTitle(String(localized: "app.section.home", defaultValue: "Home", comment: "Main tab title for the Home section."))
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
+                if #available(iOS 26.0, macOS 26.0, *) {
+                    Button("Marina", systemImage: "sparkles") { isShowingMarina = true }
+                        .accessibilityIdentifier("home.marina")
+                }
                 homeActionsToolbarButton
             }
         }
