@@ -5,6 +5,7 @@
   "fill" : "automatic",
   "groups" : [
     {
+      "blend-mode" : "normal",
       "blur-material" : null,
       "hidden" : false,
       "layers" : [
@@ -27,8 +28,8 @@
           "position" : {
             "scale" : 1.25,
             "translation-in-points" : [
-              -119,
-              -75
+              -90,
+              -45
             ]
           }
         },
