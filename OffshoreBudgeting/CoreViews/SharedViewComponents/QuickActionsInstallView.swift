@@ -64,7 +64,7 @@ struct QuickActionsInstallView: View {
     // MARK: - Sections
 
     private var shortcutsSection: some View {
-        Section("Shortcuts") {
+        Section {
             ForEach(ShortcutLinkCatalog.installGroups) { group in
                 ShortcutLinkGroupCard(
                     group: group,
@@ -73,17 +73,11 @@ struct QuickActionsInstallView: View {
                 .listRowInsets(EdgeInsets(top: 10, leading: 16, bottom: 10, trailing: 16))
                 .listRowBackground(Color.clear)
             }
-            
+        } header: {
+            Text("Shortcuts")
+        } footer: {
             if !isOnboarding && isPhone {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Tap to Pay is configured directly in the Shortcuts app using Offshore’s built-in Add Expense action.")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                    Text("There is no Tap to Pay shortcut download. Use the Setup Guide for the manual automation steps.")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                }
-                .padding(.vertical, 4)
+                Text("Tap to Pay is configured directly in the Shortcuts app using Offshore’s built-in Add Expense action.\n\nThere is no Tap to Pay shortcut download. Use the Setup Guide for the manual automation steps.")
             }
         }
     }
