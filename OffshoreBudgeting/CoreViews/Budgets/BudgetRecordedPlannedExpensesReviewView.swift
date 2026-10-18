@@ -137,6 +137,7 @@ struct BudgetRecordedPlannedExpensesReviewView: View {
                     EmptyView()
                 }
             }
+            .macFormSheetSizing()
         }
     }
 

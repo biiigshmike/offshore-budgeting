@@ -497,6 +497,7 @@ struct SavingsAccountView: View {
                     }
                 )
             }
+            .macFormSheetSizing()
         }
     }
 
@@ -847,6 +848,8 @@ private struct SavingsDateFilterRow: View {
     let onTapGo: () -> Void
     let onSelectQuickRange: (CalendarQuickRangePreset) -> Void
 
+    @State private var actionDiameter: CGFloat = 44
+
     var body: some View {
         HStack(spacing: 0) {
             Spacer(minLength: 0)
@@ -861,7 +864,7 @@ private struct SavingsDateFilterRow: View {
                 Button(action: onTapGo) {
                     Image(systemName: "arrow.right")
                         .font(.system(size: 14, weight: .semibold))
-                        .frame(width: 44, height: 44)
+                        .frame(width: actionDiameter, height: actionDiameter)
                         .background(
                             Circle()
                                 .fill(isGoEnabled
@@ -880,7 +883,7 @@ private struct SavingsDateFilterRow: View {
                 } label: {
                     Image(systemName: "calendar")
                         .font(.system(size: 14, weight: .semibold))
-                        .frame(width: 44, height: 44)
+                        .frame(width: actionDiameter, height: actionDiameter)
                         .background(Circle().fill(Color.secondary.opacity(0.1)))
                 }
                 .buttonStyle(.plain)
@@ -888,6 +891,9 @@ private struct SavingsDateFilterRow: View {
             }
 
             Spacer(minLength: 0)
+        }
+        .onPreferenceChange(DateRangePillHeightKey.self) { height in
+            if height > 0 { actionDiameter = height }
         }
     }
 }

@@ -493,6 +493,7 @@ struct AppRootView: View {
                     )
                 }
             }
+            .macFormSheetSizing()
         }
     }
 

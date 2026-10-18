@@ -88,11 +88,15 @@ struct AccountsView: View {
         .toolbar {
             if #available(iOS 26.0, macCatalyst 26.0, *) {
                 ToolbarItemGroup(placement: .primaryAction) {
+                    #if targetEnvironment(macCatalyst)
+                    segmentMenuPicker
+                    #else
                     AccountsGlassSegmentControl(
                         selectedSegment: $selectedSegment,
                         isExpanded: $isSegmentControlExpanded,
                         namespace: glassNamespace
                     )
+                    #endif
                 }
 
                 ToolbarSpacer(.fixed, placement: .primaryAction)
@@ -118,11 +122,13 @@ struct AccountsView: View {
             NavigationStack {
                 AddCardView(workspace: workspace)
             }
+            .macFormSheetSizing()
         }
         .sheet(isPresented: $showingAddAllocationAccountFromAccounts) {
             NavigationStack {
                 AddAllocationAccountView(workspace: workspace)
             }
+            .macFormSheetSizing()
         }
         .onAppear {
             consumePendingAccountsSegmentIfNeeded()

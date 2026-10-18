@@ -69,6 +69,14 @@ private extension View {
     }
 }
 
+/// Shares the rendered pill height with neighboring date-range actions on Mac.
+struct DateRangePillHeightKey: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
+    }
+}
+
 struct PillDatePickerField: View {
 
     @Environment(\.verticalSizeClass) private var verticalSizeClass
@@ -113,6 +121,11 @@ struct PillDatePickerField: View {
 
         if PillPickerPlatform.isMacCatalyst {
             triggerButton(text: dateText, accessibilityText: "\(title) \(dateText)")
+                .background {
+                    GeometryReader { proxy in
+                        Color.clear.preference(key: DateRangePillHeightKey.self, value: proxy.size.height)
+                    }
+                }
                 .popover(isPresented: $isPresented, attachmentAnchor: .rect(.bounds), arrowEdge: .top) {
                     macPopoverContent
                         .presentationCompactAdaptation(.popover)

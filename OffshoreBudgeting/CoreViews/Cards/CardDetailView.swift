@@ -534,6 +534,7 @@ struct CardDetailView: View {
                     NavigationStack {
                         AddExpenseView(workspace: workspace, defaultCard: card)
                     }
+                    .macFormSheetSizing()
                 case .importExpenses:
                     NavigationStack {
                         ExpenseCSVImportFlowView(workspace: workspace, card: card)
@@ -542,18 +543,22 @@ struct CardDetailView: View {
                     NavigationStack {
                         EditCardView(workspace: workspace, card: card)
                     }
+                    .macFormSheetSizing()
                 case .editExpense(let expense):
                     NavigationStack {
                         EditExpenseView(workspace: workspace, expense: expense)
                     }
+                    .macFormSheetSizing()
                 case .editPlannedExpense(let plannedExpense):
                     NavigationStack {
                         EditPlannedExpenseView(workspace: workspace, plannedExpense: plannedExpense)
                     }
+                    .macFormSheetSizing()
                 case .editPreset(let preset):
                     NavigationStack {
                         EditPresetView(workspace: workspace, preset: preset)
                     }
+                    .macFormSheetSizing()
                 }
             }
             .onAppear {
@@ -1391,6 +1396,8 @@ private struct DateFilterRow: View {
     let onTapGo: () -> Void
     let onSelectQuickRange: (CalendarQuickRangePreset) -> Void
 
+    @State private var actionDiameter: CGFloat = 44
+
     var body: some View {
         HStack(spacing: 0) {
             Spacer(minLength: 0)
@@ -1405,7 +1412,7 @@ private struct DateFilterRow: View {
                 Button(action: onTapGo) {
                     Image(systemName: "arrow.right")
                         .font(.system(size: 14, weight: .semibold))
-                        .frame(width: 44, height: 44)
+                        .frame(width: actionDiameter, height: actionDiameter)
                         .background(
                             Circle()
                                 .fill(isGoEnabled
@@ -1424,7 +1431,7 @@ private struct DateFilterRow: View {
                 } label: {
                     Image(systemName: "calendar")
                         .font(.system(size: 14, weight: .semibold))
-                        .frame(width: 44, height: 44)
+                        .frame(width: actionDiameter, height: actionDiameter)
                         .background(Circle().fill(Color.secondary.opacity(0.1)))
                 }
                 .buttonStyle(.plain)
@@ -1432,6 +1439,9 @@ private struct DateFilterRow: View {
             }
 
             Spacer(minLength: 0)
+        }
+        .onPreferenceChange(DateRangePillHeightKey.self) { height in
+            if height > 0 { actionDiameter = height }
         }
     }
 }

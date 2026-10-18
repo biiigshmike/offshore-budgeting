@@ -290,10 +290,12 @@ struct BudgetsView: View {
                 NavigationStack {
                     AddBudgetView(workspace: workspace)
                 }
+                .macFormSheetSizing()
             case .edit(let budget):
                 NavigationStack {
                     EditBudgetView(workspace: workspace, budget: budget)
                 }
+                .macFormSheetSizing()
             }
         }
         .alert("Delete Budget?", isPresented: $showingDeleteConfirm) {

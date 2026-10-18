@@ -374,6 +374,7 @@ struct HomeView: View {
                 showsTileSizePicker: showsTileSizePicker,
                 pinnedItems: $pinnedItems
             )
+            .macFormSheetSizing()
             .onDisappear {
                 persistPinnedItems()
             }
@@ -1331,7 +1332,7 @@ struct HomeView: View {
         Button(action: presentAssistantPanel) {
             Image(systemName: "figure.wave")
         }
-        .glassProminentButtonStyleCompat()
+        .glassProminentButtonStyleCompat(macBorderShape: .circle)
         .accessibilityLabel(String(localized: "assistant.open", defaultValue: "Open Assistant", comment: "Accessibility label for opening assistant."))
         .accessibilityIdentifier("home.assistant.openButton")
     }

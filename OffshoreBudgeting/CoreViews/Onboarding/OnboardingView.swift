@@ -788,10 +788,12 @@ private struct OnboardingWorkspaceStep: View {
                 NavigationStack {
                     AddWorkspaceView(onCreate: onCreate)
                 }
+                .macFormSheetSizing()
             case .edit(let workspace):
                 NavigationStack {
                     EditWorkspaceView(workspace: workspace)
                 }
+                .macFormSheetSizing()
             }
         }
         .alert("Delete Workspace?", isPresented: $showingWorkspaceDeleteConfirm) {
@@ -1145,10 +1147,12 @@ private struct OnboardingCategoriesStep: View {
                 NavigationStack {
                     AddCategoryView(workspace: workspace)
                 }
+                .macFormSheetSizing()
             case .edit(let category):
                 NavigationStack {
                     EditCategoryView(workspace: workspace, category: category)
                 }
+                .macFormSheetSizing()
             }
         }
         .alert("Delete?", isPresented: $showingCategoryDeleteConfirm) {
@@ -1261,10 +1265,12 @@ private struct OnboardingCardsStep: View {
                 NavigationStack {
                     AddCardView(workspace: workspace)
                 }
+                .macFormSheetSizing()
             case .edit(let card):
                 NavigationStack {
                     EditCardView(workspace: workspace, card: card)
                 }
+                .macFormSheetSizing()
             }
         }
         .alert("Delete Card?", isPresented: $showingCardDeleteConfirm) {
@@ -1530,10 +1536,12 @@ private struct OnboardingPresetsStep: View {
                 NavigationStack {
                     AddPresetView(workspace: workspace)
                 }
+                .macFormSheetSizing()
             case .edit(let preset):
                 NavigationStack {
                     EditPresetView(workspace: workspace, preset: preset)
                 }
+                .macFormSheetSizing()
             }
         }
         .alert("Delete?", isPresented: $showingPresetDeleteConfirm) {
@@ -2445,6 +2453,7 @@ private struct OnboardingIncomeStep: View {
                 NavigationStack {
                     EditIncomeView(workspace: workspace, income: income)
                 }
+                .macFormSheetSizing()
             }
         }
         .alert("Delete?", isPresented: $showingIncomeDeleteConfirm) {
@@ -2628,10 +2637,12 @@ private struct OnboardingBudgetsStep: View {
                 NavigationStack {
                     AddBudgetView(workspace: workspace)
                 }
+                .macFormSheetSizing()
             case .edit(let budget):
                 NavigationStack {
                     EditBudgetView(workspace: workspace, budget: budget)
                 }
+                .macFormSheetSizing()
             }
         }
         .alert("Delete Budget?", isPresented: $showingDeleteConfirm) {

@@ -371,6 +371,7 @@ struct IncomeView: View {
                         initialIsPlanned: sheet.initialIsPlanned
                     )
                 }
+                .macFormSheetSizing()
             }
             .sheet(isPresented: $showingImportIncomeSheet) {
                 NavigationStack {
@@ -388,6 +389,7 @@ struct IncomeView: View {
                         EmptyView()
                     }
                 }
+                .macFormSheetSizing()
             }
             .onAppear(perform: handleContentAppear)
             .onDisappear(perform: handleContentDisappear)
@@ -1046,6 +1048,7 @@ private struct MultiMonthCalendarView: View {
                         }
                         .font(.headline)
                         .glassButtonStyleCompat()
+                        .buttonBorderShape(.capsule)
                     } else {
                         HStack {
                             Spacer()

@@ -99,6 +99,7 @@ struct PresetRecordedPlannedExpensesReviewView: View {
                     EmptyView()
                 }
             }
+            .macFormSheetSizing()
         }
     }
 

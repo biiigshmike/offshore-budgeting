@@ -16,6 +16,8 @@ struct HomeDateRangeBar: View {
     let isApplyEnabled: Bool
     var onApply: () -> Void
 
+    @State private var actionDiameter: CGFloat = 44
+
     var body: some View {
         HStack(spacing: 0) {
             Spacer(minLength: 0)
@@ -29,7 +31,7 @@ struct HomeDateRangeBar: View {
                 Button(action: onApply) {
                     Image(systemName: "arrow.right")
                         .font(.system(size: 14, weight: .semibold))
-                        .frame(width: 44, height: 44)
+                        .frame(width: actionDiameter, height: actionDiameter)
                         .background(
                             Circle()
                                 .fill(isApplyEnabled
@@ -48,7 +50,7 @@ struct HomeDateRangeBar: View {
                 } label: {
                     Image(systemName: "calendar")
                         .font(.system(size: 14, weight: .semibold))
-                        .frame(width: 44, height: 44)
+                        .frame(width: actionDiameter, height: actionDiameter)
                         .background(Circle().fill(Color.secondary.opacity(0.1)))
                 }
                 .buttonStyle(.plain)
@@ -57,7 +59,15 @@ struct HomeDateRangeBar: View {
 
             Spacer(minLength: 0)
         }
-        .padding(12)
+        .onPreferenceChange(DateRangePillHeightKey.self) { height in
+            if height > 0 { actionDiameter = height }
+        }
+        .padding(.horizontal, 12)
+        #if targetEnvironment(macCatalyst)
+        .padding(.vertical, 6)
+        #else
+        .padding(.vertical, 12)
+        #endif
         .frame(maxWidth: .infinity)
         .background(
             Color("HomeTileColor"),

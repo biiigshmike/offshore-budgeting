@@ -78,6 +78,11 @@ struct MarinaPanelView: View {
     @State private var responseTask: Task<Void, Never>?
     @State private var persistenceErrorMessage: String?
     @State private var answerUpdateTick = 0
+    private var starterPromptBorderShape: ButtonBorderShape {
+        if #available(iOS 26.0, macCatalyst 26.0, *) { return .capsule }
+        return .automatic
+    }
+
     @State private var starterPrompts: [String] = []
     @FocusState private var isPromptFieldFocused: Bool
 
@@ -408,7 +413,7 @@ struct MarinaPanelView: View {
                 .font(.subheadline.weight(.semibold))
                 .frame(width: 33, height: 33)
         }
-        .modifier(AssistantIconButtonModifier())
+        .modifier(AssistantCreateMenuStyleModifier())
         .accessibilityLabel(String(localized: "assistant.createNew.section", defaultValue: "Create New", comment: "Section title for assistant create-new menu."))
         .accessibilityIdentifier("marina.createMenu")
     }
@@ -505,6 +510,7 @@ struct MarinaPanelView: View {
                             .frame(maxWidth: .infinity, minHeight: 42)
                     }
                     .buttonStyle(.bordered)
+                    .buttonBorderShape(starterPromptBorderShape)
                     .disabled(isResponding)
                     .accessibilityIdentifier("marina.starterPrompt")
                 }
@@ -1610,10 +1616,32 @@ private struct RenameChatPopoverContent: View {
     }
 }
 
+// Catalyst extracts native menu labels, so apply glass to the menu itself.
+private struct AssistantCreateMenuStyleModifier: ViewModifier {
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        #if targetEnvironment(macCatalyst)
+        if #available(macCatalyst 26.0, *) {
+            content
+                .menuStyle(.button)
+                .buttonStyle(.borderless)
+                .menuIndicator(.hidden)
+                .frame(width: 44, height: 44)
+                .tint(.white)
+                .glassEffect(.regular.tint(Color("AccentColor")).interactive(), in: Circle())
+        } else {
+            content.modifier(AssistantIconButtonModifier())
+        }
+        #else
+        content.modifier(AssistantIconButtonModifier())
+        #endif
+    }
+}
+
 private struct AssistantIconButtonModifier: ViewModifier {
     func body(content: Content) -> some View {
         content
-            .glassProminentButtonStyleCompat()
+            .glassProminentButtonStyleCompat(macBorderShape: .circle)
             .buttonBorderShape(.circle)
             .frame(minWidth: 44, minHeight: 44)
     }

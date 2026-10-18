@@ -686,30 +686,37 @@ struct BudgetDetailView: View {
                         defaultDate: .now
                     )
                 }
+                .macFormSheetSizing()
             case .managePresets:
                 NavigationStack {
                     ManagePresetsForBudgetSheet(workspace: workspace, budget: budget)
                 }
+                .macFormSheetSizing()
             case .manageCards:
                 NavigationStack {
                     ManageCardsForBudgetSheet(workspace: workspace, budget: budget)
                 }
+                .macFormSheetSizing()
             case .editBudget:
                 NavigationStack {
                     EditBudgetView(workspace: workspace, budget: budget)
                 }
+                .macFormSheetSizing()
             case .editExpense(let expense):
                 NavigationStack {
                     EditExpenseView(workspace: workspace, expense: expense)
                 }
+                .macFormSheetSizing()
             case .editPlannedExpense(let plannedExpense):
                 NavigationStack {
                     EditPlannedExpenseView(workspace: workspace, plannedExpense: plannedExpense)
                 }
+                .macFormSheetSizing()
             case .editPreset(let preset):
                 NavigationStack {
                     EditPresetView(workspace: workspace, preset: preset)
                 }
+                .macFormSheetSizing()
             case .editCategoryLimit(let input):
                 EditCategoryLimitView(
                     budget: budget,
@@ -717,6 +724,7 @@ struct BudgetDetailView: View {
                     plannedContribution: input.plannedContribution,
                     variableContribution: input.variableContribution
                 )
+                .macFormSheetSizing()
             case .reviewRecordedPlannedExpenses:
                 NavigationStack {
                     BudgetRecordedPlannedExpensesReviewView(
