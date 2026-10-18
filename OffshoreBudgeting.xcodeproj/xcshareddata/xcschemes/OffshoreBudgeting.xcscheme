@@ -80,6 +80,11 @@
       </CommandLineArguments>
       <EnvironmentVariables>
          <EnvironmentVariable
+            key = "MARINA_TOKEN_DIAGNOSTICS"
+            value = "1"
+            isEnabled = "YES">
+         </EnvironmentVariable>
+         <EnvironmentVariable
             key = "debug_marinaForceRuleBasedInterpreter"
             value = "yes"
             isEnabled = "NO">
@@ -87,12 +92,12 @@
          <EnvironmentVariable
             key = "debug_marinaShowSemanticTrace"
             value = "yes"
-            isEnabled = "YES">
+            isEnabled = "NO">
          </EnvironmentVariable>
          <EnvironmentVariable
             key = "OS_ACTIVITY_MODE"
             value = "disable"
-            isEnabled = "YES">
+            isEnabled = "NO">
          </EnvironmentVariable>
       </EnvironmentVariables>
    </LaunchAction>

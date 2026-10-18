@@ -7,6 +7,9 @@ import FoundationModels
 @available(iOS 26.0, macCatalyst 26.0, *)
 @MainActor
 final class MarinaToolBridge {
+#if DEBUG
+    var diagnostics: MarinaTokenDiagnostics?
+#endif
     private var service: MarinaReadOnlyDataService?
     private var onResult: (() -> Void)?
     var onStatus: ((MarinaResponseState) -> Void)?
@@ -33,13 +36,27 @@ final class MarinaToolBridge {
 
     func end() { service = nil; onResult = nil; onStatus = nil }
 
-    func call(_ request: MarinaDataRequest) throws -> String {
+    func call(_ request: MarinaDataRequest, diagnosticAttempt: Int? = nil) throws -> String {
+#if DEBUG
+        if let diagnosticAttempt { diagnostics?.mapped(attempt: diagnosticAttempt, request: request) }
+        var diagnosticOutput: String?
+        var diagnosticStatus = "needsClarification"
+        defer {
+            if let diagnosticAttempt, let diagnosticOutput {
+                diagnostics?.output(attempt: diagnosticAttempt, text: diagnosticOutput, status: diagnosticStatus)
+            }
+        }
+#endif
         try Task.checkCancellation()
         guard let service else { throw CancellationError() }
         calls += 1
         guard calls <= 8 else { throw ToolLimitError() }
         if requiresClarification && request.tool != .findRecords {
-            return "{\"status\":\"needsClarification\",\"explanation\":\"A lookup found competing records. Ask the person which candidate they mean before reading financial data.\"}"
+            let output = "{\"status\":\"needsClarification\",\"explanation\":\"A lookup found competing records. Ask the person which candidate they mean before reading financial data.\"}"
+#if DEBUG
+            diagnosticOutput = output
+#endif
+            return output
         }
         let status: MarinaResponseState
         switch request.tool {
@@ -51,7 +68,13 @@ final class MarinaToolBridge {
         }
         onStatus?(status)
         requests.append(request)
+#if DEBUG
+        if let diagnosticAttempt { diagnostics?.database(attempt: diagnosticAttempt) }
+#endif
         let result = try service.execute(request)
+#if DEBUG
+        diagnosticStatus = result.status
+#endif
         results.append(result)
         if result.status == "candidates" { requiresClarification = true }
         let card = result.homeAnswer
@@ -70,7 +93,15 @@ final class MarinaToolBridge {
         var facts = (try? JSONSerialization.jsonObject(with: Data(result.modelFactsJSON.utf8))) as? [String: Any] ?? [:]
         facts["visualPresentation"] = display
         if let data = try? JSONSerialization.data(withJSONObject: facts, options: [.sortedKeys]),
-           let json = String(data: data, encoding: .utf8) { return json }
+           let json = String(data: data, encoding: .utf8) {
+#if DEBUG
+            diagnosticOutput = json
+#endif
+            return json
+        }
+#if DEBUG
+        diagnosticOutput = result.modelFactsJSON
+#endif
         return result.modelFactsJSON
     }
 
@@ -144,15 +175,29 @@ struct MarinaFindRecordsTool: Tool {
         var lookup: MarinaRecordLookup
     }
     func call(arguments: Arguments) async throws -> String {
-        var request = MarinaDataRequest(tool: .findRecords)
-        request.forcePresentation = arguments.showVisual
-        request.operation = .inventory
-        request.limit = 5
-        switch arguments.lookup {
-        case .resolveName(let name): request.search = name
-        case .inventory(let kind, let offset): request.recordKind = kind?.rawValue; request.offset = offset
+#if DEBUG
+        let attempt = await bridge.diagnostics?.entered(tool: name, arguments: arguments.generatedContent.jsonString)
+#endif
+        do {
+            var request = MarinaDataRequest(tool: .findRecords)
+            request.forcePresentation = arguments.showVisual
+            request.operation = .inventory
+            request.limit = 5
+            switch arguments.lookup {
+            case .resolveName(let name): request.search = name
+            case .inventory(let kind, let offset): request.recordKind = kind?.rawValue; request.offset = offset
+            }
+#if DEBUG
+            return try await bridge.call(request, diagnosticAttempt: attempt)
+#else
+            return try await bridge.call(request)
+#endif
+        } catch {
+#if DEBUG
+            if let attempt { await bridge.diagnostics?.failed(attempt: attempt) }
+#endif
+            throw error
         }
-        return try await bridge.call(request)
     }
 }
 
@@ -213,38 +258,52 @@ struct MarinaExpensesTool: Tool {
         @Guide(description: "True to inspect upcoming costs despite calculation exclusions.") var includeFuture: Bool?
     }
     func call(arguments: Arguments) async throws -> String {
-        var request = MarinaDataRequest(tool: .expenses)
-        request.forcePresentation = arguments.showVisual
-        try applyExpenseSelection(arguments.selection, to: &request)
-        applyDates(arguments.dates, to: &request)
-        request.limit = 5
-        request.offset = arguments.offset ?? 0
-        switch arguments.operation {
-        case .summary: request.operation = .summary
-        case .upcomingPresets: request.purpose = .upcomingPresets
-        case .largestPurchase: request.operation = .transactions; request.sort = .largest; request.limit = 1
-        case .categoryShares: request.operation = .share; request.grouping = .category
-        case .cardShares: request.operation = .share; request.grouping = .card
-        case .merchantShares: request.operation = .share; request.grouping = .merchant
-        case .transactions: request.operation = .transactions; request.sort = sort(arguments.sort)
-        case .categoryTotals: request.operation = .ranking; request.grouping = .category
-        case .cardTotals: request.operation = .ranking; request.grouping = .card
-        case .merchantTotals: request.operation = .ranking; request.grouping = .merchant
-        case .periodTotals: request.operation = .trend; request.periodUnit = periodUnit(arguments.periodUnit)
-        case .compare:
-            request.operation = .comparison
-            if let other = arguments.comparison {
-                var selection = MarinaDataRequest(tool: .expenses)
-                try applyExpenseSelection(other.selection, to: &selection)
-                request.comparisonFilter = .init(cardID: selection.cardID, categoryID: selection.categoryID,
-                                                 budgetID: selection.budgetID, presetID: selection.presetID, search: selection.search)
-                applyComparisonDates(other.dates, to: &request)
+#if DEBUG
+        let attempt = await bridge.diagnostics?.entered(tool: name, arguments: arguments.generatedContent.jsonString)
+#endif
+        do {
+            var request = MarinaDataRequest(tool: .expenses)
+            request.forcePresentation = arguments.showVisual
+            try applyExpenseSelection(arguments.selection, to: &request)
+            applyDates(arguments.dates, to: &request)
+            request.limit = 5
+            request.offset = arguments.offset ?? 0
+            switch arguments.operation {
+            case .summary: request.operation = .summary
+            case .upcomingPresets: request.purpose = .upcomingPresets
+            case .largestPurchase: request.operation = .transactions; request.sort = .largest; request.limit = 1
+            case .categoryShares: request.operation = .share; request.grouping = .category
+            case .cardShares: request.operation = .share; request.grouping = .card
+            case .merchantShares: request.operation = .share; request.grouping = .merchant
+            case .transactions: request.operation = .transactions; request.sort = sort(arguments.sort)
+            case .categoryTotals: request.operation = .ranking; request.grouping = .category
+            case .cardTotals: request.operation = .ranking; request.grouping = .card
+            case .merchantTotals: request.operation = .ranking; request.grouping = .merchant
+            case .periodTotals: request.operation = .trend; request.periodUnit = periodUnit(arguments.periodUnit)
+            case .compare:
+                request.operation = .comparison
+                if let other = arguments.comparison {
+                    var selection = MarinaDataRequest(tool: .expenses)
+                    try applyExpenseSelection(other.selection, to: &selection)
+                    request.comparisonFilter = .init(cardID: selection.cardID, categoryID: selection.categoryID,
+                                                     budgetID: selection.budgetID, presetID: selection.presetID, search: selection.search)
+                    applyComparisonDates(other.dates, to: &request)
+                }
             }
+            switch arguments.scope { case .variable: request.scope = .variable; case .planned: request.scope = .planned; default: break }
+            request.includeFuture = arguments.includeFuture ?? false
+            switch arguments.measure { case .ledger: request.expenseMeasure = .ledger; case .spending: request.expenseMeasure = .spending; case .planned: request.expenseMeasure = .planned; case .actual: request.expenseMeasure = .actual; default: break }
+#if DEBUG
+            return try await bridge.call(request, diagnosticAttempt: attempt)
+#else
+            return try await bridge.call(request)
+#endif
+        } catch {
+#if DEBUG
+            if let attempt { await bridge.diagnostics?.failed(attempt: attempt) }
+#endif
+            throw error
         }
-        switch arguments.scope { case .variable: request.scope = .variable; case .planned: request.scope = .planned; default: break }
-        request.includeFuture = arguments.includeFuture ?? false
-        switch arguments.measure { case .ledger: request.expenseMeasure = .ledger; case .spending: request.expenseMeasure = .spending; case .planned: request.expenseMeasure = .planned; case .actual: request.expenseMeasure = .actual; default: break }
-        return try await bridge.call(request)
     }
 }
 
@@ -269,26 +328,40 @@ struct MarinaIncomeTool: Tool {
         var operation: MarinaIncomeOperation
     }
     func call(arguments: Arguments) async throws -> String {
-        var request = MarinaDataRequest(tool: .income)
-        request.forcePresentation = arguments.showVisual
-        request.budgetID = arguments.budgetID
-        request.search = arguments.source
-        request.cardID = arguments.cardID
-        applyDates(arguments.dates, to: &request)
-        switch arguments.state { case .planned: request.state = .planned; case .all: request.state = .all; case .actual: request.state = .actual }
-        switch arguments.operation {
-        case .summary: request.operation = .summary
-        case .progress: request.purpose = .incomeProgress; request.state = .all
-        case .transactions(let order, let offset): request.operation = .transactions; request.sort = sort(order); request.offset = offset
-        case .groups(let dimension, let offset): request.operation = .ranking; request.grouping = grouping(dimension); request.offset = offset
-        case .periodTotals(let unit, let offset): request.operation = .trend; request.periodUnit = periodUnit(unit); request.offset = offset
-        case .compareIncome(let source, let cardID, let dates):
-            request.operation = .comparison
-            request.comparisonFilter = .init(cardID: cardID, search: source)
-            applyComparisonDates(dates, to: &request)
+#if DEBUG
+        let attempt = await bridge.diagnostics?.entered(tool: name, arguments: arguments.generatedContent.jsonString)
+#endif
+        do {
+            var request = MarinaDataRequest(tool: .income)
+            request.forcePresentation = arguments.showVisual
+            request.budgetID = arguments.budgetID
+            request.search = arguments.source
+            request.cardID = arguments.cardID
+            applyDates(arguments.dates, to: &request)
+            switch arguments.state { case .planned: request.state = .planned; case .all: request.state = .all; case .actual: request.state = .actual }
+            switch arguments.operation {
+            case .summary: request.operation = .summary
+            case .progress: request.purpose = .incomeProgress; request.state = .all
+            case .transactions(let order, let offset): request.operation = .transactions; request.sort = sort(order); request.offset = offset
+            case .groups(let dimension, let offset): request.operation = .ranking; request.grouping = grouping(dimension); request.offset = offset
+            case .periodTotals(let unit, let offset): request.operation = .trend; request.periodUnit = periodUnit(unit); request.offset = offset
+            case .compareIncome(let source, let cardID, let dates):
+                request.operation = .comparison
+                request.comparisonFilter = .init(cardID: cardID, search: source)
+                applyComparisonDates(dates, to: &request)
+            }
+            request.limit = 5
+#if DEBUG
+            return try await bridge.call(request, diagnosticAttempt: attempt)
+#else
+            return try await bridge.call(request)
+#endif
+        } catch {
+#if DEBUG
+            if let attempt { await bridge.diagnostics?.failed(attempt: attempt) }
+#endif
+            throw error
         }
-        request.limit = 5
-        return try await bridge.call(request)
     }
 }
 
@@ -318,19 +391,33 @@ struct MarinaBudgetTool: Tool {
         @Guide(description: "Optional hypothetical extra spending amount; never income or savings replacement.") var hypotheticalSpending: Double?
     }
     func call(arguments: Arguments) async throws -> String {
-        var request = MarinaDataRequest(tool: .budgetSummary)
-        request.forcePresentation = arguments.showVisual
-        applyDates(arguments.dates, to: &request)
-        request.budgetID = arguments.budgetID; request.categoryID = arguments.categoryID
-        request.cardID = arguments.cardID
-        switch arguments.operation {
-        case .overview: break
-        case .pace: request.purpose = .budgetPace
-        case .savingsTrend(let unit, let offset): request.periodUnit = periodUnit(unit); request.offset = offset
+#if DEBUG
+        let attempt = await bridge.diagnostics?.entered(tool: name, arguments: arguments.generatedContent.jsonString)
+#endif
+        do {
+            var request = MarinaDataRequest(tool: .budgetSummary)
+            request.forcePresentation = arguments.showVisual
+            applyDates(arguments.dates, to: &request)
+            request.budgetID = arguments.budgetID; request.categoryID = arguments.categoryID
+            request.cardID = arguments.cardID
+            switch arguments.operation {
+            case .overview: break
+            case .pace: request.purpose = .budgetPace
+            case .savingsTrend(let unit, let offset): request.periodUnit = periodUnit(unit); request.offset = offset
+            }
+            request.hypotheticalSpending = arguments.hypotheticalSpending
+            request.limit = 5
+#if DEBUG
+            return try await bridge.call(request, diagnosticAttempt: attempt)
+#else
+            return try await bridge.call(request)
+#endif
+        } catch {
+#if DEBUG
+            if let attempt { await bridge.diagnostics?.failed(attempt: attempt) }
+#endif
+            throw error
         }
-        request.hypotheticalSpending = arguments.hypotheticalSpending
-        request.limit = 5
-        return try await bridge.call(request)
     }
 }
 
@@ -349,13 +436,27 @@ struct MarinaAccountsTool: Tool {
         var offset: Int?
     }
     func call(arguments: Arguments) async throws -> String {
-        var request = MarinaDataRequest(tool: .accounts)
-        request.forcePresentation = arguments.showVisual
-        switch arguments.scope { case .savings: request.scope = .savings; case .reconciliation: request.scope = .reconciliation; default: break }
-        request.accountID = arguments.accountID
-        applyDates(arguments.dates, to: &request)
-        request.offset = arguments.offset ?? 0; request.limit = 5
-        return try await bridge.call(request)
+#if DEBUG
+        let attempt = await bridge.diagnostics?.entered(tool: name, arguments: arguments.generatedContent.jsonString)
+#endif
+        do {
+            var request = MarinaDataRequest(tool: .accounts)
+            request.forcePresentation = arguments.showVisual
+            switch arguments.scope { case .savings: request.scope = .savings; case .reconciliation: request.scope = .reconciliation; default: break }
+            request.accountID = arguments.accountID
+            applyDates(arguments.dates, to: &request)
+            request.offset = arguments.offset ?? 0; request.limit = 5
+#if DEBUG
+            return try await bridge.call(request, diagnosticAttempt: attempt)
+#else
+            return try await bridge.call(request)
+#endif
+        } catch {
+#if DEBUG
+            if let attempt { await bridge.diagnostics?.failed(attempt: attempt) }
+#endif
+            throw error
+        }
     }
 }
 

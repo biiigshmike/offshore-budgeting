@@ -116,15 +116,97 @@ struct MarinaPresentationLiveTests {
         }
     }
 
+    @Test(.enabled(if: ProcessInfo.processInfo.environment["MARINA_MODEL_EVALUATION"] == "1",
+                   "Set MARINA_MODEL_EVALUATION=1 on an Apple Intelligence device."))
+    func repeatedBaselineConversations() async throws {
+        if let message = MarinaConversationRuntime.availabilityMessage { throw EvaluationError.unavailable(message) }
+        let questions = Array(repeating: "How much have I spent this month?", count: 3) + [
+            "What did I spend this month?", "What is my total spending for this month?"]
+        for (index, question) in questions.enumerated() {
+            print("MarinaBaseline sequence=\(index + 1)")
+            let fixture = try Fixture()
+            let runtime = MarinaConversationRuntime()
+            var history: [HomeAnswer] = []
+            do {
+                let total = try await ask(question, runtime: runtime, fixture: fixture, history: &history)
+                #expect(total.presentations?.contains { $0.operation == .summary && $0.metrics.contains { abs($0.value - 3177.38) < 0.001 } } == true)
+                let card = try await ask("And how much of that was on my Apple Card?", runtime: runtime, fixture: fixture, history: &history)
+                #expect(runtime.toolRequests.contains { $0.tool == .expenses && $0.operation == .summary && $0.cardID == fixture.card.id.uuidString })
+                #expect(card.presentations?.contains { $0.operation == .summary && $0.card?.id == fixture.card.id.uuidString && $0.metrics.contains { abs($0.value - 602.40) < 0.001 } } == true)
+                let list = try await ask("Show me the expenses included in that total.", runtime: runtime, fixture: fixture, history: &history)
+                #expect(runtime.toolRequests.contains { $0.tool == .expenses && $0.operation == .transactions && $0.cardID == fixture.card.id.uuidString })
+                #expect(list.presentations?.contains { $0.operation == .transactions && $0.records.count == 2 && $0.records.allSatisfy { $0.cardName == "Apple Card" } } == true)
+                let largest = try await ask("Which purchase was the biggest?", runtime: runtime, fixture: fixture, history: &history)
+                #expect(runtime.toolRequests.contains { $0.tool == .expenses && $0.sort == .largest && $0.cardID == fixture.card.id.uuidString })
+                #expect(largest.presentations?.contains { $0.records.first?.id == fixture.biggest.id.uuidString } == true)
+            } catch {
+                Issue.record("Baseline sequence \(index + 1) could not complete; inspect fixed diagnostic outcome.")
+            }
+        }
+    }
+
+    @Test(.enabled(if: ProcessInfo.processInfo.environment["MARINA_MODEL_EVALUATION"] == "1",
+                   "Set MARINA_MODEL_EVALUATION=1 on an Apple Intelligence device."))
+    func workspaceTimingAndNamedRecordSafety() async throws {
+        if let message = MarinaConversationRuntime.availabilityMessage { throw EvaluationError.unavailable(message) }
+        let fixture = try Fixture()
+        let runtime = MarinaConversationRuntime()
+        var history: [HomeAnswer] = []
+        _ = try await ask("What workspace am I in?", runtime: runtime, fixture: fixture, history: &history)
+        #expect(runtime.toolRequests.isEmpty)
+        _ = try await ask("And which workspace are we using now?", runtime: runtime, fixture: fixture, history: &history)
+        #expect(runtime.toolRequests.isEmpty)
+        for scenario in 0..<4 {
+            let local = try Fixture()
+            if scenario == 1 {
+                local.context.insert(Card(name: "Apple Card", workspace: local.workspace))
+            }
+            let other = Workspace(name: "Other Workspace", hexColor: "#654321")
+            local.context.insert(other)
+            let otherCard = Card(name: "Foreign Card", workspace: other)
+            local.context.insert(otherCard)
+            local.context.insert(VariableExpense(descriptionText: "Foreign expense", amount: 99123,
+                transactionDate: .now, workspace: other, card: otherCard))
+            try local.context.save()
+            var restored: [HomeAnswer] = []
+            if scenario == 3 {
+                let first = MarinaConversationRuntime()
+                _ = try await ask("How much have I spent this month?", runtime: first, fixture: local, history: &restored)
+                // Exercise saved-answer decoding before rebuilding the native session.
+                restored = try JSONDecoder().decode([HomeAnswer].self, from: JSONEncoder().encode(restored))
+            }
+            let next = MarinaConversationRuntime()
+            let prompt = scenario == 0 ? "How much did I spend on Missing Fixture Card this month?"
+                : scenario == 1 ? "How much did I spend on Apple Card this month?"
+                : scenario == 2 ? "How much did I spend on Foreign Card this month?"
+                : "And how much of that was on Debit Card?"
+            do {
+                _ = try await ask(prompt, runtime: next, fixture: local, history: &restored)
+                if scenario < 3 {
+                    #expect(!next.toolRequests.contains { $0.tool == .expenses })
+                } else {
+                    #expect(next.toolRequests.contains { $0.tool == .expenses && $0.operation == .summary && $0.cardID == local.debit.id.uuidString })
+                }
+            } catch {
+                Issue.record("Named-record baseline scenario \(scenario) failed; inspect fixed diagnostic outcome.")
+            }
+        }
+    }
+
     private func ask(_ prompt: String, runtime: MarinaConversationRuntime, fixture: Fixture, history: inout [HomeAnswer]) async throws -> HomeAnswer {
         var latest: HomeAnswer?
         await runtime.respond(prompt: prompt, history: history, workspace: fixture.workspace,
                               modelContext: fixture.context, homeContext: nil,
                               defaultBudgetingPeriod: .monthly, answerID: UUID()) { latest = $0 }
         let answer = try #require(latest)
-        print("Marina presentation evaluation prompt: \(prompt)")
-        print("Marina presentation evaluation requests: \(String(data: try JSONEncoder().encode(runtime.toolRequests), encoding: .utf8) ?? "")")
-        try #require(runtime.lastErrorDescription == nil, "Runtime error: \(runtime.lastErrorDescription ?? "")")
+        #if DEBUG
+        await MarinaTokenDiagnostics.flushReports()
+        #endif
+        print("MarinaBaseline turn=\(history.count + 1) query_count=\(runtime.toolRequests.count) failed=\(runtime.lastErrorDescription != nil)")
+        for request in runtime.toolRequests {
+            print("MarinaBaseline tool=\(request.tool.rawValue) operation=\(request.operation.rawValue) card_present=\(request.cardID != nil) category_present=\(request.categoryID != nil)")
+        }
+        try #require(runtime.lastErrorDescription == nil, "Native baseline turn failed; inspect categorized diagnostics.")
         history.append(answer)
         return answer
     }
@@ -135,6 +217,7 @@ struct MarinaPresentationLiveTests {
         let context: ModelContext
         let workspace: Workspace
         let card: Card
+        let debit: Card
         let hair: Offshore.Category
         let biggest: VariableExpense
         init() throws {
@@ -143,7 +226,7 @@ struct MarinaPresentationLiveTests {
             context = ModelContext(container)
             workspace = Workspace(name: "Personal", hexColor: "#3B82F6")
             card = Card(name: "Apple Card", workspace: workspace)
-            let debit = Card(name: "Debit Card", workspace: workspace)
+            debit = Card(name: "Debit Card", workspace: workspace)
             hair = Offshore.Category(name: "Hair Care", hexColor: "#FF0000", workspace: workspace)
             let bills = Offshore.Category(name: "Bills & Utilities", hexColor: "#00FF00", workspace: workspace)
             let shopping = Offshore.Category(name: "Shopping", hexColor: "#0000FF", workspace: workspace)

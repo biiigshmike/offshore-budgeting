@@ -13,6 +13,19 @@ final class MarinaConversationRuntime {
     var toolRequests: [MarinaDataRequest] { bridge.requests }
     private(set) var lastErrorDescription: String?
 
+#if DEBUG
+    private var diagnosticSessionID = UUID()
+    init() { MarinaTokenDiagnostics.announce() }
+    func diagnosticTools() -> [any Tool] {
+        [MarinaFindRecordsTool(bridge: bridge), MarinaExpensesTool(bridge: bridge),
+         MarinaIncomeTool(bridge: bridge), MarinaBudgetTool(bridge: bridge), MarinaAccountsTool(bridge: bridge)]
+    }
+    func diagnosticInstructions(workspace: Workspace, homeContext: MarinaPanelHomeContext?,
+                                defaultBudgetingPeriod: BudgetingPeriod, now: Date) -> String {
+        instructions(workspace: workspace, homeContext: homeContext, defaultBudgetingPeriod: defaultBudgetingPeriod, now: now)
+    }
+#endif
+
     static var availabilityMessage: String? {
         let model = SystemLanguageModel.default
         switch model.availability {
@@ -33,6 +46,9 @@ final class MarinaConversationRuntime {
                  modelContext: ModelContext, homeContext: MarinaPanelHomeContext?,
                  defaultBudgetingPeriod: BudgetingPeriod, answerID: UUID,
                  onUpdate: @escaping (HomeAnswer) -> Void) async {
+#if DEBUG
+        let preparationStart = ContinuousClock.now
+#endif
         lastErrorDescription = nil
         let now = Date.now
         let instructions = instructions(workspace: workspace, homeContext: homeContext,
@@ -40,13 +56,34 @@ final class MarinaConversationRuntime {
         let service = MarinaReadOnlyDataService(workspace: workspace, modelContext: modelContext,
                                               homeContext: homeContext, now: now, defaultBudgetingPeriod: defaultBudgetingPeriod)
         // Dates and Home filters may change while the panel remains open.
-        if configuration != instructions {
+        let rebuiltSession = configuration != instructions
+        if rebuiltSession {
+#if DEBUG
+            diagnosticSessionID = UUID()
+#endif
             session = makeSession(instructions: instructions, history: history)
             configuration = instructions
         }
+#if DEBUG
+        let diagnosticSession = session
+        let diagnostics = MarinaTokenDiagnostics.enabled ? MarinaTokenDiagnostics(
+            sessionID: diagnosticSessionID, rebuilt: rebuiltSession, historyCount: history.count,
+            initial: session.map { Array($0.transcript) } ?? [], instructions: instructions,
+            tools: diagnosticTools(), prompt: prompt, preparation: preparationStart.duration(to: .now)) : nil
+        bridge.diagnostics = diagnostics
+#endif
         var contextStatus = MarinaContextStatus.status(in: history)
         var narration = ""
         var state = MarinaResponseState.thinking
+#if DEBUG
+        diagnostics?.warning("history", contextStatus)
+        defer {
+            diagnostics?.warning("final", contextStatus)
+            diagnostics?.finish(entries: diagnosticSession.map { Array($0.transcript) } ?? [],
+                outcome: Task.isCancelled ? "cancelled" : state.rawValue, reset: session == nil)
+            bridge.diagnostics = nil
+        }
+#endif
         var retainedPresentations: [MarinaPresentation] = []
         let publish = {
             var answer = self.bridge.answer(id: answerID, prompt: prompt, narration: narration)
@@ -63,9 +100,16 @@ final class MarinaConversationRuntime {
         bridge.onStatus = { state = $0; publish() }
         publish()
         defer { bridge.end() }
+#if DEBUG
+        diagnostics?.checkpoint("preflight_start")
+#endif
         if contextStatus != .reached, let measured = await measuredContextStatus(prompt: prompt) {
             contextStatus = measured
         }
+#if DEBUG
+        diagnostics?.checkpoint("preflight_end")
+        diagnostics?.warning("preflight", contextStatus)
+#endif
         guard !Task.isCancelled else { return }
         if contextStatus == .reached {
             state = .contextLimit
@@ -75,20 +119,35 @@ final class MarinaConversationRuntime {
         publish()
         do {
             guard let session else { return }
+#if DEBUG
+            diagnostics?.checkpoint("stream_start")
+#endif
             let stream = session.streamResponse(to: prompt, options: GenerationOptions(
                 samplingMode: .greedy, maximumResponseTokens: 600
             ))
             for try await snapshot in stream {
                 try Task.checkCancellation()
+#if DEBUG
+                if !snapshot.content.isEmpty { diagnostics?.firstText() }
+#endif
                 narration = snapshot.content
                 state = .responding
                 publish()
             }
+#if DEBUG
+            diagnostics?.checkpoint("stream_end")
+#endif
             try Task.checkCancellation()
             if narration.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 narration = bridge.hasResults ? "Here is the information I found." : "I couldn’t complete that answer. Please try again."
             }
+#if DEBUG
+            diagnostics?.checkpoint("postflight_start")
+#endif
             if let measured = await measuredContextStatus() { contextStatus = measured }
+#if DEBUG
+            diagnostics?.checkpoint("postflight_end")
+#endif
             try Task.checkCancellation()
             state = bridge.hasInvalidRequest ? .invalidRequest : .complete
             if bridge.hasInvalidRequest { narration = "" }
@@ -99,6 +158,9 @@ final class MarinaConversationRuntime {
             configuration = nil
             return
         } catch {
+#if DEBUG
+            diagnostics?.checkpoint("stream_failed")
+#endif
             if Task.isCancelled { session = nil; configuration = nil; return }
             var reachedContextLimit = Self.isContextLimit(error)
             // Some backend failures wrap a full context as an inference error.
@@ -111,6 +173,8 @@ final class MarinaConversationRuntime {
             session = nil
             configuration = nil
             if reachedContextLimit { contextStatus = .reached }
+#if DEBUG
+#endif
             state = reachedContextLimit ? .contextLimit : .generationFailed
             if !reachedContextLimit, error is LanguageModelSession.ToolCallError { state = .invalidRequest }
             narration = ""

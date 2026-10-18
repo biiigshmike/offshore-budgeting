@@ -22,3 +22,6 @@ paystub.pdf
 
 # Keep Marina rebuild behavior inventory with the implementation.
 !Docs/MarinaRebuild.md
+
+# Share Marina manual diagnostic instructions.
+!Docs/MarinaManualTokenTesting.md

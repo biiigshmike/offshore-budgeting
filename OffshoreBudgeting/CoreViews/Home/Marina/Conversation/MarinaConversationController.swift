@@ -53,6 +53,11 @@ final class MarinaConversationController {
             onUpdate(answer)
         }
         if let message = availabilityMessage {
+#if DEBUG && canImport(FoundationModels)
+            if #available(iOS 26.0, macCatalyst 26.0, *) {
+                MarinaTokenDiagnostics.unavailable(historyCount: history.count, warning: MarinaContextStatus.status(in: history))
+            }
+#endif
             var answer = Self.message(message, prompt: prompt, id: answerID)
             answer.responseState = .unavailable
             emit(answer)
