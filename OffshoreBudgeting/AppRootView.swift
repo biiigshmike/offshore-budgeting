@@ -181,12 +181,8 @@ struct AppRootView: View {
     @State private var cardsPath = NavigationPath()
     @State private var settingsPath = NavigationPath()
     @State private var splitViewVisibility: NavigationSplitViewVisibility = .automatic
-
     #if targetEnvironment(macCatalyst)
-    @State private var macHomeToolbar = MacHomeToolbarController()
-    @State private var macMarinaPresented = false
-    @State private var macMarinaHomeContext: MarinaPanelHomeContext?
-    @State private var macSidebarVisible = true
+    @State private var splitPresentationWidth: CGFloat = 0
     #endif
 
     @State private var didApplyInitialSection: Bool = false
@@ -308,6 +304,13 @@ struct AppRootView: View {
         }
         .onChange(of: selectedSectionRaw) { oldValue, newValue in
             guard didApplyInitialSection else { return }
+            #if targetEnvironment(macCatalyst)
+            homePath = NavigationPath()
+            budgetsPath = NavigationPath()
+            incomePath = NavigationPath()
+            cardsPath = NavigationPath()
+            settingsPath = NavigationPath()
+            #endif
             recordSharedRootInputChange("selectedSectionRaw")
             traceTabSelection(from: oldValue, to: newValue)
             if let section = AppSection.fromStorageRaw(newValue) {
@@ -425,19 +428,19 @@ struct AppRootView: View {
     private var splitView: some View {
         Group {
             #if targetEnvironment(macCatalyst)
-            if selectedSection == .home {
-                macSplitView
-            } else {
-                standardSplitView
-            }
+            standardSplitView
+                .id(selectedSection)
+                .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { splitPresentationWidth = $0 }
             #else
             standardSplitView
             #endif
         }
+        #if !targetEnvironment(macCatalyst)
         .marinaHost(
             workspace: workspace,
-            isEnabled: selectedSection == .home && !usesNativeMacHome
+            isEnabled: selectedSection == .home
         )
+        #endif
         .background {
             MacWindowSceneTitleHost(title: macWindowSceneTitle)
         }
@@ -458,27 +461,9 @@ struct AppRootView: View {
         }
     }
 
-    private var usesNativeMacHome: Bool {
-        #if targetEnvironment(macCatalyst)
-        selectedSection == .home
-        #else
-        false
-        #endif
-    }
-
     private var standardSplitView: some View {
         NavigationSplitView(columnVisibility: $splitViewVisibility) {
-            #if targetEnvironment(macCatalyst)
-            MacSidebarView(
-                selectedSection: selectedSection,
-                onSelectSection: { selectedSectionForSidebar.wrappedValue = $0 },
-                onAddExpense: { activeQuickLinkSheet = .expense },
-                onAddIncome: { activeQuickLinkSheet = .income }
-            )
-            .navigationTitle(workspace.name)
-            #else
             sidebarContent
-            #endif
         } detail: {
             let context = AppTabActivationContext(
                 sectionRawValue: selectedSection.rawValue,
@@ -492,6 +477,15 @@ struct AppRootView: View {
             .environment(\.postBoardingTipPresenterIsActive, true)
             .environment(\.appTabActivationContext, context)
             .id(selectedSection)
+            #if targetEnvironment(macCatalyst)
+            // Keep the inspector inside the detail column so it cannot take
+            // ownership of the split view's system sidebar toolbar.
+            .marinaHost(
+                workspace: workspace,
+                isEnabled: selectedSection == .home,
+                presentationWidth: splitPresentationWidth
+            )
+            #endif
         }
     }
 
@@ -539,69 +533,6 @@ struct AppRootView: View {
         .listStyle(.sidebar)
         .navigationTitle(workspace.name)
     }
-
-    #if targetEnvironment(macCatalyst)
-    private var macSplitView: some View {
-        let context = AppTabActivationContext(
-            sectionRawValue: selectedSection.rawValue,
-            phase: .active,
-            token: activationTokens[selectedSection] ?? 0
-        )
-        return MacSplitContainer(
-            isMarinaPresented: selectedSection == .home && macMarinaPresented,
-            isSidebarVisible: $macSidebarVisible,
-            onWindowScene: { macHomeToolbar.attach(to: $0) },
-            onController: { controller in
-                macHomeToolbar.toggleSidebar = { [weak controller] in controller?.toggleSidebar() }
-            },
-            selectedSection: selectedSection,
-            onSelectSection: { selectedSectionForSidebar.wrappedValue = $0 },
-            onAddExpense: { activeQuickLinkSheet = .expense },
-            onAddIncome: { activeQuickLinkSheet = .income }
-        ) {
-            NavigationStack(path: $homePath) {
-                homeRootView
-                    .navigationBarTitleDisplayMode(.inline)
-                    .toolbar(.hidden, for: .navigationBar)
-            }
-            .rootActivationBodyReporter(root: AppSection.home.rawValue.lowercased(), context: context)
-            .environment(\.postBoardingTipPresenterIsActive, true)
-            .environment(\.appTabActivationContext, context)
-            .environment(\.macHomeToolbarController, macHomeToolbar)
-            .environment(\.marinaToolbarContext, MarinaToolbarContext(
-                isToolbarButtonVisible: !macMarinaPresented,
-                openAssistant: { homeContext in
-                    macMarinaHomeContext = homeContext
-                    macMarinaPresented = true
-                }
-            ))
-        } marina: {
-            MarinaPanelView(
-                workspace: workspace,
-                onDismiss: { macMarinaPresented = false },
-                shouldUseLargeMinimumSize: false,
-                homeContext: macMarinaHomeContext
-            )
-            .id(workspace.id)
-            .environment(\.macHomeToolbarController, macHomeToolbar)
-        }
-        .onChange(of: selectedSection) { _, section in
-            if section != .home {
-                macMarinaPresented = false
-                macMarinaHomeContext = nil
-            }
-        }
-        .onChange(of: workspace.id) { _, _ in
-            macMarinaPresented = false
-            macMarinaHomeContext = nil
-        }
-        .onDisappear {
-            macHomeToolbar.detach()
-            macMarinaPresented = false
-            macMarinaHomeContext = nil
-        }
-    }
-    #endif
 
     private var selectedSectionPath: Binding<NavigationPath> {
         switch selectedSection {

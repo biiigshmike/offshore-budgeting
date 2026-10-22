@@ -154,9 +154,6 @@ struct HomeView: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.accessibilityVoiceOverEnabled) private var voiceOverEnabled
     @Environment(\.marinaToolbarContext) private var assistantToolbarContext
-    #if targetEnvironment(macCatalyst)
-    @Environment(\.macHomeToolbarController) private var macHomeToolbarController
-    #endif
     @Environment(\.appTabActivationContext) private var tabActivationContext
     @Environment(\.appCommandHub) private var commandHub
     @Environment(\.modelContext) private var modelContext
@@ -352,14 +349,15 @@ struct HomeView: View {
         .navigationTitle(String(localized: "app.section.home", defaultValue: "Home", comment: "Main tab title for the Home section."))
         .toolbar {
             #if targetEnvironment(macCatalyst)
-            if macHomeToolbarController == nil {
-                ToolbarItemGroup(placement: .topBarTrailing) {
-                    homeActionsToolbarButton
-                    if #available(macCatalyst 26.0, *), showsAssistantToolbarButton {
-                        assistantToolbarButtoniOS26
-                    }
+            ToolbarItem(placement: .primaryAction) {
+                homeActionsToolbarButton
+            }
+            if #available(macCatalyst 26.0, *), showsAssistantToolbarButton {
+                ToolbarItem(placement: .primaryAction) {
+                    assistantToolbarButtoniOS26
                 }
             }
+            MacMarinaWindowToolbarItems()
             #else
             if #available(iOS 26.0, macCatalyst 26.0, *) {
                 ToolbarItemGroup(placement: .primaryAction) {
@@ -381,20 +379,6 @@ struct HomeView: View {
             }
             #endif
         }
-        #if targetEnvironment(macCatalyst)
-        .background {
-            if let macHomeToolbarController {
-                MacHomeToolbarRegistration(
-                    controller: macHomeToolbarController,
-                    menu: nativeHomeActionsMenu,
-                    isMarinaPresented: !showsAssistantToolbarButton,
-                    openAssistant: presentAssistantPanel
-                )
-                .frame(width: 0, height: 0)
-                .accessibilityHidden(true)
-            }
-        }
-        #endif
         #if targetEnvironment(macCatalyst)
         // Catalyst's native reorder interaction accepts drops in the navigation
         // destination, but not when this editor is presented as a sheet.
@@ -1389,18 +1373,6 @@ struct HomeView: View {
         }
         .accessibilityLabel(String(localized: "home.actions", defaultValue: "Home Actions", comment: "Accessibility label for home actions menu."))
     }
-
-    #if targetEnvironment(macCatalyst)
-    private var nativeHomeActionsMenu: UIMenu {
-        UIMenu(children: homeDisplayMenus.map { menu in
-            UIMenu(title: menu.title, image: UIImage(systemName: menu.systemImage), children: menu.options.map { option in
-                UIAction(title: option.title, state: option.isOn.wrappedValue ? .on : .off) { _ in
-                    option.isOn.wrappedValue.toggle()
-                }
-            })
-        })
-    }
-    #endif
 
     private var showsAssistantToolbarButton: Bool {
         guard #available(iOS 26.0, macCatalyst 26.0, *) else { return false }
