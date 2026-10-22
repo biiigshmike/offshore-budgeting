@@ -200,6 +200,8 @@ struct AppRootView: View {
     @State private var pendingSharedInvalidationSources: Set<String> = []
     @State private var sharedInvalidationWaveScheduled: Bool = false
 
+    @State private var homeDateRangeAccessory = HomeDateRangeAccessory()
+
     @Environment(\.appCommandHub) private var commandHub
 
     private var isPhone: Bool {
@@ -262,6 +264,7 @@ struct AppRootView: View {
             }
         }
         .environment(detailSnapshotCache)
+        .environment(\.homeDateRangeAccessory, homeDateRangeAccessory)
         .whatsNewForCurrentRelease()
         .onAppear {
             guard didApplyInitialSection == false else { return }
@@ -416,6 +419,11 @@ struct AppRootView: View {
             .tabItem { Label(AppSection.settings.title, systemImage: AppSection.settings.systemImage) }
             .tag(AppSection.settings)
         }
+        .modifier(HomeDateRangeAccessoryModifier(
+            accessory: homeDateRangeAccessory,
+            isEnabled: selectedSection == .home && homePath.isEmpty
+                && homeDateRangeAccessory.workspaceID == workspace.id
+        ))
         .tabShellBodyReporter(
             shell: "phoneTabs",
             signature: tabShellSignature,
@@ -745,8 +753,14 @@ struct AppRootView: View {
         }
     }
 
+    @ViewBuilder
     private var homeRootView: some View {
-        HomeView(workspace: workspace)
+        if #available(iOS 26.0, macCatalyst 26.0, *) {
+            HomeView(workspace: workspace)
+                .id(workspace.id)
+        } else {
+            HomeView(workspace: workspace)
+        }
     }
 
     private func traceTabSelection(from oldValue: String, to newValue: String) {

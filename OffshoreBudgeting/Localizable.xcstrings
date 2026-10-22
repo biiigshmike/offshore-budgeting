@@ -1,6 +1,72 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "home.tip.dateRange.editorDetail" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tap the date range at the bottom to choose dates, or use the Quick Ranges menu beside it. Tap Apply to update all widgets."
+          }
+        }
+      }
+    },
+    "home.tip.widgets.toolbarDetail" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tap any widget to open deeper metrics. Use Edit in the toolbar to pin, reorder, or remove widgets."
+          }
+        }
+      }
+    },
+    "home.widgets.edit" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Edit widgets"
+          }
+        }
+      }
+    },
+    "home.dateRange.changeHint" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Change the dates shown on Home."
+          }
+        }
+      }
+    },
+    "home.dateRange.applyButton" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apply"
+          }
+        }
+      }
+    },
+    "home.dateRange.invalidOrder" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "End date must be on or after start date."
+          }
+        }
+      }
+    },
     "" : {
       "localizations" : {
         "ar" : {
