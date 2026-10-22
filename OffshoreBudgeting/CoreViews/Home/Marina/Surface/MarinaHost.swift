@@ -9,8 +9,6 @@ import SwiftUI
 
 struct MarinaToolbarContext {
     var isToolbarButtonVisible: Bool = false
-    var isInspectorPresented: Bool = false
-    var closeAssistant: () -> Void = {}
     var openAssistant: (MarinaPanelHomeContext?) -> Void = { _ in }
 }
 
@@ -29,14 +27,10 @@ struct MarinaHostModifier: ViewModifier {
 
     let workspace: Workspace
     let isEnabled: Bool
-    var presentationWidth: CGFloat? = nil
 
     @State private var assistantRoute: AssistantPresentationRoute? = nil
     @State private var containerWidth: CGFloat = 0
     @State private var activeHomeContext: MarinaPanelHomeContext? = nil
-    #if targetEnvironment(macCatalyst)
-    @State private var windowToolbar = MacMarinaToolbarState()
-    #endif
 
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.accessibilityVoiceOverEnabled) private var voiceOverEnabled
@@ -59,9 +53,6 @@ struct MarinaHostModifier: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            #if targetEnvironment(macCatalyst)
-            .environment(\.macMarinaToolbarState, windowToolbar)
-            #endif
             .sheet(
                 isPresented: assistantSheetPresentedBinding,
                 onDismiss: dismissAssistant
@@ -86,9 +77,6 @@ struct MarinaHostModifier: ViewModifier {
                     shouldUseLargeMinimumSize: false,
                     homeContext: activeHomeContext
                 )
-                #if targetEnvironment(macCatalyst)
-                .environment(\.macMarinaToolbarState, windowToolbar)
-                #endif
                 .id(workspace.id)
                 .inspectorColumnWidth(min: 340, ideal: 420, max: 520)
             }
@@ -141,11 +129,7 @@ struct MarinaHostModifier: ViewModifier {
         Binding(
             get: { isEnabled && assistantRoute == .inspector },
             set: { isPresented in
-                if isPresented {
-                    assistantRoute = .inspector
-                } else {
-                    dismissAssistant()
-                }
+                assistantRoute = isPresented ? .inspector : nil
             }
         )
     }
@@ -168,9 +152,6 @@ struct MarinaHostModifier: ViewModifier {
     }
 
     private func dismissAssistant() {
-        #if targetEnvironment(macCatalyst)
-        windowToolbar.clear()
-        #endif
         assistantRoute = nil
         activeHomeContext = nil
     }
@@ -188,7 +169,7 @@ struct MarinaHostModifier: ViewModifier {
 
     private var assistantPresentationPlan: MarinaPanelPresentationPlan {
         let basePlan = MarinaPanelPresentationResolver.resolve(
-            containerWidth: presentationWidth ?? containerWidth,
+            containerWidth: containerWidth,
             supportsInlineInspector: supportsInlineInspector,
             dynamicTypeSize: dynamicTypeSize,
             voiceOverEnabled: voiceOverEnabled
@@ -247,14 +228,12 @@ struct MarinaHostModifier: ViewModifier {
     private var assistantToolbarContext: MarinaToolbarContext {
         MarinaToolbarContext(
             isToolbarButtonVisible: shouldShowToolbarButton,
-            isInspectorPresented: isEnabled && assistantRoute == .inspector,
-            closeAssistant: dismissAssistant,
             openAssistant: presentAssistant
         )
     }
 
     private var shouldMountInspectorPresenter: Bool {
-        isEnabled && supportsInlineInspector
+        isEnabled && supportsInlineInspector && assistantRoute == .inspector
     }
 
     private func updateContainerWidth(_ rawWidth: CGFloat) {
@@ -275,8 +254,8 @@ struct MarinaHostModifier: ViewModifier {
 }
 
 extension View {
-    func marinaHost(workspace: Workspace, isEnabled: Bool = true, presentationWidth: CGFloat? = nil) -> some View {
-        modifier(MarinaHostModifier(workspace: workspace, isEnabled: isEnabled, presentationWidth: presentationWidth))
+    func marinaHost(workspace: Workspace, isEnabled: Bool = true) -> some View {
+        modifier(MarinaHostModifier(workspace: workspace, isEnabled: isEnabled))
     }
 }
 

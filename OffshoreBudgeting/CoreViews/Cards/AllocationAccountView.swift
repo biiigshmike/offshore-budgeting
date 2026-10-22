@@ -159,7 +159,6 @@ struct AllocationAccountView: View {
             NavigationStack {
                 AddAllocationAccountView(workspace: workspace)
             }
-            .macFormSheetSizing()
         }
         .sheet(isPresented: $showingEditAllocationAccount, onDismiss: { editingAllocationAccount = nil }) {
             NavigationStack {
@@ -169,7 +168,6 @@ struct AllocationAccountView: View {
                     EmptyView()
                 }
             }
-            .macFormSheetSizing()
         }
         .onReceive(commandHub.$sequence) { sequence in
             if lastHandledCommandSequence == nil {

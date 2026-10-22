@@ -1,10 +1,6 @@
 import SwiftData
 import SwiftUI
 
-#if targetEnvironment(macCatalyst)
-import UIKit
-#endif
-
 struct MarinaStarterPromptFactory {
     static var basePromptPool: [String] {
         [
@@ -57,11 +53,6 @@ struct MarinaPanelView: View {
     let shouldUseLargeMinimumSize: Bool
     let homeContext: MarinaPanelHomeContext?
 
-    #if targetEnvironment(macCatalyst)
-    @Environment(\.macMarinaToolbarState) private var macMarinaToolbarState
-    @State private var toolbarOwnerID = UUID()
-    #endif
-
     @Query private var chatSessions: [MarinaChatSession]
     @Query private var cards: [Card]
     @Query private var categories: [Category]
@@ -87,11 +78,6 @@ struct MarinaPanelView: View {
     @State private var responseTask: Task<Void, Never>?
     @State private var persistenceErrorMessage: String?
     @State private var answerUpdateTick = 0
-    private var starterPromptBorderShape: ButtonBorderShape {
-        if #available(iOS 26.0, macCatalyst 26.0, *) { return .capsule }
-        return .automatic
-    }
-
     @State private var starterPrompts: [String] = []
     @FocusState private var isPromptFieldFocused: Bool
 
@@ -213,27 +199,23 @@ struct MarinaPanelView: View {
                     scrollToLatestMessage(using: proxy, animated: false)
                 }
             }
-            .safeAreaInset(edge: .top) {
-                if usesWindowToolbar {
-                    activeChatTitleView
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                }
-            }
             .toolbar {
-                if usesWindowToolbar == false {
-                    ToolbarItem(placement: .principal) {
-                        activeChatTitleView
+                ToolbarItem(placement: .topBarLeading) {
+                    Button(action: onDismiss) {
+                        Image(systemName: "xmark")
+                            .font(.body.weight(.semibold))
+                            .frame(width: 33, height: 33)
                     }
-                    ToolbarItem(placement: .topBarTrailing) {
-                        chatActionsMenu
-                    }
-                    if #available(iOS 26.0, macCatalyst 26.0, *) {
-                        ToolbarSpacer(.fixed, placement: .topBarTrailing)
-                    }
-                    ToolbarItem(placement: .topBarTrailing) {
-                        closeButton
-                    }
+                    .modifier(AssistantPanelIconButtonModifier())
+                    .accessibilityLabel(String(localized: "assistant.close", defaultValue: "Close Assistant", comment: "Accessibility label for closing assistant."))
+                }
+
+                ToolbarItem(placement: .principal) {
+                    activeChatTitleView
+                }
+
+                ToolbarItem(placement: .topBarTrailing) {
+                    chatActionsMenu
                 }
             }
         }
@@ -241,15 +223,6 @@ struct MarinaPanelView: View {
             conversationBackdrop
                 .ignoresSafeArea(.container, edges: .top)
         }
-        #if targetEnvironment(macCatalyst)
-        .onAppear(perform: publishWindowToolbar)
-        .onChange(of: toolbarActionSignature) { _, _ in
-            publishWindowToolbar()
-        }
-        .onDisappear {
-            macMarinaToolbarState?.clear(owner: toolbarOwnerID)
-        }
-        #endif
         .tint(Color("AccentColor"))
         .toolbarBackground(.visible, for: .navigationBar)
         .sheet(isPresented: $isShowingChatHistory) {
@@ -435,7 +408,7 @@ struct MarinaPanelView: View {
                 .font(.subheadline.weight(.semibold))
                 .frame(width: 33, height: 33)
         }
-        .modifier(AssistantCreateMenuStyleModifier())
+        .modifier(AssistantIconButtonModifier())
         .accessibilityLabel(String(localized: "assistant.createNew.section", defaultValue: "Create New", comment: "Section title for assistant create-new menu."))
         .accessibilityIdentifier("marina.createMenu")
     }
@@ -457,86 +430,44 @@ struct MarinaPanelView: View {
             }
     }
 
-    private var usesWindowToolbar: Bool {
-        #if targetEnvironment(macCatalyst)
-        macMarinaToolbarState != nil
-        #else
-        false
-        #endif
-    }
-
-    private var closeButton: some View {
-        Button(action: onDismiss) {
-            Image(systemName: "xmark")
-                .font(.body.weight(.semibold))
-                .frame(width: 33, height: 33)
-        }
-        .modifier(AssistantPanelIconButtonModifier())
-        .accessibilityLabel(String(localized: "assistant.close", defaultValue: "Close Assistant", comment: "Accessibility label for closing assistant."))
-    }
-
-    private var chatCreationActions: [MarinaToolbarAction] {
-        [
-            MarinaToolbarAction(
-                id: "new",
-                title: String(localized: "marina.chat.new", defaultValue: "New Chat", comment: "Menu action to start a new Marina chat."),
-                systemImage: "square.and.pencil",
-                perform: startNewChat
-            ),
-            MarinaToolbarAction(
-                id: "history",
-                title: String(localized: "marina.chat.history", defaultValue: "Chat History", comment: "Menu action to open Marina chat history."),
-                systemImage: "clock",
-                perform: { isShowingChatHistory = true }
-            )
-        ]
-    }
-
-    private var chatManagementActions: [MarinaToolbarAction] {
-        [
-            MarinaToolbarAction(
-                id: "rename",
-                title: String(localized: "marina.chat.rename", defaultValue: "Rename Chat", comment: "Menu action to rename a Marina chat."),
-                systemImage: "pencil",
-                isEnabled: activeSessionID != nil,
-                perform: beginRenameActiveChat
-            ),
-            MarinaToolbarAction(
-                id: "clear",
-                title: String(localized: "marina.chat.clearCurrent", defaultValue: "Clear Current Chat", comment: "Menu action to clear the active Marina chat."),
-                systemImage: "eraser",
-                isEnabled: activeSessionID != nil && answers.isEmpty == false,
-                perform: { isShowingClearConversationAlert = true }
-            ),
-            MarinaToolbarAction(
-                id: "delete",
-                title: String(localized: "marina.chat.delete", defaultValue: "Delete Chat", comment: "Menu action to delete a Marina chat."),
-                systemImage: "trash",
-                isEnabled: activeSessionID != nil,
-                isDestructive: true,
-                perform: beginDeleteActiveChat
-            )
-        ]
-    }
-
-    private func chatActionButton(_ action: MarinaToolbarAction) -> some View {
-        Button(role: action.isDestructive ? .destructive : nil, action: action.perform) {
-            Label(action.title, systemImage: action.systemImage)
-        }
-        .disabled(action.isEnabled == false)
-    }
-
     private var chatActionsMenu: some View {
         Menu {
-            ForEach(chatCreationActions) { action in
-                chatActionButton(action)
+            Button {
+                startNewChat()
+            } label: {
+                Label(String(localized: "marina.chat.new", defaultValue: "New Chat", comment: "Menu action to start a new Marina chat."), systemImage: "square.and.pencil")
             }
+
+            Button {
+                isShowingChatHistory = true
+            } label: {
+                Label(String(localized: "marina.chat.history", defaultValue: "Chat History", comment: "Menu action to open Marina chat history."), systemImage: "clock")
+            }
+
             Divider()
-            ForEach(chatManagementActions) { action in
-                chatActionButton(action)
+
+            Button {
+                beginRenameActiveChat()
+            } label: {
+                Label(String(localized: "marina.chat.rename", defaultValue: "Rename Chat", comment: "Menu action to rename a Marina chat."), systemImage: "pencil")
             }
+            .disabled(activeSessionID == nil)
+
+            Button {
+                isShowingClearConversationAlert = true
+            } label: {
+                Label(String(localized: "marina.chat.clearCurrent", defaultValue: "Clear Current Chat", comment: "Menu action to clear the active Marina chat."), systemImage: "eraser")
+            }
+            .disabled(activeSessionID == nil || answers.isEmpty)
+
+            Button(role: .destructive) {
+                beginDeleteActiveChat()
+            } label: {
+                Label(String(localized: "marina.chat.delete", defaultValue: "Delete Chat", comment: "Menu action to delete a Marina chat."), systemImage: "trash")
+            }
+            .disabled(activeSessionID == nil)
         } label: {
-            Label(String(localized: "marina.chat.actions", defaultValue: "Chat Actions", comment: "Accessibility label for Marina chat actions menu."), systemImage: "ellipsis")
+            Label(String(localized: "marina.chat.actions", defaultValue: "Chat Actions", comment: "Accessibility label for Marina chat actions menu."), systemImage: "ellipsis.circle")
                 .labelStyle(.iconOnly)
                 .font(.body.weight(.semibold))
                 .frame(width: 33, height: 33)
@@ -544,21 +475,6 @@ struct MarinaPanelView: View {
         .modifier(AssistantPanelIconButtonModifier())
         .accessibilityIdentifier("marina.chatActionsMenu")
     }
-
-    #if targetEnvironment(macCatalyst)
-    private func publishWindowToolbar() {
-        macMarinaToolbarState?.publish(
-            owner: toolbarOwnerID,
-            creation: chatCreationActions,
-            management: chatManagementActions
-        )
-    }
-
-    private var toolbarActionSignature: String {
-        [workspace.id.uuidString, activeSessionID?.uuidString ?? "", String(answers.isEmpty)]
-            .joined(separator: "|")
-    }
-    #endif
 
     private var marinaEmptyState: some View {
         VStack(spacing: 12) {
@@ -589,7 +505,6 @@ struct MarinaPanelView: View {
                             .frame(maxWidth: .infinity, minHeight: 42)
                     }
                     .buttonStyle(.bordered)
-                    .buttonBorderShape(starterPromptBorderShape)
                     .disabled(isResponding)
                     .accessibilityIdentifier("marina.starterPrompt")
                 }
@@ -1695,32 +1610,10 @@ private struct RenameChatPopoverContent: View {
     }
 }
 
-// Catalyst extracts native menu labels, so apply glass to the menu itself.
-private struct AssistantCreateMenuStyleModifier: ViewModifier {
-    @ViewBuilder
-    func body(content: Content) -> some View {
-        #if targetEnvironment(macCatalyst)
-        if #available(macCatalyst 26.0, *) {
-            content
-                .menuStyle(.button)
-                .buttonStyle(.borderless)
-                .menuIndicator(.hidden)
-                .frame(width: 44, height: 44)
-                .tint(.white)
-                .glassEffect(.regular.tint(Color("AccentColor")).interactive(), in: Circle())
-        } else {
-            content.modifier(AssistantIconButtonModifier())
-        }
-        #else
-        content.modifier(AssistantIconButtonModifier())
-        #endif
-    }
-}
-
 private struct AssistantIconButtonModifier: ViewModifier {
     func body(content: Content) -> some View {
         content
-            .glassProminentButtonStyleCompat(macBorderShape: .circle)
+            .glassProminentButtonStyleCompat()
             .buttonBorderShape(.circle)
             .frame(minWidth: 44, minHeight: 44)
     }

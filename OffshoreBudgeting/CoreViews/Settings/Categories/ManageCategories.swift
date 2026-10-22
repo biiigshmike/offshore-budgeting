@@ -131,12 +131,10 @@ struct ManageCategoriesView: View {
                 NavigationStack {
                     AddCategoryView(workspace: workspace)
                 }
-                .macFormSheetSizing()
             case .edit(let category):
                 NavigationStack {
                     EditCategoryView(workspace: workspace, category: category)
                 }
-                .macFormSheetSizing()
             }
         }
         .alert("Delete?", isPresented: $showingCategoryDeleteConfirm) {

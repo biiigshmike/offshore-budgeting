@@ -181,9 +181,6 @@ struct AppRootView: View {
     @State private var cardsPath = NavigationPath()
     @State private var settingsPath = NavigationPath()
     @State private var splitViewVisibility: NavigationSplitViewVisibility = .automatic
-    #if targetEnvironment(macCatalyst)
-    @State private var splitPresentationWidth: CGFloat = 0
-    #endif
 
     @State private var didApplyInitialSection: Bool = false
     @State private var showingHelpSheet: Bool = false
@@ -199,8 +196,6 @@ struct AppRootView: View {
     @State private var lastEligibilitySignatures: [AppSection: String] = [:]
     @State private var pendingSharedInvalidationSources: Set<String> = []
     @State private var sharedInvalidationWaveScheduled: Bool = false
-
-    @State private var homeDateRangeAccessory = HomeDateRangeAccessory()
 
     @Environment(\.appCommandHub) private var commandHub
 
@@ -264,7 +259,6 @@ struct AppRootView: View {
             }
         }
         .environment(detailSnapshotCache)
-        .environment(\.homeDateRangeAccessory, homeDateRangeAccessory)
         .whatsNewForCurrentRelease()
         .onAppear {
             guard didApplyInitialSection == false else { return }
@@ -307,13 +301,6 @@ struct AppRootView: View {
         }
         .onChange(of: selectedSectionRaw) { oldValue, newValue in
             guard didApplyInitialSection else { return }
-            #if targetEnvironment(macCatalyst)
-            homePath = NavigationPath()
-            budgetsPath = NavigationPath()
-            incomePath = NavigationPath()
-            cardsPath = NavigationPath()
-            settingsPath = NavigationPath()
-            #endif
             recordSharedRootInputChange("selectedSectionRaw")
             traceTabSelection(from: oldValue, to: newValue)
             if let section = AppSection.fromStorageRaw(newValue) {
@@ -419,11 +406,6 @@ struct AppRootView: View {
             .tabItem { Label(AppSection.settings.title, systemImage: AppSection.settings.systemImage) }
             .tag(AppSection.settings)
         }
-        .modifier(HomeDateRangeAccessoryModifier(
-            accessory: homeDateRangeAccessory,
-            isEnabled: selectedSection == .home && homePath.isEmpty
-                && homeDateRangeAccessory.workspaceID == workspace.id
-        ))
         .tabShellBodyReporter(
             shell: "phoneTabs",
             signature: tabShellSignature,
@@ -434,21 +416,67 @@ struct AppRootView: View {
     // MARK: - iPad + Mac
 
     private var splitView: some View {
-        Group {
-            #if targetEnvironment(macCatalyst)
-            standardSplitView
-                .id(selectedSection)
-                .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { splitPresentationWidth = $0 }
-            #else
-            standardSplitView
-            #endif
+        NavigationSplitView(columnVisibility: $splitViewVisibility) {
+            List(selection: selectedSectionForSidebar) {
+                ForEach(AppSection.allCases) { section in
+                    Label(section.title, systemImage: section.systemImage)
+                        .tag(section)
+                }
+
+                Section(
+                    String(
+                        localized: "app.quickLinks.section.title",
+                        defaultValue: "Quick Links",
+                        comment: "Sidebar section title for quick add actions."
+                    )
+                ) {
+                    Button {
+                        activeQuickLinkSheet = .expense
+                    } label: {
+                        Label(
+                            String(
+                                localized: "app.quickLinks.addExpense",
+                                defaultValue: "Add Expense",
+                                comment: "Sidebar quick link for adding an expense."
+                            ),
+                            systemImage: "plus"
+                        )
+                    }
+
+                    Button {
+                        activeQuickLinkSheet = .income
+                    } label: {
+                        Label(
+                            String(
+                                localized: "app.quickLinks.addIncome",
+                                defaultValue: "Add Income",
+                                comment: "Sidebar quick link for adding income."
+                            ),
+                            systemImage: "plus"
+                        )
+                    }
+                }
+            }
+            .listStyle(.sidebar)
+            .navigationTitle(workspace.name)
+        } detail: {
+            let context = AppTabActivationContext(
+                sectionRawValue: selectedSection.rawValue,
+                phase: .active,
+                token: activationTokens[selectedSection] ?? 0
+            )
+            NavigationStack(path: selectedSectionPath) {
+                sectionRootView
+            }
+            .rootActivationBodyReporter(root: selectedSection.rawValue.lowercased(), context: context)
+            .environment(\.postBoardingTipPresenterIsActive, true)
+            .environment(\.appTabActivationContext, context)
+            .id(selectedSection)
         }
-        #if !targetEnvironment(macCatalyst)
         .marinaHost(
             workspace: workspace,
             isEnabled: selectedSection == .home
         )
-        #endif
         .background {
             MacWindowSceneTitleHost(title: macWindowSceneTitle)
         }
@@ -465,81 +493,7 @@ struct AppRootView: View {
                     )
                 }
             }
-            .macFormSheetSizing()
         }
-    }
-
-    private var standardSplitView: some View {
-        NavigationSplitView(columnVisibility: $splitViewVisibility) {
-            sidebarContent
-        } detail: {
-            let context = AppTabActivationContext(
-                sectionRawValue: selectedSection.rawValue,
-                phase: .active,
-                token: activationTokens[selectedSection] ?? 0
-            )
-            NavigationStack(path: selectedSectionPath) {
-                sectionRootView
-            }
-            .rootActivationBodyReporter(root: selectedSection.rawValue.lowercased(), context: context)
-            .environment(\.postBoardingTipPresenterIsActive, true)
-            .environment(\.appTabActivationContext, context)
-            .id(selectedSection)
-            #if targetEnvironment(macCatalyst)
-            // Keep the inspector inside the detail column so it cannot take
-            // ownership of the split view's system sidebar toolbar.
-            .marinaHost(
-                workspace: workspace,
-                isEnabled: selectedSection == .home,
-                presentationWidth: splitPresentationWidth
-            )
-            #endif
-        }
-    }
-
-    private var sidebarContent: some View {
-        List(selection: selectedSectionForSidebar) {
-            ForEach(AppSection.allCases) { section in
-                Label(section.title, systemImage: section.systemImage)
-                    .tag(section)
-            }
-
-            Section(
-                String(
-                    localized: "app.quickLinks.section.title",
-                    defaultValue: "Quick Links",
-                    comment: "Sidebar section title for quick add actions."
-                )
-            ) {
-                Button {
-                    activeQuickLinkSheet = .expense
-                } label: {
-                    Label(
-                        String(
-                            localized: "app.quickLinks.addExpense",
-                            defaultValue: "Add Expense",
-                            comment: "Sidebar quick link for adding an expense."
-                        ),
-                        systemImage: "plus"
-                    )
-                }
-
-                Button {
-                    activeQuickLinkSheet = .income
-                } label: {
-                    Label(
-                        String(
-                            localized: "app.quickLinks.addIncome",
-                            defaultValue: "Add Income",
-                            comment: "Sidebar quick link for adding income."
-                        ),
-                        systemImage: "plus"
-                    )
-                }
-            }
-        }
-        .listStyle(.sidebar)
-        .navigationTitle(workspace.name)
     }
 
     private var selectedSectionPath: Binding<NavigationPath> {
@@ -753,14 +707,8 @@ struct AppRootView: View {
         }
     }
 
-    @ViewBuilder
     private var homeRootView: some View {
-        if #available(iOS 26.0, macCatalyst 26.0, *) {
-            HomeView(workspace: workspace)
-                .id(workspace.id)
-        } else {
-            HomeView(workspace: workspace)
-        }
+        HomeView(workspace: workspace)
     }
 
     private func traceTabSelection(from oldValue: String, to newValue: String) {

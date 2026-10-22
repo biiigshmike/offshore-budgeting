@@ -184,13 +184,11 @@ struct WorkspacePickerView: View {
                 NavigationStack {
                     AddWorkspaceView(onCreate: onCreate)
                 }
-                .macFormSheetSizing()
 
             case .editWorkspace(let workspace):
                 NavigationStack {
                     EditWorkspaceView(workspace: workspace)
                 }
-                .macFormSheetSizing()
 
             case .exportWorkspace(let workspace):
                 NavigationStack {

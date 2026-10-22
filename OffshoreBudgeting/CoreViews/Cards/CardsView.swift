@@ -165,7 +165,6 @@ struct CardsView: View {
             NavigationStack {
                 AddCardView(workspace: workspace)
             }
-            .macFormSheetSizing()
         }
         .sheet(isPresented: $showingAddExpenseSheet) {
             NavigationStack {
@@ -174,7 +173,6 @@ struct CardsView: View {
                     prefilledDescription: shortcutExpenseDescription
                 )
             }
-            .macFormSheetSizing()
             .onDisappear {
                 shortcutExpenseDescription = nil
             }
@@ -207,7 +205,6 @@ struct CardsView: View {
                     EmptyView()
                 }
             }
-            .macFormSheetSizing()
         }
         .onAppear {
             consumePendingShortcutActionIfNeeded()

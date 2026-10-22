@@ -98,7 +98,7 @@ private struct MacWindowSceneTitleRepresentable: UIViewRepresentable {
                 isApplyingSceneTitle = false
             }
 
-            if let titlebar = scene.titlebar, titlebar.titleVisibility != .hidden {
+            if let titlebar = scene.titlebar, titlebar.titleVisibility != .visible {
                 titlebar.titleVisibility = .visible
             }
         }

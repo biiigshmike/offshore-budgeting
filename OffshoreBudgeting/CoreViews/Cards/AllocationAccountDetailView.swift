@@ -251,13 +251,11 @@ struct AllocationAccountDetailView: View {
             NavigationStack {
                 AddAllocationSettlementView(workspace: workspace, account: account)
             }
-            .macFormSheetSizing()
         }
         .sheet(isPresented: $showingEditAccountSheet) {
             NavigationStack {
                 EditAllocationAccountView(account: account)
             }
-            .macFormSheetSizing()
         }
         .sheet(item: $editingSheetEntry, onDismiss: {
             editingSheetEntry = nil
@@ -269,7 +267,6 @@ struct AllocationAccountDetailView: View {
                     entry: entry
                 )
             }
-            .macFormSheetSizing()
         }
     }
 
@@ -949,8 +946,6 @@ private struct ReconciliationDateFilterRow: View {
     let onTapGo: () -> Void
     let onSelectQuickRange: (CalendarQuickRangePreset) -> Void
 
-    @State private var actionDiameter: CGFloat = 44
-
     var body: some View {
         HStack(spacing: 0) {
             Spacer(minLength: 0)
@@ -965,7 +960,7 @@ private struct ReconciliationDateFilterRow: View {
                 Button(action: onTapGo) {
                     Image(systemName: "arrow.right")
                         .font(.system(size: 14, weight: .semibold))
-                        .frame(width: actionDiameter, height: actionDiameter)
+                        .frame(width: 44, height: 44)
                         .background(
                             Circle()
                                 .fill(
@@ -986,7 +981,7 @@ private struct ReconciliationDateFilterRow: View {
                 } label: {
                     Image(systemName: "calendar")
                         .font(.system(size: 14, weight: .semibold))
-                        .frame(width: actionDiameter, height: actionDiameter)
+                        .frame(width: 44, height: 44)
                         .background(Circle().fill(Color.secondary.opacity(0.1)))
                 }
                 .buttonStyle(.plain)
@@ -994,9 +989,6 @@ private struct ReconciliationDateFilterRow: View {
             }
 
             Spacer(minLength: 0)
-        }
-        .onPreferenceChange(DateRangePillHeightKey.self) { height in
-            if height > 0 { actionDiameter = height }
         }
     }
 }

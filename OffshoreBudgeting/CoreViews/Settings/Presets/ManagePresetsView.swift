@@ -311,12 +311,10 @@ struct ManagePresetsView: View {
                 NavigationStack {
                     AddPresetView(workspace: workspace)
                 }
-                .macFormSheetSizing()
             case .edit(let preset):
                 NavigationStack {
                     EditPresetView(workspace: workspace, preset: preset)
                 }
-                .macFormSheetSizing()
             }
         }
         .alert("Delete?", isPresented: $showingPresetDeleteConfirm) {

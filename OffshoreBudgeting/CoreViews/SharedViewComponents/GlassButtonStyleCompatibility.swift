@@ -2,14 +2,9 @@ import SwiftUI
 
 extension View {
     @ViewBuilder
-    func glassProminentButtonStyleCompat(macBorderShape: ButtonBorderShape = .capsule) -> some View {
+    func glassProminentButtonStyleCompat() -> some View {
         if #available(iOS 26.0, macCatalyst 26.0, *) {
-            #if targetEnvironment(macCatalyst)
             self.buttonStyle(.glassProminent)
-                .buttonBorderShape(macBorderShape)
-            #else
-            self.buttonStyle(.glassProminent)
-            #endif
         } else {
             self.buttonStyle(.borderedProminent)
         }

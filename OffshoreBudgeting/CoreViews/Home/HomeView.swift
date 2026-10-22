@@ -61,9 +61,6 @@ struct HomeView: View {
     @State private var excludeFutureVariableExpensesFromCalculationsInView: Bool
 
     @State private var isEditingWidgets: Bool = false
-    @State private var dateRangeAccessoryOwnerID = UUID()
-    @State private var isHomeVisible = false
-    @Environment(\.homeDateRangeAccessory) private var dateRangeAccessory
 
     @State private var pinnedItems: [HomePinnedItem]
     @State private var isApplyingSyncedPinnedItems: Bool = false
@@ -263,17 +260,15 @@ struct HomeView: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 14) {
 
-                        if !usesModernHomeControls {
-                            HomeDateRangeBar(
-                                draftStartDate: $draftStartDate,
-                                draftEndDate: $draftEndDate,
-                                isApplyEnabled: isDateRangeDirty,
-                                onApply: applyDraftRange
-                            )
-                            .padding(.top, 8)
+                        HomeDateRangeBar(
+                            draftStartDate: $draftStartDate,
+                            draftEndDate: $draftEndDate,
+                            isApplyEnabled: isDateRangeDirty,
+                            onApply: applyDraftRange
+                        )
+                        .padding(.top, 8)
 
-                            widgetsHeader
-                        }
+                        widgetsHeader
 
                         VStack(spacing: 12) {
                             if pinnedItems.isEmpty {
@@ -342,63 +337,36 @@ struct HomeView: View {
                 PostBoardingTipItem(
                     systemImage: "rectangle.grid.2x2",
                     title: String(localized: "home.widgets.header", defaultValue: "Widgets", comment: "Header title for home widgets section."),
-                    detail: usesModernHomeControls
-                        ? String(localized: "home.tip.widgets.toolbarDetail", defaultValue: "Tap any widget to open deeper metrics. Use Edit in the toolbar to pin, reorder, or remove widgets.")
-                        : String(localized: "home.tip.widgets.detail", defaultValue: "Tap any widget to open deeper metrics. Use Edit to pin, reorder, or remove widgets.", comment: "Home tip detail for widgets usage.")
+                    detail: String(localized: "home.tip.widgets.detail", defaultValue: "Tap any widget to open deeper metrics. Use Edit to pin, reorder, or remove widgets.", comment: "Home tip detail for widgets usage.")
                 ),
                 PostBoardingTipItem(
                     systemImage: "calendar",
                     title: String(localized: "home.tip.dateRange.title", defaultValue: "Date Range", comment: "Home tip title for date range controls."),
-                    detail: usesModernHomeControls
-                        ? String(localized: "home.tip.dateRange.editorDetail", defaultValue: "Tap the date range at the bottom to choose dates, or use the Quick Ranges menu beside it. Tap Apply to update all widgets.")
-                        : String(localized: "home.tip.dateRange.detail", defaultValue: "Use the date controls at the top to change the time period shown across all widgets.", comment: "Home tip detail for date range controls.")
+                    detail: String(localized: "home.tip.dateRange.detail", defaultValue: "Use the date controls at the top to change the time period shown across all widgets.", comment: "Home tip detail for date range controls.")
                 )
             ]
         )
         .navigationTitle(String(localized: "app.section.home", defaultValue: "Home", comment: "Main tab title for the Home section."))
         .toolbar {
-            #if targetEnvironment(macCatalyst)
-            if #available(macCatalyst 26.0, *) {
-                ToolbarItem(placement: .primaryAction) {
-                    editWidgetsToolbarButton
+            if #available(iOS 26.0, macCatalyst 26.0, *) {
+                ToolbarItemGroup(placement: .primaryAction) {
+                    homeActionsToolbarButton
                 }
-            }
-            ToolbarItem(placement: .primaryAction) {
-                homeActionsToolbarButton
-            }
-            if #available(macCatalyst 26.0, *), showsAssistantToolbarButton {
-                ToolbarItem(placement: .primaryAction) {
-                    assistantToolbarButtoniOS26
+
+                if showsAssistantToolbarButton {
+                    ToolbarSpacer(.flexible, placement: .primaryAction)
+
+                    ToolbarItemGroup(placement: .primaryAction) {
+                        assistantToolbarButtoniOS26
+                    }
                 }
-            }
-            MacMarinaWindowToolbarItems()
-            #else
-            homeToolbarItems
-            #endif
-        }
-        .safeAreaInset(edge: .bottom) {
-            if #available(iOS 26.0, macCatalyst 26.0, *), !isPhone {
-                HomeDateRangeControls(startDate: appliedStartDate, endDate: appliedEndDate,
-                                      onApply: applyModernRange)
-                    .padding(.horizontal)
-                    .padding(.vertical, 8)
+            } else {
+                ToolbarItemGroup(placement: .primaryAction) {
+                    homeActionsToolbarButton
+                }
+
             }
         }
-        #if targetEnvironment(macCatalyst)
-        // Catalyst's native reorder interaction accepts drops in the navigation
-        // destination, but not when this editor is presented as a sheet.
-        .navigationDestination(isPresented: $isEditingWidgets) {
-            HomeEditPinnedCardsView(
-                cards: cards,
-                workspaceID: workspace.id,
-                showsTileSizePicker: true,
-                pinnedItems: $pinnedItems
-            )
-            .onDisappear {
-                persistPinnedItems()
-            }
-        }
-        #else
         .sheet(isPresented: $isEditingWidgets) {
             HomeEditPinnedCardsView(
                 cards: cards,
@@ -406,14 +374,11 @@ struct HomeView: View {
                 showsTileSizePicker: showsTileSizePicker,
                 pinnedItems: $pinnedItems
             )
-            .macFormSheetSizing()
             .onDisappear {
                 persistPinnedItems()
             }
         }
-        #endif
         .onAppear {
-            isHomeVisible = true
             if shouldSyncCommandSurface {
                 commandHub.activate(.home)
             }
@@ -421,7 +386,6 @@ struct HomeView: View {
             syncAppliedRangeToCurrentDefaultBudgetingPeriodIfNeeded()
             applyDefaultBudgetingPeriodIfSettingsChanged()
             syncDraftToAppliedIfNeeded()
-            publishDateRangeAccessory()
             if hasLoadedDashboardSnapshot == false {
                 hydrateDashboardSnapshotIfAvailable()
                 if hasLoadedDashboardSnapshot == false {
@@ -436,8 +400,6 @@ struct HomeView: View {
             scheduleActivationEnrichment(reason: "onAppear")
         }
         .onDisappear {
-            isHomeVisible = false
-            dateRangeAccessory?.clear(ownerID: dateRangeAccessoryOwnerID)
             dismissAssistantPanel()
             cancelDashboardSnapshotRefresh(reason: "onDisappear")
             cancelPostSettleHousekeeping()
@@ -456,12 +418,6 @@ struct HomeView: View {
             )
         ) { _ in
             reloadSyncedPinnedItemsIfNeeded()
-        }
-        .onChange(of: appliedStartTimestamp) { _, _ in
-            publishDateRangeAccessory()
-        }
-        .onChange(of: appliedEndTimestamp) { _, _ in
-            publishDateRangeAccessory()
         }
         .onChange(of: pinnedItems) { _, _ in
             guard isApplyingSyncedPinnedItems == false else { return }
@@ -1330,58 +1286,30 @@ struct HomeView: View {
 
     // MARK: - Widgets Header
 
-    private struct HomeDisplayOption: Identifiable {
-        let id: String
-        let title: String
-        let isOn: Binding<Bool>
-    }
-
-    private struct HomeDisplayMenu: Identifiable {
-        let id: String
-        let title: String
-        let systemImage: String
-        let options: [HomeDisplayOption]
-    }
-
-    private var homeDisplayMenus: [HomeDisplayMenu] {
-        let plannedImage: String
-        if #available(iOS 26.0, *) {
-            plannedImage = "calendar.badge"
-        } else {
-            plannedImage = "calendar.badge.clock"
-        }
-        return [
-            HomeDisplayMenu(
-                id: "planned",
-                title: String(localized: "expenseDisplay.planned.title", defaultValue: "Planned Expense Display", comment: "Menu label for planned expense display options."),
-                systemImage: plannedImage,
-                options: [
-                    HomeDisplayOption(id: "hidePlanned", title: String(localized: "expenseDisplay.hideFuturePlanned", defaultValue: "Hide Future Planned Expenses", comment: "Toggle label to hide future planned expenses."), isOn: $hideFuturePlannedExpensesInView),
-                    HomeDisplayOption(id: "excludePlanned", title: String(localized: "expenseDisplay.excludeFuturePlanned", defaultValue: "Exclude Future Planned Expenses from Totals", comment: "Toggle label to exclude future planned expenses from totals."), isOn: $excludeFuturePlannedExpensesFromCalculationsInView)
-                ]
-            ),
-            HomeDisplayMenu(
-                id: "variable",
-                title: String(localized: "expenseDisplay.variable.title", defaultValue: "Variable Expense Display", comment: "Menu label for variable expense display options."),
-                systemImage: "chart.xyaxis.line",
-                options: [
-                    HomeDisplayOption(id: "hideVariable", title: String(localized: "expenseDisplay.hideFutureVariable", defaultValue: "Hide Future Variable Expenses", comment: "Toggle label to hide future variable expenses."), isOn: $hideFutureVariableExpensesInView),
-                    HomeDisplayOption(id: "excludeVariable", title: String(localized: "expenseDisplay.excludeFutureVariable", defaultValue: "Exclude Future Variable Expenses from Totals", comment: "Toggle label to exclude future variable expenses from totals."), isOn: $excludeFutureVariableExpensesFromCalculationsInView)
-                ]
-            )
-        ]
-    }
-
     private var homeActionsToolbarButton: some View {
         Menu {
-            ForEach(homeDisplayMenus) { menu in
-                Menu {
-                    ForEach(menu.options) { option in
-                        Toggle(option.title, isOn: option.isOn)
-                    }
-                } label: {
-                    Label(menu.title, systemImage: menu.systemImage)
+            Menu {
+                Toggle(String(localized: "expenseDisplay.hideFuturePlanned", defaultValue: "Hide Future Planned Expenses", comment: "Toggle label to hide future planned expenses."), isOn: $hideFuturePlannedExpensesInView)
+                Toggle(
+                    String(localized: "expenseDisplay.excludeFuturePlanned", defaultValue: "Exclude Future Planned Expenses from Totals", comment: "Toggle label to exclude future planned expenses from totals."),
+                    isOn: $excludeFuturePlannedExpensesFromCalculationsInView
+                )
+            } label: {
+                if #available(iOS 26.0, *) {
+                    Label(String(localized: "expenseDisplay.planned.title", defaultValue: "Planned Expense Display", comment: "Menu label for planned expense display options."), systemImage: "calendar.badge")
+                } else {
+                    Label(String(localized: "expenseDisplay.planned.title", defaultValue: "Planned Expense Display", comment: "Menu label for planned expense display options."), systemImage: "calendar.badge.clock")
                 }
+            }
+
+            Menu {
+                Toggle(String(localized: "expenseDisplay.hideFutureVariable", defaultValue: "Hide Future Variable Expenses", comment: "Toggle label to hide future variable expenses."), isOn: $hideFutureVariableExpensesInView)
+                Toggle(
+                    String(localized: "expenseDisplay.excludeFutureVariable", defaultValue: "Exclude Future Variable Expenses from Totals", comment: "Toggle label to exclude future variable expenses from totals."),
+                    isOn: $excludeFutureVariableExpensesFromCalculationsInView
+                )
+            } label: {
+                Label(String(localized: "expenseDisplay.variable.title", defaultValue: "Variable Expense Display", comment: "Menu label for variable expense display options."), systemImage: "chart.xyaxis.line")
             }
         } label: {
             Image(systemName: "eye")
@@ -1403,63 +1331,9 @@ struct HomeView: View {
         Button(action: presentAssistantPanel) {
             Image(systemName: "figure.wave")
         }
-        .glassProminentButtonStyleCompat(macBorderShape: .circle)
+        .glassProminentButtonStyleCompat()
         .accessibilityLabel(String(localized: "assistant.open", defaultValue: "Open Assistant", comment: "Accessibility label for opening assistant."))
         .accessibilityIdentifier("home.assistant.openButton")
-    }
-
-    private var usesModernHomeControls: Bool {
-        if #available(iOS 26.0, macCatalyst 26.0, *) { return true }
-        return false
-    }
-
-    @ToolbarContentBuilder
-    private var homeToolbarItems: some ToolbarContent {
-        if #available(iOS 26.0, macCatalyst 26.0, *) {
-            ToolbarItem(placement: .primaryAction) {
-                editWidgetsToolbarButton
-            }
-            ToolbarSpacer(.flexible, placement: .primaryAction)
-            ToolbarItem(placement: .primaryAction) {
-                homeActionsToolbarButton
-            }
-            if showsAssistantToolbarButton {
-                ToolbarSpacer(.flexible, placement: .primaryAction)
-                ToolbarItem(placement: .primaryAction) {
-                    assistantToolbarButtoniOS26
-                }
-            }
-        } else {
-            ToolbarItem(placement: .primaryAction) {
-                homeActionsToolbarButton
-            }
-        }
-    }
-
-    private var editWidgetsToolbarButton: some View {
-        Button { isEditingWidgets = true } label: {
-            Text(String(localized: "common.edit", defaultValue: "Edit"))
-        }
-        .accessibilityLabel(String(localized: "home.widgets.edit", defaultValue: "Edit widgets"))
-    }
-
-    private func applyModernRange(start: Date, end: Date) {
-        let calendar = Calendar.current
-        guard calendar.startOfDay(for: start) <= calendar.startOfDay(for: end) else { return }
-        let startOfEndDay = calendar.startOfDay(for: end)
-        let inclusiveEnd = calendar.date(byAdding: DateComponents(day: 1, second: -1),
-                                         to: startOfEndDay) ?? end
-        setAppliedRange(start: calendar.startOfDay(for: start), end: inclusiveEnd)
-        syncDraftToAppliedIfNeeded()
-        publishDateRangeAccessory()
-    }
-
-    private func publishDateRangeAccessory() {
-        guard usesModernHomeControls, isPhone, isHomeVisible else { return }
-        dateRangeAccessory?.register(
-            ownerID: dateRangeAccessoryOwnerID, workspaceID: workspace.id,
-            start: appliedStartDate, end: appliedEndDate, apply: applyModernRange
-        )
     }
 
     private var widgetsHeader: some View {
