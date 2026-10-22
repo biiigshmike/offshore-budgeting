@@ -233,7 +233,7 @@ struct MarinaHostModifier: ViewModifier {
     }
 
     private var shouldMountInspectorPresenter: Bool {
-        isEnabled && supportsInlineInspector && assistantRoute == .inspector
+        isEnabled && supportsInlineInspector
     }
 
     private func updateContainerWidth(_ rawWidth: CGFloat) {

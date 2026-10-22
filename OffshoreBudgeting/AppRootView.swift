@@ -182,6 +182,13 @@ struct AppRootView: View {
     @State private var settingsPath = NavigationPath()
     @State private var splitViewVisibility: NavigationSplitViewVisibility = .automatic
 
+    #if targetEnvironment(macCatalyst)
+    @State private var macHomeToolbar = MacHomeToolbarController()
+    @State private var macMarinaPresented = false
+    @State private var macMarinaHomeContext: MarinaPanelHomeContext?
+    @State private var macSidebarVisible = true
+    #endif
+
     @State private var didApplyInitialSection: Bool = false
     @State private var showingHelpSheet: Bool = false
     @State private var activeQuickLinkSheet: QuickLinkSheet? = nil
@@ -416,66 +423,20 @@ struct AppRootView: View {
     // MARK: - iPad + Mac
 
     private var splitView: some View {
-        NavigationSplitView(columnVisibility: $splitViewVisibility) {
-            List(selection: selectedSectionForSidebar) {
-                ForEach(AppSection.allCases) { section in
-                    Label(section.title, systemImage: section.systemImage)
-                        .tag(section)
-                }
-
-                Section(
-                    String(
-                        localized: "app.quickLinks.section.title",
-                        defaultValue: "Quick Links",
-                        comment: "Sidebar section title for quick add actions."
-                    )
-                ) {
-                    Button {
-                        activeQuickLinkSheet = .expense
-                    } label: {
-                        Label(
-                            String(
-                                localized: "app.quickLinks.addExpense",
-                                defaultValue: "Add Expense",
-                                comment: "Sidebar quick link for adding an expense."
-                            ),
-                            systemImage: "plus"
-                        )
-                    }
-
-                    Button {
-                        activeQuickLinkSheet = .income
-                    } label: {
-                        Label(
-                            String(
-                                localized: "app.quickLinks.addIncome",
-                                defaultValue: "Add Income",
-                                comment: "Sidebar quick link for adding income."
-                            ),
-                            systemImage: "plus"
-                        )
-                    }
-                }
+        Group {
+            #if targetEnvironment(macCatalyst)
+            if selectedSection == .home {
+                macSplitView
+            } else {
+                standardSplitView
             }
-            .listStyle(.sidebar)
-            .navigationTitle(workspace.name)
-        } detail: {
-            let context = AppTabActivationContext(
-                sectionRawValue: selectedSection.rawValue,
-                phase: .active,
-                token: activationTokens[selectedSection] ?? 0
-            )
-            NavigationStack(path: selectedSectionPath) {
-                sectionRootView
-            }
-            .rootActivationBodyReporter(root: selectedSection.rawValue.lowercased(), context: context)
-            .environment(\.postBoardingTipPresenterIsActive, true)
-            .environment(\.appTabActivationContext, context)
-            .id(selectedSection)
+            #else
+            standardSplitView
+            #endif
         }
         .marinaHost(
             workspace: workspace,
-            isEnabled: selectedSection == .home
+            isEnabled: selectedSection == .home && !usesNativeMacHome
         )
         .background {
             MacWindowSceneTitleHost(title: macWindowSceneTitle)
@@ -496,6 +457,151 @@ struct AppRootView: View {
             .macFormSheetSizing()
         }
     }
+
+    private var usesNativeMacHome: Bool {
+        #if targetEnvironment(macCatalyst)
+        selectedSection == .home
+        #else
+        false
+        #endif
+    }
+
+    private var standardSplitView: some View {
+        NavigationSplitView(columnVisibility: $splitViewVisibility) {
+            #if targetEnvironment(macCatalyst)
+            MacSidebarView(
+                selectedSection: selectedSection,
+                onSelectSection: { selectedSectionForSidebar.wrappedValue = $0 },
+                onAddExpense: { activeQuickLinkSheet = .expense },
+                onAddIncome: { activeQuickLinkSheet = .income }
+            )
+            .navigationTitle(workspace.name)
+            #else
+            sidebarContent
+            #endif
+        } detail: {
+            let context = AppTabActivationContext(
+                sectionRawValue: selectedSection.rawValue,
+                phase: .active,
+                token: activationTokens[selectedSection] ?? 0
+            )
+            NavigationStack(path: selectedSectionPath) {
+                sectionRootView
+            }
+            .rootActivationBodyReporter(root: selectedSection.rawValue.lowercased(), context: context)
+            .environment(\.postBoardingTipPresenterIsActive, true)
+            .environment(\.appTabActivationContext, context)
+            .id(selectedSection)
+        }
+    }
+
+    private var sidebarContent: some View {
+        List(selection: selectedSectionForSidebar) {
+            ForEach(AppSection.allCases) { section in
+                Label(section.title, systemImage: section.systemImage)
+                    .tag(section)
+            }
+
+            Section(
+                String(
+                    localized: "app.quickLinks.section.title",
+                    defaultValue: "Quick Links",
+                    comment: "Sidebar section title for quick add actions."
+                )
+            ) {
+                Button {
+                    activeQuickLinkSheet = .expense
+                } label: {
+                    Label(
+                        String(
+                            localized: "app.quickLinks.addExpense",
+                            defaultValue: "Add Expense",
+                            comment: "Sidebar quick link for adding an expense."
+                        ),
+                        systemImage: "plus"
+                    )
+                }
+
+                Button {
+                    activeQuickLinkSheet = .income
+                } label: {
+                    Label(
+                        String(
+                            localized: "app.quickLinks.addIncome",
+                            defaultValue: "Add Income",
+                            comment: "Sidebar quick link for adding income."
+                        ),
+                        systemImage: "plus"
+                    )
+                }
+            }
+        }
+        .listStyle(.sidebar)
+        .navigationTitle(workspace.name)
+    }
+
+    #if targetEnvironment(macCatalyst)
+    private var macSplitView: some View {
+        let context = AppTabActivationContext(
+            sectionRawValue: selectedSection.rawValue,
+            phase: .active,
+            token: activationTokens[selectedSection] ?? 0
+        )
+        return MacSplitContainer(
+            isMarinaPresented: selectedSection == .home && macMarinaPresented,
+            isSidebarVisible: $macSidebarVisible,
+            onWindowScene: { macHomeToolbar.attach(to: $0) },
+            onController: { controller in
+                macHomeToolbar.toggleSidebar = { [weak controller] in controller?.toggleSidebar() }
+            },
+            selectedSection: selectedSection,
+            onSelectSection: { selectedSectionForSidebar.wrappedValue = $0 },
+            onAddExpense: { activeQuickLinkSheet = .expense },
+            onAddIncome: { activeQuickLinkSheet = .income }
+        ) {
+            NavigationStack(path: $homePath) {
+                homeRootView
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar(.hidden, for: .navigationBar)
+            }
+            .rootActivationBodyReporter(root: AppSection.home.rawValue.lowercased(), context: context)
+            .environment(\.postBoardingTipPresenterIsActive, true)
+            .environment(\.appTabActivationContext, context)
+            .environment(\.macHomeToolbarController, macHomeToolbar)
+            .environment(\.marinaToolbarContext, MarinaToolbarContext(
+                isToolbarButtonVisible: !macMarinaPresented,
+                openAssistant: { homeContext in
+                    macMarinaHomeContext = homeContext
+                    macMarinaPresented = true
+                }
+            ))
+        } marina: {
+            MarinaPanelView(
+                workspace: workspace,
+                onDismiss: { macMarinaPresented = false },
+                shouldUseLargeMinimumSize: false,
+                homeContext: macMarinaHomeContext
+            )
+            .id(workspace.id)
+            .environment(\.macHomeToolbarController, macHomeToolbar)
+        }
+        .onChange(of: selectedSection) { _, section in
+            if section != .home {
+                macMarinaPresented = false
+                macMarinaHomeContext = nil
+            }
+        }
+        .onChange(of: workspace.id) { _, _ in
+            macMarinaPresented = false
+            macMarinaHomeContext = nil
+        }
+        .onDisappear {
+            macHomeToolbar.detach()
+            macMarinaPresented = false
+            macMarinaHomeContext = nil
+        }
+    }
+    #endif
 
     private var selectedSectionPath: Binding<NavigationPath> {
         switch selectedSection {

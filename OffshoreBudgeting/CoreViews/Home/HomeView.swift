@@ -154,6 +154,9 @@ struct HomeView: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.accessibilityVoiceOverEnabled) private var voiceOverEnabled
     @Environment(\.marinaToolbarContext) private var assistantToolbarContext
+    #if targetEnvironment(macCatalyst)
+    @Environment(\.macHomeToolbarController) private var macHomeToolbarController
+    #endif
     @Environment(\.appTabActivationContext) private var tabActivationContext
     @Environment(\.appCommandHub) private var commandHub
     @Environment(\.modelContext) private var modelContext
@@ -348,6 +351,16 @@ struct HomeView: View {
         )
         .navigationTitle(String(localized: "app.section.home", defaultValue: "Home", comment: "Main tab title for the Home section."))
         .toolbar {
+            #if targetEnvironment(macCatalyst)
+            if macHomeToolbarController == nil {
+                ToolbarItemGroup(placement: .topBarTrailing) {
+                    homeActionsToolbarButton
+                    if #available(macCatalyst 26.0, *), showsAssistantToolbarButton {
+                        assistantToolbarButtoniOS26
+                    }
+                }
+            }
+            #else
             if #available(iOS 26.0, macCatalyst 26.0, *) {
                 ToolbarItemGroup(placement: .primaryAction) {
                     homeActionsToolbarButton
@@ -366,7 +379,22 @@ struct HomeView: View {
                 }
 
             }
+            #endif
         }
+        #if targetEnvironment(macCatalyst)
+        .background {
+            if let macHomeToolbarController {
+                MacHomeToolbarRegistration(
+                    controller: macHomeToolbarController,
+                    menu: nativeHomeActionsMenu,
+                    isMarinaPresented: !showsAssistantToolbarButton,
+                    openAssistant: presentAssistantPanel
+                )
+                .frame(width: 0, height: 0)
+                .accessibilityHidden(true)
+            }
+        }
+        #endif
         .sheet(isPresented: $isEditingWidgets) {
             HomeEditPinnedCardsView(
                 cards: cards,
@@ -1287,36 +1315,76 @@ struct HomeView: View {
 
     // MARK: - Widgets Header
 
+    private struct HomeDisplayOption: Identifiable {
+        let id: String
+        let title: String
+        let isOn: Binding<Bool>
+    }
+
+    private struct HomeDisplayMenu: Identifiable {
+        let id: String
+        let title: String
+        let systemImage: String
+        let options: [HomeDisplayOption]
+    }
+
+    private var homeDisplayMenus: [HomeDisplayMenu] {
+        let plannedImage: String
+        if #available(iOS 26.0, *) {
+            plannedImage = "calendar.badge"
+        } else {
+            plannedImage = "calendar.badge.clock"
+        }
+        return [
+            HomeDisplayMenu(
+                id: "planned",
+                title: String(localized: "expenseDisplay.planned.title", defaultValue: "Planned Expense Display", comment: "Menu label for planned expense display options."),
+                systemImage: plannedImage,
+                options: [
+                    HomeDisplayOption(id: "hidePlanned", title: String(localized: "expenseDisplay.hideFuturePlanned", defaultValue: "Hide Future Planned Expenses", comment: "Toggle label to hide future planned expenses."), isOn: $hideFuturePlannedExpensesInView),
+                    HomeDisplayOption(id: "excludePlanned", title: String(localized: "expenseDisplay.excludeFuturePlanned", defaultValue: "Exclude Future Planned Expenses from Totals", comment: "Toggle label to exclude future planned expenses from totals."), isOn: $excludeFuturePlannedExpensesFromCalculationsInView)
+                ]
+            ),
+            HomeDisplayMenu(
+                id: "variable",
+                title: String(localized: "expenseDisplay.variable.title", defaultValue: "Variable Expense Display", comment: "Menu label for variable expense display options."),
+                systemImage: "chart.xyaxis.line",
+                options: [
+                    HomeDisplayOption(id: "hideVariable", title: String(localized: "expenseDisplay.hideFutureVariable", defaultValue: "Hide Future Variable Expenses", comment: "Toggle label to hide future variable expenses."), isOn: $hideFutureVariableExpensesInView),
+                    HomeDisplayOption(id: "excludeVariable", title: String(localized: "expenseDisplay.excludeFutureVariable", defaultValue: "Exclude Future Variable Expenses from Totals", comment: "Toggle label to exclude future variable expenses from totals."), isOn: $excludeFutureVariableExpensesFromCalculationsInView)
+                ]
+            )
+        ]
+    }
+
     private var homeActionsToolbarButton: some View {
         Menu {
-            Menu {
-                Toggle(String(localized: "expenseDisplay.hideFuturePlanned", defaultValue: "Hide Future Planned Expenses", comment: "Toggle label to hide future planned expenses."), isOn: $hideFuturePlannedExpensesInView)
-                Toggle(
-                    String(localized: "expenseDisplay.excludeFuturePlanned", defaultValue: "Exclude Future Planned Expenses from Totals", comment: "Toggle label to exclude future planned expenses from totals."),
-                    isOn: $excludeFuturePlannedExpensesFromCalculationsInView
-                )
-            } label: {
-                if #available(iOS 26.0, *) {
-                    Label(String(localized: "expenseDisplay.planned.title", defaultValue: "Planned Expense Display", comment: "Menu label for planned expense display options."), systemImage: "calendar.badge")
-                } else {
-                    Label(String(localized: "expenseDisplay.planned.title", defaultValue: "Planned Expense Display", comment: "Menu label for planned expense display options."), systemImage: "calendar.badge.clock")
+            ForEach(homeDisplayMenus) { menu in
+                Menu {
+                    ForEach(menu.options) { option in
+                        Toggle(option.title, isOn: option.isOn)
+                    }
+                } label: {
+                    Label(menu.title, systemImage: menu.systemImage)
                 }
-            }
-
-            Menu {
-                Toggle(String(localized: "expenseDisplay.hideFutureVariable", defaultValue: "Hide Future Variable Expenses", comment: "Toggle label to hide future variable expenses."), isOn: $hideFutureVariableExpensesInView)
-                Toggle(
-                    String(localized: "expenseDisplay.excludeFutureVariable", defaultValue: "Exclude Future Variable Expenses from Totals", comment: "Toggle label to exclude future variable expenses from totals."),
-                    isOn: $excludeFutureVariableExpensesFromCalculationsInView
-                )
-            } label: {
-                Label(String(localized: "expenseDisplay.variable.title", defaultValue: "Variable Expense Display", comment: "Menu label for variable expense display options."), systemImage: "chart.xyaxis.line")
             }
         } label: {
             Image(systemName: "eye")
         }
         .accessibilityLabel(String(localized: "home.actions", defaultValue: "Home Actions", comment: "Accessibility label for home actions menu."))
     }
+
+    #if targetEnvironment(macCatalyst)
+    private var nativeHomeActionsMenu: UIMenu {
+        UIMenu(children: homeDisplayMenus.map { menu in
+            UIMenu(title: menu.title, image: UIImage(systemName: menu.systemImage), children: menu.options.map { option in
+                UIAction(title: option.title, state: option.isOn.wrappedValue ? .on : .off) { _ in
+                    option.isOn.wrappedValue.toggle()
+                }
+            })
+        })
+    }
+    #endif
 
     private var showsAssistantToolbarButton: Bool {
         guard #available(iOS 26.0, macCatalyst 26.0, *) else { return false }
