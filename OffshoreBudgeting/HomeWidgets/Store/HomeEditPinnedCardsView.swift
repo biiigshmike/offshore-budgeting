@@ -152,6 +152,7 @@ struct HomeEditPinnedCardsView: View {
                 editMode = .inactive
             }
             .toolbar {
+                #if !targetEnvironment(macCatalyst)
                 ToolbarItem(placement: .topBarLeading) {
                     Button {
                         dismiss()
@@ -159,6 +160,7 @@ struct HomeEditPinnedCardsView: View {
                         Image(systemName: "xmark")
                     }
                 }
+                #endif
 
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {

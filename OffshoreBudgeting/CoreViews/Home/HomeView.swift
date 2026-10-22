@@ -395,6 +395,21 @@ struct HomeView: View {
             }
         }
         #endif
+        #if targetEnvironment(macCatalyst)
+        // Catalyst's native reorder interaction accepts drops in the navigation
+        // destination, but not when this editor is presented as a sheet.
+        .navigationDestination(isPresented: $isEditingWidgets) {
+            HomeEditPinnedCardsView(
+                cards: cards,
+                workspaceID: workspace.id,
+                showsTileSizePicker: true,
+                pinnedItems: $pinnedItems
+            )
+            .onDisappear {
+                persistPinnedItems()
+            }
+        }
+        #else
         .sheet(isPresented: $isEditingWidgets) {
             HomeEditPinnedCardsView(
                 cards: cards,
@@ -407,6 +422,7 @@ struct HomeView: View {
                 persistPinnedItems()
             }
         }
+        #endif
         .onAppear {
             if shouldSyncCommandSurface {
                 commandHub.activate(.home)
