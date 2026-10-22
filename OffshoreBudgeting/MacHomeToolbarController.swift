@@ -7,6 +7,7 @@ final class MacHomeToolbarController: NSObject, NSToolbarDelegate {
     private static let sidebarID = NSToolbarItem.Identifier("home.sidebar")
     private static let actionsID = NSToolbarItem.Identifier("home.actions")
     private static let assistantID = NSToolbarItem.Identifier("home.assistant.openButton")
+    private static let editWidgetsID = NSToolbarItem.Identifier("home.editWidgets")
 
     private static let chatActionsID = NSToolbarItem.Identifier("marina.chatActionsMenu")
     private static let closeAssistantID = NSToolbarItem.Identifier("marina.closeButton")
@@ -17,6 +18,9 @@ final class MacHomeToolbarController: NSObject, NSToolbarDelegate {
     private var toolbar: NSToolbar?
     private var actionsItem: NSMenuToolbarItem?
     private var chatActionsItem: NSMenuToolbarItem?
+    private var editWidgetsItem: NSToolbarItem?
+    private var registrationID: UUID?
+    private var editWidgets: () -> Void = {}
     private var chatMenu = UIMenu(children: [])
     private var closeAssistant: () -> Void = {}
     private var menu = UIMenu(children: [])
@@ -44,6 +48,7 @@ final class MacHomeToolbarController: NSObject, NSToolbarDelegate {
     }
 
     func detach() {
+        if let registrationID { clearHomeRegistration(id: registrationID) }
         if let titlebar = scene?.titlebar, titlebar.toolbar === toolbar {
             titlebar.toolbar = previousToolbar
             restoreToolbarStyle?()
@@ -54,6 +59,7 @@ final class MacHomeToolbarController: NSObject, NSToolbarDelegate {
         toolbar = nil
         actionsItem = nil
         chatActionsItem = nil
+        editWidgetsItem = nil
         chatMenu = UIMenu(children: [])
         closeAssistant = {}
         menu = UIMenu(children: [])
@@ -61,10 +67,22 @@ final class MacHomeToolbarController: NSObject, NSToolbarDelegate {
         toggleSidebar = {}
     }
 
-    func update(menu: UIMenu, isMarinaPresented: Bool, openAssistant: @escaping () -> Void) {
+    func update(
+        menu: UIMenu,
+        isMarinaPresented: Bool,
+        openAssistant: @escaping () -> Void,
+        editWidgets: @escaping () -> Void,
+        registrationID: UUID
+    ) {
+        if let previousID = self.registrationID, previousID != registrationID {
+            clearHomeRegistration(id: previousID)
+        }
+        self.registrationID = registrationID
+        self.editWidgets = editWidgets
         self.menu = menu
         self.openAssistant = openAssistant
         actionsItem?.itemMenu = menu
+        editWidgetsItem?.isEnabled = true
         guard self.isMarinaPresented != isMarinaPresented else { return }
         self.isMarinaPresented = isMarinaPresented
         guard let toolbar else { return }
@@ -75,6 +93,17 @@ final class MacHomeToolbarController: NSObject, NSToolbarDelegate {
         }
     }
 
+    /// A disappearing registration must not clear actions installed by a newer Home.
+    func clearHomeRegistration(id: UUID) {
+        guard registrationID == id else { return }
+        registrationID = nil
+        editWidgets = {}
+        openAssistant = {}
+        menu = UIMenu(children: [])
+        actionsItem?.itemMenu = menu
+        editWidgetsItem?.isEnabled = false
+    }
+
     func updateMarina(menu: UIMenu, onDismiss: @escaping () -> Void) {
         chatMenu = menu
         closeAssistant = onDismiss
@@ -83,7 +112,8 @@ final class MacHomeToolbarController: NSObject, NSToolbarDelegate {
 
     private var identifiers: [NSToolbarItem.Identifier] {
         var items: [NSToolbarItem.Identifier] = [
-            .flexibleSpace, Self.sidebarID, .primarySidebarTrackingSeparatorItemIdentifier, .flexibleSpace, Self.actionsID
+            .flexibleSpace, Self.sidebarID, .primarySidebarTrackingSeparatorItemIdentifier,
+            Self.editWidgetsID, .flexibleSpace, Self.actionsID, .flexibleSpace
         ]
         if isMarinaPresented {
             items += [.supplementarySidebarTrackingSeparatorItemIdentifier, .flexibleSpace, Self.chatActionsID, .space, Self.closeAssistantID]
@@ -104,6 +134,17 @@ final class MacHomeToolbarController: NSObject, NSToolbarDelegate {
     func toolbar(_ toolbar: NSToolbar, itemForItemIdentifier identifier: NSToolbarItem.Identifier,
                  willBeInsertedIntoToolbar flag: Bool) -> NSToolbarItem? {
         switch identifier {
+        case Self.editWidgetsID:
+            let item = NSToolbarItem(itemIdentifier: identifier)
+            item.title = String(localized: "common.edit", defaultValue: "Edit")
+            item.label = String(localized: "home.widgets.edit", defaultValue: "Edit widgets")
+            item.toolTip = item.label
+            item.target = self
+            item.action = #selector(didEditWidgets)
+            item.autovalidates = false
+            item.isEnabled = registrationID != nil
+            editWidgetsItem = item
+            return item
         case Self.actionsID:
             let item = NSMenuToolbarItem(itemIdentifier: identifier)
             item.label = String(localized: "home.actions", defaultValue: "Home Actions")
@@ -148,6 +189,8 @@ final class MacHomeToolbarController: NSObject, NSToolbarDelegate {
             return nil
         }
     }
+
+    @objc private func didEditWidgets() { editWidgets() }
 
     @objc private func didToggleSidebar() { toggleSidebar() }
     @objc private func didCloseAssistant() { closeAssistant() }

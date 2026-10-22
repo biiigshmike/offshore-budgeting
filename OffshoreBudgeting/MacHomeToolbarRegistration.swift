@@ -20,6 +20,14 @@ struct MacHomeToolbarRegistration: UIViewRepresentable {
     let menu: UIMenu
     let isMarinaPresented: Bool
     let openAssistant: () -> Void
+    let editWidgets: () -> Void
+
+    final class Coordinator {
+        let registrationID = UUID()
+        weak var controller: MacHomeToolbarController?
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator() }
 
     func makeUIView(context: Context) -> UIView {
         let view = UIView(frame: .zero)
@@ -29,11 +37,18 @@ struct MacHomeToolbarRegistration: UIViewRepresentable {
     }
 
     func updateUIView(_ uiView: UIView, context: Context) {
+        context.coordinator.controller = controller
         controller.update(
             menu: menu,
             isMarinaPresented: isMarinaPresented,
-            openAssistant: openAssistant
+            openAssistant: openAssistant,
+            editWidgets: editWidgets,
+            registrationID: context.coordinator.registrationID
         )
+    }
+
+    static func dismantleUIView(_ uiView: UIView, coordinator: Coordinator) {
+        coordinator.controller?.clearHomeRegistration(id: coordinator.registrationID)
     }
 }
 #endif
