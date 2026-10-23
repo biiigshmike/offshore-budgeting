@@ -364,6 +364,9 @@ private struct SettingsMaintenanceView: View {
             }
             .glassProminentButtonStyleCompat()
             .tint(tint)
+            #if targetEnvironment(macCatalyst)
+            .padding(.vertical, 8)
+            #endif
         } else {
             Button(action: action) {
                 Text(title)

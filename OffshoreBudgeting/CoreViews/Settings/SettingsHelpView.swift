@@ -955,7 +955,7 @@ private struct HelpSectionFullscreenViewer: View {
                     Image(systemName: "xmark")
                         .frame(width: 33, height: 33)
                 }
-                .glassButtonStyleCompat()
+                .glassButtonStyleCompat(catalystShape: .circle)
                 .buttonBorderShape(.circle)
                 .accessibilityLabel(Text("Close"))
             } else {

@@ -1637,7 +1637,7 @@ private struct RenameChatPopoverContent: View {
 private struct AssistantIconButtonModifier: ViewModifier {
     func body(content: Content) -> some View {
         content
-            .glassProminentButtonStyleCompat()
+            .glassProminentButtonStyleCompat(catalystShape: .circle)
             .buttonBorderShape(.circle)
             .frame(minWidth: 44, minHeight: 44)
     }

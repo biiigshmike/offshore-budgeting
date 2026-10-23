@@ -80,6 +80,9 @@ struct BudgetFormView: View {
                     }
                     .listRowSeparator(.hidden)
                     .glassProminentButtonStyleCompat()
+                    #if targetEnvironment(macCatalyst)
+                    .padding(.vertical, 8)
+                    #endif
                     .disabled(cards.isEmpty)
                 } else {
                     Button {
@@ -116,6 +119,9 @@ struct BudgetFormView: View {
                     }
                     .listRowSeparator(.hidden)
                     .glassProminentButtonStyleCompat()
+                    #if targetEnvironment(macCatalyst)
+                    .padding(.vertical, 8)
+                    #endif
                     .disabled(presets.isEmpty)
                 } else {
                     Button {
