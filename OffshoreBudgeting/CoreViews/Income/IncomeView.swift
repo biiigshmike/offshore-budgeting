@@ -363,7 +363,7 @@ struct IncomeView: View {
 
     private func contentView(proxy: GeometryProxy) -> some View {
         configuredIncomeView(proxy: proxy)
-            .sheet(item: $addIncomeSheet) { sheet in
+            .appSheet(item: $addIncomeSheet) { sheet in
                 NavigationStack {
                     AddIncomeView(
                         workspace: workspace,
@@ -372,7 +372,7 @@ struct IncomeView: View {
                     )
                 }
             }
-            .sheet(isPresented: $showingImportIncomeSheet) {
+            .appSheet(isPresented: $showingImportIncomeSheet) {
                 NavigationStack {
                     ExpenseCSVImportFlowView(
                         workspace: workspace,
@@ -380,7 +380,7 @@ struct IncomeView: View {
                     )
                 }
             }
-            .sheet(isPresented: $showingEditIncome, onDismiss: { editingIncome = nil }) {
+            .appSheet(isPresented: $showingEditIncome, onDismiss: { editingIncome = nil }) {
                 NavigationStack {
                     if let editingIncome {
                         EditIncomeView(workspace: workspace, income: editingIncome)

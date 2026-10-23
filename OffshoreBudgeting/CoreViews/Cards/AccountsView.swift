@@ -114,12 +114,12 @@ struct AccountsView: View {
                 }
             }
         }
-        .sheet(isPresented: $showingAddCardFromAccounts) {
+        .appSheet(isPresented: $showingAddCardFromAccounts) {
             NavigationStack {
                 AddCardView(workspace: workspace)
             }
         }
-        .sheet(isPresented: $showingAddAllocationAccountFromAccounts) {
+        .appSheet(isPresented: $showingAddAllocationAccountFromAccounts) {
             NavigationStack {
                 AddAllocationAccountView(workspace: workspace)
             }

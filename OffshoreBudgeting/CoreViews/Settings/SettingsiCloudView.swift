@@ -112,7 +112,7 @@ struct SettingsiCloudView: View {
         } message: {
             Text("This will switch you to your iCloud data. Your on-device data stays on this device and can be accessed by switching back to On Device.")
         }
-        .sheet(isPresented: $showingRestartRequired) {
+        .appSheet(isPresented: $showingRestartRequired) {
             RestartRequiredView(
                 title: "Restart Required",
                 message: AppRestartService.restartRequiredMessage(

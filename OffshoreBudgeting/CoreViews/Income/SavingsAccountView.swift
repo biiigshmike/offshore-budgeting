@@ -484,7 +484,7 @@ struct SavingsAccountView: View {
         } message: {
             Text("This savings entry will be deleted.")
         }
-        .sheet(isPresented: $showingEntrySheet, onDismiss: {
+        .appSheet(isPresented: $showingEntrySheet, onDismiss: {
             editingEntry = nil
         }) {
             NavigationStack {

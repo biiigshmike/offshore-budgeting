@@ -88,7 +88,7 @@ struct SettingsView: View {
                 workspaceTrailingNavBarItem
             }
         }
-        .sheet(isPresented: $showingWorkspaceManager) {
+        .appSheet(isPresented: $showingWorkspaceManager) {
             workspaceManagerSheet
         }
         .onAppear {

@@ -247,17 +247,17 @@ struct AllocationAccountDetailView: View {
         } message: {
             Text(settlementActionErrorMessage)
         }
-        .sheet(isPresented: $showingAddSettlementSheet) {
+        .appSheet(isPresented: $showingAddSettlementSheet) {
             NavigationStack {
                 AddAllocationSettlementView(workspace: workspace, account: account)
             }
         }
-        .sheet(isPresented: $showingEditAccountSheet) {
+        .appSheet(isPresented: $showingEditAccountSheet) {
             NavigationStack {
                 EditAllocationAccountView(account: account)
             }
         }
-        .sheet(item: $editingSheetEntry, onDismiss: {
+        .appSheet(item: $editingSheetEntry, onDismiss: {
             editingSheetEntry = nil
         }) { entry in
             NavigationStack {

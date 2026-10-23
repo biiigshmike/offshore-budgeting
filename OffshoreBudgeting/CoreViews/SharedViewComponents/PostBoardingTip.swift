@@ -116,7 +116,7 @@ private struct PostBoardingTipModifier: ViewModifier {
             }
 
         if shouldAttachSheet {
-            base.sheet(isPresented: $showingTip, onDismiss: handleTipDismissal) {
+            base.appSheet(isPresented: $showingTip, onDismiss: handleTipDismissal) {
                 TipSheet(
                     title: title,
                     items: items,

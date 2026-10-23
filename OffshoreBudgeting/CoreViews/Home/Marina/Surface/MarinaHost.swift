@@ -46,7 +46,7 @@ struct MarinaHostModifier: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .sheet(
+            .appSheet(
                 isPresented: assistantSheetPresentedBinding,
                 onDismiss: dismissAssistant
             ) {
@@ -57,8 +57,6 @@ struct MarinaHostModifier: ViewModifier {
                     homeContext: activeHomeContext
                 )
                 .id(workspace.id)
-                .frame(idealWidth: 700, idealHeight: 650)
-                .presentationSizing(.fitted)
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
             }

@@ -129,7 +129,7 @@ struct ManageCardsForBudgetSheet: View {
             Text("These planned expenses have actual spending recorded.")
         }
 
-        .sheet(isPresented: $showingReviewRecordedExpenses) {
+        .appSheet(isPresented: $showingReviewRecordedExpenses) {
             if let reviewCard {
                 NavigationStack {
                     BudgetRecordedPlannedExpensesReviewView(

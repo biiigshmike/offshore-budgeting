@@ -170,7 +170,7 @@ struct SettingsGeneralView: View {
                 )
             }
         }
-        .sheet(isPresented: $showingRestartRequired) {
+        .appSheet(isPresented: $showingRestartRequired) {
             RestartRequiredView(
                 title: "Restart Required",
                 message: AppRestartService.restartRequiredMessage(

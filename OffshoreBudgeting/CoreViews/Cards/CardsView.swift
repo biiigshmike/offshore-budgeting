@@ -161,12 +161,12 @@ struct CardsView: View {
         } message: {
             Text("This deletes the card and all of its expenses.")
         }
-        .sheet(isPresented: $showingAddCard) {
+        .appSheet(isPresented: $showingAddCard) {
             NavigationStack {
                 AddCardView(workspace: workspace)
             }
         }
-        .sheet(isPresented: $showingAddExpenseSheet) {
+        .appSheet(isPresented: $showingAddExpenseSheet) {
             NavigationStack {
                 AddExpenseView(
                     workspace: workspace,
@@ -177,7 +177,7 @@ struct CardsView: View {
                 shortcutExpenseDescription = nil
             }
         }
-        .sheet(isPresented: $showingImportExpensesSheet, onDismiss: {
+        .appSheet(isPresented: $showingImportExpensesSheet, onDismiss: {
             shortcutImportCard = nil
             shortcutImportClipboardText = nil
         }) {
@@ -197,7 +197,7 @@ struct CardsView: View {
                 }
             }
         }
-        .sheet(isPresented: $showingEditCard, onDismiss: { editingCard = nil }) {
+        .appSheet(isPresented: $showingEditCard, onDismiss: { editingCard = nil }) {
             NavigationStack {
                 if let editingCard {
                     EditCardView(workspace: workspace, card: editingCard)

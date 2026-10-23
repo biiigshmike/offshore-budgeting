@@ -168,7 +168,7 @@ struct OnboardingView: View {
         } message: {
             Text("This Apple ID can sync existing Offshore data from iCloud. You can always switch later from Manage Workspaces.")
         }
-        .sheet(isPresented: $showingRestartRequired) {
+        .appSheet(isPresented: $showingRestartRequired) {
             RestartRequiredView(
                 title: "Restart Required",
                 message: AppRestartService.restartRequiredMessage(
@@ -782,7 +782,7 @@ private struct OnboardingWorkspaceStep: View {
         .onChange(of: workspaces.count) { _, _ in
             ensureInitialSelection()
         }
-        .sheet(item: $sheetRoute) { route in
+        .appSheet(item: $sheetRoute) { route in
             switch route {
             case .add:
                 NavigationStack {
@@ -956,7 +956,7 @@ private struct OnboardingPrivacySyncStep: View {
         } message: {
             Text("Switching to iCloud will show your iCloud data. Your on-device data will remain on this device if you switch back later.")
         }
-        .sheet(isPresented: $showingRestartRequired) {
+        .appSheet(isPresented: $showingRestartRequired) {
             RestartRequiredView(
                 title: "Restart Required",
                 message: AppRestartService.restartRequiredMessage(
@@ -1139,7 +1139,7 @@ private struct OnboardingCategoriesStep: View {
             }
             Spacer(minLength: 0)
         }
-        .sheet(item: $sheetRoute) { route in
+        .appSheet(item: $sheetRoute) { route in
             switch route {
             case .add:
                 NavigationStack {
@@ -1255,7 +1255,7 @@ private struct OnboardingCardsStep: View {
 
             Spacer(minLength: 0)
         }
-        .sheet(item: $sheetRoute) { route in
+        .appSheet(item: $sheetRoute) { route in
             switch route {
             case .add:
                 NavigationStack {
@@ -1524,7 +1524,7 @@ private struct OnboardingPresetsStep: View {
             
             Spacer(minLength: 0)
         }
-        .sheet(item: $sheetRoute) { route in
+        .appSheet(item: $sheetRoute) { route in
             switch route {
             case .add:
                 NavigationStack {
@@ -2439,7 +2439,7 @@ private struct OnboardingIncomeStep: View {
         } message: {
             Text("Enter an amount greater than 0 to add income.")
         }
-        .sheet(item: $sheetRoute) { route in
+        .appSheet(item: $sheetRoute) { route in
             switch route {
             case .edit(let income):
                 NavigationStack {
@@ -2622,7 +2622,7 @@ private struct OnboardingBudgetsStep: View {
 
             Spacer(minLength: 0)
         }
-        .sheet(item: $sheetRoute) { route in
+        .appSheet(item: $sheetRoute) { route in
             switch route {
             case .add:
                 NavigationStack {

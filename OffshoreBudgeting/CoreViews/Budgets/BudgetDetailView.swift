@@ -676,7 +676,7 @@ struct BudgetDetailView: View {
                 pendingExpenseDelete = nil
             }
         }
-        .sheet(item: $activeModal) { modal in
+        .appSheet(item: $activeModal) { modal in
             switch modal {
             case .addExpense:
                 NavigationStack {

@@ -155,12 +155,12 @@ struct AllocationAccountView: View {
         } message: {
             Text("Archived Reconciliations stay in history but are hidden from new allocation choices.")
         }
-        .sheet(isPresented: $showingAddAllocationAccount) {
+        .appSheet(isPresented: $showingAddAllocationAccount) {
             NavigationStack {
                 AddAllocationAccountView(workspace: workspace)
             }
         }
-        .sheet(isPresented: $showingEditAllocationAccount, onDismiss: { editingAllocationAccount = nil }) {
+        .appSheet(isPresented: $showingEditAllocationAccount, onDismiss: { editingAllocationAccount = nil }) {
             NavigationStack {
                 if let editingAllocationAccount {
                     EditAllocationAccountView(account: editingAllocationAccount)

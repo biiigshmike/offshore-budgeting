@@ -367,7 +367,7 @@ struct HomeView: View {
 
             }
         }
-        .sheet(isPresented: $isEditingWidgets) {
+        .appSheet(isPresented: $isEditingWidgets) {
             HomeEditPinnedCardsView(
                 cards: cards,
                 workspaceID: workspace.id,

@@ -36,7 +36,7 @@ private struct PostBoardingReleaseLogPromptModifier: ViewModifier {
             }
 
         if shouldAttachSheet {
-            base.sheet(isPresented: $showingReleasePrompt) {
+            base.appSheet(isPresented: $showingReleasePrompt) {
                 if let section = currentSection {
                     CurrentReleaseLogSheet(section: section) {
                         markCurrentReleaseSeen()

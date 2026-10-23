@@ -91,7 +91,7 @@ struct PresetRecordedPlannedExpensesReviewView: View {
                 pendingExpenseDelete = nil
             }
         }
-        .sheet(isPresented: $showingEditPlannedExpense, onDismiss: { editingPlannedExpense = nil }) {
+        .appSheet(isPresented: $showingEditPlannedExpense, onDismiss: { editingPlannedExpense = nil }) {
             NavigationStack {
                 if let editingPlannedExpense {
                     EditPlannedExpenseView(workspace: workspace, plannedExpense: editingPlannedExpense)

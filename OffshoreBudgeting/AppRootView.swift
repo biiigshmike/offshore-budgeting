@@ -313,7 +313,7 @@ struct AppRootView: View {
                 commandHub.setActiveSectionRaw(newValue)
             }
         }
-        .sheet(isPresented: $showingHelpSheet) {
+        .appSheet(isPresented: $showingHelpSheet) {
             NavigationStack {
                 SettingsHelpView()
                     .toolbar {
@@ -480,7 +480,7 @@ struct AppRootView: View {
         .background {
             MacWindowSceneTitleHost(title: macWindowSceneTitle)
         }
-        .sheet(item: $activeQuickLinkSheet) { sheet in
+        .appSheet(item: $activeQuickLinkSheet) { sheet in
             NavigationStack {
                 switch sheet {
                 case .expense:

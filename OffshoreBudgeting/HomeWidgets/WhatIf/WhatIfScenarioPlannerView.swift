@@ -476,7 +476,7 @@ struct WhatIfScenarioPlannerView: View {
             .accessibilityLabel(String(localized: "common.export", defaultValue: "Export", comment: "Common action label for export."))
         }
         .padding(.vertical, 4)
-        .sheet(item: $exportSheetRoute) { route in
+        .appSheet(item: $exportSheetRoute) { route in
             switch route {
             case .options:
                 ExportOptionsSheet(

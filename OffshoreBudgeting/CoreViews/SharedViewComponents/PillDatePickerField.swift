@@ -119,7 +119,7 @@ struct PillDatePickerField: View {
                 }
         } else {
             triggerButton(text: dateText, accessibilityText: "\(title) \(dateText)")
-                .sheet(isPresented: $isPresented) {
+                .appSheet(isPresented: $isPresented) {
                     mobileSheetContent
                 }
         }
@@ -297,7 +297,7 @@ struct PillTimePickerField: View {
                 }
         } else {
             triggerButton(text: timeText, accessibilityText: "\(title) \(timeText)")
-                .sheet(isPresented: $isPresented) {
+                .appSheet(isPresented: $isPresented) {
                     mobileSheetContent
                 }
         }
@@ -405,7 +405,11 @@ private struct PillPickerSheetPresentationModifier: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .presentationDetents([.height(PillPickerSheetMetrics.sheetHeight)])
+            .presentationDetents(
+                UIDevice.current.userInterfaceIdiom == .phone
+                    ? [.height(PillPickerSheetMetrics.sheetHeight)]
+                    : [.large]
+            )
             .presentationDragIndicator(.visible)
     }
 }

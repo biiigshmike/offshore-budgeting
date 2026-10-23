@@ -225,7 +225,7 @@ struct MarinaPanelView: View {
         }
         .tint(Color("AccentColor"))
         .toolbarBackground(.visible, for: .navigationBar)
-        .sheet(isPresented: $isShowingChatHistory) {
+        .appSheet(isPresented: $isShowingChatHistory) {
             MarinaChatHistoryView(
                 sessions: chatSessions,
                 activeSessionID: activeSessionID,

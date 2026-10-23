@@ -125,7 +125,7 @@ struct ManageCategoriesView: View {
                 }
             }
         }
-        .sheet(item: $sheetRoute) { route in
+        .appSheet(item: $sheetRoute) { route in
             switch route {
             case .add:
                 NavigationStack {
