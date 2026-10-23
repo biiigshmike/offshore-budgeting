@@ -29,16 +29,9 @@ struct MarinaHostModifier: ViewModifier {
     let isEnabled: Bool
 
     @State private var assistantRoute: AssistantPresentationRoute? = nil
-    @State private var containerWidth: CGFloat = 0
     @State private var activeHomeContext: MarinaPanelHomeContext? = nil
 
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-    @Environment(\.accessibilityVoiceOverEnabled) private var voiceOverEnabled
-    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
-    @Environment(\.verticalSizeClass) private var verticalSizeClass
-
     private enum AssistantPresentationRoute: Equatable {
-        case inspector
         case sheet
         case fullScreen
     }
@@ -60,25 +53,14 @@ struct MarinaHostModifier: ViewModifier {
                 MarinaPanelView(
                     workspace: workspace,
                     onDismiss: dismissAssistant,
-                    shouldUseLargeMinimumSize: assistantPresentationPlan.usesExpandedPanelSizing,
-                    homeContext: activeHomeContext
-                )
-                .id(workspace.id)
-                .presentationDetents(assistantPresentationPlan.detents)
-                .presentationDragIndicator(.visible)
-            }
-            .applyAssistantInspectorIfNeeded(
-                isEnabled: shouldMountInspectorPresenter,
-                isPresented: assistantInspectorPresentedBinding
-            ) {
-                MarinaPanelView(
-                    workspace: workspace,
-                    onDismiss: dismissAssistant,
                     shouldUseLargeMinimumSize: false,
                     homeContext: activeHomeContext
                 )
                 .id(workspace.id)
-                .inspectorColumnWidth(min: 340, ideal: 420, max: 520)
+                .frame(idealWidth: 700, idealHeight: 650)
+                .presentationSizing(.fitted)
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
             }
             .fullScreenCover(
                 isPresented: assistantFullScreenPresentedBinding,
@@ -90,17 +72,6 @@ struct MarinaHostModifier: ViewModifier {
                     shouldUseLargeMinimumSize: false,
                     homeContext: activeHomeContext
                 )
-            }
-            .background {
-                GeometryReader { proxy in
-                    Color.clear
-                        .onAppear {
-                            updateContainerWidth(proxy.size.width)
-                        }
-                        .onChange(of: proxy.size.width) { _, newWidth in
-                            updateContainerWidth(newWidth)
-                        }
-                }
             }
             .environment(\.marinaToolbarContext, assistantToolbarContext)
             .onChange(of: workspace.id) { _, _ in
@@ -125,15 +96,6 @@ struct MarinaHostModifier: ViewModifier {
         )
     }
 
-    private var assistantInspectorPresentedBinding: Binding<Bool> {
-        Binding(
-            get: { isEnabled && assistantRoute == .inspector },
-            set: { isPresented in
-                assistantRoute = isPresented ? .inspector : nil
-            }
-        )
-    }
-
     private var assistantFullScreenPresentedBinding: Binding<Bool> {
         Binding(
             get: { isEnabled && assistantRoute == .fullScreen },
@@ -148,7 +110,7 @@ struct MarinaHostModifier: ViewModifier {
         guard isEnabled else { return }
         guard assistantRoute == nil else { return }
         activeHomeContext = homeContext
-        assistantRoute = route(for: assistantPresentationPlan.mode)
+        assistantRoute = isPhone ? .fullScreen : .sheet
     }
 
     private func dismissAssistant() {
@@ -156,65 +118,9 @@ struct MarinaHostModifier: ViewModifier {
         activeHomeContext = nil
     }
 
-    private func route(for mode: MarinaPanelPresentationMode) -> AssistantPresentationRoute {
-        switch mode {
-        case .inspector:
-            return .inspector
-        case .sheet:
-            return .sheet
-        case .fullScreen:
-            return .fullScreen
-        }
-    }
-
-    private var assistantPresentationPlan: MarinaPanelPresentationPlan {
-        let basePlan = MarinaPanelPresentationResolver.resolve(
-            containerWidth: containerWidth,
-            supportsInlineInspector: supportsInlineInspector,
-            dynamicTypeSize: dynamicTypeSize,
-            voiceOverEnabled: voiceOverEnabled
-        )
-
-        guard isPhone == false else {
-            return MarinaPanelPresentationPlan(
-                mode: .fullScreen,
-                showsBottomLauncher: false,
-                showsToolbarButton: true,
-                detents: [.large],
-                usesExpandedPanelSizing: false,
-                prefersInlineInspectorWhenAvailable: false
-            )
-        }
-
-        guard usesCompactPhoneHeight == false else {
-            return MarinaPanelPresentationPlan(
-                mode: basePlan.mode,
-                showsBottomLauncher: false,
-                showsToolbarButton: true,
-                detents: basePlan.detents,
-                usesExpandedPanelSizing: basePlan.usesExpandedPanelSizing,
-                prefersInlineInspectorWhenAvailable: basePlan.prefersInlineInspectorWhenAvailable
-            )
-        }
-
-        return basePlan
-    }
-
-    private var supportsInlineInspector: Bool {
-        isPhone == false && horizontalSizeClass != .compact
-    }
-
-    private var usesCompactPhoneHeight: Bool {
-        #if os(iOS)
-        isPhone && verticalSizeClass == .compact
-        #else
-        false
-        #endif
-    }
-
     private var shouldShowToolbarButton: Bool {
         guard #available(iOS 26.0, macCatalyst 26.0, *) else { return false }
-        guard isEnabled, assistantPresentationPlan.showsToolbarButton else {
+        guard isEnabled else {
             return false
         }
 
@@ -231,45 +137,10 @@ struct MarinaHostModifier: ViewModifier {
             openAssistant: presentAssistant
         )
     }
-
-    private var shouldMountInspectorPresenter: Bool {
-        isEnabled && supportsInlineInspector && assistantRoute == .inspector
-    }
-
-    private func updateContainerWidth(_ rawWidth: CGFloat) {
-        let width = max(0, rawWidth)
-        let previousBand = widthBand(for: containerWidth)
-        let nextBand = widthBand(for: width)
-
-        if containerWidth == 0 || previousBand != nextBand {
-            containerWidth = width
-        }
-    }
-
-    private func widthBand(for width: CGFloat) -> Int {
-        if width < 540 { return 0 }
-        if width < 900 { return 1 }
-        return 2
-    }
 }
 
 extension View {
     func marinaHost(workspace: Workspace, isEnabled: Bool = true) -> some View {
         modifier(MarinaHostModifier(workspace: workspace, isEnabled: isEnabled))
-    }
-}
-
-private extension View {
-    @ViewBuilder
-    func applyAssistantInspectorIfNeeded<InspectorContent: View>(
-        isEnabled: Bool,
-        isPresented: Binding<Bool>,
-        @ViewBuilder content: @escaping () -> InspectorContent
-    ) -> some View {
-        if isEnabled {
-            self.inspector(isPresented: isPresented, content: content)
-        } else {
-            self
-        }
     }
 }
