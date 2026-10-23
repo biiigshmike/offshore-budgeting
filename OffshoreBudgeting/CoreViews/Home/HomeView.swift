@@ -353,6 +353,8 @@ struct HomeView: View {
                 )
             }
             if #available(iOS 26.0, macCatalyst 26.0, *) {
+                ToolbarSpacer(.fixed, placement: .primaryAction)
+
                 ToolbarItemGroup(placement: .primaryAction) {
                     homeActionsToolbarButton
                 }

@@ -431,6 +431,10 @@ struct SavingsAccountView<TrailingToolbar: ToolbarContent>: View {
                     onSelectQuickRange: applyQuickRangePresetDeferred
                 )
             }
+            if #available(iOS 26.0, macCatalyst 26.0, *) {
+                ToolbarSpacer(.fixed, placement: .primaryAction)
+            }
+
             trailingToolbar
         }
         .onAppear {
