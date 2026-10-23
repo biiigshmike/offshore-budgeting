@@ -260,14 +260,6 @@ struct HomeView: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 14) {
 
-                        HomeDateRangeBar(
-                            draftStartDate: $draftStartDate,
-                            draftEndDate: $draftEndDate,
-                            isApplyEnabled: isDateRangeDirty,
-                            onApply: applyDraftRange
-                        )
-                        .padding(.top, 8)
-
                         widgetsHeader
 
                         VStack(spacing: 12) {
@@ -348,6 +340,18 @@ struct HomeView: View {
         )
         .navigationTitle(String(localized: "app.section.home", defaultValue: "Home", comment: "Main tab title for the Home section."))
         .toolbar {
+            ToolbarItemGroup(placement: .primaryAction) {
+                DateRangeToolbarControls(
+                    startDate: appliedStartDate,
+                    endDate: appliedEndDate,
+                    onApply: { start, end in
+                        draftStartDate = start
+                        draftEndDate = end
+                        applyDraftRange()
+                    },
+                    onSelectQuickRange: applyQuickRange
+                )
+            }
             if #available(iOS 26.0, macCatalyst 26.0, *) {
                 ToolbarItemGroup(placement: .primaryAction) {
                     homeActionsToolbarButton
@@ -1361,10 +1365,6 @@ struct HomeView: View {
 
     // MARK: - Date Range
 
-    private var isDateRangeDirty: Bool {
-        draftStartDate != appliedStartDate || draftEndDate != appliedEndDate
-    }
-
     private var appliedStartDate: Date {
         Date(timeIntervalSince1970: appliedStartTimestamp)
     }
@@ -1445,6 +1445,16 @@ struct HomeView: View {
         let clampedEnd = max(end, start)
         appliedStartTimestamp = start.timeIntervalSince1970
         appliedEndTimestamp = clampedEnd.timeIntervalSince1970
+    }
+
+    private func applyQuickRange(_ preset: CalendarQuickRangePreset) {
+        let range = preset.makeRange(now: Date(), calendar: .current)
+        draftStartDate = range.start
+        draftEndDate = max(range.end, range.start)
+        // Let the quick-range menu dismiss before refreshing the dashboard.
+        DispatchQueue.main.async {
+            applyDraftRange()
+        }
     }
 
     private func applyDraftRange() {

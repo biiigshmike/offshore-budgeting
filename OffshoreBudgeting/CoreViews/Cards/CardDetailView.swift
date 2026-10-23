@@ -593,7 +593,6 @@ struct CardDetailView: View {
     private func listContent(derived: CardDetailDerivedState) -> some View {
         List {
             heroSection
-            dateRangeSection
             totalSpentSection(derived)
 
             if !derived.availableCategoriesForChips.isEmpty {
@@ -614,20 +613,6 @@ struct CardDetailView: View {
             )
             .listRowInsets(EdgeInsets(top: 10, leading: 16, bottom: 10, trailing: 16))
             .listRowSeparator(.hidden)
-        }
-    }
-
-    private var dateRangeSection: some View {
-        Section {
-            DateFilterRow(
-                draftStartDate: $draftStartDate,
-                draftEndDate: $draftEndDate,
-                isGoEnabled: isDateDirty && !isApplyingQuickRange,
-                onTapGo: { applyDraftDates() },
-                onSelectQuickRange: { applyQuickRangePresetDeferred($0) }
-            )
-        } header: {
-            Text("Date Range")
         }
     }
 
@@ -823,6 +808,19 @@ struct CardDetailView: View {
 
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
+        ToolbarItemGroup(placement: .primaryAction) {
+            DateRangeToolbarControls(
+                startDate: appliedStartDate,
+                endDate: appliedEndDate,
+                isEnabled: !isApplyingQuickRange,
+                onApply: { start, end in
+                    draftStartDate = start
+                    draftEndDate = end
+                    applyDraftDates()
+                },
+                onSelectQuickRange: applyQuickRangePresetDeferred
+            )
+        }
         if #available(iOS 26.0, macCatalyst 26.0, *) {
             ToolbarItemGroup(placement: .primaryAction) {
                 cardDisplayToolbarButton
@@ -1378,61 +1376,6 @@ private struct HeroCardRow: View {
             Spacer(minLength: 0)
         }
         .padding(.vertical, 8)
-    }
-}
-
-// MARK: - Date Filter Row
-
-private struct DateFilterRow: View {
-    @Binding var draftStartDate: Date
-    @Binding var draftEndDate: Date
-
-    let isGoEnabled: Bool
-    let onTapGo: () -> Void
-    let onSelectQuickRange: (CalendarQuickRangePreset) -> Void
-
-    var body: some View {
-        HStack(spacing: 0) {
-            Spacer(minLength: 0)
-
-            HStack(spacing: 10) {
-                PillDatePickerField(title: "Start Date", date: $draftStartDate)
-                    .layoutPriority(1)
-
-                PillDatePickerField(title: "End Date", date: $draftEndDate)
-                    .layoutPriority(1)
-
-                Button(action: onTapGo) {
-                    Image(systemName: "arrow.right")
-                        .font(.system(size: 14, weight: .semibold))
-                        .frame(width: 44, height: 44)
-                        .background(
-                            Circle()
-                                .fill(isGoEnabled
-                                      ? Color.accentColor.opacity(0.85)
-                                      : Color.secondary.opacity(0.1))
-                        )
-                }
-                .buttonStyle(.plain)
-                .disabled(!isGoEnabled)
-                .accessibilityLabel("Apply Date Range")
-
-                Menu {
-                    CalendarQuickRangeMenuItems { preset in
-                        onSelectQuickRange(preset)
-                    }
-                } label: {
-                    Image(systemName: "calendar")
-                        .font(.system(size: 14, weight: .semibold))
-                        .frame(width: 44, height: 44)
-                        .background(Circle().fill(Color.secondary.opacity(0.1)))
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Quick Date Ranges")
-            }
-
-            Spacer(minLength: 0)
-        }
     }
 }
 

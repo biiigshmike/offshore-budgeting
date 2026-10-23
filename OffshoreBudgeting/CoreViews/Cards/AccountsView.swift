@@ -86,36 +86,8 @@ struct AccountsView: View {
         }
         .navigationTitle(navigationTitleText)
         .toolbar {
-            if #available(iOS 26.0, macCatalyst 26.0, *) {
-                ToolbarItemGroup(placement: .primaryAction) {
-                    #if targetEnvironment(macCatalyst)
-                    segmentMenuPicker
-                    #else
-                    AccountsGlassSegmentControl(
-                        selectedSegment: $selectedSegment,
-                        isExpanded: $isSegmentControlExpanded,
-                        namespace: glassNamespace
-                    )
-                    #endif
-                }
-
-                ToolbarSpacer(.fixed, placement: .primaryAction)
-
-                ToolbarItemGroup(placement: .primaryAction) {
-                    sortToolbarButton
-                }
-
-                ToolbarSpacer(.flexible, placement: .primaryAction)
-
-                ToolbarItemGroup(placement: .primaryAction) {
-                    addToolbarButton
-                }
-            } else {
-                ToolbarItemGroup(placement: .topBarTrailing) {
-                    segmentMenuPicker
-                    sortToolbarButton
-                    addToolbarButton
-                }
+            if selectedSegment != .savings {
+                accountsToolbar
             }
         }
         .appSheet(isPresented: $showingAddCardFromAccounts) {
@@ -169,6 +141,41 @@ struct AccountsView: View {
         }
     }
 
+    @ToolbarContentBuilder
+    private var accountsToolbar: some ToolbarContent {
+        if #available(iOS 26.0, macCatalyst 26.0, *) {
+            ToolbarItemGroup(placement: .primaryAction) {
+                #if targetEnvironment(macCatalyst)
+                segmentMenuPicker
+                #else
+                AccountsGlassSegmentControl(
+                    selectedSegment: $selectedSegment,
+                    isExpanded: $isSegmentControlExpanded,
+                    namespace: glassNamespace
+                )
+                #endif
+            }
+
+            ToolbarSpacer(.fixed, placement: .primaryAction)
+
+            ToolbarItemGroup(placement: .primaryAction) {
+                sortToolbarButton
+            }
+
+            ToolbarSpacer(.flexible, placement: .primaryAction)
+
+            ToolbarItemGroup(placement: .primaryAction) {
+                addToolbarButton
+            }
+        } else {
+            ToolbarItemGroup(placement: .topBarTrailing) {
+                segmentMenuPicker
+                sortToolbarButton
+                addToolbarButton
+            }
+        }
+    }
+
     // MARK: - Commands
 
     @ViewBuilder
@@ -180,7 +187,9 @@ struct AccountsView: View {
             case .sharedBalances:
                 AllocationAccountView(workspace: workspace)
             case .savings:
-                SavingsAccountView(workspace: workspace)
+                SavingsAccountView(workspace: workspace) {
+                    accountsToolbar
+                }
             }
         } else {
             Color.clear

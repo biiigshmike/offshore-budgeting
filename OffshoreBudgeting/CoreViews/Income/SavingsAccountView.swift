@@ -64,7 +64,7 @@ enum SavingsLedgerSortMode: String {
     }
 }
 
-struct SavingsAccountView: View {
+struct SavingsAccountView<TrailingToolbar: ToolbarContent>: View {
     private enum SavingsTrendMode: CaseIterable, Identifiable {
         case runningTotal
         case currentPeriod
@@ -89,6 +89,7 @@ struct SavingsAccountView: View {
     }
 
     let workspace: Workspace
+    private let trailingToolbar: TrailingToolbar
 
     @AppStorage("general_defaultBudgetingPeriod")
     private var defaultBudgetingPeriodRaw: String = BudgetingPeriod.monthly.rawValue
@@ -127,8 +128,9 @@ struct SavingsAccountView: View {
     @State private var needsGraphSnapshotRefresh: Bool = false
     @State private var graphSnapshotRefreshTask: Task<Void, Never>? = nil
 
-    init(workspace: Workspace) {
+    init(workspace: Workspace, @ToolbarContentBuilder trailingToolbar: () -> TrailingToolbar) {
         self.workspace = workspace
+        self.trailingToolbar = trailingToolbar()
         let workspaceID = workspace.id
 
         _savingsAccounts = Query(
@@ -218,15 +220,6 @@ struct SavingsAccountView: View {
         }
 
         return sortMode.sorted(entries: filteredRows)
-    }
-
-    private var isDateDirty: Bool {
-        let cal = Calendar.current
-        let s1 = cal.startOfDay(for: draftStartDate)
-        let s2 = cal.startOfDay(for: appliedStartDate)
-        let e1 = cal.startOfDay(for: draftEndDate)
-        let e2 = cal.startOfDay(for: appliedEndDate)
-        return s1 != s2 || e1 != e2
     }
 
     private var runningTotal: Double {
@@ -352,16 +345,6 @@ struct SavingsAccountView: View {
                     .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
             }
 
-            Section("Date Range") {
-                SavingsDateFilterRow(
-                    draftStartDate: $draftStartDate,
-                    draftEndDate: $draftEndDate,
-                    isGoEnabled: isDateDirty && !isApplyingQuickRange,
-                    onTapGo: applyDraftDates,
-                    onSelectQuickRange: applyQuickRangePresetDeferred
-                )
-            }
-
             Section("Savings Account") {
                 HStack {
                     Text(String(localized: "Running Total", defaultValue: "Running Total", comment: "Label for the running total savings value."))
@@ -434,6 +417,22 @@ struct SavingsAccountView: View {
             }
         }
         .listStyle(.insetGrouped)
+        .toolbar {
+            ToolbarItemGroup(placement: .primaryAction) {
+                DateRangeToolbarControls(
+                    startDate: appliedStartDate,
+                    endDate: appliedEndDate,
+                    isEnabled: !isApplyingQuickRange,
+                    onApply: { start, end in
+                        draftStartDate = start
+                        draftEndDate = end
+                        applyDraftDates()
+                    },
+                    onSelectQuickRange: applyQuickRangePresetDeferred
+                )
+            }
+            trailingToolbar
+        }
         .onAppear {
             initializeDateRangeIfNeeded()
             hydrateGraphSnapshotIfAvailable()
@@ -837,59 +836,6 @@ private struct SavingsChartPoint: Identifiable {
         self.total = total
     }
 
-}
-
-private struct SavingsDateFilterRow: View {
-    @Binding var draftStartDate: Date
-    @Binding var draftEndDate: Date
-
-    let isGoEnabled: Bool
-    let onTapGo: () -> Void
-    let onSelectQuickRange: (CalendarQuickRangePreset) -> Void
-
-    var body: some View {
-        HStack(spacing: 0) {
-            Spacer(minLength: 0)
-
-            HStack(spacing: 10) {
-                PillDatePickerField(title: "Start Date", date: $draftStartDate)
-                    .layoutPriority(1)
-
-                PillDatePickerField(title: "End Date", date: $draftEndDate)
-                    .layoutPriority(1)
-
-                Button(action: onTapGo) {
-                    Image(systemName: "arrow.right")
-                        .font(.system(size: 14, weight: .semibold))
-                        .frame(width: 44, height: 44)
-                        .background(
-                            Circle()
-                                .fill(isGoEnabled
-                                      ? Color.accentColor.opacity(0.85)
-                                      : Color.secondary.opacity(0.1))
-                        )
-                }
-                .buttonStyle(.plain)
-                .disabled(!isGoEnabled)
-                .accessibilityLabel("Apply Date Range")
-
-                Menu {
-                    CalendarQuickRangeMenuItems { preset in
-                        onSelectQuickRange(preset)
-                    }
-                } label: {
-                    Image(systemName: "calendar")
-                        .font(.system(size: 14, weight: .semibold))
-                        .frame(width: 44, height: 44)
-                        .background(Circle().fill(Color.secondary.opacity(0.1)))
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Quick Date Ranges")
-            }
-
-            Spacer(minLength: 0)
-        }
-    }
 }
 
 struct SavingsLedgerRow: View {

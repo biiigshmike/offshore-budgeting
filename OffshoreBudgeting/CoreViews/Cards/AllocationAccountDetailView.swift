@@ -55,15 +55,6 @@ struct AllocationAccountDetailView: View {
         return settlement.expense != nil || settlement.plannedExpense != nil
     }
 
-    private var isDateDirty: Bool {
-        let cal = Calendar.current
-        let s1 = cal.startOfDay(for: draftStartDate)
-        let s2 = cal.startOfDay(for: appliedStartDate)
-        let e1 = cal.startOfDay(for: draftEndDate)
-        let e2 = cal.startOfDay(for: appliedEndDate)
-        return s1 != s2 || e1 != e2
-    }
-
     private var derivedState: ReconciliationDetailDerivedState {
         buildDerivedState()
     }
@@ -75,7 +66,6 @@ struct AllocationAccountDetailView: View {
     var body: some View {
         List {
             balanceSection(derivedState)
-            dateRangeSection
 
             if !derivedState.availableCategoriesForChips.isEmpty {
                 categorySection(derivedState)
@@ -102,6 +92,19 @@ struct AllocationAccountDetailView: View {
             applyDefaultPeriodRange()
         }
         .toolbar {
+            ToolbarItemGroup(placement: .primaryAction) {
+                DateRangeToolbarControls(
+                    startDate: appliedStartDate,
+                    endDate: appliedEndDate,
+                    isEnabled: !isApplyingQuickRange,
+                    onApply: { start, end in
+                        draftStartDate = start
+                        draftEndDate = end
+                        applyDraftDates()
+                    },
+                    onSelectQuickRange: applyQuickRangePresetDeferred
+                )
+            }
             if account.isArchived {
                 ToolbarItemGroup(placement: .topBarTrailing) {
                     Text("Archived")
@@ -481,20 +484,6 @@ struct AllocationAccountDetailView: View {
             Text("Balance")
         } footer: {
             Text("Current outstanding reconciliation balance across all history.")
-        }
-    }
-
-    private var dateRangeSection: some View {
-        Section {
-            ReconciliationDateFilterRow(
-                draftStartDate: $draftStartDate,
-                draftEndDate: $draftEndDate,
-                isGoEnabled: isDateDirty && !isApplyingQuickRange,
-                onTapGo: applyDraftDates,
-                onSelectQuickRange: applyQuickRangePresetDeferred
-            )
-        } header: {
-            Text("Date Range")
         }
     }
 
@@ -935,61 +924,6 @@ private struct ReconciliationBalanceStatementRow: View {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Balance")
         .accessibilityValue(Text(total, format: CurrencyFormatter.currencyStyle()))
-    }
-}
-
-private struct ReconciliationDateFilterRow: View {
-    @Binding var draftStartDate: Date
-    @Binding var draftEndDate: Date
-
-    let isGoEnabled: Bool
-    let onTapGo: () -> Void
-    let onSelectQuickRange: (CalendarQuickRangePreset) -> Void
-
-    var body: some View {
-        HStack(spacing: 0) {
-            Spacer(minLength: 0)
-
-            HStack(spacing: 10) {
-                PillDatePickerField(title: "Start Date", date: $draftStartDate)
-                    .layoutPriority(1)
-
-                PillDatePickerField(title: "End Date", date: $draftEndDate)
-                    .layoutPriority(1)
-
-                Button(action: onTapGo) {
-                    Image(systemName: "arrow.right")
-                        .font(.system(size: 14, weight: .semibold))
-                        .frame(width: 44, height: 44)
-                        .background(
-                            Circle()
-                                .fill(
-                                    isGoEnabled
-                                    ? Color.accentColor.opacity(0.85)
-                                    : Color.secondary.opacity(0.1)
-                                )
-                        )
-                }
-                .buttonStyle(.plain)
-                .disabled(!isGoEnabled)
-                .accessibilityLabel("Apply Date Range")
-
-                Menu {
-                    CalendarQuickRangeMenuItems { preset in
-                        onSelectQuickRange(preset)
-                    }
-                } label: {
-                    Image(systemName: "calendar")
-                        .font(.system(size: 14, weight: .semibold))
-                        .frame(width: 44, height: 44)
-                        .background(Circle().fill(Color.secondary.opacity(0.1)))
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Quick Date Ranges")
-            }
-
-            Spacer(minLength: 0)
-        }
     }
 }
 
