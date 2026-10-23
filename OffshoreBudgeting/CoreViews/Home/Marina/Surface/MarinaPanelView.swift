@@ -404,11 +404,35 @@ struct MarinaPanelView: View {
                 }
             }
         } label: {
+            #if targetEnvironment(macCatalyst)
+            if #available(iOS 26.0, macCatalyst 26.0, *) {
+                Image(systemName: "plus")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: 44, height: 44)
+                    .contentShape(Circle())
+                    .glassEffect(.regular.tint(Color("AccentColor")).interactive(), in: Circle())
+            } else {
+                Image(systemName: "plus")
+                    .font(.subheadline.weight(.semibold))
+                    .frame(width: 44, height: 44)
+                    .background(.regularMaterial, in: Circle())
+                    .contentShape(Circle())
+            }
+            #else
             Image(systemName: "plus")
                 .font(.subheadline.weight(.semibold))
                 .frame(width: 33, height: 33)
+            #endif
         }
+        #if targetEnvironment(macCatalyst)
+        // Draw glass on the full-sized label; Catalyst otherwise uses compact menu chrome.
+        .menuStyle(.button)
+        .menuIndicator(.hidden)
+        .buttonStyle(.plain)
+        #else
         .modifier(AssistantIconButtonModifier())
+        #endif
         .accessibilityLabel(String(localized: "assistant.createNew.section", defaultValue: "Create New", comment: "Section title for assistant create-new menu."))
         .accessibilityIdentifier("marina.createMenu")
     }
