@@ -88,11 +88,15 @@ struct AccountsView: View {
         .toolbar {
             if #available(iOS 26.0, macCatalyst 26.0, *) {
                 ToolbarItemGroup(placement: .primaryAction) {
+                    #if targetEnvironment(macCatalyst)
+                    segmentMenuPicker
+                    #else
                     AccountsGlassSegmentControl(
                         selectedSegment: $selectedSegment,
                         isExpanded: $isSegmentControlExpanded,
                         namespace: glassNamespace
                     )
+                    #endif
                 }
 
                 ToolbarSpacer(.fixed, placement: .primaryAction)
