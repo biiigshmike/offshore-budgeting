@@ -19,172 +19,180 @@ struct HomeEditPinnedCardsView: View {
 
     @State private var editMode: EditMode = .inactive
 
-    private var isEditing: Bool { editMode == .active }
+    private var isEditing: Bool { editMode.isEditing }
 
     var body: some View {
-        NavigationStack {
-            List {
+        List {
 
-                // MARK: - Pinned on Home (combined)
+            // MARK: - Pinned on Home (combined)
 
-                Section(
-                    String(
-                        localized: "homeEdit.section.pinnedOnDashboard",
-                        defaultValue: "Pinned on Dashboard",
-                        comment: "Section title for items currently pinned to the Home dashboard."
-                    )
-                ) {
-                    if pinnedItems.isEmpty {
-                        Text(
-                            String(
-                                localized: "homeEdit.empty.pinned",
-                                defaultValue: "Nothing is pinned yet.",
-                                comment: "Empty-state message when no cards or widgets are pinned on Home."
-                            )
-                        )
-                            .foregroundStyle(.secondary)
-                    } else {
-                        ForEach($pinnedItems) { $item in
-                            row(item: $item)
-                                .moveDisabled(!isEditing)
-                                .deleteDisabled(!isEditing)
-                        }
-                        .onMove(perform: movePinnedItems)
-                        .onDelete(perform: deletePinnedItems)
-                    }
-                }
-
-                // MARK: - Available Widgets
-
-                Section(
-                    String(
-                        localized: "homeEdit.section.availableWidgets",
-                        defaultValue: "Available Panels",
-                        comment: "Section title for widgets available to pin to Home."
-                    )
-                ) {
-                    let pinnedWidgetSet = Set(pinnedItems.compactMap { item -> HomeWidgetID? in
-                        if case .widget(let w, _) = item { return w }
-                        return nil
-                    })
-
-                    let availableWidgets = HomeWidgetID.allCases.filter { !pinnedWidgetSet.contains($0) }
-
-                    if availableWidgets.isEmpty {
-                        Text(
-                            String(
-                                localized: "homeEdit.empty.availableWidgets",
-                                defaultValue: "All panels are pinned.",
-                                comment: "Message shown when there are no additional widgets available to pin."
-                            )
-                        )
-                            .foregroundStyle(.secondary)
-                    } else {
-                        ForEach(availableWidgets) { widget in
-                            Button {
-                                pinnedItems.append(.widget(widget, .small))
-                            } label: {
-                                HStack {
-                                    Text(widget.title)
-                                        .foregroundStyle(.primary)
-                                    Spacer()
-                                    Image(systemName: "plus.circle.fill")
-                                        .foregroundStyle(.secondary)
-                                }
-                            }
-                        }
-                        .disabled(!isEditing)
-                    }
-                }
-
-                // MARK: - Available Cards
-
-                Section(
-                    String(
-                        localized: "homeEdit.section.availableCards",
-                        defaultValue: "Available Cards",
-                        comment: "Section title for cards available to pin to Home."
-                    )
-                ) {
-                    let pinnedCardSet = Set(pinnedItems.compactMap { item -> UUID? in
-                        if case .card(let id, _) = item { return id }
-                        return nil
-                    })
-
-                    let availableCards = cards.filter { !pinnedCardSet.contains($0.id) }
-
-                    if availableCards.isEmpty {
-                        Text(
-                            String(
-                                localized: "homeEdit.empty.availableCards",
-                                defaultValue: "All cards are pinned.",
-                                comment: "Message shown when there are no additional cards available to pin."
-                            )
-                        )
-                            .foregroundStyle(.secondary)
-                    } else {
-                        ForEach(availableCards) { card in
-                            Button {
-                                pinnedItems.append(.card(card.id, .small))
-                            } label: {
-                                HStack {
-                                    Text(card.name)
-                                        .foregroundStyle(.primary)
-                                    Spacer()
-                                    Image(systemName: "plus.circle.fill")
-                                        .foregroundStyle(.secondary)
-                                }
-                            }
-                        }
-                        .disabled(!isEditing)
-                    }
-                }
-            }
-            .navigationTitle(
+            Section(
                 String(
-                    localized: "homeEdit.navigationTitle",
-                    defaultValue: "Edit Dashboard",
-                    comment: "Navigation title for editing Home pinned items."
+                    localized: "homeEdit.section.pinnedOnDashboard",
+                    defaultValue: "Pinned on Dashboard",
+                    comment: "Section title for items currently pinned to the Home dashboard."
                 )
-            )
-            .environment(\.editMode, $editMode)
-            .onDisappear {
-                editMode = .inactive
-            }
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button {
-                        dismiss()
-                    } label: {
-                        Image(systemName: "xmark")
+            ) {
+                if pinnedItems.isEmpty {
+                    Text(
+                        String(
+                            localized: "homeEdit.empty.pinned",
+                            defaultValue: "Nothing is pinned yet.",
+                            comment: "Empty-state message when no cards or widgets are pinned on Home."
+                        )
+                    )
+                        .foregroundStyle(.secondary)
+                } else {
+                    ForEach($pinnedItems) { $item in
+                        row(item: $item)
+                            .moveDisabled(!isEditing)
+                            .deleteDisabled(!isEditing)
                     }
+                    .onMove(perform: movePinnedItems)
+                    .onDelete(perform: deletePinnedItems)
                 }
+            }
 
-                ToolbarItem(placement: .topBarTrailing) {
+            // MARK: - Available Widgets
+
+            Section(
+                String(
+                    localized: "homeEdit.section.availableWidgets",
+                    defaultValue: "Available Panels",
+                    comment: "Section title for widgets available to pin to Home."
+                )
+            ) {
+                let pinnedWidgetSet = Set(pinnedItems.compactMap { item -> HomeWidgetID? in
+                    if case .widget(let w, _) = item { return w }
+                    return nil
+                })
+
+                let availableWidgets = HomeWidgetID.allCases.filter { !pinnedWidgetSet.contains($0) }
+
+                if availableWidgets.isEmpty {
+                    Text(
+                        String(
+                            localized: "homeEdit.empty.availableWidgets",
+                            defaultValue: "All panels are pinned.",
+                            comment: "Message shown when there are no additional widgets available to pin."
+                        )
+                    )
+                        .foregroundStyle(.secondary)
+                } else {
+                    ForEach(availableWidgets) { widget in
+                        Button {
+                            pinnedItems.append(.widget(widget, .small))
+                        } label: {
+                            HStack {
+                                Text(widget.title)
+                                    .foregroundStyle(.primary)
+                                Spacer()
+                                Image(systemName: "plus.circle.fill")
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                    .disabled(!isEditing)
+                }
+            }
+
+            // MARK: - Available Cards
+
+            Section(
+                String(
+                    localized: "homeEdit.section.availableCards",
+                    defaultValue: "Available Cards",
+                    comment: "Section title for cards available to pin to Home."
+                )
+            ) {
+                let pinnedCardSet = Set(pinnedItems.compactMap { item -> UUID? in
+                    if case .card(let id, _) = item { return id }
+                    return nil
+                })
+
+                let availableCards = cards.filter { !pinnedCardSet.contains($0.id) }
+
+                if availableCards.isEmpty {
+                    Text(
+                        String(
+                            localized: "homeEdit.empty.availableCards",
+                            defaultValue: "All cards are pinned.",
+                            comment: "Message shown when there are no additional cards available to pin."
+                        )
+                    )
+                        .foregroundStyle(.secondary)
+                } else {
+                    ForEach(availableCards) { card in
+                        Button {
+                            pinnedItems.append(.card(card.id, .small))
+                        } label: {
+                            HStack {
+                                Text(card.name)
+                                    .foregroundStyle(.primary)
+                                Spacer()
+                                Image(systemName: "plus.circle.fill")
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                    .disabled(!isEditing)
+                }
+            }
+        }
+        .navigationTitle(
+            String(
+                localized: "homeEdit.navigationTitle",
+                defaultValue: "Edit Dashboard",
+                comment: "Navigation title for editing Home pinned items."
+            )
+        )
+        .environment(\.editMode, $editMode)
+        .onDisappear {
+            editMode = .inactive
+        }
+        .toolbar {
+            #if !targetEnvironment(macCatalyst)
+            ToolbarItem(placement: .topBarLeading) {
+                Button {
+                    dismiss()
+                } label: {
+                    Image(systemName: "xmark")
+                }
+            }
+
+            #endif
+
+            ToolbarItem(placement: .topBarTrailing) {
+                if isEditing {
                     Button {
                         withAnimation {
-                            editMode = isEditing ? .inactive : .active
+                            editMode = .inactive
                         }
                     } label: {
-                        if isEditing {
-                            Label(
-                                String(
-                                    localized: "common.done",
-                                    defaultValue: "Done",
-                                    comment: "Generic action label to finish editing."
-                                ),
-                                systemImage: "checkmark"
-                            )
-                        } else {
-                            Text(
-                                String(
-                                    localized: "common.edit",
-                                    defaultValue: "Edit",
-                                    comment: "Generic action label to start editing."
-                                )
-                            )
+                        Label(
+                            String(
+                                localized: "common.done",
+                                defaultValue: "Done",
+                                comment: "Generic action label to finish editing."
+                            ),
+                            systemImage: "checkmark"
+                        )
+                    }
+                    .labelStyle(.iconOnly)
+                    .id("finishEditing")
+                } else {
+                    Button(
+                        String(
+                            localized: "common.edit",
+                            defaultValue: "Edit",
+                            comment: "Generic action label to start editing."
+                        )
+                    ) {
+                        withAnimation {
+                            editMode = .active
                         }
                     }
+                    .id("startEditing")
                 }
             }
         }

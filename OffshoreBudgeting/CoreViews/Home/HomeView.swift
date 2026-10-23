@@ -373,7 +373,9 @@ struct HomeView: View {
 
             }
         }
-        .appSheet(isPresented: $isEditingWidgets) {
+        #if targetEnvironment(macCatalyst)
+        // Catalyst sheet presentation prevents this list from accepting reorder drops.
+        .navigationDestination(isPresented: $isEditingWidgets) {
             HomeEditPinnedCardsView(
                 cards: cards,
                 workspaceID: workspace.id,
@@ -384,6 +386,21 @@ struct HomeView: View {
                 persistPinnedItems()
             }
         }
+        #else
+        .appSheet(isPresented: $isEditingWidgets) {
+            NavigationStack {
+                HomeEditPinnedCardsView(
+                    cards: cards,
+                    workspaceID: workspace.id,
+                    showsTileSizePicker: showsTileSizePicker,
+                    pinnedItems: $pinnedItems
+                )
+            }
+            .onDisappear {
+                persistPinnedItems()
+            }
+        }
+        #endif
         .onAppear {
             if shouldSyncCommandSurface {
                 commandHub.activate(.home)
