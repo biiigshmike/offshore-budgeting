@@ -119,8 +119,9 @@ struct PillDatePickerField: View {
                 }
         } else {
             triggerButton(text: dateText, accessibilityText: "\(title) \(dateText)")
-                .appSheet(isPresented: $isPresented) {
+                .sheet(isPresented: $isPresented) {
                     mobileSheetContent
+                        .presentationSizing(.form)
                 }
         }
     }
