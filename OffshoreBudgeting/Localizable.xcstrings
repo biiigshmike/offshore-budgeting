@@ -21529,6 +21529,12 @@
         }
       }
     },
+    "Filtering by Date" : {
+
+    },
+    "Filtering by Date has moved to the top toolbar on Home, Cards, Reconciliations, and Savings." : {
+
+    },
     "Filtering lets you isolate the exact slice of spending you need to evaluate before making changes. Use this to narrow by category, card, or other scope controls when totals need explanation. Focused views reduce noise and shorten investigation time.\n\nA good sequence is filter first, inspect entries second, then decide action. This keeps decisions tied to evidence instead of intuition. Clear filtered views are especially useful when spending accelerates unexpectedly.\n\nReset filters after analysis so future reviews begin from full context. That habit avoids accidental conclusions from stale scopes. Filtering is most powerful when used intentionally and reset consistently." : {
       "localizations" : {
         "ar" : {
@@ -22099,6 +22105,9 @@
           }
         }
       }
+    },
+    "Futher Enhancements to Marina" : {
+
     },
     "General" : {
       "localizations" : {
@@ -31316,6 +31325,9 @@
           }
         }
       }
+    },
+    "Marina has had some additional training to ensure a more enriched, natural experience so that she can help users understand their budgeting data in plain English." : {
+
     },
     "Marina is Offshore's on-device financial assistant on the Home tab. Ask read-only questions about spending, income, savings, categories, cards, and budgets, then use Marina's + menu for explicit create forms. Edits and deletes stay on the screens that own those records so changes remain clear and traceable." : {
       "localizations" : {
@@ -48782,6 +48794,9 @@
         }
       }
     },
+    "Optimized Interface for Mac" : {
+
+    },
     "Optional Quick Actions are now available through Shortcuts and Automations. You’ll see them during Onboarding and in Settings > Install Quick Actions.\n\nThese are completely optional and can help automate adding income from SMS or email notifications, as well as logging expenses from Apple Wallet taps. Offshore works perfectly without them." : {
       "localizations" : {
         "ar" : {
@@ -52804,6 +52819,9 @@
           }
         }
       }
+    },
+    "Reconfigured the user interface for a better experience while using a Mac." : {
+
     },
     "Record actual income in Income using the flow that matches how you track deposits. Capture accurate amount and date so the entry lands in the right period and comparisons stay trustworthy.\n\nTimely recording matters. The faster you log landed income, the more reliable Home and budget guidance becomes." : {
       "localizations" : {

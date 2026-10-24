@@ -146,7 +146,7 @@ struct CardsView: View {
                 PostBoardingTipItem(
                     systemImage: "banknote.fill",
                     title: "Savings",
-                    detail: "Use Savings to record deposits and withdrawals so your savings progress stays visible over time."
+                    detail: "Use Savings to monitor your actual savings at the close of every budget period."
                 )
             ]
         )

@@ -343,7 +343,7 @@ struct HomeView: View {
                     isEditingWidgets = true
                 } label: {
                     Label(
-                        String(localized: "homeEdit.navigationTitle", defaultValue: "Edit Dashboard", comment: "Navigation title for editing Home pinned items."),
+                        String(localized: "homeEdit.navigationTitle", defaultValue: "Edit", comment: "Navigation title for editing Home pinned items."),
                         systemImage: "widget.grid.2x1.rectangle"
                     )
                 }
