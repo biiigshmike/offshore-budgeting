@@ -142,7 +142,7 @@ struct HomeEditPinnedCardsView: View {
         .navigationTitle(
             String(
                 localized: "homeEdit.navigationTitle",
-                defaultValue: "Edit Dashboard",
+                defaultValue: "Edit",
                 comment: "Navigation title for editing Home pinned items."
             )
         )
