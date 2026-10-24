@@ -260,8 +260,6 @@ struct HomeView: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 14) {
 
-                        widgetsHeader
-
                         VStack(spacing: 12) {
                             if pinnedItems.isEmpty {
                                 HomeTileContainer(
@@ -340,6 +338,18 @@ struct HomeView: View {
         )
         .navigationTitle(String(localized: "app.section.home", defaultValue: "Home", comment: "Main tab title for the Home section."))
         .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                Button {
+                    isEditingWidgets = true
+                } label: {
+                    Label(
+                        String(localized: "homeEdit.navigationTitle", defaultValue: "Edit Dashboard", comment: "Navigation title for editing Home pinned items."),
+                        systemImage: "widget.grid.2x1.rectangle"
+                    )
+                }
+                .labelStyle(.iconOnly)
+            }
+
             ToolbarItemGroup(placement: .primaryAction) {
                 DateRangeToolbarControls(
                     startDate: appliedStartDate,
@@ -1307,7 +1317,7 @@ struct HomeView: View {
         }
     }
 
-    // MARK: - Widgets Header
+    // MARK: - Home Toolbar
 
     private var homeActionsToolbarButton: some View {
         Menu {
@@ -1357,29 +1367,6 @@ struct HomeView: View {
         .glassProminentButtonStyleCompat()
         .accessibilityLabel(String(localized: "assistant.open", defaultValue: "Open Assistant", comment: "Accessibility label for opening assistant."))
         .accessibilityIdentifier("home.assistant.openButton")
-    }
-
-    private var widgetsHeader: some View {
-        HStack(alignment: .firstTextBaseline) {
-            Text(String(localized: "home.widgets.header", defaultValue: "Widgets", comment: "Header title for home widgets section."))
-                .font(.title3.weight(.semibold))
-                .foregroundStyle(.primary)
-
-            Spacer()
-
-            Button {
-                isEditingWidgets = true
-            } label: {
-                Text(String(localized: "common.edit", defaultValue: "Edit", comment: "Edit action label."))
-                    .font(.subheadline.weight(.semibold))
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 8)
-                    .background(.thinMaterial, in: Capsule())
-            }
-            .buttonStyle(.plain)
-            .foregroundStyle(.secondary)
-        }
-        .padding(.top, 6)
     }
 
     // MARK: - Date Range
