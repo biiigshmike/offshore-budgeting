@@ -13,14 +13,15 @@ struct MarinaContextStatusTests {
         #expect(MarinaContextStatus.measured(tokens: 0, capacity: 0) == nil)
     }
 
-    @Test func savedNoticeSurvivesLaterMessagesAndNewChatStartsClear() throws {
+    @Test func savedNoticesDoNotLockAChatAfterSessionRenewal() throws {
         var answer = HomeAnswer(queryID: UUID(), kind: .message, title: "")
         answer.contextStatus = .approaching
         let pending = HomeAnswer(queryID: UUID(), kind: .message, title: "", responseState: .thinking)
-        #expect(MarinaContextStatus.status(in: [answer, pending]) == .approaching)
+        #expect(MarinaContextStatus.status(in: [answer, pending]) == nil)
         answer.contextStatus = .reached
         let restored = try JSONDecoder().decode(HomeAnswer.self, from: JSONEncoder().encode(answer))
-        #expect(MarinaContextStatus.status(in: [restored, pending]) == .reached)
+        #expect(restored.contextStatus == .reached)
+        #expect(MarinaContextStatus.status(in: [restored, pending]) == nil)
         #expect(MarinaContextStatus.status(in: []) == nil)
     }
 
@@ -30,6 +31,8 @@ struct MarinaContextStatusTests {
         #expect(restored.contextStatus == nil)
         #expect(MarinaContextStatus.status(in: [restored]) == nil)
         let failed = HomeAnswer(queryID: UUID(), kind: .message, title: "", responseState: .contextLimit)
-        #expect(MarinaContextStatus.status(in: [failed]) == .reached)
+        #expect(MarinaContextStatus.status(in: [failed]) == nil)
+        #expect(MarinaResponseState.contextLimit.canRetry)
+        #expect(MarinaResponseState.recovering.isActive)
     }
 }

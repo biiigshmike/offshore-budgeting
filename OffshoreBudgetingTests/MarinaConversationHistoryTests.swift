@@ -4,6 +4,17 @@ import Testing
 
 @MainActor
 struct MarinaConversationHistoryTests {
+    @Test func recent_excludesIncompleteAttemptsWithoutLosingCompletedContext() {
+        let completed = answer(prompt: "On my Travel card?", response: "Here is your spending.")
+        let failed = HomeAnswer(queryID: UUID(), kind: .message,
+            userPrompt: String(repeating: "oversized ", count: 1000), title: "", responseState: .contextLimit)
+        let cancelled = HomeAnswer(queryID: UUID(), kind: .message,
+            userPrompt: "And last month?", title: "", responseState: .cancelled)
+        let exchanges = MarinaConversationHistory.recent([completed, failed, cancelled])
+        #expect(exchanges.count == 1)
+        #expect(exchanges.first?.prompt == completed.userPrompt)
+    }
+
     @Test func recent_keepsLatestCompleteExchangesInChronologicalOrder() {
         let answers = (0..<6).map { answer(prompt: "Question \($0)", response: "Answer \($0)") }
 

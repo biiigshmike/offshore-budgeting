@@ -9,6 +9,11 @@ import Testing
 struct MarinaPresentationRenderingTests {
     @Test(arguments: ["phone", "tablet", "accessible-dark"])
     func nativePresentationsRenderAtSupportedWidths(_ layout: String) throws {
+        // Use the test app's sandbox and isolate previews from concurrent or previous runs.
+        let outputDirectory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("MarinaPresentationRenderingTests-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: outputDirectory, withIntermediateDirectories: true)
+        print("Marina rendering previews (\(layout)): \(outputDirectory.path)")
         let width: CGFloat = layout == "tablet" ? 640 : 350
         let largeText = layout == "accessible-dark"
         for (name, presentation) in fixtures {
@@ -25,7 +30,8 @@ struct MarinaPresentationRenderingTests {
             #expect(image.size.width == width)
             #expect(image.size.height > 0)
             let data = try #require(image.pngData())
-            try data.write(to: URL(fileURLWithPath: "/tmp/marina-ui-preview-\(layout)-\(name).png"))
+            try data.write(to: outputDirectory.appendingPathComponent("marina-ui-preview-\(layout)-\(name).png"),
+                           options: .atomic)
         }
     }
 

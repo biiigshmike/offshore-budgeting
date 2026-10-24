@@ -1,6 +1,6 @@
-# Marina baseline diagnostics and manual testing
+# Marina context management, diagnostics, and manual testing
 
-This pass measures the restored on-device implementation. It does not change prompts, tool definitions, financial calculations, presentation selection, or the 75% context warning. All five production tools remain available. Reports use **format 4**.
+Marina now keeps the saved conversation separately from the model's bounded working context. All five production tools remain available. Reports use **format 4**. The October 17 section below records the historical, unmodified baseline; the October 23 implementation changes instructions, tool schemas, model-facing facts, and context management while preserving financial calculation services and saved financial presentations.
 
 ## Enable reports in Xcode
 
@@ -48,7 +48,7 @@ Standalone instructions, schema, tool-set, prompt, and output counts overlap wit
 
 Timing separates session preparation, the existing context preflight, stream start to first text, response completion, and post-response context checks. Additional diagnostic counting occurs after generation, outside the streaming loop. Total elapsed time is not labeled pure model-generation time.
 
-A smaller measured tool set is an overhead experiment—not evidence that Marina can handle every question with those tools. The production implementation still supplies all five tools. No routing, dynamic profiles, cloud model, prewarming, or automatic context renewal is introduced.
+A smaller measured tool set is an overhead experiment, not evidence that Marina can handle every question with those tools. Compare the **all five** initial-transcript row for production overhead. The implementation uses automatic renewal, prewarming, and availability-gated Dynamic Profiles; it does not introduce domain routing, a cloud model, or an external package.
 
 ## Engineering benchmark and local acceptance
 
@@ -57,6 +57,103 @@ The Debug test `MarinaToolSetBenchmarkTests.unchangedProductionToolCombinations`
 Native conversation tests use `MARINA_MODEL_EVALUATION=1`, with `MARINA_TOKEN_DIAGNOSTICS=1` for reports. `MarinaPresentationLiveTests` includes repeated full spending sequences, workspace timing, category/empty results, income/budget/presets, named-record safety, and restored saved history. Fixtures retain their in-memory model containers and do not read the user's workspace. Disabled native tests are not behavioral passes.
 
 Current-run measured counts and verification outcomes are reported in the implementation handoff. A functioning diagnostic package is separate from conversational acceptance; any native-model failures must be reported without changing financial behavior to hide them.
+
+## Renewable conversations — October 23, 2026
+
+The app uses the device-reported `contextSize` and reserves `max(1,024, ceil(capacity / 4))` tokens for tool work and narration. On iOS 26.4 and later it uses Apple's native token counter. Earlier iOS 26 releases use conservative, separately calibrated prefix and text estimates. The fallback is an estimate, not a measurement; the schema benchmark asserts that it covers the measured production prefix on the test device.
+
+Before generation, Marina fits a bounded, deterministic memory and the newest complete visible exchanges into that input budget. It drops older exchanges first, then reduces memory by complete units. A genuine framework context-overflow error renews and retries once using the same visible answer ID. An oversized request gets a narrower-request response without locking the chat. Historical saved limit markers no longer disable the composer.
+
+`MarinaConversationMemory` stores confirmed entity IDs/names, validated query scope and dates, comparisons, pending clarification candidates, paging state, and result references. It stores no balances or amounts. It is versioned and scoped to both workspace and chat through the existing `followUpContextData`; unknown legacy payloads remain inert and visible history remains readable. Validated relative periods are frozen to their actual dates. Instructions require fresh financial reads on follow-ups; native evaluation must still verify that the model obeys them. UI pagination also updates this memory before the next model request.
+
+iOS 26 renews static sessions. iOS 27 uses a Dynamic Profile with a shared retention policy that preserves instructions, tools, and the entire active tool chain. The profile's model-facing transform does not delete saved chat messages. Sessions prewarm when the active chat opens and after renewal, and are released on navigation away. Instructions/tools remain stable between renewals.
+
+Model-facing results contain operation-relevant facts and exact formatted currency. Account facts and transaction previews are bounded; full totals, clarification choices, scope, financial meaning, and pagination remain available. Saved financial presentations retain their complete results. No SwiftData schema migration, external model provider, new dependency, or financial-calculation change is included.
+
+### Native acceptance procedure
+
+Enable `MARINA_MODEL_EVALUATION=1` and `MARINA_LONG_MODEL_EVALUATION=1` to run `MarinaLongConversationTests` separately from other native-model suites. With `xcodebuild`, use the corresponding `TEST_RUNNER_` environment-variable prefixes. `MARINA_LONG_STATIC_SESSION=1` exercises the iOS 26 session implementation on a newer OS; it does **not** establish iOS 26 device performance. `MARINA_LONG_EVALUATION_VERBOSE=1` prints synthetic fixture requests and retained memory only from this opt-in test suite; never enable similar raw output for real workspace diagnostics.
+
+The suite covers a 20-turn mixed-domain conversation with at least two renewals, a 4K-budget saved-chat restoration with data edited between turns, oversized-prompt recovery, cancellation, and rapid chat/workspace switching. A Debug-only injected-overflow case throws the real framework error type after a real financial tool result; it verifies one retry, stable answer identity, removal of failed-attempt visuals, and usability after a second overflow. This injection tests recovery logic, not actual device capacity. The suite verifies visible-history preservation, answer identity, fresh reads, exact fixture results, scope, ambiguity, and account pagination. Failures remain failures; completing 20 turns alone is insufficient.
+
+Collect cold, warm, and post-renewal time to first text and total time separately, using the same physical device and workload on iOS 26 and iOS 27. A Mac Catalyst native-model run verifies the host's model behavior, not iPhone latency. No response-time improvement is promised by token reductions alone. Apple's Foundation Models instrument is still needed to separate loading, input processing, scheduling, and inference.
+
+### Initial renewal verification, before the native accuracy fixes below
+
+The final focused iOS 26.3 simulator run passed **94 tests across 13 suites**. Coverage includes schema decoding and operation mapping, compact facts and full saved results, memory/version/workspace boundaries, whole-turn retention, legacy limit markers, storage, financial-service parity, and diagnostics. The app and test targets compile for iOS 26.3 and Mac Catalyst 27.0.1.
+
+Native token measurements on Mac Catalyst 27.0.1, using all five production tools and the same synthetic context as the October 17 benchmark:
+
+| Measurement | October 17 | October 23 |
+|---|---:|---:|
+| Complete tool set | 4,554 | 2,364 |
+| Initial transcript | 5,366 | 2,699 |
+| Reported capacity | 8,192 | 8,192 |
+
+Initial overhead fell **49.7%**, occupying about 33% of this device's capacity. The fallback prefix estimate is 2,851 tokens, above the native measurement. The below-half-capacity target is met on this 8K host, but **not established for 4K devices**: the same measured prefix would occupy about 66% of 4K. A 4K budget leaves only 373 measured tokens after the 1,024-token reserve, before the question and remembered context; more aggressive compaction on those devices is expected.
+
+**Native conversational acceptance is not met.** The final Dynamic Profile run executed nine tests: six passed and three failed, with 29 recorded issues. The 20-turn test retained all 20 visible messages and performed seven renewals without requiring a new chat, but failed 21 accuracy/lifecycle expectations. Failures included dropping a resolved card filter, choosing the wrong account or topic, and looping on a merchant clarification until the tool-call cap. The two older live conversation tests also failed card-scoping and clarification checks. These results must not be described as a successful long-conversation accuracy evaluation.
+
+The 4K-budget saved-chat restoration test passed, including a fresh read after the underlying data changed. Oversized-prompt recovery, cancellation/retry identity, chat/workspace switching, and injected one/two-overflow recovery all passed. The token benchmark also passed. The older live fixtures now retain their in-memory containers, so those two tests reach inference instead of crashing during fixture construction.
+
+The final static-session compatibility run also retained all 20 visible messages and renewed three times, but failed 29 expectations involving card/category/account scope, clarification, comparisons, and completion state. Its 4K-budget saved-chat test failed one date-context expectation. This exercises the iOS 26 implementation on macOS 27.0.1, not an iOS 26 physical device. The same invocation re-ran three older presentation tests against the final production Dynamic Profile path: screenshot conversation, budget/income/presets, and workspace/named-target safety. They failed eight, two, and four expectations respectively. This invocation therefore ran five failing tests with 44 issues. An earlier investigation run was interrupted by an AppKit toolbar-constraint exception; that host exception is separate from model-accuracy failures and is not counted as a model pass.
+
+For the final 20-turn Dynamic Profile run on Mac Catalyst, these are session-phase timings, not a cold-device benchmark:
+
+| Session phase | Turns | Time to first text | Total turn time |
+|---|---:|---:|---:|
+| New session | 1 | 7.327 s | 7.523 s |
+| Continuing session | 12 | 4.471–14.724 s | 6.366–15.556 s |
+| After renewal | 7 | 5.716–11.094 s on six turns | 8.374–56.099 s |
+
+The seventh post-renewal turn produced no text and failed at the tool-call cap after 56.099 seconds. In the static-session run, first text took 8.003 seconds for the initial turn, 4.808–18.730 seconds across 16 continuing turns, and 5.772–11.010 seconds across three post-renewal turns. Total times were respectively 8.209, 6.506–26.672, and 7.360–25.951 seconds. These workloads include financial tools and differ from the October 17 workspace-only timing case. There is no demonstrated latency improvement, and no physical iOS 26/iOS 27 or Instruments performance comparison was completed.
+
+The physical iOS 27.0.1 iPhone build succeeded, but Xcode could not launch its native tests because the device was locked. Unlocking was requested; the still-pending launch was stopped before the handoff, and no device results are claimed. Both connected physical iOS devices reported 27.0.1, so a physical iOS 26 comparison also remains outstanding.
+
+A bounded schema experiment restored the original expense-filter variants. It measured 3,036 initial tokens (3,265 estimated), leaving only 36 tokens before the 3,072-token input ceiling on a hypothetical 4K device. The experiment was fully reverted; it did not establish an accuracy improvement. Further work must address native target selection, clarification, and narration grounding without silently broadening queries or accepting fewer capabilities. Domain routing and extra model-classification passes remain deferred as requested.
+
+Local, uncommitted test artifacts: `/private/tmp/marina-renewal-regression-verified.log`, `/private/tmp/marina-renewal-native-verified.log`, `/private/tmp/marina-renewal-static-verified.log`, `/private/tmp/marina-renewal-device-verified.log`, and `/private/tmp/marina-filter-native-benchmark.log`. Simulator passes and reduced token costs do not establish model accuracy or faster responses.
+
+### Native accuracy follow-up — October 23, 2026
+
+The follow-up replaces model-supplied database identifiers with validated, workspace/chat-bound references (`r1`, `r2`, etc.). A shared scalar selection represents workspace, previous, or explicit references. Previous selection and previous dates come from the latest validated financial query; name lookups cannot replace the financial period. References are bounded, survive renewal/restoration, and are never reassigned to a different entity. Unknown, expired, foreign, deleted, or incompatible targets cannot silently become an unfiltered read.
+
+Named lookups preserve ambiguity unless the current question explicitly supplies a record kind. Card/merchant and savings/reconciliation names remain distinct. The bridge validates literal targets against a fresh, workspace-scoped name catalog even when the model skips lookup. An old reference cannot satisfy a newly ambiguous name. Kind words must attach to the target: “on my card at Apple” does not resolve Apple to a card. Quoted/named unknown records and title-case card names are checked conservatively; arbitrary unquoted unknown names are not a complete supported grammar. Generic financial nouns and invented protocol labels cannot become false missing-name answers, while explicitly named records remain searchable. Conservative constraints honor explicit universal scopes while retaining unrelated filters; comparisons, exclusions, and mixed scopes are left to typed request validation. The data service also checks an account ID against the requested account domain. Financial calculations and saved financial records are unchanged.
+
+Clarifications display verified candidate names and kinds and stop inference while the person chooses. A restored clarification still requires an affirmative candidate choice; a generic acknowledgment does not authorize the model to select one. Supported explicit calendar cues freeze the unresolved question's period through the existing date resolver. That period survives restoration and an interrupted candidate lookup, until a financial read completes or an explicit new topic replaces it. Explicit new dates override the pending period. Unsupported or multiple date cues do not trigger automatic date inference.
+
+Financial captions use the validated result's amounts, dates, qualifications, and reconciliation direction. They can appear as soon as a read completes. A conservative English/Spanish evidence policy suppresses unsupported prose for recognized financial requests; it is not a complete natural-language intent parser. On iOS 27, a session property requires tool calls until a financial read succeeds, then allows narration; verified ambiguity or a missing name ends generation with a question. This follows [Apple's required-tool guidance](https://developer.apple.com/documentation/foundationmodels/expanding-generation-with-tool-calling), including its required exit condition. On iOS 26, a missing read for those requests triggers one bounded renewal/retry and otherwise produces a safe verification failure. Greetings, workspace metadata, general definitions, and creation forms retain their ordinary paths. All five tools remain available without a separate model-classification pass or new provider.
+
+Comparison arguments use `operation: "compare"`/`"compareIncome"` and a sibling `comparison` payload containing the other selection and its dates. Validation requires that payload exactly when comparing. A recognized request to compare two calendar periods cannot be satisfied by two independent transaction lists. Planned/received income and unambiguous follow-up selections are validated independently of older card topics. Generic account follow-ups preserve the previous savings/reconciliation domain as well as the selection. Selected accounts display their full balance alongside paged ledger activity; an account list retains all balances and supports paging. These are request and presentation changes, not new financial calculations.
+
+For requests requiring financial evidence, lookup names must occur affirmatively in the current question, the pending question being answered, or the latest financial selection during a contextual follow-up. Arbitrary names from an older inventory cannot authorize a lookup. A malformed argument decoded before the tool body can use the same single missing-read renewal/retry; it does not gain another independent retry. A first, closed-vocabulary unnamed expense/income total can explicitly repair a model-invented unknown reference to workspace. That exception requires no financial history, pending/resolved name, unresolved lookup, or current named requirement, and excludes known foreign/stale/wrong-kind reference failures. Named targets cannot use it to broaden a read.
+
+`MarinaLongEvaluation.first_visible_text_s` now measures the first displayed caption or narration. It is not interchangeable with the older model-narration-only timing. `MarinaTokens.stream_to_first_text_seconds` still measures the first model-generated text snapshot. Native accuracy, visible response latency, and total completion time must be assessed separately.
+
+### Usage-limited checkpoint — October 23, 2026
+
+Work stopped at the user's requested usage checkpoint. The final Mac Catalyst build and **222 focused tests across 19 suites passed** (`/private/tmp/marina-accuracy-checkpoint.log`). The final native token benchmark measured 2,350 tokens for all five tools and **2,676 initial transcript tokens**, versus the October 17 initial baseline of 5,366. The host reports 8,192 capacity; the fallback prefix estimate is 2,850 with 9,259 schema bytes. This is about a 50% startup reduction and below half this host's capacity, but not below half a hypothetical 4K capacity.
+
+The last native sweep (`/private/tmp/marina-accuracy-long-v9.log`) completed the 20-turn script with all visible answers retained, seven session renewals, and **six capacity-driven renewals**. No turn forced a new chat. **Native accuracy acceptance still failed:** comparison sides were reversed, an income-progress follow-up became a card-filtered period comparison, and a named-budget pace question produced an overview. A newly strengthened activity assertion also checked the wrong representation; it now checks the exact saved answer row, dates, and transaction amounts. The separate restored-clarification sequence encountered an account-validation loop when Alex existed in both account domains. The short card/date/comparison sequence passed.
+
+The last edits correct those explicit operation/date constraints and recognize single-target account-domain wording such as “reconciliation balance with Alex.” They have deterministic regression coverage but **have not been rerun through the native model**. The earlier upcoming-preset and income-percentage corrections also await native revalidation. Do not interpret passing unit tests as a native accuracy pass or expand phrase-specific rules without a bounded evaluation decision.
+
+Observed times in that 20-turn run, including its inaccurate answers:
+
+| Session phase | Turns | First visible text | Total completion |
+|---|---:|---:|---:|
+| Cold | 1 | 24.854 s | 26.083 s |
+| Warm | 12 | 6.998–25.163 s | 9.746–31.001 s |
+| After renewal | 7 | 5.936–17.398 s | 8.216–17.398 s |
+
+The sweep was intentionally interrupted during the following saved-chat test to conserve usage. Remaining native recovery cases and the static-session 20-turn run were not rerun on the final source. Physical iOS 26/iOS 27 testing remains deferred at the user's request. No latency improvement or completed native acceptance is claimed. A future bounded check should first rerun the failed cases, then assess whether broader model-routing work is warranted instead of continuing open-ended semantic patches.
+
+### Files and review phases
+
+1. Tool cost: `MarinaTools.swift`, `MarinaDataResult.swift`, and the resolved-query metadata in `MarinaReadOnlyDataService.swift`; schema/fact and benchmark tests.
+2. Context lifecycle: new `MarinaConversationMemory.swift`, `MarinaContextBudget.swift`, and `MarinaTranscriptWindow.swift`; runtime, controller, store, panel, context/response status, and diagnostics; memory/history/storage/retention tests.
+3. Accuracy validation: new `MarinaTurnPolicy.swift`, `MarinaNamedTargetRequirement.swift`, `MarinaGroundingPolicy.swift`, `MarinaVerifiedNarration.swift`, `MarinaClarificationRequired.swift`, and the availability-gated `MarinaSessionProfile.swift`; tool bridge integration and focused regressions.
+4. Native verification: `MarinaLongConversationTests.swift`, the retained in-memory containers in native/presentation tests, and this testing guide. No financial math or SwiftData schema change is included.
 
 ## Measured baseline — October 17, 2026
 

@@ -4,7 +4,10 @@ import Testing
 @testable import Offshore
 
 @MainActor
-struct MarinaChatSessionStoreTests {
+final class MarinaChatSessionStoreTests {
+    // ModelContext does not keep its container's store connection alive on every platform.
+    private var retainedContainers: [ModelContainer] = []
+
     private func makeContext() throws -> ModelContext {
         let schema = Schema([
             Workspace.self,
@@ -29,8 +32,9 @@ struct MarinaChatSessionStoreTests {
             Income.self
         ])
 
-        let config = ModelConfiguration(isStoredInMemoryOnly: true)
+        let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         let container = try ModelContainer(for: schema, configurations: config)
+        retainedContainers.append(container)
         return ModelContext(container)
     }
 
@@ -113,6 +117,71 @@ struct MarinaChatSessionStoreTests {
 
         try store.saveTranscript([answer], sessionID: session.id, workspaceID: work.id, modelContext: context)
 
+        #expect(store.visibleAnswers(for: session).isEmpty)
+    }
+
+    @Test func memory_roundTripsOnlyWithinItsWorkspaceAndChat() throws {
+        let context = try makeContext()
+        let workspace = Workspace(name: "Personal", hexColor: "#3B82F6")
+        context.insert(workspace)
+        let store = MarinaChatSessionStore()
+        let session = try store.createSession(workspace: workspace, modelContext: context)
+        let otherChat = try store.createSession(workspace: workspace, modelContext: context)
+        let answer = HomeAnswer(queryID: UUID(), kind: .message, userPrompt: "This month?", title: "Spending")
+        var memory = MarinaConversationMemory(workspaceID: workspace.id, chatID: session.id)
+        memory.record(request: .init(relativePeriod: .currentMonth, tool: .expenses), result: .init(scope: "Personal"), answerID: answer.id)
+
+        try store.saveTranscript([answer], sessionID: session.id, workspaceID: workspace.id, modelContext: context, memory: memory)
+        #expect(store.memory(for: session) == memory)
+        #expect(store.visibleAnswers(for: session) == [answer])
+        try store.saveTranscript([], sessionID: otherChat.id, workspaceID: workspace.id, modelContext: context, memory: memory)
+        #expect(otherChat.followUpContextData.isEmpty)
+        otherChat.followUpContextData = session.followUpContextData
+        #expect(store.memory(for: otherChat) == nil)
+
+        let foreign = MarinaConversationMemory(workspaceID: UUID(), chatID: session.id)
+        try store.saveTranscript([answer], sessionID: session.id, workspaceID: workspace.id, modelContext: context, memory: foreign)
+        #expect(store.memory(for: session) == memory)
+        session.followUpContextData = try JSONEncoder().encode(foreign)
+        #expect(store.memory(for: session) == nil)
+    }
+
+    @Test func memory_rejectsMalformedUnknownAndOversizedStateWithoutHidingAnswers() throws {
+        let context = try makeContext()
+        let workspace = Workspace(name: "Personal", hexColor: "#3B82F6")
+        context.insert(workspace)
+        let store = MarinaChatSessionStore()
+        let answers = [HomeAnswer(queryID: UUID(), kind: .message, title: "Saved answer")]
+        let session = try store.createSession(workspace: workspace, answers: answers, modelContext: context)
+        let memory = MarinaConversationMemory(workspaceID: workspace.id, chatID: session.id)
+        var json = try #require(JSONSerialization.jsonObject(with: JSONEncoder().encode(memory)) as? [String: Any])
+        json["version"] = 999
+        let payloads = [
+            Data("opaque legacy state".utf8), Data("{".utf8),
+            try JSONSerialization.data(withJSONObject: json),
+            Data(repeating: 65, count: MarinaConversationMemory.maxStoredBytes + 1)
+        ]
+        for payload in payloads {
+            session.followUpContextData = payload
+            #expect(store.memory(for: session) == nil)
+            try store.saveTranscript(answers, sessionID: session.id, workspaceID: workspace.id, modelContext: context)
+            #expect(session.followUpContextData == payload)
+            #expect(store.visibleAnswers(for: session) == answers)
+        }
+    }
+
+    @Test func clearSession_removesNewMemoryAsWellAsVisibleHistory() throws {
+        let context = try makeContext()
+        let workspace = Workspace(name: "Personal", hexColor: "#3B82F6")
+        context.insert(workspace)
+        let store = MarinaChatSessionStore()
+        let session = try store.createSession(workspace: workspace, modelContext: context)
+        let memory = MarinaConversationMemory(workspaceID: workspace.id, chatID: session.id)
+        try store.saveTranscript([HomeAnswer(queryID: UUID(), kind: .message, title: "Saved answer")],
+                                 sessionID: session.id, workspaceID: workspace.id, modelContext: context, memory: memory)
+        #expect(store.memory(for: session) != nil)
+        _ = try store.clearSession(id: session.id, workspaceID: workspace.id, modelContext: context)
+        #expect(store.memory(for: session) == nil)
         #expect(store.visibleAnswers(for: session).isEmpty)
     }
 

@@ -19,6 +19,15 @@ final class MarinaReadOnlyDataService {
         self.defaultBudgetingPeriod = defaultBudgetingPeriod
     }
 
+    func namedTargetRequirements(prompt: String) throws -> [MarinaNamedTargetRequirement] {
+        let snapshot = try MarinaWorkspaceSnapshotProvider().snapshot(for: workspace, modelContext: modelContext,
+            homeContext: homeContext, now: now)
+        let catalog = lookupRecords(snapshot: snapshot).map {
+            MarinaConversationMemory.Entity(kind: $0.kind, id: $0.id, name: $0.title)
+        }
+        return MarinaNamedTargetRequirement.requirements(prompt: prompt, catalog: catalog)
+    }
+
     func execute(_ request: MarinaDataRequest) throws -> MarinaDataResult {
         var request = request
         if request.purpose == .upcomingPresets {
@@ -115,6 +124,8 @@ final class MarinaReadOnlyDataService {
             if let search = request.search { filters.append("text: " + search) }
             result.appliedFilters = filters.isEmpty ? nil : filters.joined(separator: "; ")
             result.presentation = presentation(for: result, request: request, snapshot: snapshot, range: range, comparisonLabel: comparisonLabel, comparisonRange: comparisonResolvedRange)
+            result.resolvedRequest = frozenRequest(request, range: range,
+                hasComparison: comparisonLabel != nil, comparisonRange: comparisonResolvedRange)
             return result
         } catch let error as RequestError {
             return MarinaDataResult(status: "invalidRequest", scope: workspace.name, explanation: error.message)
@@ -152,6 +163,7 @@ final class MarinaReadOnlyDataService {
         var operation = request.operation
         // These are structured query fields, never interpretations of the user's wording.
         if request.tool == .findRecords { operation = .inventory }
+        else if request.tool == .accounts { operation = request.accountID == nil ? .inventory : .transactions }
         else if request.periodUnit != nil { operation = .trend }
         else if request.comparisonFilter != nil || request.comparisonPeriod != nil || request.comparisonStartDate != nil || request.comparisonAllTime { operation = .comparison }
         else if request.grouping != .none && operation != .share { operation = .ranking }
@@ -180,7 +192,10 @@ final class MarinaReadOnlyDataService {
         case .accounts: title = "Account balances"
         case .findRecords: title = result.status == "candidates" ? "Which did you mean?" : "Matching records"
         }
-        if operation == .transactions { title = request.tool == .income ? "Income records" : request.limit == 1 && request.sort == .largest ? "Largest expense" : "Expenses" }
+        if operation == .transactions {
+            title = request.tool == .accounts ? "Account activity" : request.tool == .income ? "Income records"
+                : request.limit == 1 && request.sort == .largest ? "Largest expense" : "Expenses"
+        }
         if operation == .ranking { title = "\(request.tool == .income ? "Income" : "Spending") by \(request.grouping.rawValue)" }
         if operation == .trend { title = request.tool == .budgetSummary ? "Savings over time" : request.tool == .income ? "Income over time" : "Spending over time" }
         if operation == .comparison { title = request.tool == .income ? "Income comparison" : "Spending comparison" }
@@ -222,17 +237,11 @@ final class MarinaReadOnlyDataService {
             let remainder = total - chartPoints.reduce(0) { $0 + $1.value }
             chartPoints.append(.init(id: "remaining-groups", label: "Other", value: remainder))
         }
-        var frozen = request
-        frozen.relativePeriod = nil
-        if comparisonLabel != nil {
-            frozen.comparisonPeriod = nil
-            frozen.comparisonStartDate = comparisonRange.map { dateText($0.startDate) }
-            frozen.comparisonEndDate = comparisonRange.map { dateText($0.endDate) }
-            frozen.comparisonAllTime = comparisonRange == nil
-        }
-        if let range { frozen.startDate = dateText(range.startDate); frozen.endDate = dateText(range.endDate); frozen.allTime = false }
-        else { frozen.allTime = true }
-        let canPage = result.nextOffset != nil && [.transactions, .inventory, .ranking, .share, .trend].contains(operation) && !(operation == .transactions && request.limit == 1)
+        let frozen = frozenRequest(request, range: range,
+            hasComparison: comparisonLabel != nil, comparisonRange: comparisonRange)
+        let isLargestExpense = request.tool == .expenses && operation == .transactions
+            && request.sort == .largest && request.limit == 1
+        let canPage = result.nextOffset != nil && [.transactions, .inventory, .ranking, .share, .trend].contains(operation) && !isLargestExpense
         let qualifier: String?
         if request.tool == .expenses {
             switch request.expenseMeasure {
@@ -274,6 +283,24 @@ final class MarinaReadOnlyDataService {
                      totalCount: result.totalCount,
                      pagination: canPage ? .init(workspaceID: workspace.id, request: frozen, visibleCount: request.offset + result.records.count, calculationDate: now, excludeFuturePlanned: homeContext?.excludeFuturePlannedExpensesFromCalculations ?? false, excludeFutureVariable: homeContext?.excludeFutureVariableExpensesFromCalculations ?? false) : nil,
                      isEmpty: result.status == "empty" && (request.tool == .expenses || request.tool == .income || request.tool == .findRecords))
+    }
+
+    private func frozenRequest(_ request: MarinaDataRequest, range: HomeQueryDateRange?,
+                               hasComparison: Bool, comparisonRange: HomeQueryDateRange?) -> MarinaDataRequest {
+        var frozen = request
+        frozen.relativePeriod = nil
+        if hasComparison {
+            frozen.comparisonPeriod = nil
+            frozen.comparisonStartDate = comparisonRange.map { dateText($0.startDate) }
+            frozen.comparisonEndDate = comparisonRange.map { dateText($0.endDate) }
+            frozen.comparisonAllTime = comparisonRange == nil
+        }
+        if let range {
+            frozen.startDate = dateText(range.startDate)
+            frozen.endDate = dateText(range.endDate)
+            frozen.allTime = false
+        } else { frozen.allTime = true }
+        return frozen
     }
 
     private func presentationDate(_ value: String) -> Date? {
@@ -331,8 +358,19 @@ final class MarinaReadOnlyDataService {
         try check(request.cardID, ids: snapshot.cards.map(\.id), label: "card")
         if request.categoryID != "uncategorized" { try check(request.categoryID, ids: snapshot.categories.map(\.id), label: "category") }
         try check(request.budgetID, ids: snapshot.budgets.map(\.id), label: "budget")
-        try check(request.accountID, ids: snapshot.savingsAccounts.map(\.id) + snapshot.reconciliationAccounts.map(\.id), label: "account")
+        switch request.scope {
+        case .savings:
+            try check(request.accountID, ids: snapshot.savingsAccounts.map(\.id), label: "savings account")
+        case .reconciliation:
+            try check(request.accountID, ids: snapshot.reconciliationAccounts.map(\.id), label: "reconciliation account")
+        default:
+            try check(request.accountID, ids: snapshot.savingsAccounts.map(\.id) + snapshot.reconciliationAccounts.map(\.id), label: "account")
+        }
         func require(_ condition: Bool, _ message: String) throws { if !condition { throw RequestError(message: message) } }
+        try require(request.tool != .accounts || [.all, .savings, .reconciliation].contains(request.scope), "Accounts require all, savings, or reconciliation scope.")
+        if let kind = request.recordKind {
+            try require(["card", "category", "budget", "preset", "savingsAccount", "reconciliationAccount", "incomeSource", "merchant", "workspace"].contains(kind), "Unknown record kind. Choose card, category, budget, preset, savingsAccount, reconciliationAccount, incomeSource, merchant, or workspace.")
+        }
         try require(request.purpose != .budgetPace || request.tool == .budgetSummary, "Budget pace requires budgetSummary.")
         try require(request.purpose != .incomeProgress || request.tool == .income, "Income progress requires income.")
         try require(request.purpose != .upcomingPresets || request.tool == .expenses, "Upcoming presets require expenses.")
@@ -432,7 +470,7 @@ final class MarinaReadOnlyDataService {
         return HomeQueryDateRange(startDate: calendar.startOfDay(for: period.start), endDate: endOfDay(period.end))
     }
 
-    private func findRecords(_ request: MarinaDataRequest, snapshot: MarinaWorkspaceSnapshot) -> MarinaDataResult {
+    private func lookupRecords(snapshot: MarinaWorkspaceSnapshot) -> [MarinaDataResult.Record] {
         var records: [MarinaDataResult.Record] = [.init(id: workspace.id.uuidString, kind: "workspace", title: workspace.name, detail: workspace.hexColor)]
         records += snapshot.cards.map { .init(id: $0.id.uuidString, kind: "card", title: $0.name, detail: "\($0.theme) / \($0.effect)") }
         records += snapshot.categories.map { .init(id: $0.id.uuidString, kind: "category", title: $0.name, detail: $0.hexColor) }
@@ -443,7 +481,12 @@ final class MarinaReadOnlyDataService {
         records += snapshot.reconciliationAccounts.map { .init(id: $0.id.uuidString, kind: "reconciliationAccount", title: $0.name) }
         records += Set(snapshot.incomes.map(\.source)).sorted().map { .init(id: $0, kind: "incomeSource", title: $0) }
         records += Set(snapshot.variableExpenses.map(\.descriptionText)).sorted().map { .init(id: $0, kind: "merchant", title: $0) }
-        if let kind = request.recordKind, request.search == nil { records = records.filter { $0.kind == kind } }
+        return records
+    }
+
+    private func findRecords(_ request: MarinaDataRequest, snapshot: MarinaWorkspaceSnapshot) -> MarinaDataResult {
+        var records = lookupRecords(snapshot: snapshot)
+        if let kind = request.recordKind { records = records.filter { $0.kind == kind } }
         if let search = request.search, !search.isEmpty { records = records.filter { matches($0.title, search) } }
         var result = page(records, request: request, scope: workspace.name)
         result.metrics = [.init(label: "Matching record count", value: Double(records.count), unit: .number)]

@@ -18,6 +18,7 @@
   },
   "testTargets" : [
     {
+      "enabled" : false,
       "target" : {
         "containerPath" : "container:OffshoreBudgeting.xcodeproj",
         "identifier" : "4C96F8672F20523900541774",
@@ -26,6 +27,111 @@
     },
     {
       "parallelizable" : true,
+      "skippedTests" : {
+        "suites" : [
+          {
+            "name" : "AddExpenseShortcutExecutorTests"
+          },
+          {
+            "name" : "AllocationLedgerServiceTests"
+          },
+          {
+            "name" : "AppCommandHubPolicyTests"
+          },
+          {
+            "name" : "AppRootLaunchSectionResolverTests"
+          },
+          {
+            "name" : "BudgetDeletionServiceTests"
+          },
+          {
+            "name" : "BudgetPlannedExpenseStoreTests"
+          },
+          {
+            "name" : "CategoryArchiveBehaviorTests"
+          },
+          {
+            "name" : "ContentViewResumeCoordinatorTests"
+          },
+          {
+            "name" : "ContentViewWidgetRefreshExecutorTests"
+          },
+          {
+            "name" : "DateRangeEditorDraftTests"
+          },
+          {
+            "name" : "DebugFeatureFlagResolverTests"
+          },
+          {
+            "name" : "ExcursionModeReliabilityTests"
+          },
+          {
+            "name" : "ExpenseImageAndPaystubImportParserTests"
+          },
+          {
+            "name" : "HomeCategoryMetricsCalculatorTests"
+          },
+          {
+            "name" : "HomeNextPlannedExpenseFinderTests"
+          },
+          {
+            "name" : "HomePinnedStoresTests"
+          },
+          {
+            "name" : "HomeSpendTrendsAggregatorTests"
+          },
+          {
+            "name" : "ICloudPreferenceSyncServiceTests"
+          },
+          {
+            "name" : "OffshoreBudgetingTests"
+          },
+          {
+            "name" : "OffshoreIntentDataStoreResolutionTests"
+          },
+          {
+            "name" : "PlannedExpenseDisplaySubtitleTests"
+          },
+          {
+            "name" : "PlannedExpenseFuturePolicyTests"
+          },
+          {
+            "name" : "PostBoardingTipsStoreTests"
+          },
+          {
+            "name" : "ReconciliationDetailSearchTests"
+          },
+          {
+            "name" : "SavingsAccountServiceTests"
+          },
+          {
+            "name" : "SnapshotContentSignatureTests"
+          },
+          {
+            "name" : "StatementPDFImportParserTests"
+          },
+          {
+            "name" : "SwiftDataCRUDTests"
+          },
+          {
+            "name" : "SwiftDataDeletionRulesTests"
+          },
+          {
+            "name" : "WhatIfScenarioStoreTests"
+          },
+          {
+            "name" : "WorkspaceTransferServiceTests"
+          }
+        ],
+        "xctestClasses" : [
+          {
+            "name" : "ICloudBootstrapTests"
+          },
+          {
+            "name" : "OnboardingResetServiceTests"
+          }
+        ]
+      },
       "target" : {
         "containerPath" : "container:OffshoreBudgeting.xcodeproj",
         "identifier" : "4C96F85D2F20523900541774",

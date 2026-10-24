@@ -29,6 +29,7 @@ struct MarinaToolSetBenchmarkTests {
             ("combined", ["findRecords", "readExpenses", "readIncome"])
         ]
         print("MarinaBenchmark accounting=component counts overlap; do not sum")
+        print("MarinaBenchmark context_capacity=\(model.contextSize)")
         var baselineTools: Int?
         var baselineTranscript: Int?
         for (name, names) in sets {
@@ -38,7 +39,13 @@ struct MarinaToolSetBenchmarkTests {
             do {
                 let toolTokens = try await model.tokenCount(for: tools)
                 let transcriptTokens = try await model.tokenCount(for: Array(session.transcript))
-                if name == "baseline" { baselineTools = toolTokens; baselineTranscript = transcriptTokens }
+                if name == "baseline" {
+                    baselineTools = toolTokens; baselineTranscript = transcriptTokens
+                    let schemaBytes = try tools.reduce(0) { try $0 + JSONEncoder().encode($1.parameters).count }
+                    let estimate = MarinaContextBudget.estimatedPrefixTokens(instructions: instructions, schemaBytes: schemaBytes)
+                    print("MarinaBenchmark fallback_initial_estimate=\(estimate) schema_bytes=\(schemaBytes)")
+                    #expect(estimate >= transcriptTokens, "Recalibrate the prefix fallback when production instructions or schemas change.")
+                }
                 let toolDelta = baselineTools.map { toolTokens - $0 }.map(String.init) ?? "unavailable"
                 let transcriptDelta = baselineTranscript.map { transcriptTokens - $0 }.map(String.init) ?? "unavailable"
                 print("MarinaBenchmark configuration=\(name) tool_set=\(toolTokens) initial_transcript=\(transcriptTokens) tool_delta=\(toolDelta) transcript_delta=\(transcriptDelta)")

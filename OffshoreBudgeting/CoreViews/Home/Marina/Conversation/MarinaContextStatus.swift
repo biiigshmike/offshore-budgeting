@@ -10,16 +10,15 @@ nonisolated enum MarinaContextStatus: String, Codable, Sendable {
     }
 
     static func status(in answers: [HomeAnswer]) -> Self? {
-        if answers.contains(where: { $0.contextStatus == .reached || $0.responseState == .contextLimit }) {
-            return .reached
-        }
-        return answers.contains(where: { $0.contextStatus == .approaching }) ? .approaching : nil
+        // Compatibility-only saved markers describe discarded model sessions.
+        // They must never prevent another request in this saved chat.
+        nil
     }
 
     var message: String {
         switch self {
-        case .approaching: "This chat is getting close to its limit. Start a new chat soon to keep talking with Marina."
-        case .reached: "This chat has reached its limit. Start a new chat to keep talking with Marina. Your conversation is saved."
+        case .approaching: "Marina can refresh its working context while keeping this chat saved."
+        case .reached: "Try a shorter question or a narrower date range. You can keep using this chat."
         }
     }
 }

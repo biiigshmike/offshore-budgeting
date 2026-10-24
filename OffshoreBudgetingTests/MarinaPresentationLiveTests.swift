@@ -96,6 +96,16 @@ struct MarinaPresentationLiveTests {
     func sharedVisualParaphrasesSelectAnalyticalPurposes() async throws {
         if let message = MarinaConversationRuntime.availabilityMessage { throw EvaluationError.unavailable(message) }
         let fixture = try Fixture()
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: .now)
+        let month = try #require(calendar.dateInterval(of: .month, for: today))
+        let previousDay = month.start.addingTimeInterval(-1)
+        for (amount, planned, date) in [(4000.0, true, today), (3000.38, false, today),
+                                         (9000.0, true, previousDay), (999.0, false, previousDay)] {
+            fixture.context.insert(Income(source: "Salary", amount: amount, date: date,
+                                          isPlanned: planned, workspace: fixture.workspace))
+        }
+        try fixture.context.save()
         for (prompt, purpose) in [
             ("How is my spending tracking against the plan this month?", MarinaDataRequest.Purpose.budgetPace),
             ("What percentage of my planned income have I received this month?", .incomeProgress),
@@ -105,6 +115,11 @@ struct MarinaPresentationLiveTests {
             var history: [HomeAnswer] = []
             let answer = try await ask(prompt, runtime: runtime, fixture: fixture, history: &history)
             #expect(answer.presentations?.contains { $0.purpose == purpose } == true)
+            if purpose == .incomeProgress {
+                #expect(answer.presentations?.contains {
+                    $0.incomeProgress?.actual == 3000.38 && $0.incomeProgress?.planned == 4000
+                } == true)
+            }
             if purpose == .upcomingPresets {
                 let request = try #require(runtime.toolRequests.last { $0.purpose == purpose })
                 let calendar = Calendar.current
@@ -206,7 +221,16 @@ struct MarinaPresentationLiveTests {
         for request in runtime.toolRequests {
             print("MarinaBaseline tool=\(request.tool.rawValue) operation=\(request.operation.rawValue) card_present=\(request.cardID != nil) category_present=\(request.categoryID != nil)")
         }
+        if ProcessInfo.processInfo.environment["MARINA_LONG_EVALUATION_VERBOSE"] == "1" {
+            // Opt-in synthetic fixture diagnostics; these tests never read the user's workspace.
+            print("MarinaBaselineSynthetic prompt=\(prompt) requests=\(String(decoding: try JSONEncoder().encode(runtime.toolRequests), as: UTF8.self)) caption=\(answer.explanation ?? "")")
+            print("MarinaBaselineSynthetic notices=\(answer.rows.filter { $0.role == .assumption }.map(\.title)) error=\(runtime.lastErrorDescription ?? "none")")
+            if answer.responseState != .complete { print("MarinaBaselineSynthetic failed_calls=\(runtime.diagnosticFailedToolCalls)") }
+        }
         try #require(runtime.lastErrorDescription == nil, "Native baseline turn failed; inspect categorized diagnostics.")
+        try #require(answer.responseState == .complete, "A verified result with an unresolved tool error is not a completed answer.")
+        try #require(answer.explanation?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false,
+                     "A native baseline turn must publish a visible answer or clarification.")
         history.append(answer)
         return answer
     }

@@ -4,10 +4,14 @@ import Testing
 @testable import Offshore
 
 @MainActor
-struct MarinaAnalyticalPresentationTests {
+final class MarinaAnalyticalPresentationTests {
+    private var retainedContainers: [ModelContainer] = []
     private func fixture() throws -> (ModelContext, Workspace, Card) {
         let schema = Schema([Workspace.self, Budget.self, Card.self, BudgetCardLink.self, Offshore.Category.self, Preset.self, BudgetPresetLink.self, BudgetCategoryLimit.self, PlannedExpense.self, VariableExpense.self, AllocationAccount.self, ExpenseAllocation.self, AllocationSettlement.self, SavingsAccount.self, SavingsLedgerEntry.self, ImportMerchantRule.self, AssistantAliasRule.self, IncomeSeries.self, Income.self, MarinaChatSession.self])
-        let context = ModelContext(try ModelContainer(for: schema, configurations: ModelConfiguration(isStoredInMemoryOnly: true)))
+        let container = try ModelContainer(for: schema, configurations: ModelConfiguration(
+            "MarinaAnalyticalFixture-\(UUID().uuidString)", schema: schema, isStoredInMemoryOnly: true, cloudKitDatabase: .none))
+        retainedContainers.append(container)
+        let context = ModelContext(container)
         let workspace = Workspace(name: "Personal", hexColor: "#FFFFFF")
         let card = Card(name: "Debit", workspace: workspace)
         context.insert(workspace); context.insert(card)

@@ -100,6 +100,7 @@ struct MarinaLiveConversationTests {
     private enum EvaluationError: Error { case unavailable(String) }
 
     private struct Fixture {
+        let container: ModelContainer
         let context: ModelContext
         let workspace: Workspace
         let card: Card
@@ -115,7 +116,14 @@ struct MarinaLiveConversationTests {
                                  ExpenseAllocation.self, AllocationSettlement.self, SavingsAccount.self,
                                  SavingsLedgerEntry.self, ImportMerchantRule.self, AssistantAliasRule.self,
                                  MarinaChatSession.self, IncomeSeries.self, Income.self])
-            context = ModelContext(try ModelContainer(for: schema, configurations: ModelConfiguration(isStoredInMemoryOnly: true)))
+            container = try ModelContainer(
+                for: schema,
+                configurations: ModelConfiguration(
+                    "MarinaLiveFixture-\(UUID())", schema: schema,
+                    isStoredInMemoryOnly: true, cloudKitDatabase: .none
+                )
+            )
+            context = ModelContext(container)
             let calendar = Calendar.current
             today = calendar.startOfDay(for: .now)
             let month = try #require(calendar.dateInterval(of: .month, for: today))

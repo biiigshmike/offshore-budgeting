@@ -104,7 +104,7 @@ final class MarinaTokenDiagnostics {
         let elapsed = attemptStarts[attempt].map { String(Self.seconds($0.duration(to: .now))) } ?? "unavailable"
         let execution = databaseStarts[attempt].map { String(Self.seconds($0.duration(to: .now))) } ?? "unavailable"
         lines.append("attempt=\(attempt) tool_elapsed_seconds=\(elapsed) execution_and_presentation_seconds=\(execution)")
-        lines.append("attempt=\(attempt) stage=returned status=\(Self.safe(status, ["success", "empty", "candidates", "needsClarification", "invalidRequest", "unavailable", "failure"]))")
+        lines.append("attempt=\(attempt) stage=returned status=\(Self.safe(status, ["success", "empty", "candidates", "needsClarification", "scopeAlreadyResolved", "invalidRequest", "unavailable", "failure"]))")
     }
     func failed(attempt: Int) {
         guard active else { return }
@@ -114,6 +114,11 @@ final class MarinaTokenDiagnostics {
         guard active, marks["first_text"] == nil else { return }
         marks["first_text"] = .now
     }
+    func contextPolicy(capacity: Int, reserve: Int, renewals: Int) {
+        guard active else { return }
+        lines.append("working_context_capacity=\(capacity) response_reserve=\(reserve) session_renewals=\(renewals)")
+    }
+
     func finish(entries: [Transcript.Entry], outcome: String, reset: Bool) {
         guard active, !finished else { return }
         finished = true

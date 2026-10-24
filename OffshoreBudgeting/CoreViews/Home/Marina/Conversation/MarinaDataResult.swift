@@ -31,46 +31,102 @@ struct MarinaDataResult: Codable, Equatable, Sendable {
     var nextOffset: Int? = nil
     var explanation: String? = nil
     var appliedFilters: String? = nil
+    /// Validated targets and resolved dates for reference memory, never a cached financial answer.
+    var resolvedRequest: MarinaDataRequest? = nil
 
-    var modelFactsJSON: String {
-        // UI snapshots and pagination are not model context. Include exact formatted money facts.
+    var modelFactsJSON: String { modelFactsJSON(for: nil) }
+
+    /// A bounded narration payload. The original result and saved UI snapshots stay complete.
+    func modelFactsJSON(for request: MarinaDataRequest?, reference: ((String, String) -> String?)? = nil) -> String {
         struct Facts: Encodable {
-            struct MetricFact: Encodable { let label: String; let value: Double; let formatted: String; let unit: Metric.Unit }
-            struct SelectionFact: Encodable { let type = "expenseMatching"; let filters: [[String: String]] }
-            struct RecordFact: Encodable { let id: String; let kind: String; let title: String; let date: String?; let amount: Double?; let detail: String?; let formattedAmount: String?; let filter: [String: String]?; let selection: SelectionFact? }
-            let status: String; let scope: String; let metrics: [MetricFact]; let records: [RecordFact]?
-            let totalCount: Int; let nextOffset: Int?; let explanation: String?; let appliedFilters: String?
-        }
-        let isSummary = presentation?.operation == .summary
-        func resolvedFilter(_ record: Record) -> [String: String]? {
-            guard presentation?.operation == .inventory else { return nil }
-            switch record.kind {
-            case "savingsAccount", "reconciliationAccount": return ["accountID": record.id]
-            case "incomeSource": return ["source": record.title]
-            default: return nil
+            struct MetricFact: Encodable { let label: String; let formatted: String; let unit: Metric.Unit }
+            struct RecordFact: Encodable {
+                let selection: String?
+                let kind: String
+                let title: String
+                let date: String?
+                let detail: String?
+                let formattedAmount: String?
             }
+            let status: String
+            let scope: String
+            let comparisonScope: String?
+            let metrics: [MetricFact]
+            let records: [RecordFact]?
+            let totalCount: Int
+            let nextOffset: Int?
+            let explanation: String?
+            let appliedFilters: String?
+            let qualifier: String?
         }
-        func expenseFilters(_ record: Record) -> [[String: String]]? {
-            guard presentation?.operation == .inventory else { return nil }
-            switch record.kind {
-            case "card": return [["type": "expenseCard", "id": record.id]]
-            case "category": return [["type": "expenseCategory", "id": record.id]]
-            case "budget": return [["type": "expenseBudget", "id": record.id]]
-            case "preset": return [["type": "expensePreset", "id": record.id]]
-            case "merchant": return [["type": "expenseMerchant", "name": record.title]]
-            default: return nil
-            }
+        let tool = request?.tool ?? presentation?.topicKey?.split(separator: ":").first.flatMap { MarinaDataRequest.Tool(rawValue: String($0)) }
+        let operation = presentation?.operation ?? request?.operation
+        let purpose = presentation?.purpose ?? request?.purpose
+        let isInventory = operation == .inventory || tool == .findRecords
+        let isAccountList = tool == .accounts && (request.map { $0.accountID == nil }
+            ?? !metrics.contains { $0.label == "Selected period activity count" })
+        // Account balance metrics repeat the account rows and can grow without a page limit.
+        // Keep the paged rows instead. Selected-account activity still retains its balance.
+        let selectedMetrics = modelMetrics(tool: tool, operation: operation, purpose: purpose,
+                                           hypothetical: request?.hypotheticalSpending != nil,
+                                           accountList: isAccountList)
+        let includesRecords = isInventory || tool == .accounts
+            || (tool == .budgetSummary && purpose != .budgetPace && request?.hypotheticalSpending == nil)
+            || (operation != .summary && operation != .comparison)
+        let modelRecords = includesRecords ? Array(records.prefix(5)) : []
+        let recordFacts = modelRecords.map { record in
+            Facts.RecordFact(
+                selection: isInventory || isAccountList ? reference?(record.kind, record.id) : nil,
+                kind: record.kind, title: record.title, date: record.date, detail: record.detail,
+                formattedAmount: record.amount.map { CurrencyFormatter.string(from: $0) })
         }
+        let offset = request?.offset ?? presentation?.pagination?.request.offset ?? nextOffset.map { max(0, $0 - records.count) } ?? 0
+        let modelNextOffset = includesRecords
+            ? (modelRecords.count < records.count ? offset + modelRecords.count : nextOffset)
+            : nil
         let facts = Facts(status: status, scope: scope,
-                          metrics: metrics.map { .init(label: $0.label, value: $0.value, formatted: $0.formatted, unit: $0.unit) },
-                          records: isSummary ? nil : records.map { .init(id: $0.id, kind: $0.kind, title: $0.title, date: $0.date, amount: $0.amount, detail: $0.detail, formattedAmount: $0.amount.map { CurrencyFormatter.string(from: $0) }, filter: resolvedFilter($0), selection: expenseFilters($0).map { .init(filters: $0) }) },
-                          totalCount: totalCount, nextOffset: isSummary ? nil : nextOffset, explanation: explanation, appliedFilters: appliedFilters)
+                          comparisonScope: operation == .comparison ? presentation?.chartPoints.last?.label : nil,
+                          metrics: selectedMetrics.map { .init(label: $0.label, formatted: $0.formatted, unit: $0.unit) },
+                          records: includesRecords ? recordFacts : nil,
+                          totalCount: totalCount, nextOffset: modelNextOffset, explanation: explanation,
+                          appliedFilters: appliedFilters, qualifier: presentation?.qualifier)
         let encoder = JSONEncoder()
         encoder.outputFormatting = .sortedKeys
         guard let data = try? encoder.encode(facts), let text = String(data: data, encoding: .utf8) else {
             return "{\"status\":\"error\",\"explanation\":\"Result encoding failed\"}"
         }
         return text
+    }
+
+    private func modelMetrics(tool: MarinaDataRequest.Tool?, operation: MarinaDataRequest.Operation?,
+                              purpose: MarinaDataRequest.Purpose?, hypothetical: Bool,
+                              accountList: Bool) -> [Metric] {
+        if accountList { return [] }
+        if operation == .comparison {
+            return metrics.filter { ["Total", "Comparison total", "Difference", "Change percent"].contains($0.label) }
+        }
+        if purpose == .incomeProgress {
+            return metrics.filter { ["Actual income", "Planned income", "Income progress percent"].contains($0.label) }
+        }
+        if tool == .income && operation == .summary {
+            // State and full-result scope remain in the explanation. Unrequested counterpart
+            // totals can be mistaken for fresh evidence in a later actual/planned follow-up.
+            return metrics.filter { ["Total", "Count"].contains($0.label) || $0.label.hasPrefix("Average per ") }
+        }
+        guard tool == .budgetSummary else { return metrics }
+        let paceLabels: Set<String> = ["Planned spending", "Pace actual spending", "Elapsed period percent",
+            "Expected spending by now", "Spending pace difference", "Spending per elapsed day", "Projected spending at current pace"]
+        if purpose == .budgetPace { return metrics.filter { paceLabels.contains($0.label) } }
+        if operation == .trend {
+            return metrics.filter { ["Actual savings", "Projected savings"].contains($0.label)
+                || $0.label.hasPrefix("Average actual savings per ") || $0.label.hasPrefix("Average projected savings per ") }
+        }
+        if hypothetical {
+            return metrics.filter { ["Projected savings", "Remaining room", "Hypothetical additional spending",
+                                      "Projected savings after hypothetical spending"].contains($0.label) }
+        }
+        // These details remain available through the dedicated pace operation.
+        return metrics.filter { !paceLabels.subtracting(["Planned spending"]).contains($0.label) }
     }
 
     var homeAnswer: HomeAnswer {

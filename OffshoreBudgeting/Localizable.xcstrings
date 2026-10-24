@@ -13473,7 +13473,7 @@
       }
     },
     "common.edit" : {
-      "comment" : "Edit action label.\nGeneric action label to start editing.",
+      "comment" : "Generic action label to start editing.",
       "extractionState" : "extracted_with_value",
       "localizations" : {
         "ar" : {
@@ -59286,9 +59286,6 @@
           }
         }
       }
-    },
-    "Start new chat" : {
-
     },
     "Start the budget, keep the generated title or enter your own, then confirm dates." : {
       "localizations" : {

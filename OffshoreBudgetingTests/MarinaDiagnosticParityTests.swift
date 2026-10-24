@@ -62,7 +62,11 @@ struct MarinaDiagnosticParityTests {
         plain.begin(service: service, onResult: {})
         observed.begin(service: service, onResult: {})
         defer { plain.end(); observed.end() }
-        let args = MarinaExpensesTool.Arguments(selection: .expenseMatching(filters: [.expenseCard(id: fixture.card.id.uuidString)]), dates: .currentMonth, operation: .summary)
+        var memory = MarinaConversationMemory(workspaceID: fixture.workspace.id, chatID: UUID())
+        let ref = memory.reference(for: .init(kind: "card", id: fixture.card.id.uuidString, name: fixture.card.name))
+        plain.conversationMemory = { memory }
+        observed.conversationMemory = { memory }
+        let args = MarinaExpensesTool.Arguments(selection: .references([ref]), dates: .currentMonth, operation: .summary)
         let plainOutput = try await MarinaExpensesTool(bridge: plain).call(arguments: args)
         let observedOutput = try await MarinaExpensesTool(bridge: observed).call(arguments: args)
         #expect(plainOutput == observedOutput)
@@ -106,7 +110,7 @@ struct MarinaDiagnosticParityTests {
         let plainLookup = try await MarinaFindRecordsTool(bridge: plain).call(arguments: lookup)
         let observedLookup = try await MarinaFindRecordsTool(bridge: observed).call(arguments: lookup)
         #expect(plainLookup == observedLookup)
-        let summary = MarinaExpensesTool.Arguments(selection: .expenseWorkspace, dates: .currentMonth, operation: .summary)
+        let summary = MarinaExpensesTool.Arguments(selection: .workspace, dates: .currentMonth, operation: .summary)
         let plainOutput = try await MarinaExpensesTool(bridge: plain).call(arguments: summary)
         let observedOutput = try await MarinaExpensesTool(bridge: observed).call(arguments: summary)
         #expect(plainOutput == observedOutput)

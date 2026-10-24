@@ -4,7 +4,10 @@ import Testing
 @testable import Offshore
 
 @MainActor
-struct MarinaCreateServiceTests {
+final class MarinaCreateServiceTests {
+    // Keep each in-memory store alive for the entire test, including relationship inserts.
+    private var containers: [ModelContainer] = []
+
     private func makeContext() throws -> ModelContext {
         let schema = Schema([
             Workspace.self,
@@ -29,8 +32,10 @@ struct MarinaCreateServiceTests {
             Income.self
         ])
 
-        let config = ModelConfiguration(isStoredInMemoryOnly: true)
+        let config = ModelConfiguration("MarinaCreateFixture-\(UUID().uuidString)", schema: schema,
+                                        isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         let container = try ModelContainer(for: schema, configurations: config)
+        containers.append(container)
         return ModelContext(container)
     }
 

@@ -224,6 +224,7 @@ final class MarinaChatSessionStore {
         sessionID: UUID,
         workspaceID: UUID,
         modelContext: ModelContext,
+        memory: MarinaConversationMemory? = nil,
         now: Date = Date()
     ) throws {
         guard let session = try session(id: sessionID, workspaceID: workspaceID, modelContext: modelContext) else {
@@ -232,6 +233,13 @@ final class MarinaChatSessionStore {
 
         let trimmedAnswers = trimmed(answers)
         session.visibleAnswersData = try encodedAnswers(trimmedAnswers)
+        if let memory, memory.workspaceID == workspaceID, memory.chatID == sessionID,
+           memory.version == MarinaConversationMemory.currentVersion {
+            let data = try encoder.encode(memory)
+            if data.count <= MarinaConversationMemory.maxStoredBytes {
+                session.followUpContextData = data
+            }
+        }
         session.updatedAt = now
         session.lastOpenedAt = now
 
@@ -311,6 +319,16 @@ final class MarinaChatSessionStore {
             return []
         }
         return trimmed(answers)
+    }
+
+    func memory(for session: MarinaChatSession) -> MarinaConversationMemory? {
+        guard !session.followUpContextData.isEmpty,
+              session.followUpContextData.count <= MarinaConversationMemory.maxStoredBytes,
+              let memory = try? decoder.decode(MarinaConversationMemory.self, from: session.followUpContextData),
+              memory.version == MarinaConversationMemory.currentVersion,
+              memory.workspaceID == session.workspace?.id,
+              memory.chatID == session.id else { return nil }
+        return memory
     }
 
     func markLegacyMigrationComplete(workspaceID: UUID) {

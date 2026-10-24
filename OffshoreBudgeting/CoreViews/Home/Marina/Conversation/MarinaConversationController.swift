@@ -10,6 +10,9 @@ final class MarinaConversationController {
     private var availabilityRevision = 0
     @ObservationIgnored private var runtime: AnyObject?
     @ObservationIgnored private var workspaceID: UUID?
+    @ObservationIgnored private var chatID: UUID?
+    @ObservationIgnored private var preparationTask: Task<Void, Never>?
+    @ObservationIgnored private var preparationID: UUID?
     @ObservationIgnored private var generation = UUID()
 
     func refreshAvailability() { availabilityRevision += 1 }
@@ -26,9 +29,67 @@ final class MarinaConversationController {
 
     func reset() {
         generation = UUID()
+        preparationTask?.cancel()
+        preparationTask = nil
+        preparationID = nil
         runtime = nil
         workspaceID = nil
+        chatID = nil
         isResponding = false
+    }
+
+    var memory: MarinaConversationMemory? {
+        #if canImport(FoundationModels)
+        if #available(iOS 26.0, macCatalyst 26.0, *) {
+            return (runtime as? MarinaConversationRuntime)?.memory
+        }
+        #endif
+        return nil
+    }
+
+    @discardableResult
+    func recordUIRead(request: MarinaDataRequest, result: MarinaDataResult, answerID: UUID,
+                      workspaceID: UUID, chatID: UUID, restoredMemory: MarinaConversationMemory?) -> Bool {
+        guard !isResponding, self.workspaceID == workspaceID, self.chatID == chatID else { return false }
+        // A suspended preparation captured the previous page's memory. Cancel it before updating.
+        preparationTask?.cancel()
+        preparationTask = nil
+        preparationID = nil
+        #if canImport(FoundationModels)
+        if #available(iOS 26.0, macCatalyst 26.0, *), let active = runtime as? MarinaConversationRuntime {
+            return active.recordUIRead(request: request, result: result, answerID: answerID,
+                workspaceID: workspaceID, chatID: chatID, restoredMemory: restoredMemory)
+        }
+        #endif
+        return false
+    }
+
+    func prepare(history: [HomeAnswer], workspace: Workspace, homeContext: MarinaPanelHomeContext?,
+                 defaultBudgetingPeriod: BudgetingPeriod, chatID: UUID,
+                 restoredMemory: MarinaConversationMemory?) {
+        guard !isResponding, availabilityMessage == nil else { return }
+        if workspaceID != workspace.id || self.chatID != chatID { reset() }
+        workspaceID = workspace.id
+        self.chatID = chatID
+        #if canImport(FoundationModels)
+        if #available(iOS 26.0, macCatalyst 26.0, *) {
+            guard preparationTask == nil else { return }
+            let active = (runtime as? MarinaConversationRuntime) ?? MarinaConversationRuntime()
+            runtime = active
+            let preparation = UUID()
+            preparationID = preparation
+            preparationTask = Task { [weak self] in
+                defer {
+                    if self?.preparationID == preparation {
+                        self?.preparationTask = nil
+                        self?.preparationID = nil
+                    }
+                }
+                await active.prepare(history: history, workspace: workspace, homeContext: homeContext,
+                    defaultBudgetingPeriod: defaultBudgetingPeriod, chatID: chatID, restoredMemory: restoredMemory)
+            }
+        }
+        #endif
     }
 
     func respond(
@@ -39,15 +100,24 @@ final class MarinaConversationController {
         modelContext: ModelContext,
         homeContext: MarinaPanelHomeContext?,
         defaultBudgetingPeriod: BudgetingPeriod,
+        chatID: UUID? = nil,
+        restoredMemory: MarinaConversationMemory? = nil,
         onUpdate: @escaping (HomeAnswer) -> Void
     ) async {
         guard !isResponding else { return }
-        if workspaceID != workspace.id { reset() }
+        if workspaceID != workspace.id || self.chatID != chatID { reset() }
         workspaceID = workspace.id
+        self.chatID = chatID
         let turn = UUID()
         generation = turn
         isResponding = true
         defer { if generation == turn { isResponding = false } }
+        let preparing = preparationTask
+        preparing?.cancel()
+        await preparing?.value
+        guard generation == turn, !Task.isCancelled else { return }
+        preparationTask = nil
+        preparationID = nil
         let emit: (HomeAnswer) -> Void = { [weak self] answer in
             guard let self, self.generation == turn, !Task.isCancelled else { return }
             onUpdate(answer)
@@ -75,7 +145,7 @@ final class MarinaConversationController {
             await active.respond(prompt: prompt, history: history, workspace: workspace,
                                  modelContext: modelContext, homeContext: homeContext,
                                  defaultBudgetingPeriod: defaultBudgetingPeriod,
-                                 answerID: answerID, onUpdate: emit)
+                                 answerID: answerID, chatID: chatID, restoredMemory: restoredMemory, onUpdate: emit)
         }
         #endif
     }
@@ -92,6 +162,7 @@ enum MarinaConversationHistory {
         var remaining = characterBudget
         var exchanges: [(prompt: String, response: String)] = []
         for answer in answers.reversed() {
+            guard answer.responseState == nil || answer.responseState == .complete else { continue }
             guard let prompt = answer.userPrompt, !prompt.isEmpty else { continue }
             var facts: [String] = []
             if let presentations = answer.presentations {

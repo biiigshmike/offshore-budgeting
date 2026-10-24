@@ -4,15 +4,80 @@ import Testing
 @testable import Offshore
 
 @MainActor
-struct MarinaReadOnlyDataServiceTests {
+final class MarinaReadOnlyDataServiceTests {
+    private var containers: [ModelContainer] = []
+
     private func context() throws -> ModelContext {
         let schema = Schema([Workspace.self, Budget.self, Card.self, BudgetCardLink.self, Category.self, Preset.self, BudgetPresetLink.self, BudgetCategoryLimit.self, PlannedExpense.self, VariableExpense.self, AllocationAccount.self, ExpenseAllocation.self, AllocationSettlement.self, SavingsAccount.self, SavingsLedgerEntry.self, ImportMerchantRule.self, AssistantAliasRule.self, IncomeSeries.self, Income.self, MarinaChatSession.self])
-        return ModelContext(try ModelContainer(for: schema, configurations: ModelConfiguration(isStoredInMemoryOnly: true)))
+        let container = try ModelContainer(for: schema, configurations: ModelConfiguration(
+            "MarinaDataServiceFixture-\(UUID().uuidString)", schema: schema,
+            isStoredInMemoryOnly: true, cloudKitDatabase: .none))
+        containers.append(container)
+        return ModelContext(container)
     }
     private func date(_ day: Int, hour: Int = 12) -> Date {
         Calendar.current.date(from: DateComponents(year: 2026, month: 10, day: day, hour: hour))!
     }
     private func total(_ result: MarinaDataResult) -> Double? { result.metrics.first { $0.label == "Total" }?.value }
+
+    @Test func namedTargetRequirementsUseFreshWorkspaceScopedLookupCatalog() throws {
+        let context = try context()
+        let workspace = Workspace(name: "Personal", hexColor: "#FFFFFF")
+        let other = Workspace(name: "Other", hexColor: "#000000")
+        let category = Category(name: "Hair Care", hexColor: "#FFFFFF", workspace: workspace)
+        let foreignCategory = Category(name: "Hair Care", hexColor: "#FFFFFF", workspace: other)
+        let foreignCard = Card(name: "Foreign Card", workspace: other)
+        context.insert(workspace); context.insert(other); context.insert(category)
+        context.insert(foreignCategory); context.insert(foreignCard)
+        try context.save()
+        let service = MarinaReadOnlyDataService(workspace: workspace, modelContext: context, now: date(17))
+        let current = try #require(service.namedTargetRequirements(prompt: "Show the Hair Care category").first)
+        #expect(current.recordKind == "category" && !current.isAmbiguous)
+        #expect(current.candidates.map(\.id) == [category.id.uuidString])
+        let lookup = try service.execute(.init(tool: .findRecords, recordKind: "category", search: current.search))
+        #expect(lookup.records.map(\.id) == current.candidates.map(\.id))
+        let foreign = try service.namedTargetRequirements(prompt: "Show spending on Foreign Card")
+        #expect(!foreign.flatMap(\.candidates).contains { $0.id == foreignCard.id.uuidString })
+
+        category.name = "Salon"
+        try context.save()
+        #expect(try service.namedTargetRequirements(prompt: "Show the Hair Care category").flatMap(\.candidates).isEmpty)
+        let renamed = try #require(service.namedTargetRequirements(prompt: "Show the Salon category").first)
+        #expect(renamed.candidates.map(\.id) == [category.id.uuidString])
+        context.delete(category)
+        try context.save()
+        #expect(try service.namedTargetRequirements(prompt: "Show the Salon category").flatMap(\.candidates).isEmpty)
+    }
+
+    @Test func accountDomainNameRequirementsAgreeWithFreshTypedLookupAndScopeValidation() throws {
+        let context = try context()
+        let workspace = Workspace(name: "Personal", hexColor: "#FFFFFF")
+        let other = Workspace(name: "Other", hexColor: "#000000")
+        let savings = SavingsAccount(name: "Alex", total: 1_000, workspace: workspace)
+        let reconciliation = AllocationAccount(name: "Alex", workspace: workspace)
+        let foreign = AllocationAccount(name: "Alex", workspace: other)
+        context.insert(workspace); context.insert(other); context.insert(savings)
+        context.insert(reconciliation); context.insert(foreign)
+        context.insert(SavingsLedgerEntry(date: date(17), amount: 1_000, note: "Saved",
+            kindRaw: SavingsLedgerEntryKind.manualAdjustment.rawValue, workspace: workspace, account: savings))
+        context.insert(AllocationSettlement(date: date(17), note: "Shared balance", amount: 25,
+            workspace: workspace, account: reconciliation))
+        try context.save()
+        let service = MarinaReadOnlyDataService(workspace: workspace, modelContext: context, now: date(17))
+        let required = try #require(service.namedTargetRequirements(
+            prompt: "What is my current reconciliation balance with Alex?").first)
+        #expect(required.recordKind == "reconciliationAccount" && !required.isAmbiguous)
+        #expect(required.candidates.map(\.id) == [reconciliation.id.uuidString])
+        let lookup = try service.execute(.init(tool: .findRecords, recordKind: required.recordKind, search: required.search))
+        #expect(lookup.status == "success" && lookup.records.map(\.id) == [reconciliation.id.uuidString])
+        let request = MarinaDataRequest(tool: .accounts, accountID: reconciliation.id.uuidString, scope: .reconciliation)
+        #expect(required.includes(in: request))
+        #expect(metric("Alex current reconciliation balance", try service.execute(request)) == 25)
+        let wrongDomain = try service.execute(.init(tool: .accounts, accountID: savings.id.uuidString, scope: .reconciliation))
+        #expect(wrongDomain.status == "invalidRequest" && wrongDomain.metrics.isEmpty)
+        let saved = try #require(service.namedTargetRequirements(prompt: "Show savings balance in Alex").first)
+        #expect(saved.recordKind == "savingsAccount" && saved.candidates.map(\.id) == [savings.id.uuidString])
+    }
 
     #if canImport(FoundationModels)
     @Test func ambiguousLookupBlocksFinancialReadsUntilTheNextTurn() throws {
@@ -151,6 +216,145 @@ struct MarinaReadOnlyDataServiceTests {
         #expect(total(try service.execute(request)) == 0)
         #expect(try service.execute(request).status == "empty")
     }
+
+    @Test func namedLookupRespectsRecordKindAndPreservesUnresolvedAmbiguity() throws {
+        let context = try context()
+        let workspace = Workspace(name: "Personal", hexColor: "#FFFFFF")
+        let card = Card(name: "Apple", workspace: workspace)
+        let savings = SavingsAccount(name: "Apple", workspace: workspace)
+        let reconciliation = AllocationAccount(name: "Apple", workspace: workspace)
+        context.insert(workspace); context.insert(card); context.insert(savings); context.insert(reconciliation)
+        context.insert(VariableExpense(descriptionText: "Apple", amount: 20, transactionDate: date(17), workspace: workspace, card: card))
+        try context.save()
+        let service = MarinaReadOnlyDataService(workspace: workspace, modelContext: context, now: date(17))
+        var request = MarinaDataRequest(tool: .findRecords)
+        request.search = "Apple"
+        let ambiguous = try service.execute(request)
+        #expect(ambiguous.status == "candidates")
+        #expect(ambiguous.totalCount == 4)
+        #expect(Set(ambiguous.records.map(\.kind)) == ["card", "merchant", "savingsAccount", "reconciliationAccount"])
+
+        for (kind, id) in [("card", card.id.uuidString), ("merchant", "Apple"),
+                           ("savingsAccount", savings.id.uuidString), ("reconciliationAccount", reconciliation.id.uuidString)] {
+            request.recordKind = kind
+            let selected = try service.execute(request)
+            #expect(selected.status == "success")
+            #expect(selected.totalCount == 1)
+            #expect(selected.records.map(\.id) == [id])
+            #expect(selected.records.map(\.kind) == [kind])
+        }
+
+        let duplicate = Card(name: "Apple", workspace: workspace)
+        context.insert(duplicate)
+        try context.save()
+        request.recordKind = "card"
+        let sameKindAmbiguity = try service.execute(request)
+        #expect(sameKindAmbiguity.status == "candidates")
+        #expect(Set(sameKindAmbiguity.records.map(\.id)) == [card.id.uuidString, duplicate.id.uuidString])
+        #expect(sameKindAmbiguity.records.allSatisfy { $0.kind == "card" })
+        request.search = "Missing card"
+        let missing = try service.execute(request)
+        #expect(missing.status == "empty")
+        #expect(missing.records.isEmpty)
+    }
+
+    @Test func unknownRecordKindsAreInvalidForNamedAndInventoryLookups() throws {
+        let context = try context()
+        let workspace = Workspace(name: "Personal", hexColor: "#FFFFFF")
+        context.insert(workspace)
+        context.insert(Card(name: "Apple", workspace: workspace))
+        try context.save()
+        let service = MarinaReadOnlyDataService(workspace: workspace, modelContext: context, now: date(17))
+        for kind in ["", "cards", "Card", "unknown"] {
+            for search: String? in [nil, "Apple"] {
+                var request = MarinaDataRequest(tool: .findRecords)
+                request.recordKind = kind
+                request.search = search
+                let result = try service.execute(request)
+                #expect(result.status == "invalidRequest")
+                #expect(result.records.isEmpty && result.metrics.isEmpty)
+                #expect(result.presentation == nil)
+            }
+        }
+    }
+
+    @Test func accountSelectionsMustMatchRequestedKindWithoutFallingBackToOtherAccounts() throws {
+        let context = try context()
+        let workspace = Workspace(name: "Personal", hexColor: "#FFFFFF")
+        let savings = SavingsAccount(name: "Shared", workspace: workspace)
+        let reconciliation = AllocationAccount(name: "Shared", workspace: workspace)
+        context.insert(workspace); context.insert(savings); context.insert(reconciliation)
+        context.insert(SavingsLedgerEntry(date: date(17), amount: 30, note: "Saved", kindRaw: SavingsLedgerEntryKind.manualAdjustment.rawValue, workspace: workspace, account: savings))
+        context.insert(AllocationSettlement(date: date(17), note: "Shared activity", amount: -7, workspace: workspace, account: reconciliation))
+        try context.save()
+        let service = MarinaReadOnlyDataService(workspace: workspace, modelContext: context, now: date(17))
+        let cases: [(UUID, MarinaDataRequest.Scope, MarinaDataRequest.Scope, String, Double)] = [
+            (savings.id, .savings, .reconciliation, "savingsLedgerEntry", 30),
+            (reconciliation.id, .reconciliation, .savings, "reconciliationItem", -7)
+        ]
+        for (id, matchingScope, wrongScope, kind, amount) in cases {
+            var request = MarinaDataRequest(tool: .accounts)
+            request.accountID = id.uuidString
+            request.scope = wrongScope
+            let wrongKind = try service.execute(request)
+            #expect(wrongKind.status == "invalidRequest")
+            #expect(wrongKind.records.isEmpty && wrongKind.metrics.isEmpty)
+            #expect(wrongKind.presentation == nil)
+            for scope in [matchingScope, .all] {
+                request.scope = scope
+                let selected = try service.execute(request)
+                #expect(selected.status == "success")
+                #expect(selected.records.map(\.kind) == [kind])
+                #expect(metric("Selected period activity total", selected) == amount)
+            }
+        }
+        for scope: MarinaDataRequest.Scope in [.planned, .variable] {
+            var request = MarinaDataRequest(tool: .accounts)
+            request.scope = scope
+            #expect(try service.execute(request).status == "invalidRequest")
+        }
+    }
+
+    @Test func namedLookupsAndAccountSelectionsStayInsideTheCurrentWorkspace() throws {
+        let context = try context()
+        let selected = Workspace(name: "Personal", hexColor: "#FFFFFF")
+        let other = Workspace(name: "Other", hexColor: "#000000")
+        let card = Card(name: "Shared", workspace: selected)
+        let foreignCard = Card(name: "Shared", workspace: other)
+        let savings = SavingsAccount(name: "Shared", workspace: selected)
+        let foreignSavings = SavingsAccount(name: "Shared", workspace: other)
+        let reconciliation = AllocationAccount(name: "Shared", workspace: selected)
+        let foreignReconciliation = AllocationAccount(name: "Shared", workspace: other)
+        context.insert(selected); context.insert(other); context.insert(card); context.insert(foreignCard)
+        context.insert(savings); context.insert(foreignSavings); context.insert(reconciliation); context.insert(foreignReconciliation)
+        context.insert(VariableExpense(descriptionText: "Foreign merchant", amount: 900001, transactionDate: date(17), workspace: other, card: foreignCard))
+        try context.save()
+        let service = MarinaReadOnlyDataService(workspace: selected, modelContext: context, now: date(17))
+        var lookup = MarinaDataRequest(tool: .findRecords)
+        lookup.search = "Shared"
+        let candidates = try service.execute(lookup)
+        #expect(candidates.status == "candidates")
+        #expect(Set(candidates.records.map(\.id)) == [card.id.uuidString, savings.id.uuidString, reconciliation.id.uuidString])
+        for (kind, id) in [("card", card.id.uuidString), ("savingsAccount", savings.id.uuidString), ("reconciliationAccount", reconciliation.id.uuidString)] {
+            lookup.recordKind = kind
+            #expect(try service.execute(lookup).records.map(\.id) == [id])
+        }
+        lookup.recordKind = "merchant"
+        lookup.search = "Foreign merchant"
+        #expect(try service.execute(lookup).status == "empty")
+        for id in [foreignSavings.id, foreignReconciliation.id] {
+            for scope: MarinaDataRequest.Scope in [.all, .savings, .reconciliation] {
+                var request = MarinaDataRequest(tool: .accounts)
+                request.accountID = id.uuidString
+                request.scope = scope
+                let result = try service.execute(request)
+                #expect(result.status == "invalidRequest")
+                #expect(result.records.isEmpty && result.metrics.isEmpty)
+                #expect(result.presentation == nil)
+            }
+        }
+    }
+
     private func metric(_ label: String, _ result: MarinaDataResult) -> Double? {
         result.metrics.first { $0.label == label }?.value
     }
@@ -237,6 +441,12 @@ struct MarinaReadOnlyDataServiceTests {
         let saved = try service.execute(request)
         #expect(metric("Savings Account current balance", saved) == 90)
         #expect(metric("Selected period activity total", saved) == -10)
+        let savedPresentation = try #require(saved.presentation)
+        #expect(savedPresentation.operation == .transactions && savedPresentation.title == "Account activity")
+        #expect(savedPresentation.records.count == 1)
+        #expect(savedPresentation.records.first?.kind == "savingsLedgerEntry")
+        #expect(savedPresentation.records.first?.amount == -10)
+        #expect(savedPresentation.metrics.contains { $0.label == "Savings Account current balance" && $0.value == 90 })
         var selectedPeriod = request
         selectedPeriod.startDate = nil; selectedPeriod.endDate = nil
         selectedPeriod.relativePeriod = .selectedPeriod
@@ -250,6 +460,73 @@ struct MarinaReadOnlyDataServiceTests {
         #expect(reconciliation.totalCount == 2)
         #expect(reconciliation.records.count == 1)
         #expect(reconciliation.explanation?.contains("positive reconciliation balance means money is owed to you") == true)
+        let firstActivity = try #require(reconciliation.presentation)
+        #expect(firstActivity.operation == .transactions && firstActivity.title == "Account activity")
+        #expect(firstActivity.records.count == 1 && firstActivity.totalCount == 2)
+        #expect(firstActivity.records.first?.kind == "reconciliationItem" && firstActivity.records.first?.amount == -15)
+        #expect(firstActivity.metrics.contains { $0.label == "Alex current reconciliation balance" && $0.value == 25 })
+        #expect(firstActivity.pagination?.workspaceID == workspace.id)
+        #expect(firstActivity.pagination?.request.accountID == account.id.uuidString)
+        #expect(firstActivity.pagination?.request.startDate == "2026-10-17")
+        #expect(firstActivity.pagination?.request.endDate == "2026-10-18")
+        let allActivity = try #require(service.loadMore(presentation: firstActivity).presentation)
+        #expect(allActivity.id == firstActivity.id && allActivity.operation == .transactions)
+        #expect(allActivity.records.count == 2 && allActivity.totalCount == 2)
+        #expect(Set(allActivity.records.map(\.kind)) == ["expenseAllocation", "reconciliationItem"])
+        #expect(Set(allActivity.records.compactMap(\.amount)) == [40, -15])
+        #expect(allActivity.metrics == firstActivity.metrics)
+        #expect(allActivity.pagination == nil)
+        #expect(MarinaPresentationDisplayPolicy.shouldShow(allActivity, after: [allActivity]))
+    }
+
+    @Test func accountInventoryPresentationsPreserveFullBalancesAndPageAccountRows() throws {
+        let context = try context()
+        let workspace = Workspace(name: "Personal", hexColor: "#FFFFFF")
+        let other = Workspace(name: "Other", hexColor: "#000000")
+        let savings = SavingsAccount(name: "Saved", total: 9999, workspace: workspace)
+        context.insert(workspace); context.insert(other); context.insert(savings)
+        context.insert(SavingsLedgerEntry(date: date(17), amount: 2000, note: "Saved amount",
+            kindRaw: SavingsLedgerEntryKind.manualAdjustment.rawValue, workspace: workspace, account: savings))
+        var accountIDs: Set<String> = []
+        for index in 1...7 {
+            let account = AllocationAccount(name: "Shared \(index)", workspace: workspace)
+            accountIDs.insert(account.id.uuidString)
+            context.insert(account)
+            context.insert(AllocationSettlement(date: date(17), note: "Activity", amount: Double(index),
+                workspace: workspace, account: account))
+        }
+        let foreign = AllocationAccount(name: "Foreign", workspace: other)
+        context.insert(foreign)
+        context.insert(AllocationSettlement(date: date(17), note: "Foreign activity", amount: 900001,
+            workspace: other, account: foreign))
+        try context.save()
+        let service = MarinaReadOnlyDataService(workspace: workspace, modelContext: context, now: date(19))
+        for scope: MarinaDataRequest.Scope in [.reconciliation, .all] {
+            var request = MarinaDataRequest(tool: .accounts)
+            request.scope = scope
+            request.limit = 5
+            let first = try #require(service.execute(request).presentation)
+            let expectedCount = scope == .all ? 8 : 7
+            #expect(first.operation == .inventory && first.title == "Account balances")
+            #expect(first.records.count == 5 && first.totalCount == expectedCount)
+            #expect(first.metrics.count == expectedCount)
+            for index in 1...7 {
+                #expect(first.metrics.contains { $0.label == "Shared \(index) current reconciliation balance" && $0.value == Double(index) })
+            }
+            #expect(first.metrics.contains { $0.label == "Saved current balance" && $0.value == 2000 } == (scope == .all))
+            #expect(!first.metrics.contains { $0.value == 900001 })
+            #expect(first.pagination?.workspaceID == workspace.id)
+            #expect(first.pagination?.request.scope == scope && first.pagination?.request.accountID == nil)
+            let complete = try #require(service.loadMore(presentation: first).presentation)
+            let expectedIDs = scope == .all ? accountIDs.union([savings.id.uuidString]) : accountIDs
+            #expect(complete.id == first.id && complete.operation == .inventory)
+            #expect(complete.records.count == expectedCount && complete.totalCount == expectedCount)
+            #expect(Set(complete.records.map(\.id)) == expectedIDs)
+            #expect(complete.records.allSatisfy { ["savingsAccount", "reconciliationAccount"].contains($0.kind) })
+            #expect(complete.metrics == first.metrics)
+            #expect(complete.pagination == nil)
+            #expect(MarinaPresentationDisplayPolicy.shouldShow(complete, after: [complete]))
+        }
     }
 
     @Test func comparisonsSharesAndEmptyCalendarPeriodsAreCalculatedByTools() throws {

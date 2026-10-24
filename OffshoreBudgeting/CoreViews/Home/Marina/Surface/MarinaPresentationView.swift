@@ -50,6 +50,12 @@ struct MarinaPresentationView: View {
                         MarinaMetricView(metric: presentation.metrics[index], prominent: index == 0)
                     }
                 case .transactions, .inventory:
+                    if presentation.operation == .transactions,
+                       presentation.topicKey?.hasPrefix("accounts:") == true {
+                        ForEach(presentation.metrics.indices, id: \.self) { index in
+                            MarinaMetricView(metric: presentation.metrics[index], prominent: index == 0)
+                        }
+                    }
                     MarinaPresentationRecordsView(records: presentation.records)
                 case .ranking, .comparison, .trend, .share:
                     if presentation.operation == .trend, presentation.topicKey?.hasPrefix("expenses:") == true {
