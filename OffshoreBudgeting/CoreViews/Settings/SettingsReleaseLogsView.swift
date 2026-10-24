@@ -78,9 +78,14 @@ struct SettingsReleaseLogsView: View {
 
     static let releaseSections: [ReleaseSection] = [
         ReleaseSection(
-            version: "2.4.1",
+            version: "2.5",
             build: "22",
             items: [
+                ReleaseItem(
+                    systemImage: "figure.wave",
+                    title: "Futher Enhancements to Marina",
+                    description: "Marina has had some additional training to ensure a more enriched, natural experience so that she can help users understand their budgeting data in plain English."
+                ),
                 ReleaseItem(
                     systemImage: "widget.extralarge",
                     title: "Layout Adjustments for Extra Large Income and Next Planned Expense Widgets",
@@ -90,6 +95,16 @@ struct SettingsReleaseLogsView: View {
                     systemImage: "square.and.arrow.down",
                     title: "Workspace Import & Export",
                     description: "Workspaces can now be saved to a file and imported later as a new copy, making it easier to back up your data, move between Local and iCloud, or recover after a reinstall."
+                ),
+                ReleaseItem(
+                    systemImage: "desktopcomputer",
+                    title: "Optimized Interface for Mac",
+                    description: "Reconfigured the user interface for a better experience while using a Mac."
+                ),
+                ReleaseItem(
+                    systemImage: "calendar",
+                    title: "Filtering by Date",
+                    description: "Filtering by Date has moved to the top toolbar on Home, Cards, Reconciliations, and Savings."
                 )
             ]
         ),
