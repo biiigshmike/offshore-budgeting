@@ -63,11 +63,13 @@ struct MarinaPresentation: Codable, Equatable, Sendable, Identifiable {
     }
     var id: String
     var purpose: MarinaDataRequest.Purpose? = nil
+    var chartIntent: MarinaDataRequest.ChartIntent? = nil
     var forcePresentation: Bool? = nil
     var identityKey: String? = nil
     var topicKey: String? = nil
     var incomeProgress: IncomeProgressSnapshot? = nil
     var budgetPace: BudgetPaceSnapshot? = nil
+    var report: MarinaReport? = nil
     var operation: MarinaDataRequest.Operation
     var title: String
     var scopeLabel: String

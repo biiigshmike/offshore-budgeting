@@ -2,6 +2,41 @@
 
 Marina now keeps the saved conversation separately from the model's bounded working context. All five production tools remain available. Reports use **format 4**. The October 17 section below records the historical, unmodified baseline; the October 23 implementation changes instructions, tool schemas, model-facing facts, and context management while preserving financial calculation services and saved financial presentations.
 
+## October 28 staged-query revision
+
+Current behavior and acceptance results are recorded in [MarinaCapabilities.md](MarinaCapabilities.md). Older dated measurements below describe their respective implementations, not the current model contract.
+
+The query session keeps all five tools and returns bounded result references. A separate, tool-free session composes the explanation from the selected verified evidence. Both explicitly include generation schemas, including after renewal and restoration. `MarinaPhases` records query/narration duration, selected references, narration input/schema cost, and fallback reason in opt-in native evaluations. Query transcript counts do not include the separate narration session; do not add overlapping component counts to either transcript.
+
+Comparison tool arguments now carry their second selection and dates inside the operation payload (`compare` or `compareIncome`), so a simple operation does not also generate a speculative comparison. Result references and narration evidence references have real generation constraints; all entity references are decoded and checked against fresh workspace data.
+
+Native capability testing uses `MARINA_MODEL_EVALUATION=1` with synthetic in-memory finances. Add `MARINA_LONG_EVALUATION_VERBOSE=1` for fixture tool arguments and mapped requests, and `MARINA_SCHEMA_BENCHMARK=1` for schema calibration. Raw fixture logging requires both evaluation and verbose flags. Do not enable these flags for manual testing of a real workspace; use ordinary token diagnostics there.
+
+## October 29 controlled query experiments
+
+The normal app still uses the production five-tool query session. Debug-only experiments additionally require `MARINA_MODEL_EVALUATION=1` and an explicit `MARINA_QUERY_EXPERIMENT_MODE`:
+
+- `production` (also the absent/invalid value): unchanged session behavior and all five tools.
+- `fresh`: rebuild query context every visible turn from validated memory and bounded visible history, keeping all five tools.
+- `semanticTools`: the same refresh behavior, plus a separate tool-free domain classifier that selects among the existing tool implementations. Mixed/failed classifications retain all tools; existing bounded repairs can broaden once without adding a retry.
+- `compiled`: evaluation-only two-step translation. The first tool-free session selects an answer capability and new/active/pending/earlier context. The second receives only that capability's optional change schema. Ordinary app code compiles the request, resolves identities, executes the existing read implementation, and selects the result. A separate tool-free narration session still uses verified evidence.
+
+`MarinaQueryExperiment` logs mode, domain, routing latency/input/schema tokens, effective tool names, and fallback reason. Query timing excludes the separate routing phase. Selected tool schemas remain part of query context accounting. The classifier receives the pending original question separately from compact memory, so memory trimming cannot silently erase it.
+
+The two `freshQueryExperiment…` tests in `MarinaCapabilityLiveTests` also require `MARINA_QUERY_RENEWAL_EXPERIMENT=1`; run the same tests in both modes. `MarinaQueryRoutingLiveTests` requires `MARINA_QUERY_ROUTING_EVALUATION=1` and independently checks held-out domain selection and clarification/topic changes. Classifier passes do not establish correct financial queries. Keep failed classifications and full conversation failures in the report, including successful reads that answer the wrong question. See the dated results in [MarinaCapabilities.md](MarinaCapabilities.md).
+
+### Compiled translation and longer-chat acceptance
+
+Use `MARINA_MODEL_EVALUATION=1` and `MARINA_QUERY_EXPERIMENT_MODE=compiled` together for synthetic native tests. `MarinaTranslationLiveTests` repeats the category/June comparison, card summary/extrema/merchant sequence, availability, card grouping, held-out wording, and compound-request handling three times. Also rerun `MarinaCapabilityLiveTests` for the original metrics, greetings, workspace summaries, charts, and merchant-choice regressions.
+
+Add `MARINA_TRANSLATION_LONG_EVALUATION=1` for `MarinaTranslationLongConversationTests`. It attempts all 20 turns with a forced 4K budget, saves/reopens the actual chat store, returns to an older report, changes fixture transactions, and checks fresh results. A completed turn is not an acceptance pass: assertions inspect operation, scope, dates, visuals, and facts. Actual supported 4K-device testing remains separate from this forced-budget run on the Mac.
+
+`MARINA_SCHEMA_BENCHMARK=1` enables the translator's native schema measurements. It counts the full capability-specific schema used by the runtime, along with instructions, references, question, and the unchanged response reserve. Pruned-field measurements are diagnostic comparisons, not the runtime contract. `MARINA_LONG_EVALUATION_VERBOSE=1` additionally logs fixture-only generated JSON. Do not enable synthetic evaluation flags against a real workspace.
+
+The app stores completed requests on historical answers and keeps a bounded recent cache. Translation uses the active request, one pending clarification, relevant earlier request descriptors, and a bounded recent exchange; it does not replay the entire financial transcript. Both interpretation sessions are fresh each turn. The normal production path retains its existing session renewal. Exact offered choices can resolve directly, without interpretation calls. Failed/cancelled turns cannot commit working memory, and pagination cannot replace a pending question.
+
+Keep this path experimental until the critical native conversations pass three repetitions. Capability mappings and deterministic tests do not establish model reliability. Record interpretation failures, clarification failures, narration fallback, input/schema cost, latency, and OS/model capacity separately.
+
 ## Enable reports in Xcode
 
 1. Open the project in Xcode and select the main **OffshoreBudgeting** scheme and your Apple Intelligence device or My Mac (Mac Catalyst).
@@ -17,6 +52,8 @@ These diagnostics are Debug-only and require the exact environment value `1`. Th
 Reports contain temporary correlation identifiers, token counts, timings, fixed operation/status labels, and filter-presence flags. They omit your question, record names, financial values, actual dates, persistent record identifiers, and raw tool/framework output. Question wording and screenshots are optional.
 
 ## Scenarios
+
+The capability expansion adds a [shared scenario matrix and text-only QA guide](MarinaCapabilities.md#shared-scenarios-and-text-only-qa), including the original category, card, availability, greeting, and follow-up cases. Keep each scenario in its own chat.
 
 Use the same workspace and settings throughout a comparison. Names below are examples: use a real card/category from your workspace. Start a new chat where indicated.
 

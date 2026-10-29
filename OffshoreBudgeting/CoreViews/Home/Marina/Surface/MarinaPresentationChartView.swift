@@ -4,6 +4,7 @@ import Charts
 struct MarinaPresentationChartView: View {
     let operation: MarinaDataRequest.Operation
     let points: [MarinaPresentation.ChartPoint]
+    var chartIntent: MarinaDataRequest.ChartIntent? = nil
 
     private var usesDonut: Bool {
         operation == .share && !points.isEmpty && points.allSatisfy { $0.value >= 0 }
@@ -23,14 +24,9 @@ struct MarinaPresentationChartView: View {
                     .foregroundStyle(.secondary)
             } else {
                 if operation == .trend {
-                    Chart(points) { point in
-                        LineMark(x: .value("Period", point.label), y: .value("Amount", point.value))
-                            .foregroundStyle(Color.accentColor)
-                        PointMark(x: .value("Period", point.label), y: .value("Amount", point.value))
-                            .foregroundStyle(Color.accentColor)
-                    }
-                    .frame(height: 180)
-                    .accessibilityHidden(true)
+                    HomeFinancialSeriesChart(series: [.init(id: "amount", label: "Amount", points: points.map {
+                        .init(id: $0.id, label: $0.label, value: $0.value, date: $0.date)
+                    })], style: chartIntent == .movementOverTime ? .lines : .bars)
                 } else if usesDonut {
                     DonutChartView(slices: points.map { point in
                         DonutSlice(

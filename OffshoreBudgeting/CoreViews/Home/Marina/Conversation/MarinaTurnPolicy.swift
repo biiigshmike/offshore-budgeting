@@ -237,20 +237,46 @@ nonisolated struct MarinaTurnPolicy {
     /// Empty prompts support trusted callers which already provide typed requests.
     func confirms(kind: String) -> Bool {
         if isEmpty { return true }
-        let nouns: [String]
+        return Self.containsAny(Self.nouns(for: kind), in: affirmativeClauses)
+    }
+
+    /// A type-only reply can narrow offered choices, but a newly supplied name must
+    /// be resolved on its own instead of selecting the sole candidate of that type.
+    func confirmsOnlyPendingKind(_ kind: String) -> Bool {
+        guard !isEmpty, confirms(kind: kind) else { return false }
+        let grammaticalWords: Set<String> = ["i", "mean", "meant", "the", "a", "an", "that", "this", "one", "please",
+            "yes", "it", "is", "my", "only", "in", "for", "during", "yo", "quiero", "decir", "el", "la", "los", "las",
+            "un", "una", "ese", "esa", "este", "esta", "por", "favor", "si", "es", "mi", "solo", "en", "para", "durante"]
+        let typeWords = Self.nouns(for: kind).flatMap { $0.split(separator: " ").map(String.init) }
+        let periodWords = Self.supportedPeriods.flatMap(\.1).flatMap { $0.split(separator: " ").map(String.init) }
+        let allowed = grammaticalWords.union(typeWords).union(periodWords)
+        let words = affirmativeClauses.flatMap { $0 }
+        if words.allSatisfy(allowed.contains) { return true }
+        // Date adjuncts can accompany a type choice without naming another record.
+        // A calendar word directly naming the merchant is not such an adjunct.
+        let datePrepositions: Set<String> = ["on", "in", "for", "during", "between", "from", "through", "until", "to",
+            "en", "para", "durante", "entre", "desde", "hasta", "al"]
+        guard periodCue != .none, !Set(words).isDisjoint(with: datePrepositions) else { return false }
+        let calendarWords: Set<String> = ["january", "february", "march", "april", "may", "june", "july", "august",
+            "september", "october", "november", "december", "enero", "febrero", "marzo", "abril", "mayo", "junio",
+            "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"]
+        let dateAllowed = allowed.union(datePrepositions).union(calendarWords)
+        return words.allSatisfy { dateAllowed.contains($0) || $0.allSatisfy(\.isNumber) }
+    }
+
+    private static func nouns(for kind: String) -> [String] {
         switch kind {
-        case "card": nouns = ["card", "cards", "tarjeta", "tarjetas"]
-        case "category": nouns = ["category", "categories", "categoria", "categorias"]
-        case "budget": nouns = ["budget", "budgets", "presupuesto", "presupuestos"]
-        case "preset": nouns = ["preset", "presets", "preajuste", "preajustes", "plantilla", "plantillas"]
-        case "merchant": nouns = ["merchant", "merchants", "comercio", "comercios", "comerciante", "comerciantes"]
-        case "savingsAccount": nouns = ["savings", "ahorro", "ahorros"]
-        case "reconciliationAccount": nouns = ["reconciliation", "conciliacion", "reconciliacion"]
-        case "incomeSource": nouns = ["income", "incomes", "ingreso", "ingresos", "income source", "fuente de ingreso"]
-        case "workspace": nouns = ["workspace", "workspaces", "espacio de trabajo", "espacios de trabajo"]
-        default: return false
+        case "card": ["card", "cards", "tarjeta", "tarjetas"]
+        case "category": ["category", "categories", "categoria", "categorias"]
+        case "budget": ["budget", "budgets", "presupuesto", "presupuestos"]
+        case "preset": ["preset", "presets", "preajuste", "preajustes", "plantilla", "plantillas"]
+        case "merchant": ["merchant", "merchants", "comercio", "comercios", "comerciante", "comerciantes"]
+        case "savingsAccount": ["savings", "ahorro", "ahorros"]
+        case "reconciliationAccount": ["reconciliation", "conciliacion", "reconciliacion"]
+        case "incomeSource": ["income", "incomes", "ingreso", "ingresos", "income source", "fuente de ingreso"]
+        case "workspace": ["workspace", "workspaces", "espacio de trabajo", "espacios de trabajo"]
+        default: []
         }
-        return Self.containsAny(nouns, in: affirmativeClauses)
     }
 
     /// Remove only an invented record-type suffix from a name literally present in the user's
@@ -298,20 +324,41 @@ nonisolated struct MarinaTurnPolicy {
 
     func confirmsPendingCandidate(kind: String, name: String,
                                   candidates: [(kind: String, name: String)], ambiguousSearch: String?) -> Bool {
-        if confirms(kind: kind), candidates.filter({ $0.kind == kind }).count == 1 { return true }
         func words(_ text: String) -> String {
             Self.normalized(text).components(separatedBy: CharacterSet.alphanumerics.inverted)
                 .filter { !$0.isEmpty }.joined(separator: " ")
         }
-        let candidateName = words(name)
-        guard !candidateName.isEmpty, candidateName != ambiguousSearch.map(words),
-              Self.containsAny([candidateName], in: affirmativeClauses) else { return false }
-        let mentioned = candidates.filter { Self.containsAny([words($0.name)], in: affirmativeClauses) }
-        guard mentioned.count == 1, mentioned[0].kind == kind, words(mentioned[0].name) == candidateName else { return false }
-        return !candidates.contains { other in
-            (other.kind != kind || words(other.name) != candidateName)
-                && (" " + words(other.name) + " ").contains(" " + candidateName + " ")
+        // Match the complete offered label before tokenizing. Punctuation belongs to the
+        // merchant identity; it must not split a single choice into separate clauses.
+        let literal = candidates.filter { MarinaNamedTargetRequirement.containsLiteralName($0.name, in: normalizedPrompt) }
+        let allMentions = candidates.filter { Self.containsAny([words($0.name)], in: [words(normalizedPrompt).split(separator: " ").map(String.init)]) }
+        let specificallyMentioned = allMentions.filter { candidate in
+            !allMentions.contains { other in
+                words(other.name) != words(candidate.name)
+                    && MarinaNamedTargetRequirement.containsLiteralName(words(candidate.name), in: words(other.name))
+            }
         }
+        if specificallyMentioned.contains(where: { $0.kind == kind && $0.name == name }),
+           !MarinaNamedTargetRequirement.containsLiteralName(words(name), in: words(normalizedPrompt)),
+           !literal.contains(where: { $0.kind == kind && $0.name == name }) { return false }
+        let normalizedMatches = candidates.filter {
+            MarinaNamedTargetRequirement.containsLiteralName(words($0.name), in: words(normalizedPrompt))
+        }
+        let mentioned = literal + normalizedMatches.filter { candidate in
+            !literal.contains { $0.kind == candidate.kind && $0.name == candidate.name }
+                && !literal.contains { words($0.name) == words(candidate.name) }
+        }
+        let longest = mentioned.filter { candidate in
+            !mentioned.contains { other in
+                words(other.name) != words(candidate.name)
+                    && MarinaNamedTargetRequirement.containsLiteralName(words(candidate.name), in: words(other.name))
+            }
+        }
+        if longest.isEmpty, confirmsOnlyPendingKind(kind), candidates.filter({ $0.kind == kind }).count == 1 { return true }
+        guard longest.count == 1, longest[0].kind == kind, longest[0].name == name else { return false }
+        // Repeating the original broad search cannot resolve its own ambiguity. A full
+        // offered label is otherwise authoritative, even when another label extends it.
+        return words(name) != ambiguousSearch.map(words) || confirms(kind: kind)
     }
 
     func violation(for request: MarinaDataRequest) -> String? {
@@ -587,8 +634,16 @@ nonisolated struct MarinaTurnPolicy {
     private static func comparisonScopesMatch(_ request: MarinaDataRequest) -> Bool {
         guard request.accountID == nil, request.hypotheticalSpending == nil else { return false }
         let primary = MarinaDataRequest.Filter(cardID: request.cardID, categoryID: request.categoryID,
-            budgetID: request.budgetID, presetID: request.presetID, search: request.search)
-        return primary == (request.comparisonFilter ?? primary)
+            categoryIDs: request.categoryIDs,
+            budgetID: request.budgetID, presetID: request.presetID, search: request.search, merchantName: request.merchantName)
+        func canonical(_ filter: MarinaDataRequest.Filter) -> MarinaDataRequest.Filter {
+            var filter = filter
+            let categories = Set((filter.categoryIDs ?? []) + [filter.categoryID].compactMap { $0 })
+            filter.categoryID = nil
+            filter.categoryIDs = categories.isEmpty ? nil : categories.sorted()
+            return filter
+        }
+        return canonical(primary) == canonical(request.comparisonFilter ?? primary)
     }
 
     private static func requiresPeriodComparison(_ prompt: String) -> Bool {

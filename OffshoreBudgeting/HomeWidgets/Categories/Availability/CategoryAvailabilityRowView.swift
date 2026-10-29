@@ -8,6 +8,8 @@
 import SwiftUI
 
 struct CategoryAvailabilityRowView: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @ScaledMetric(relativeTo: .caption) private var labelWidth: CGFloat = 62
 
     let metric: CategoryAvailabilityMetric
     let scope: AvailabilityScope
@@ -15,7 +17,10 @@ struct CategoryAvailabilityRowView: View {
     let nearThreshold: Double
 
     var body: some View {
-        HStack(alignment: .center, spacing: 12) {
+        let layout = dynamicTypeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 12))
+            : AnyLayout(HStackLayout(alignment: .center, spacing: 12))
+        layout {
 
             // Left: name + labels
             VStack(alignment: .leading, spacing: 6) {
@@ -27,7 +32,7 @@ struct CategoryAvailabilityRowView: View {
                     Text(metric.name)
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(.primary)
-                        .lineLimit(1)
+                        .fixedSize(horizontal: false, vertical: true)
 
                     Spacer(minLength: 0)
                 }
@@ -135,14 +140,18 @@ struct CategoryAvailabilityRowView: View {
     }
 
     private func labelLine(title: String, value: String) -> some View {
-        HStack(spacing: 6) {
+        let layout = dynamicTypeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 2))
+            : AnyLayout(HStackLayout(spacing: 6))
+        return layout {
             Text("\(title):")
-                .frame(width: 62, alignment: .leading)
+                .frame(width: dynamicTypeSize.isAccessibilitySize ? nil : labelWidth, alignment: .leading)
 
             Text(value)
                 .foregroundStyle(.primary)
-            
-            Spacer(minLength: 0)
+                .fixedSize(horizontal: false, vertical: true)
+
+            if !dynamicTypeSize.isAccessibilitySize { Spacer(minLength: 0) }
         }
     }
 

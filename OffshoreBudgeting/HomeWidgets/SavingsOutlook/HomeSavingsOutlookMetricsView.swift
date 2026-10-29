@@ -223,12 +223,13 @@ struct HomeSavingsOutlookMetricsView: View {
                     )
                     .foregroundStyle(point.actualRunning >= 0 ? Color.green.opacity(0.85) : Color.red.opacity(0.85))
 
-                    LineMark(
+                    HomeFinancialLineMark(
                         x: .value("Date", point.date, unit: chartUnit(for: granularity)),
-                        y: .value("Projected", point.projectedRunning)
+                        y: .value("Projected", point.projectedRunning),
+                        series: "Projected",
+                        dash: [6, 4]
                     )
                     .foregroundStyle(accent.opacity(0.75))
-                    .lineStyle(StrokeStyle(lineWidth: 2, dash: [6, 4]))
                 }
                 .chartYAxis {
                     AxisMarks(position: .leading) {
@@ -317,44 +318,12 @@ struct HomeSavingsOutlookMetricsView: View {
     }
 
     private func buildChartPoints(for range: (start: Date, end: Date, granularity: BucketGranularity)) -> [SavingsPoint] {
-        let buckets = makeBuckets(from: range.start, to: range.end, granularity: range.granularity)
-        guard !buckets.isEmpty else { return [] }
-
-        var points: [SavingsPoint] = []
-        points.reserveCapacity(buckets.count)
-
-        var projectedRunning: Double = 0
-        var actualRunning: Double = 0
-
-        for bucket in buckets {
-            // Event-based projection deltas
-            let plannedIncomeDelta = sumPlannedIncome(from: bucket.start, to: bucket.end)
-            let plannedExpensePlannedDelta = sumPlannedExpensesPlanned(from: bucket.start, to: bucket.end)
-
-            let projectedDelta = plannedIncomeDelta - plannedExpensePlannedDelta
-            projectedRunning += projectedDelta
-
-            let actualIncomeDelta = sumActualIncome(from: bucket.start, to: bucket.end)
-            let plannedExpenseEffectiveActualDelta = sumPlannedExpensesEffectiveActual(from: bucket.start, to: bucket.end)
-            let variableExpenseDelta = sumVariableExpenses(from: bucket.start, to: bucket.end)
-
-            let actualDelta = actualIncomeDelta - (plannedExpenseEffectiveActualDelta + variableExpenseDelta)
-            actualRunning += actualDelta
-
-            points.append(
-                SavingsPoint(
-                    date: bucket.start,
-                    actualRunning: actualRunning,
-                    projectedRunning: projectedRunning
-                )
-            )
-        }
-
-        if points.allSatisfy({ $0.actualRunning == 0 && $0.projectedRunning == 0 }) {
-            return []
-        }
-
-        return points
+        let ranges = makeBuckets(from: range.start, to: range.end, granularity: range.granularity)
+            .map { HomeQueryDateRange(startDate: $0.start, endDate: $0.end) }
+        let points = SavingsOutlookCalculator.cumulativePoints(ranges: ranges, incomes: incomes,
+            plannedExpenses: plannedExpenses, variableExpenses: variableExpenses, savingsEntries: savingsEntries)
+            .map { SavingsPoint(date: $0.startDate, actualRunning: $0.actual, projectedRunning: $0.projected) }
+        return points.allSatisfy { $0.actualRunning == 0 && $0.projectedRunning == 0 } ? [] : points
     }
 
     private func makeBuckets(from start: Date, to end: Date, granularity: BucketGranularity) -> [(start: Date, end: Date)] {
@@ -399,72 +368,26 @@ struct HomeSavingsOutlookMetricsView: View {
     // MARK: - Totals
 
     private func projectedSavingsTotal(from start: Date, to end: Date) -> Double {
-        sumPlannedIncome(from: start, to: end) - sumPlannedExpensesPlanned(from: start, to: end)
+        outlook(from: start, to: end).projected
     }
 
     private func actualSavingsTotal(from start: Date, to end: Date) -> Double {
-        let actualIncome = sumActualIncome(from: start, to: end)
-        let plannedEffective = sumPlannedExpensesEffectiveActual(from: start, to: end)
-        let variableTotal = sumVariableExpenses(from: start, to: end)
-        let adjustmentTotal = SavingsMathService.actualSavingsAdjustmentTotal(
-            from: savingsEntries,
-            startDate: start,
-            endDate: end
-        )
-        return actualIncome - (plannedEffective + variableTotal) + adjustmentTotal
+        outlook(from: start, to: end).actual
     }
 
-    // MARK: - Summation
-
-    private func sumPlannedIncome(from start: Date, to end: Date) -> Double {
-        incomes
-            .filter { $0.isPlanned }
-            .filter { $0.date >= start && $0.date <= end }
-            .reduce(0) { $0 + $1.amount }
+    private func outlook(from start: Date, to end: Date) -> SavingsOutlookCalculator.Summary {
+        SavingsOutlookCalculator.totals(incomes: incomes, plannedExpenses: plannedExpenses,
+            variableExpenses: variableExpenses, savingsEntries: savingsEntries,
+            startDate: start, endDate: end)
     }
-
-    private func sumActualIncome(from start: Date, to end: Date) -> Double {
-        incomes
-            .filter { !$0.isPlanned }
-            .filter { $0.date >= start && $0.date <= end }
-            .reduce(0) { $0 + $1.amount }
-    }
-
-    private func sumPlannedExpensesPlanned(from start: Date, to end: Date) -> Double {
-        plannedExpenses
-            .filter { $0.expenseDate >= start && $0.expenseDate <= end }
-            .reduce(0) { $0 + SavingsMathService.plannedProjectedBudgetImpactAmount(for: $1) }
-    }
-
-    private func sumPlannedExpensesEffectiveActual(from start: Date, to end: Date) -> Double {
-        plannedExpenses
-            .filter { $0.expenseDate >= start && $0.expenseDate <= end }
-            .reduce(0) { $0 + SavingsMathService.plannedBudgetImpactAmount(for: $1) }
-    }
-
-    private func sumVariableExpenses(from start: Date, to end: Date) -> Double {
-        variableExpenses
-            .filter { $0.transactionDate >= start && $0.transactionDate <= end }
-            .reduce(0) { $0 + SavingsMathService.variableBudgetImpactAmount(for: $1) }
-    }
-
-    // MARK: - Progress Summary
 
     private func progressSummary(projected: Double, actual: Double) -> (lineText: String, percentText: String) {
-        guard projected != 0 else {
-            return (lineText: "Progress: —", percentText: "—")
+        let progress = SavingsOutlookCalculator.progress(projected: projected, actual: actual)
+        switch progress.mode {
+        case .projection: return ("Progress: \(progress.formatted) of projection", progress.formatted)
+        case .breakEven: return ("Progress: \(progress.formatted) toward break-even", progress.formatted)
+        case .unavailable: return ("Progress: —", "—")
         }
-
-        if projected > 0 {
-            let ratio = max(0, actual / projected)
-            let percentText = ratio.formatted(.percent.precision(.fractionLength(0)))
-            return (lineText: "Progress: \(percentText) of projection", percentText: percentText)
-        }
-
-        // Negative projection mode, progress toward break-even (0).
-        let progressToBreakeven = max(0, (actual - projected) / abs(projected))
-        let percentText = progressToBreakeven.formatted(.percent.precision(.fractionLength(0)))
-        return (lineText: "Progress: \(percentText) toward break-even", percentText: percentText)
     }
 
     private func accentColor(for projected: Double) -> Color {

@@ -23,6 +23,7 @@ struct MarinaDataResult: Codable, Equatable, Sendable {
         var detail: String? = nil
     }
     var presentation: MarinaPresentation? = nil
+    var report: MarinaReport? = nil
     var status: String = "success"
     var scope: String
     var metrics: [Metric] = []
@@ -33,6 +34,8 @@ struct MarinaDataResult: Codable, Equatable, Sendable {
     var appliedFilters: String? = nil
     /// Validated targets and resolved dates for reference memory, never a cached financial answer.
     var resolvedRequest: MarinaDataRequest? = nil
+    /// A typed financial request blocked on a choice, preserved independently of lookup requests.
+    var pendingRequest: MarinaDataRequest? = nil
 
     var modelFactsJSON: String { modelFactsJSON(for: nil) }
 
@@ -58,6 +61,8 @@ struct MarinaDataResult: Codable, Equatable, Sendable {
             let explanation: String?
             let appliedFilters: String?
             let qualifier: String?
+            let report: MarinaReport?
+            let reportIsPreview: Bool?
         }
         let tool = request?.tool ?? presentation?.topicKey?.split(separator: ":").first.flatMap { MarinaDataRequest.Tool(rawValue: String($0)) }
         let operation = presentation?.operation ?? request?.operation
@@ -67,16 +72,21 @@ struct MarinaDataResult: Codable, Equatable, Sendable {
             ?? !metrics.contains { $0.label == "Selected period activity count" })
         // Account balance metrics repeat the account rows and can grow without a page limit.
         // Keep the paged rows instead. Selected-account activity still retains its balance.
-        let selectedMetrics = modelMetrics(tool: tool, operation: operation, purpose: purpose,
+        var selectedMetrics = modelMetrics(tool: tool, operation: operation, purpose: purpose,
                                            hypothetical: request?.hypotheticalSpending != nil,
                                            accountList: isAccountList)
-        let includesRecords = isInventory || tool == .accounts
+        if let metric = request?.metric, let focused = metrics.first(where: { $0.label == metric.metricLabel }) {
+            selectedMetrics.removeAll { $0.label == focused.label }
+            selectedMetrics.insert(focused, at: 0)
+        }
+        let isClarification = ["needsPeriodChoice", "needsBudgetChoice"].contains(status)
+        let includesRecords = isClarification || isInventory || tool == .accounts
             || (tool == .budgetSummary && purpose != .budgetPace && request?.hypotheticalSpending == nil)
             || (operation != .summary && operation != .comparison)
         let modelRecords = includesRecords ? Array(records.prefix(5)) : []
         let recordFacts = modelRecords.map { record in
             Facts.RecordFact(
-                selection: isInventory || isAccountList ? reference?(record.kind, record.id) : nil,
+                selection: isClarification || isInventory || isAccountList ? reference?(record.kind, record.id) : nil,
                 kind: record.kind, title: record.title, date: record.date, detail: record.detail,
                 formattedAmount: record.amount.map { CurrencyFormatter.string(from: $0) })
         }
@@ -84,12 +94,22 @@ struct MarinaDataResult: Codable, Equatable, Sendable {
         let modelNextOffset = includesRecords
             ? (modelRecords.count < records.count ? offset + modelRecords.count : nextOffset)
             : nil
+        var boundedReport = report
+        boundedReport?.groups = report?.groups.map { Array($0.prefix(5)) }
+        boundedReport?.categories = report?.categories.map { Array($0.prefix(5)) }
+        boundedReport?.merchants = report?.merchants.map { Array($0.prefix(3)) }
+        boundedReport?.frequentMerchants = report?.frequentMerchants.map { Array($0.prefix(3)) }
+        boundedReport?.transactions = report?.transactions.map { Array($0.prefix(5)) }
+        boundedReport?.series = report?.series.map { series in Array(series.prefix(2)).map { item in
+            var item = item; item.points = Array(item.points.prefix(5)); return item
+        } }
         let facts = Facts(status: status, scope: scope,
                           comparisonScope: operation == .comparison ? presentation?.chartPoints.last?.label : nil,
                           metrics: selectedMetrics.map { .init(label: $0.label, formatted: $0.formatted, unit: $0.unit) },
                           records: includesRecords ? recordFacts : nil,
                           totalCount: totalCount, nextOffset: modelNextOffset, explanation: explanation,
-                          appliedFilters: appliedFilters, qualifier: presentation?.qualifier)
+                          appliedFilters: appliedFilters, qualifier: presentation?.qualifier,
+                          report: boundedReport, reportIsPreview: report == nil ? nil : boundedReport != report)
         let encoder = JSONEncoder()
         encoder.outputFormatting = .sortedKeys
         guard let data = try? encoder.encode(facts), let text = String(data: data, encoding: .utf8) else {

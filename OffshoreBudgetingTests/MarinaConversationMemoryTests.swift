@@ -506,7 +506,7 @@ struct MarinaConversationMemoryTests {
         memory.record(request: request, result: .init(scope: "Personal"), answerID: UUID())
 
         let latest = try #require(contextObject(memory.contextText(maxBytes: 1200))["latestQuery"] as? [String: Any])
-        #expect(latest["operation"] as? String == "compare")
+        #expect((latest["operation"] as? [String: Any])?["compare"] != nil)
         var argumentsObject = latest
         argumentsObject.removeValue(forKey: "tool")
         let argumentsData = try JSONSerialization.data(withJSONObject: argumentsObject)
@@ -537,7 +537,7 @@ struct MarinaConversationMemoryTests {
         #expect(start == "2026-10-01")
         #expect(end == "2026-10-31")
         #expect(latest["comparisonSelection"] == nil)
-        let comparison = try #require(latest["comparison"] as? [String: Any])
+        let comparison = try #require((latest["operation"] as? [String: Any])?["compare"] as? [String: Any])
         #expect(comparison["dates"] as? String == "previousMonth")
         let comparisonRefs = try #require(comparison["selection"] as? String).components(separatedBy: ",")
         #expect(comparisonRefs.count == 1)
@@ -552,7 +552,7 @@ struct MarinaConversationMemoryTests {
 
     @available(iOS 26.0, macCatalyst 26.0, *)
     @MainActor
-    @Test func modelIncomeComparisonDecodesAsFlatToolArguments() throws {
+    @Test func modelIncomeComparisonDecodesAsExclusiveOperationArguments() throws {
         var memory = MarinaConversationMemory(workspaceID: UUID(), chatID: UUID())
         var request = MarinaDataRequest(operation: .comparison, relativePeriod: .currentMonth, tool: .income)
         request.comparisonPeriod = .previousMonth
@@ -561,7 +561,7 @@ struct MarinaConversationMemoryTests {
         memory.record(request: request, result: .init(scope: "Personal"), answerID: UUID())
 
         let latest = try #require(contextObject(memory.contextText(maxBytes: 1200))["latestQuery"] as? [String: Any])
-        #expect(latest["operation"] as? String == "compareIncome")
+        #expect((latest["operation"] as? [String: Any])?["compareIncome"] != nil)
         var argumentsObject = latest
         argumentsObject.removeValue(forKey: "tool")
         let argumentsData = try JSONSerialization.data(withJSONObject: argumentsObject)
@@ -576,7 +576,7 @@ struct MarinaConversationMemoryTests {
         #expect(refs.first.flatMap(memory.entity(forReference:))?.name == "Salary")
         #expect(latest["selection"] as? String == "workspace")
         #expect(latest["dates"] as? String == "currentMonth")
-        #expect(latest["comparison"] != nil)
+        #expect((latest["operation"] as? [String: Any])?["compareIncome"] != nil)
         #expect(latest["comparisonSelection"] == nil)
 
         // Invalid leftover comparison metadata must not make a summary look like a comparison.

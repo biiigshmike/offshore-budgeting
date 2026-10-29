@@ -26,22 +26,31 @@ nonisolated struct MarinaNamedTargetRequirement: Equatable, Sendable {
         return false
     }
 
+    /// A type explicitly attached to this literal, independent of the catalog's kinds.
+    static func explicitKind(for name: String, in prompt: String) -> String? {
+        let text = folded(prompt), name = folded(name)
+        guard let range = text.range(of: name), hasWordBoundaries(range, in: text),
+              isAffirmative(prefix: String(text[..<range.lowerBound])) else { return nil }
+        return attachedKind(prefix: String(text[..<range.lowerBound]), name: name,
+            suffix: String(text[range.upperBound...]), kinds: Set(kindNames.keys))
+    }
+
     func includes(in request: MarinaDataRequest) -> Bool {
         candidates.contains { entity in
             switch entity.kind {
             case "card":
                 return sameID(entity.id, request.cardID) || sameID(entity.id, request.comparisonFilter?.cardID)
             case "category":
-                return sameID(entity.id, request.categoryID) || sameID(entity.id, request.comparisonFilter?.categoryID)
+                return sameID(entity.id, request.categoryID) || request.categoryIDs?.contains(entity.id) == true || sameID(entity.id, request.comparisonFilter?.categoryID) || request.comparisonFilter?.categoryIDs?.contains(entity.id) == true
             case "budget":
-                return sameID(entity.id, request.budgetID) || sameID(entity.id, request.comparisonFilter?.budgetID)
+                return sameID(entity.id, request.budgetID) || sameID(entity.id, request.periodBudgetID) || sameID(entity.id, request.comparisonFilter?.budgetID)
             case "preset":
                 return sameID(entity.id, request.presetID) || sameID(entity.id, request.comparisonFilter?.presetID)
             case "savingsAccount", "reconciliationAccount":
                 return request.tool == .accounts && sameID(entity.id, request.accountID)
             case "merchant":
-                return request.tool == .expenses && (sameName(entity.name, request.search)
-                    || sameName(entity.name, request.comparisonFilter?.search))
+                return request.tool == .expenses && (sameName(entity.name, request.merchantName)
+                    || sameName(entity.name, request.comparisonFilter?.merchantName))
             case "incomeSource":
                 return request.tool == .income && (sameName(entity.name, request.search)
                     || sameName(entity.name, request.comparisonFilter?.search))
@@ -70,14 +79,34 @@ nonisolated struct MarinaNamedTargetRequirement: Equatable, Sendable {
             let range: Range<String.Index>
         }
         var matches: [Match] = []
+        // Shared leading names are discovery targets too. Derive them from this fresh
+        // catalog so a partial merchant name cannot disappear beside a resolved card.
+        // Full literals still win below when their ranges overlap these prefixes.
+        var sharedPrefixes: [String: (name: String, identities: Set<String>)] = [:]
+        let grammarWords: Set<String> = ["a", "an", "the", "my", "your", "our", "this", "that", "same", "previous", "and", "or", "of", "for", "in", "on", "at", "el", "la", "los", "las", "mi", "mis", "de", "del", "y", "o"]
+        if let tokens = try? NSRegularExpression(pattern: #"[\p{L}\p{N}]+"#) {
+            for entity in searchable {
+                for token in tokens.matches(in: entity.name, range: NSRange(entity.name.startIndex..., in: entity.name)).prefix(4) {
+                    guard let range = Range(token.range, in: entity.name) else { continue }
+                    let prefix = String(entity.name[..<range.upperBound])
+                    let key = folded(prefix)
+                    let meaningful = words(key).contains { !grammarWords.contains($0) && !genericNames.contains($0) && !calendarNames.contains($0) }
+                    guard key.count >= 2, meaningful, !genericNames.contains(key), !calendarNames.contains(key) else { continue }
+                    var entry = sharedPrefixes[key] ?? (prefix, [])
+                    entry.identities.insert(entity.kind + ":" + entity.id)
+                    sharedPrefixes[key] = entry
+                }
+            }
+        }
+        let literalNames = searchable.map(\.name) + sharedPrefixes.values.filter { $0.identities.count > 1 }.map(\.name)
         var seenNames = Set<String>()
-        for entity in searchable {
-            let name = folded(entity.name)
+        for literal in literalNames {
+            let name = folded(literal)
             guard seenNames.insert(name).inserted else { continue }
             var remaining = text.startIndex..<text.endIndex
             while let range = text.range(of: name, range: remaining) {
                 if hasWordBoundaries(range, in: text) {
-                    matches.append(.init(name: entity.name, range: range))
+                    matches.append(.init(name: literal, range: range))
                 }
                 guard range.upperBound < text.endIndex else { break }
                 remaining = range.upperBound..<text.endIndex
@@ -99,6 +128,8 @@ nonisolated struct MarinaNamedTargetRequirement: Equatable, Sendable {
         }.map { folded($0.name) } + explicitNames.map { folded($0.name) })
         var requirements: [Self] = []
         for match in selected.sorted(by: { $0.range.lowerBound < $1.range.lowerBound }) {
+            if explicitKind(for: match.name, in: prompt) == "workspace",
+               catalog.contains(where: { $0.kind == "workspace" && folded($0.name) == folded(match.name) }) { continue }
             // A full explicit unknown name also outranks a known shorter name inside it.
             // For example, Café 🍵 Card must not become the existing Café 🍵 category.
             let isInsideLongerLiteral = explicitNames.contains { literal in
@@ -143,6 +174,7 @@ nonisolated struct MarinaNamedTargetRequirement: Equatable, Sendable {
         // explicit quoted/named records, and anchored title-case names ending in Card/Tarjeta.
         // An empty candidate list still requires a lookup; it never authorizes workspace fallback.
         for literal in explicitNames {
+            if literal.kind == "workspace", catalog.contains(where: { $0.kind == "workspace" && folded($0.name) == folded(literal.name) }) { continue }
             guard !requirements.contains(where: { folded($0.search) == folded(literal.name) }) else { continue }
             let candidates = searchable.filter {
                 (literal.kind == nil || $0.kind == literal.kind)
@@ -232,6 +264,7 @@ nonisolated struct MarinaNamedTargetRequirement: Equatable, Sendable {
     private static let namedBoundary = #"\s+(?:and|or|but|with|on|at|within|plus|y|o|pero|con|en|this|last|current|previous|today|yesterday|during|in|for|este|esta|el mes|durante)\b"#
 
     private static let kindNames: [String: [String]] = [
+        "workspace": ["workspace", "workspaces", "espacio de trabajo", "espacios de trabajo"],
         "card": ["card", "cards", "tarjeta", "tarjetas"],
         "category": ["category", "categories", "categoria", "categorias"],
         "budget": ["budget", "budgets", "presupuesto", "presupuestos"],

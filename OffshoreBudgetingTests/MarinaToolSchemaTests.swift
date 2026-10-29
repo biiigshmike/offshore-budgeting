@@ -14,8 +14,10 @@ struct MarinaToolSchemaTests {
             homeContext: nil, defaultBudgetingPeriod: .monthly, now: Date(timeIntervalSince1970: 1_792_224_000))
         let schemaBytes = try runtime.diagnosticTools().reduce(0) { try $0 + JSONEncoder().encode($1.parameters).count }
         let prefix = MarinaContextBudget.estimatedPrefixTokens(instructions: instructions, schemaBytes: schemaBytes)
-        let prompt = MarinaContextBudget.estimatedTokens("How much did I spend using my Apple Card this month?")
-        #expect(MarinaContextBudget(capacity: 4096).fits(prefix + prompt + 16))
+        let prompt = MarinaContextBudget.estimatedTokens(MarinaConversationRuntime.queryPrompt(for: "How much did I spend using my Apple Card this month?"))
+        let occupied = prefix + prompt + runtime.diagnosticAdditionalNarrationPromptTokens + 16
+        #expect(MarinaContextBudget(capacity: 4096).fits(occupied),
+                "Prefix including response contract \(prefix), additional schema \(runtime.diagnosticAdditionalNarrationPromptTokens), question \(prompt), framing 16.")
     }
     #endif
 
@@ -50,6 +52,9 @@ struct MarinaToolSchemaTests {
     }
 
     @Test func compactSelectionsRoundTripWithoutDatabaseIdentifiers() throws {
+        let schema = try #require(JSONSerialization.jsonObject(with: Data(MarinaSelection.generationSchema.debugDescription.utf8)) as? [String: Any])
+        #expect(schema["type"] as? String == "string")
+        #expect(schema["pattern"] == nil)
         for selection in [MarinaSelection.workspace, .previous, .references(["r1", "r2"])] {
             #expect(try MarinaSelection(selection.generatedContent).generatedContent == selection.generatedContent)
         }
@@ -151,6 +156,13 @@ struct MarinaToolSchemaTests {
     }
 
     @Test func expenseComparisonsRequireTheOtherSelectionAndPeriod() throws {
+        var leaderArguments = MarinaExpensesTool.Arguments(selection: .workspace, dates: .currentMonth, operation: .categoryTotals)
+        leaderArguments.leadersBy = .category
+        #expect(throws: (any Error).self) { try leaderArguments.validatedOperation() }
+        leaderArguments.operation = .compare(selection: .workspace, dates: .previousMonth)
+        #expect(throws: Never.self) { try leaderArguments.validatedOperation() }
+        leaderArguments.leadersBy = .source
+        #expect(throws: (any Error).self) { try leaderArguments.validatedOperation() }
         let simpleOperations: [(MarinaExpenseOperation, String)] = [
             (.summary, "summary"), (.transactions, "transactions"), (.upcomingPresets, "upcomingPresets"),
             (.largestPurchase, "largestPurchase"), (.categoryTotals, "categoryTotals"), (.cardTotals, "cardTotals"),
@@ -172,8 +184,9 @@ struct MarinaToolSchemaTests {
             #expect(try MarinaExpenseOperation(content).generatedContent == content)
             let arguments = MarinaExpensesTool.Arguments(selection: .workspace, dates: .currentMonth, operation: operation)
             let argumentJSON = try #require(JSONSerialization.jsonObject(with: Data(arguments.generatedContent.jsonString.utf8)) as? [String: Any])
-            #expect(argumentJSON["operation"] as? String == "compare")
-            let comparison = try #require(argumentJSON["comparison"] as? [String: Any])
+            let operationObject = try #require(argumentJSON["operation"] as? [String: Any])
+            let comparison = try #require(operationObject["compare"] as? [String: Any])
+            #expect(argumentJSON["comparison"] == nil)
             #expect(Set(comparison.keys) == ["selection", "dates"])
             #expect(try MarinaExpensesTool.Arguments(arguments.generatedContent).validatedOperation().generatedContent == content)
         }
@@ -197,7 +210,7 @@ struct MarinaToolSchemaTests {
         }
     }
 
-    @Test func flatComparisonPayloadsAreRequiredIfAndOnlyIfComparisonIsChosen() throws {
+    @Test func comparisonPayloadsAreExclusiveOperationVariants() throws {
         let incomeOperations: [MarinaIncomeOperation] = [
             .summary, .progress, .transactions(order: .newest, offset: 0), .groups(by: .source, offset: 5),
             .periodTotals(unit: .month, offset: 0), .compareIncome(selection: .workspace, dates: .previousMonth)
@@ -208,41 +221,31 @@ struct MarinaToolSchemaTests {
             let decoded = try MarinaIncomeTool.Arguments(arguments.generatedContent)
             #expect(try decoded.validatedOperation().generatedContent == operation.generatedContent)
             let object = try #require(JSONSerialization.jsonObject(with: Data(arguments.generatedContent.jsonString.utf8)) as? [String: Any])
+            #expect(object["comparison"] == nil)
             if case .compareIncome = operation {
-                #expect(object["operation"] as? String == "compareIncome")
-                let comparison = try #require(object["comparison"] as? [String: Any])
+                let operationObject = try #require(object["operation"] as? [String: Any])
+                let comparison = try #require(operationObject["compareIncome"] as? [String: Any])
                 #expect(Set(comparison.keys) == ["selection", "dates"])
-            } else { #expect(decoded.comparison == nil) }
+            }
+        }
+        for schema in [MarinaExpensesTool.Arguments.generationSchema, MarinaIncomeTool.Arguments.generationSchema] {
+            let object = try #require(JSONSerialization.jsonObject(with: Data(schema.debugDescription.utf8)) as? [String: Any])
+            let properties = try #require(object["properties"] as? [String: Any])
+            #expect(properties["comparison"] == nil, "A noncomparison can no longer generate an independent comparison payload.")
         }
         for json in [
             #"{"selection":"workspace","dates":"currentMonth","operation":"compare"}"#,
-            #"{"selection":"workspace","dates":"currentMonth","operation":"summary","comparison":{"selection":"workspace","dates":"previousMonth"}}"#
+            #"{"selection":"workspace","dates":"currentMonth","operation":{"compare":{"selection":"workspace"}}}"#,
+            #"{"selection":"workspace","dates":"currentMonth","operation":{"compare":{"dates":"previousMonth"}}}"#,
+            #"{"selection":"workspace","dates":"currentMonth","operation":{"compare":{"selection":"workspace","dates":"previousMonth"},"summary":{}}}"#
         ] {
-            let arguments = try MarinaExpensesTool.Arguments(GeneratedContent(json: json))
-            do {
-                _ = try arguments.validatedOperation()
-                Issue.record("A comparison payload must be present exactly when compare is selected.")
-            } catch { #expect(MarinaToolBridge.argumentErrorFeedback(error) != nil) }
+            #expect(throws: (any Error).self) { try MarinaExpensesTool.Arguments(GeneratedContent(json: json)) }
         }
         for json in [
             #"{"selection":"workspace","dates":"currentMonth","state":"actual","operation":"compareIncome"}"#,
-            #"{"selection":"workspace","dates":"currentMonth","state":"actual","operation":"summary","comparison":{"selection":"workspace","dates":"previousMonth"}}"#
+            #"{"selection":"workspace","dates":"currentMonth","state":"actual","operation":{"compareIncome":{"selection":"workspace"}}}"#
         ] {
-            let arguments = try MarinaIncomeTool.Arguments(GeneratedContent(json: json))
-            do {
-                _ = try arguments.validatedOperation()
-                Issue.record("A comparison payload must be present exactly when compareIncome is selected.")
-            } catch { #expect(MarinaToolBridge.argumentErrorFeedback(error) != nil) }
-        }
-        for json in [
-            #"{"selection":"workspace","dates":"currentMonth","operation":"compare","comparison":{"selection":"workspace"}}"#,
-            #"{"selection":"workspace","dates":"currentMonth","operation":"compare","comparison":{"dates":"previousMonth"}}"#,
-            #"{"selection":"workspace","dates":"currentMonth","operation":{"compare":{"selection":"workspace","dates":"previousMonth"}}}"#
-        ] {
-            do {
-                _ = try MarinaExpensesTool.Arguments(GeneratedContent(json: json))
-                Issue.record("Flat comparisons require a complete typed payload and string operation.")
-            } catch { }
+            #expect(throws: (any Error).self) { try MarinaIncomeTool.Arguments(GeneratedContent(json: json)) }
         }
     }
 

@@ -30,6 +30,21 @@ struct MarinaToolSetBenchmarkTests {
         ]
         print("MarinaBenchmark accounting=component counts overlap; do not sum")
         print("MarinaBenchmark context_capacity=\(model.contextSize)")
+        let queryTokens = try await model.tokenCount(for: MarinaQueryOutcome.generationSchema)
+        let queryEstimate = runtime.diagnosticEstimatedQuerySchemaTokens
+        print("MarinaBenchmark phases=query_with_five_tools,narration_without_tools query_schema=\(queryTokens) query_schema_estimate=\(queryEstimate)")
+        #expect(queryEstimate >= queryTokens, "Recalibrate the query schema fallback when its schema changes.")
+        for factCount in [0, 1, 6] {
+            let facts = (0..<factCount).map { index in
+                MarinaNarrationEvidence(id: "q0f\(index)", subject: "Verified subject", relation: "totals",
+                    value: "$100", scope: "October", isFocus: index == 0)
+            }
+            let schema = try MarinaNarrationSchema.make(act: facts.isEmpty ? .greeting : .answer, evidence: facts)
+            let narrationTokens = try await model.tokenCount(for: schema)
+            let narrationEstimate = MarinaNarrationSchema.estimatedTokens(schema)
+            print("MarinaBenchmark narration_facts=\(factCount) narration_schema=\(narrationTokens) fallback_narration_estimate=\(narrationEstimate)")
+            #expect(narrationEstimate >= narrationTokens, "Recalibrate the current evidence schema fallback when its schema changes.")
+        }
         var baselineTools: Int?
         var baselineTranscript: Int?
         for (name, names) in sets {
@@ -44,6 +59,7 @@ struct MarinaToolSetBenchmarkTests {
                     let schemaBytes = try tools.reduce(0) { try $0 + JSONEncoder().encode($1.parameters).count }
                     let estimate = MarinaContextBudget.estimatedPrefixTokens(instructions: instructions, schemaBytes: schemaBytes)
                     print("MarinaBenchmark fallback_initial_estimate=\(estimate) schema_bytes=\(schemaBytes)")
+                    print("MarinaBenchmark query_prefix_with_output_schema=\(transcriptTokens + queryTokens)")
                     #expect(estimate >= transcriptTokens, "Recalibrate the prefix fallback when production instructions or schemas change.")
                 }
                 let toolDelta = baselineTools.map { toolTokens - $0 }.map(String.init) ?? "unavailable"

@@ -19,6 +19,72 @@ final class MarinaReadOnlyDataService {
         self.defaultBudgetingPeriod = defaultBudgetingPeriod
     }
 
+    var workspaceIdentity: MarinaConversationMemory.Entity {
+        .init(kind: "workspace", id: workspace.id.uuidString, name: workspace.name)
+    }
+
+    /// Fresh identity data for validating app-owned conversation references. Amounts
+    /// and ledger rows never enter this context catalogue.
+    func compiledEntityCatalog() throws -> [MarinaConversationMemory.Entity] {
+        let snapshot = try MarinaWorkspaceSnapshotProvider().snapshot(for: workspace, modelContext: modelContext,
+            homeContext: homeContext, now: now)
+        return lookupRecords(snapshot: snapshot).map { .init(kind: $0.kind, id: $0.id, name: $0.title) }
+    }
+
+    /// Freeze a compiled question's date defaults before name clarification. This
+    /// reads app state, without performing or caching a financial aggregation.
+    func prepareCompiledDates(_ request: MarinaDataRequest) throws -> MarinaDataResult {
+        try prepareCompiledDates(request, deferringBudgetSides: []).result
+    }
+
+    /// A missing budget identity postpones only the window that depends on it.
+    /// Keep independently resolved dates even when the other side needs a choice.
+    func prepareCompiledDates(_ request: MarinaDataRequest,
+                              deferringBudgetSides: Set<MarinaRequestCompiler.DateSide>) throws
+        -> (result: MarinaDataResult, pendingDateSide: MarinaRequestCompiler.DateSide?) {
+        let snapshot = try MarinaWorkspaceSnapshotProvider().snapshot(for: workspace, modelContext: modelContext,
+            homeContext: homeContext, now: now)
+        var frozen = request
+        var pending: (choice: PeriodChoiceRequired, side: MarinaRequestCompiler.DateSide)?
+        do {
+            if !deferringBudgetSides.contains(.primary) {
+                do {
+                    let range = try dateRange(request, snapshot: snapshot)
+                    frozen = frozenRequest(frozen, range: range, hasComparison: false, comparisonRange: nil)
+                } catch let choice as PeriodChoiceRequired { pending = (choice, .primary) }
+            }
+            let hasOwnComparisonDates = request.comparisonPeriod != nil || request.comparisonAllTime
+                || request.comparisonStartDate != nil || request.comparisonEndDate != nil
+            let hasOwnComparisonBudget = request.comparisonFilter?.budgetID != nil
+                && request.comparisonFilter?.budgetID != request.budgetID
+            let inheritsUnresolvedPrimaryDates = deferringBudgetSides.contains(.primary)
+                && !hasOwnComparisonDates && !hasOwnComparisonBudget
+            if request.operation == .comparison, !deferringBudgetSides.contains(.comparison), !inheritsUnresolvedPrimaryDates {
+                do {
+                    let range = try dateRange(comparisonRequest(from: frozen), snapshot: snapshot)
+                    frozen.comparisonPeriod = nil
+                    frozen.comparisonStartDate = range.map { dateText($0.startDate) }
+                    frozen.comparisonEndDate = range.map { dateText($0.endDate) }
+                    frozen.comparisonAllTime = range == nil
+                } catch let choice as PeriodChoiceRequired {
+                    if pending == nil { pending = (choice, .comparison) }
+                }
+            }
+            guard let pending else { return (.init(status: "ready", scope: workspace.name, resolvedRequest: frozen), nil) }
+            let choice = pending.choice
+            let question = pending.side == .comparison
+                ? "More than one budget applies to the comparison period. Which budget's dates should I use?"
+                : choice.selectsBudget ? "More than one budget applies. Which budget should I use?" : "More than one budget applies. Which budget's dates should I use?"
+            return (.init(status: choice.selectsBudget ? "needsBudgetChoice" : "needsPeriodChoice", scope: workspace.name,
+                records: choice.budgets.map { .init(id: $0.id.uuidString, kind: "budget", title: $0.name,
+                    detail: "\(dateText($0.startDate)) through \(dateText($0.endDate))") },
+                totalCount: choice.budgets.count,
+                explanation: question, resolvedRequest: frozen), pending.side)
+        } catch let error as RequestError {
+            return (.init(status: "invalidRequest", scope: workspace.name, explanation: error.message), nil)
+        }
+    }
+
     func namedTargetRequirements(prompt: String) throws -> [MarinaNamedTargetRequirement] {
         let snapshot = try MarinaWorkspaceSnapshotProvider().snapshot(for: workspace, modelContext: modelContext,
             homeContext: homeContext, now: now)
@@ -41,15 +107,30 @@ final class MarinaReadOnlyDataService {
                 request.relativePeriod = .nextSevenDays
             }
         }
+        if request.purpose == .nextPlannedExpense {
+            request.operation = .transactions; request.scope = .planned; request.state = .all
+            request.expenseMeasure = .spending; request.includeFuture = true
+            request.sort = .oldest; request.limit = 1; request.offset = 0
+        }
+        if request.purpose == .cardSummary { request.operation = .summary; request.expenseMeasure = .spending }
+        if request.purpose == .incomeTimeline { request.state = .all }
+        if [.budgetCards, .budgetPresets].contains(request.purpose) { request.operation = .inventory }
         let snapshot = try MarinaWorkspaceSnapshotProvider().snapshot(for: workspace, modelContext: modelContext, homeContext: homeContext, now: now)
         do {
-            if request.purpose == .budgetPace && request.budgetID == nil {
+            if [.budgetPace, .categoryAvailability, .budgetCards, .budgetPresets].contains(request.purpose), request.budgetID == nil {
                 let requestedRange = try dateRange(request, snapshot: snapshot)
                 let matching = snapshot.budgets.filter { budget in requestedRange.map { budget.startDate <= $0.endDate && budget.endDate >= $0.startDate } ?? false }
-                if matching.count == 1 { request.budgetID = matching[0].id.uuidString }
+                if matching.count == 1 {
+                    if request.purpose == .categoryAvailability { request.periodBudgetID = matching[0].id.uuidString }
+                    else { request.budgetID = matching[0].id.uuidString }
+                }
+                else if matching.count > 1 { throw PeriodChoiceRequired(budgets: matching, selectsBudget: true) }
+            }
+            let range = try dateRange(request, snapshot: snapshot)
+            if [.spendingPatterns, .incomeTimeline, .savingsTimeline].contains(request.purpose) {
+                request.periodUnit = request.periodUnit ?? range.map(defaultPeriodUnit)
             }
             try validate(request, snapshot: snapshot)
-            let range = try dateRange(request, snapshot: snapshot)
             if let range, request.periodUnit != nil,
                (calendar.dateComponents([.day], from: range.startDate, to: range.endDate).day ?? 0) > 36600 {
                 throw RequestError(message: "Please choose a range of 100 years or less for period summaries.")
@@ -57,7 +138,10 @@ final class MarinaReadOnlyDataService {
             var result: MarinaDataResult
             switch request.tool {
             case .findRecords: result = findRecords(request, snapshot: snapshot)
-            case .expenses: result = summarize(expenses(request, snapshot: snapshot, range: range), request: request, range: range)
+            case .expenses:
+                let rows = expenses(request, snapshot: snapshot, range: range)
+                result = summarize(rows, request: request, range: range)
+                enrichExpenses(&result, rows: rows, request: request, snapshot: snapshot, range: range)
             case .income:
                 result = summarize(incomes(request, snapshot: snapshot, range: range), request: request, range: range)
                 var stateRequest = request
@@ -67,14 +151,32 @@ final class MarinaReadOnlyDataService {
                 let expected = incomes(stateRequest, snapshot: snapshot, range: range).reduce(0) { $0 + $1.amount }
                 result.metrics += [.init(label: "Actual income", value: received), .init(label: "Planned income", value: expected)]
                 if expected > 0 { result.metrics.append(.init(label: "Income progress percent", value: received / expected * 100, unit: .percent)) }
+                if request.purpose == .incomeTimeline, let range {
+                    result.report = incomeTimeline(request, snapshot: snapshot, range: range)
+                    // Buckets are shared pagination anchors; their amounts live only in the
+                    // separate planned and received series, never in a merged income series.
+                    result.records = result.records.map { record in
+                        var record = record; record.amount = nil; record.detail = nil
+                        return record
+                    }
+                    result.metrics.removeAll { $0.label == "Total" || $0.label.hasPrefix("Average per ") }
+                    result.explanation = "Planned and received income are separate series. Their totals include all matching records, not only this page."
+                }
             case .budgetSummary: result = budgetSummary(request, snapshot: snapshot, range: range)
             case .accounts: result = accounts(request, snapshot: snapshot, range: range)
             }
-            if (request.tool == .expenses || request.tool == .income),
-               request.cardID != nil || request.categoryID != nil || request.presetID != nil || request.search != nil {
+            if (request.tool == .expenses || request.tool == .income), request.purpose != .incomeTimeline,
+               request.cardID != nil || request.categoryID != nil || request.categoryIDs != nil || request.presetID != nil || request.search != nil || request.merchantName != nil {
                 var wholeRequest = request
-                wholeRequest.cardID = nil; wholeRequest.categoryID = nil
-                wholeRequest.presetID = nil; wholeRequest.search = nil
+                // Remove only the numerator selection. Other filters define the
+                // requested population (for example Dining's share on Apple Card).
+                if request.categoryID != nil || request.categoryIDs != nil {
+                    wholeRequest.categoryID = nil; wholeRequest.categoryIDs = nil
+                } else if request.search != nil || request.merchantName != nil {
+                    wholeRequest.search = nil; wholeRequest.merchantName = nil
+                } else if request.presetID != nil {
+                    wholeRequest.presetID = nil
+                } else { wholeRequest.cardID = nil }
                 let wholeRows = request.tool == .expenses
                     ? expenses(wholeRequest, snapshot: snapshot, range: range)
                     : incomes(wholeRequest, snapshot: snapshot, range: range)
@@ -86,47 +188,66 @@ final class MarinaReadOnlyDataService {
             var comparisonResolvedRange: HomeQueryDateRange?
             if request.tool == .expenses || request.tool == .income,
                request.comparisonAllTime || request.comparisonPeriod != nil || request.comparisonStartDate != nil || request.comparisonEndDate != nil || request.comparisonFilter != nil {
-                var comparison = request
-                if request.comparisonStartDate != nil || request.comparisonEndDate != nil {
-                    comparison.allTime = false
-                    comparison.relativePeriod = nil
-                    comparison.startDate = request.comparisonStartDate
-                    comparison.endDate = request.comparisonEndDate
-                }
-                if request.comparisonAllTime {
-                    comparison.relativePeriod = nil; comparison.startDate = nil; comparison.endDate = nil
-                    comparison.allTime = true
-                }
-                if let period = request.comparisonPeriod {
-                    comparison.relativePeriod = period
-                    comparison.startDate = nil; comparison.endDate = nil; comparison.allTime = false
-                }
-                if let filter = request.comparisonFilter {
-                    comparison.cardID = filter.cardID; comparison.categoryID = filter.categoryID
-                    comparison.budgetID = filter.budgetID; comparison.presetID = filter.presetID
-                    comparison.search = filter.search
-                }
+                let comparison = comparisonRequest(from: request)
                 try validate(comparison, snapshot: snapshot)
                 let comparisonRange = try dateRange(comparison, snapshot: snapshot)
                 comparisonResolvedRange = comparisonRange
                 comparisonLabel = displayScope(comparison, snapshot: snapshot, range: comparisonRange)
                 let rows = request.tool == .expenses ? expenses(comparison, snapshot: snapshot, range: comparisonRange) : incomes(comparison, snapshot: snapshot, range: comparisonRange)
-                let previous = rows.reduce(0) { $0 + $1.amount }
-                let current = result.metrics.first(where: { $0.label == "Total" })?.value ?? 0
+                var previous = rows.reduce(0) { $0 + $1.amount }
+                var current = result.metrics.first(where: { $0.label == "Total" })?.value ?? 0
+                if request.compareLeaders == true {
+                    let primaryRows = expenses(request, snapshot: snapshot, range: range)
+                    let first = leader(primaryRows, grouping: request.grouping, scope: displayScope(request, snapshot: snapshot, range: range))
+                    let second = leader(rows, grouping: request.grouping, scope: comparisonLabel ?? scopeText(comparisonRange))
+                    var report = result.report ?? MarinaReport()
+                    report.leaders = [first, second]; result.report = report
+                    current = first.amount ?? 0; previous = second.amount ?? 0
+                    result.metrics.removeAll { $0.label == "Total" }
+                    result.metrics.insert(.init(label: "Total", value: current), at: 0)
+                }
                 result.metrics.append(.init(label: "Comparison total", value: previous))
-                result.metrics.append(.init(label: "Difference", value: current - previous))
-                if previous != 0 { result.metrics.append(.init(label: "Change percent", value: (current - previous) / abs(previous) * 100, unit: .percent)) }
+                let canCompare = request.compareLeaders != true || result.report?.leaders?.allSatisfy { $0.amount != nil } == true
+                if canCompare {
+                    result.metrics.append(.init(label: "Difference", value: current - previous))
+                    if previous != 0 { result.metrics.append(.init(label: "Change percent", value: (current - previous) / abs(previous) * 100, unit: .percent)) }
+                }
             }
             var filters: [String] = []
             if let id = request.cardID { filters.append("card: " + (snapshot.cards.first { $0.id == UUID(uuidString: id) }?.name ?? id)) }
             if let id = request.categoryID { filters.append("category: " + (snapshot.categories.first { $0.id == UUID(uuidString: id) }?.name ?? id)) }
+            if let ids = request.categoryIDs { filters.append("categories: " + ids.map { id in id == "uncategorized" ? "Uncategorized" : snapshot.categories.first { $0.id == UUID(uuidString: id) }?.name ?? id }.joined(separator: ", ")) }
             if let id = request.budgetID { filters.append("budget: " + (snapshot.budgets.first { $0.id == UUID(uuidString: id) }?.name ?? id)) }
             if let search = request.search { filters.append("text: " + search) }
             result.appliedFilters = filters.isEmpty ? nil : filters.joined(separator: "; ")
+            if request.metric == .share && request.grouping != .none {
+                result.metrics.removeAll { $0.label == MarinaDataRequest.MetricFocus.share.metricLabel }
+                if let share = result.report?.groups?.first?.sharePercent {
+                    result.metrics.append(.init(label: MarinaDataRequest.MetricFocus.share.metricLabel, value: share, unit: .percent))
+                }
+            }
+            if let focus = request.metric, !result.metrics.contains(where: { $0.label == focus.metricLabel }) {
+                if focus == .share, let share = result.report?.groups?.first?.sharePercent {
+                    result.metrics.append(.init(label: focus.metricLabel, value: share, unit: .percent))
+                } else if focus == .average && result.totalCount == 0 {
+                    result.explanation = "There are no matching records, so an average is unavailable."
+                } else if focus == .share {
+                    result.explanation = "A share is unavailable because the matching period total is zero."
+                } else if focus != .savingsProgress {
+                    throw RequestError(message: "That metric is not available for this result. Choose the matching income, expense, or budget report.")
+                }
+            }
             result.presentation = presentation(for: result, request: request, snapshot: snapshot, range: range, comparisonLabel: comparisonLabel, comparisonRange: comparisonResolvedRange)
             result.resolvedRequest = frozenRequest(request, range: range,
                 hasComparison: comparisonLabel != nil, comparisonRange: comparisonResolvedRange)
             return result
+        } catch let choice as PeriodChoiceRequired {
+            return .init(status: choice.selectsBudget ? "needsBudgetChoice" : "needsPeriodChoice", scope: workspace.name,
+                         records: choice.budgets.map { .init(id: $0.id.uuidString, kind: "budget", title: $0.name,
+                             detail: "\(dateText($0.startDate)) through \(dateText($0.endDate))") },
+                         totalCount: choice.budgets.count,
+                         explanation: choice.selectsBudget ? "More than one budget applies. Which budget should I use?" : "More than one budget applies. Which budget's dates should I use?",
+                         resolvedRequest: request)
         } catch let error as RequestError {
             return MarinaDataResult(status: "invalidRequest", scope: workspace.name, explanation: error.message)
         }
@@ -171,7 +292,7 @@ final class MarinaReadOnlyDataService {
             let variable = snapshot.variableExpenses.first { $0.id == UUID(uuidString: record.id) }
             let planned = snapshot.plannedExpenses.first { $0.id == UUID(uuidString: record.id) }
             let rowCategory = variable?.category ?? planned?.category
-            let usesPresetRow = request.purpose == .upcomingPresets || (request.tool == .findRecords && record.kind == "preset")
+            let usesPresetRow = request.purpose == .upcomingPresets || request.purpose == .budgetPresets || (request.tool == .findRecords && record.kind == "preset")
             let preset = usesPresetRow ? snapshot.presets.first { $0.id == (planned?.sourcePresetID ?? UUID(uuidString: record.id)) } : nil
             let presetSnapshot: MarinaPresentation.PresetSnapshot? = preset.map { preset in
                 .init(id: preset.id.uuidString, title: preset.title, plannedAmount: preset.plannedAmount,
@@ -194,7 +315,8 @@ final class MarinaReadOnlyDataService {
         }
         if operation == .transactions {
             title = request.tool == .accounts ? "Account activity" : request.tool == .income ? "Income records"
-                : request.limit == 1 && request.sort == .largest ? "Largest expense" : "Expenses"
+                : request.limit == 1 && request.sort == .largest ? "Largest expense"
+                : request.limit == 1 && request.sort == .smallest ? "Smallest expense" : "Expenses"
         }
         if operation == .ranking { title = "\(request.tool == .income ? "Income" : "Spending") by \(request.grouping.rawValue)" }
         if operation == .trend { title = request.tool == .budgetSummary ? "Savings over time" : request.tool == .income ? "Income over time" : "Spending over time" }
@@ -205,6 +327,27 @@ final class MarinaReadOnlyDataService {
             metrics = result.metrics.filter { labels.contains($0.label) }
         } else if request.tool == .accounts { metrics = result.metrics.filter { $0.label.hasSuffix("current balance") || $0.label.hasSuffix("current reconciliation balance") } }
         if operation == .comparison { metrics = result.metrics.filter { ["Total", "Comparison total", "Difference", "Change percent"].contains($0.label) } }
+        switch request.purpose {
+        case .cardSummary:
+            metrics = result.metrics.filter { ["Total", "Planned card spending", "Variable card spending"].contains($0.label) }
+        case .budgetDetails:
+            metrics = result.metrics.filter { ["Actual income", "Planned income", "Planned spending", "Recorded planned expenses", "Effective planned spending", "Variable spending", "Total", "Max savings", "Projected savings", "Actual savings"].contains($0.label) }
+        case .savingsOutlook, .savingsTimeline:
+            title = "Savings outlook"
+            metrics = result.metrics.filter { ["Actual savings", "Projected savings", "Gap to projected savings", "Savings progress percent"].contains($0.label) }
+        case .categoryAvailability:
+            title = "Category availability"; metrics = result.metrics.filter { ["Categories over limit", "Categories near limit"].contains($0.label) }
+        case .budgetCards: title = "Linked cards"; metrics = result.metrics
+        case .budgetPresets: title = "Linked presets"; metrics = result.metrics
+        case .nextPlannedExpense: title = "Next planned expense"
+        case .spendingPatterns: title = "Spending patterns"
+        case .incomeTimeline: title = "Planned and received income"; metrics = result.metrics.filter { ["Actual income", "Planned income"].contains($0.label) }
+        default: break
+        }
+        if let focus = request.metric {
+            metrics = result.metrics.filter { $0.label == focus.metricLabel }
+            if !metrics.isEmpty { title = focus.metricLabel }
+        }
         var chartPoints: [MarinaPresentation.ChartPoint]
         if operation == .comparison {
             chartPoints = result.metrics.filter { ["Total", "Comparison total"].contains($0.label) }.map {
@@ -239,9 +382,8 @@ final class MarinaReadOnlyDataService {
         }
         let frozen = frozenRequest(request, range: range,
             hasComparison: comparisonLabel != nil, comparisonRange: comparisonRange)
-        let isLargestExpense = request.tool == .expenses && operation == .transactions
-            && request.sort == .largest && request.limit == 1
-        let canPage = result.nextOffset != nil && [.transactions, .inventory, .ranking, .share, .trend].contains(operation) && !isLargestExpense
+        let isSingleExpense = request.tool == .expenses && operation == .transactions && request.limit == 1
+        let canPage = result.nextOffset != nil && ([.transactions, .inventory, .ranking, .share, .trend].contains(operation) || request.purpose == .categoryAvailability) && !isSingleExpense
         let qualifier: String?
         if request.tool == .expenses {
             switch request.expenseMeasure {
@@ -258,7 +400,9 @@ final class MarinaReadOnlyDataService {
             case .planned: qualifier = "Planned amounts."
             case .actual: qualifier = "Recorded amounts."
             case .ledger: qualifier = "Ledger amounts, including credits and adjustments."
-            case .spending: qualifier = "Debit spending."
+            case .spending:
+                let hasPlanned = expenses(request, snapshot: snapshot, range: range).contains { $0.kind == "plannedExpense" }
+                qualifier = hasPlanned ? "Debit spending and effective planned expenses." : "Debit spending."
             }
         } else if request.purpose == .budgetPace {
             qualifier = "Uses budget-impact spending, including planned amounts for unrecorded expenses due by today."
@@ -275,7 +419,7 @@ final class MarinaReadOnlyDataService {
         if request.purpose == .incomeProgress { title = "Income progress"; metrics = result.metrics.filter { ["Actual income", "Planned income"].contains($0.label) } }
         if request.purpose == .budgetPace { title = "Budget pace"; metrics = result.metrics.filter { ["Pace actual spending", "Expected spending by now", "Spending pace difference"].contains($0.label) } }
         if request.purpose == .upcomingPresets { title = "Upcoming preset expenses" }
-        return .init(id: UUID().uuidString, purpose: request.purpose, forcePresentation: request.forcePresentation, identityKey: identity,
+        var presentation = MarinaPresentation(id: UUID().uuidString, purpose: request.purpose, forcePresentation: request.forcePresentation, identityKey: identity,
                      topicKey: [request.tool.rawValue, request.purpose?.rawValue ?? "", operation.rawValue, request.grouping.rawValue].joined(separator: ":"),
                      incomeProgress: incomeProgress, budgetPace: budgetPace, operation: operation, title: title, scopeLabel: displayScope(request, snapshot: snapshot, range: range), qualifier: qualifier,
                      metrics: metrics, records: operation == .summary || operation == .comparison ? [] : rows,
@@ -283,6 +427,44 @@ final class MarinaReadOnlyDataService {
                      totalCount: result.totalCount,
                      pagination: canPage ? .init(workspaceID: workspace.id, request: frozen, visibleCount: request.offset + result.records.count, calculationDate: now, excludeFuturePlanned: homeContext?.excludeFuturePlannedExpensesFromCalculations ?? false, excludeFutureVariable: homeContext?.excludeFutureVariableExpensesFromCalculations ?? false) : nil,
                      isEmpty: result.status == "empty" && (request.tool == .expenses || request.tool == .income || request.tool == .findRecords))
+        presentation.report = result.report
+        presentation.chartIntent = request.chartIntent
+        return presentation
+    }
+
+    /// Both execution and pending questions resolve the same comparison population.
+    private func comparisonRequest(from request: MarinaDataRequest) -> MarinaDataRequest {
+        var comparison = request
+        if request.comparisonStartDate != nil || request.comparisonEndDate != nil {
+            comparison.allTime = false
+            comparison.relativePeriod = nil
+            comparison.startDate = request.comparisonStartDate
+            comparison.endDate = request.comparisonEndDate
+        }
+        if request.comparisonAllTime {
+            comparison.relativePeriod = nil; comparison.startDate = nil; comparison.endDate = nil
+            comparison.allTime = true
+        }
+        if let period = request.comparisonPeriod {
+            comparison.relativePeriod = period
+            comparison.startDate = nil; comparison.endDate = nil; comparison.allTime = false
+        }
+        if let filter = request.comparisonFilter {
+            comparison.cardID = filter.cardID; comparison.categoryID = filter.categoryID
+            comparison.categoryIDs = filter.categoryIDs
+            comparison.budgetID = filter.budgetID; comparison.presetID = filter.presetID
+            comparison.search = filter.search
+            comparison.merchantName = filter.merchantName
+            if let budgetID = filter.budgetID, budgetID != request.budgetID,
+               request.comparisonStartDate == nil, request.comparisonEndDate == nil,
+               request.comparisonPeriod == nil, !request.comparisonAllTime {
+                // A separately selected budget supplies its own dates. Primary
+                // frozen dates must not clip a different budget to an empty range.
+                comparison.startDate = nil; comparison.endDate = nil
+                comparison.relativePeriod = nil; comparison.allTime = false
+            }
+        }
+        return comparison
     }
 
     private func frozenRequest(_ request: MarinaDataRequest, range: HomeQueryDateRange?,
@@ -316,10 +498,15 @@ final class MarinaReadOnlyDataService {
         if let card = snapshot.cards.first(where: { $0.id == UUID(uuidString: request.cardID ?? "") }) { names.append(card.name) }
         if let category = snapshot.categories.first(where: { $0.id == UUID(uuidString: request.categoryID ?? "") }) { names.append(category.name) }
         if request.categoryID == "uncategorized" { names.append("Uncategorized") }
+        if let ids = request.categoryIDs {
+            names += ids.filter { $0 != request.categoryID }.compactMap { id in
+                id == "uncategorized" ? "Uncategorized" : snapshot.categories.first { $0.id.uuidString == id }?.name
+            }
+        }
         if let budget = snapshot.budgets.first(where: { $0.id == UUID(uuidString: request.budgetID ?? "") }) { names.append(budget.name) }
         if let account = snapshot.savingsAccounts.first(where: { $0.id == UUID(uuidString: request.accountID ?? "") }) { names.append(account.name) }
         if let account = snapshot.reconciliationAccounts.first(where: { $0.id == UUID(uuidString: request.accountID ?? "") }) { names.append(account.name) }
-        if let search = request.search { names.append(search) }
+        if let search = request.merchantName ?? request.search { names.append(search) }
         if names.isEmpty { names.append(workspace.name) }
         names.append(range.map { friendlyRange($0) } ?? "All time")
         return names.joined(separator: " · ")
@@ -337,6 +524,7 @@ final class MarinaReadOnlyDataService {
     }
 
     private struct RequestError: Error { let message: String }
+    private struct PeriodChoiceRequired: Error { let budgets: [Budget]; var selectsBudget: Bool = false }
     private struct Row {
         let id: UUID
         let kind: String
@@ -354,10 +542,17 @@ final class MarinaReadOnlyDataService {
                 throw RequestError(message: "Unknown \(label) in the current workspace. Use findRecords to resolve the name; never omit this filter as a fallback.")
             }
         }
+        if let name = request.merchantName {
+            guard request.tool == .expenses, snapshot.variableExpenses.contains(where: { sameMerchant($0.descriptionText, name) }) else {
+                throw RequestError(message: "The selected merchant is no longer available in this workspace. Resolve the name again; never omit this selection as a fallback.")
+            }
+        }
         try check(request.presetID, ids: snapshot.presets.map(\.id), label: "preset")
         try check(request.cardID, ids: snapshot.cards.map(\.id), label: "card")
         if request.categoryID != "uncategorized" { try check(request.categoryID, ids: snapshot.categories.map(\.id), label: "category") }
+        for id in request.categoryIDs ?? [] where id != "uncategorized" { try check(id, ids: snapshot.categories.map(\.id), label: "category") }
         try check(request.budgetID, ids: snapshot.budgets.map(\.id), label: "budget")
+        try check(request.periodBudgetID, ids: snapshot.budgets.map(\.id), label: "period budget")
         switch request.scope {
         case .savings:
             try check(request.accountID, ids: snapshot.savingsAccounts.map(\.id), label: "savings account")
@@ -374,7 +569,21 @@ final class MarinaReadOnlyDataService {
         try require(request.purpose != .budgetPace || request.tool == .budgetSummary, "Budget pace requires budgetSummary.")
         try require(request.purpose != .incomeProgress || request.tool == .income, "Income progress requires income.")
         try require(request.purpose != .upcomingPresets || request.tool == .expenses, "Upcoming presets require expenses.")
-        try require(request.purpose == nil || (request.grouping == .none && request.periodUnit == nil && request.comparisonFilter == nil && request.comparisonPeriod == nil && request.comparisonStartDate == nil && !request.comparisonAllTime), "Choose an analytical purpose or a grouped, trend, or comparison operation.")
+        if let purpose = request.purpose {
+            let allowedTool: MarinaDataRequest.Tool
+            switch purpose {
+            case .cardSummary, .upcomingPresets, .nextPlannedExpense, .spendingPatterns: allowedTool = .expenses
+            case .incomeProgress, .incomeTimeline: allowedTool = .income
+            default: allowedTool = .budgetSummary
+            }
+            try require(request.tool == allowedTool, "This report requires the \(allowedTool.rawValue) tool.")
+            let allowsPeriod = [.spendingPatterns, .incomeTimeline, .savingsTimeline].contains(purpose)
+            try require(request.grouping == .none && (allowsPeriod || request.periodUnit == nil) && request.comparisonFilter == nil && request.comparisonPeriod == nil && request.comparisonStartDate == nil && !request.comparisonAllTime,
+                        "Choose a report or a grouped/comparison operation, not both.")
+        }
+        try require(request.compareLeaders != true || (request.tool == .expenses && request.operation == .comparison && [.category, .merchant, .card].contains(request.grouping)), "Leader comparisons require expense comparison grouped by category, merchant, or card.")
+        try require(request.transactionFilter == nil || request.tool == .expenses, "Transaction filters require expenses.")
+        try require(request.availabilityFilter == nil || request.purpose == .categoryAvailability, "Category status filters require category availability.")
         if request.purpose == .budgetPace && request.budgetID == nil {
             let range = try dateRange(request, snapshot: snapshot)
             let matches = snapshot.budgets.filter { budget in range.map { budget.startDate <= $0.endDate && budget.endDate >= $0.startDate } ?? false }
@@ -391,8 +600,8 @@ final class MarinaReadOnlyDataService {
         try require(request.tool == .budgetSummary || request.hypotheticalSpending == nil, "Spending scenarios require budgetSummary.")
         try require(request.tool == .expenses || request.expenseMeasure == .budgetImpact, "Expense measures require expenses.")
         try require(request.tool == .expenses || request.tool == .income || request.grouping == .none, "Grouping requires expenses or income.")
-        try require(request.tool == .expenses || request.tool == .budgetSummary || request.categoryID == nil, "Category filtering is unsupported for this tool.")
-        try require(request.tool == .expenses || request.tool == .income || request.purpose == .budgetPace || request.cardID == nil, "Card filtering requires expenses or income.")
+        try require(request.tool == .expenses || request.tool == .budgetSummary || (request.categoryID == nil && request.categoryIDs == nil), "Category filtering is unsupported for this tool.")
+        try require(request.tool == .expenses || request.tool == .income || request.tool == .budgetSummary || request.cardID == nil, "Card filtering requires expenses, income, or budget reports.")
         try require(request.tool == .expenses || request.tool == .income || request.tool == .budgetSummary || request.budgetID == nil, "Budget filtering is unsupported for this tool.")
         try require(request.tool != .budgetSummary || request.search == nil, "Resolve a budget name with findRecords, then provide budgetID.")
         try require(request.tool != .accounts || request.search == nil, "Resolve an account name with findRecords, then provide accountID.")
@@ -402,6 +611,7 @@ final class MarinaReadOnlyDataService {
         try require(request.tool != .budgetSummary || !request.allTime, "Budget summaries require a finite date range.")
         try require(request.tool == .expenses || request.tool == .income || (!request.comparisonAllTime && request.comparisonPeriod == nil && request.comparisonStartDate == nil && request.comparisonEndDate == nil && request.comparisonFilter == nil), "Date comparisons require expenses or income.")
         if let spending = request.hypotheticalSpending, !spending.isFinite || spending < 0 { throw RequestError(message: "Hypothetical spending must be a finite nonnegative amount.") }
+        if let ids = request.categoryIDs { try require(!ids.isEmpty && Set(ids).count == ids.count, "Choose one or more distinct categories.") }
         guard request.offset >= 0, request.limit > 0 else { throw RequestError(message: "Offset must be nonnegative and limit must be positive.") }
     }
 
@@ -416,12 +626,13 @@ final class MarinaReadOnlyDataService {
             // Explicit period selection uses the Home/default period, even for accounts
             // whose omitted dates intentionally mean all ledger history.
             selection.tool = .expenses
-            let selected = try dateRange(selection, snapshot: snapshot)
-                ?? HomeQueryDateRange(startDate: calendar.startOfDay(for: now), endDate: endOfDay(now))
             let resolved: HomeQueryDateRange
             switch period {
-            case .selectedPeriod: return selected
+            case .selectedPeriod:
+                return try dateRange(selection, snapshot: snapshot)
             case .previousPeriod:
+                let selected = try dateRange(selection, snapshot: snapshot)
+                    ?? HomeQueryDateRange(startDate: calendar.startOfDay(for: now), endDate: endOfDay(now))
                 let end = selected.startDate.addingTimeInterval(-0.001)
                 let standard = defaultBudgetingPeriod.defaultRange(containing: selected.startDate, calendar: calendar)
                 if calendar.isDate(selected.startDate, inSameDayAs: standard.start),
@@ -465,6 +676,22 @@ final class MarinaReadOnlyDataService {
             return HomeQueryDateRange(startDate: calendar.startOfDay(for: budget.startDate), endDate: endOfDay(budget.endDate))
         }
         if request.tool == .findRecords || request.tool == .accounts { return nil }
+        if let id = request.periodBudgetID {
+            guard let budget = snapshot.budgets.first(where: { $0.id.uuidString == id }) else {
+                throw RequestError(message: "The chosen period budget is not in this workspace. Please choose it again.")
+            }
+            return .init(startDate: calendar.startOfDay(for: budget.startDate), endDate: endOfDay(budget.endDate))
+        }
+        let active = snapshot.budgets.filter {
+            calendar.startOfDay(for: $0.startDate) <= now && endOfDay($0.endDate) >= now
+        }.sorted { $0.name == $1.name ? $0.id.uuidString < $1.id.uuidString : $0.name < $1.name }
+        if active.count > 1 {
+            throw PeriodChoiceRequired(budgets: active,
+                selectsBudget: [.budgetPace, .categoryAvailability, .budgetCards, .budgetPresets].contains(request.purpose))
+        }
+        if let budget = active.first {
+            return .init(startDate: calendar.startOfDay(for: budget.startDate), endDate: endOfDay(budget.endDate))
+        }
         if let range = homeContext?.dateRange { return HomeQueryDateRange(startDate: calendar.startOfDay(for: range.startDate), endDate: endOfDay(range.endDate)) }
         let period = defaultBudgetingPeriod.defaultRange(containing: now, calendar: calendar)
         return HomeQueryDateRange(startDate: calendar.startOfDay(for: period.start), endDate: endOfDay(period.end))
@@ -487,9 +714,11 @@ final class MarinaReadOnlyDataService {
     private func findRecords(_ request: MarinaDataRequest, snapshot: MarinaWorkspaceSnapshot) -> MarinaDataResult {
         var records = lookupRecords(snapshot: snapshot)
         if let kind = request.recordKind { records = records.filter { $0.kind == kind } }
-        if let search = request.search, !search.isEmpty { records = records.filter { matches($0.title, search) } }
+        if let expected = request.expectedRecordID { records = records.filter { $0.id == expected } }
+        if let search = request.search, !search.isEmpty { records = records.filter { request.exactRecordName == true ? sameMerchant($0.title, search) : matches($0.title, search) } }
         var result = page(records, request: request, scope: workspace.name)
-        result.metrics = [.init(label: "Matching record count", value: Double(records.count), unit: .number)]
+        result.metrics = [.init(label: "Matching record count", value: Double(records.count), unit: .number),
+                          .init(label: "Count", value: Double(records.count), unit: .number)]
         if request.recordKind == "preset" {
             result.metrics.append(.init(label: "Total preset planned amounts", value: records.reduce(0) { $0 + ($1.amount ?? 0) }))
         }
@@ -507,32 +736,37 @@ final class MarinaReadOnlyDataService {
             guard contains(date, range) else { return false }
             if let budget, (!budgetCards.contains(card?.id ?? UUID()) || date < calendar.startOfDay(for: budget.startDate) || date > endOfDay(budget.endDate)) { return false }
             if let id = request.cardID, card?.id != UUID(uuidString: id) { return false }
-            if let id = request.categoryID {
-                if id == "uncategorized" { if category != nil { return false } }
-                else if category?.id != UUID(uuidString: id) { return false }
-            }
+            if !acceptsCategory(category, request: request) { return false }
+            if let merchant = request.merchantName, !sameMerchant(title, merchant) { return false }
             if let search = request.search, !matches(title, search) { return false }
             return true
         }
         var rows: [Row] = []
         if request.scope != .planned && request.state != .planned && request.presetID == nil && request.expenseMeasure != .planned {
-            rows += (request.includeFuture ? snapshot.variableExpenses : snapshot.homeCalculationVariableExpenses).filter { accepts(card: $0.card, category: $0.category, title: $0.descriptionText, date: $0.transactionDate) }.map {
+            rows += (request.includeFuture ? snapshot.variableExpenses : snapshot.homeCalculationVariableExpenses).filter { accepts(card: $0.card, category: $0.category, title: $0.descriptionText, date: $0.transactionDate) && acceptsTransaction($0, filter: request.transactionFilter) }.map {
                 Row(id: $0.id, kind: "variableExpense", title: $0.descriptionText, date: $0.transactionDate, amount: variableAmount($0, measure: request.expenseMeasure), card: $0.card?.name ?? "No card", category: $0.category?.name ?? "Uncategorized")
             }
         }
         if request.scope != .variable {
-            rows += (request.includeFuture ? snapshot.homePlannedExpenses : snapshot.homeCalculationPlannedExpenses).filter {
+            let plannedBase: [PlannedExpense]
+            if request.purpose == .cardSummary {
+                plannedBase = PlannedExpenseFuturePolicy.filteredForCalculations(snapshot.plannedExpenses,
+                    excludeFuture: !request.includeFuture && (homeContext?.excludeFuturePlannedExpensesFromCalculations ?? false), now: now)
+            } else { plannedBase = request.includeFuture ? snapshot.homePlannedExpenses : snapshot.homeCalculationPlannedExpenses }
+            rows += plannedBase.filter {
                 accepts(card: $0.card, category: $0.category, title: $0.title, date: $0.expenseDate)
                 && (request.purpose != .upcomingPresets || ($0.sourcePresetID != nil && $0.actualAmount == 0))
+                && (request.purpose != .nextPlannedExpense || $0.expenseDate >= calendar.startOfDay(for: now))
+                && acceptsTransaction($0, filter: request.transactionFilter)
                 && (request.presetID == nil || $0.sourcePresetID == UUID(uuidString: request.presetID ?? ""))
                 && (budget == nil || $0.sourceBudgetID == budget?.id)
                 && ((request.state != .actual && request.expenseMeasure != .actual) || $0.actualAmount > 0)
             }.map {
                 Row(id: $0.id, kind: "plannedExpense", title: $0.title, date: $0.expenseDate,
-                    amount: plannedAmount($0, measure: request.state == .planned ? .planned : request.expenseMeasure), card: $0.card?.name ?? "No card", category: $0.category?.name ?? "Uncategorized")
+                    amount: [.cardSummary, .nextPlannedExpense].contains(request.purpose) ? $0.effectiveAmount() : plannedAmount($0, measure: request.state == .planned ? .planned : request.expenseMeasure), card: $0.card?.name ?? "No card", category: $0.category?.name ?? "Uncategorized")
             }
         }
-        return rows
+        return request.positiveOnly == true ? rows.filter { $0.amount > 0 } : rows
     }
 
     private func incomes(_ request: MarinaDataRequest, snapshot: MarinaWorkspaceSnapshot, range: HomeQueryDateRange?) -> [Row] {
@@ -561,14 +795,19 @@ final class MarinaReadOnlyDataService {
             }
             records = groups.map { key, rows in
                 let amount = rows.reduce(0) { $0 + $1.amount }
-                return .init(id: key, kind: "group", title: key, amount: amount, detail: "Count: \(rows.count); share percent: \(total == 0 ? 0 : amount / total * 100)")
+                let shareText = total == 0 ? "unavailable" : String(amount / total * 100)
+                return .init(id: key, kind: "group", title: key, amount: amount, detail: "Count: \(rows.count); share percent: \(shareText)")
             }.sorted { ($0.amount ?? 0) == ($1.amount ?? 0) ? $0.id < $1.id : (request.sort == .smallest ? ($0.amount ?? 0) < ($1.amount ?? 0) : ($0.amount ?? 0) > ($1.amount ?? 0)) }
         }
         var result = page(records, request: request, scope: scopeText(range))
         result.metrics = [.init(label: "Total", value: total), .init(label: "Count", value: Double(rows.count), unit: .number)]
+        if request.grouping != .none { result.metrics.append(.init(label: "Group count", value: Double(records.count), unit: .number)) }
         if let unit = request.periodUnit, let range {
             let count = periodRanges(unit, range: range).count
-            if count > 0 { result.metrics.append(.init(label: "Average per \(unit.rawValue)", value: total / Double(count))) }
+            if count > 0 {
+                result.metrics.append(.init(label: "Average per \(unit.rawValue)", value: total / Double(count)))
+                result.metrics.append(.init(label: "Average per period", value: total / Double(count)))
+            }
         }
         if !rows.isEmpty { result.metrics.append(.init(label: "Average per record", value: total / Double(rows.count))) }
         if let range {
@@ -582,28 +821,21 @@ final class MarinaReadOnlyDataService {
     private func budgetSummary(_ request: MarinaDataRequest, snapshot: MarinaWorkspaceSnapshot, range: HomeQueryDateRange?) -> MarinaDataResult {
         guard let range else { return .init(status: "invalidRequest", scope: workspace.name, explanation: "A budget summary needs a date range.") }
         let budget = snapshot.budgets.first { $0.id == UUID(uuidString: request.budgetID ?? "") }
+        if [.budgetCards, .budgetPresets].contains(request.purpose) {
+            return budgetInventory(request, snapshot: snapshot, budget: budget, range: range)
+        }
         let cardIDs = Set((budget?.cardLinks ?? []).compactMap { $0.card?.id })
-        let planned = snapshot.homeCalculationPlannedExpenses.filter { expense in
-            if request.purpose == .budgetPace {
-                if let cardID = request.cardID, expense.card?.id != UUID(uuidString: cardID) { return false }
-                if let categoryID = request.categoryID {
-                    if categoryID == "uncategorized" { if expense.category != nil { return false } }
-                    else if expense.category?.id != UUID(uuidString: categoryID) { return false }
-                }
-            }
+        let planned = (request.includeFuture ? snapshot.homePlannedExpenses : snapshot.homeCalculationPlannedExpenses).filter { expense in
+            if let cardID = request.cardID, expense.card?.id != UUID(uuidString: cardID) { return false }
+            if !acceptsCategory(expense.category, request: request) { return false }
             guard let budget else { return true }
             return expense.sourceBudgetID == budget.id && cardIDs.contains(expense.card?.id ?? UUID())
                 && expense.expenseDate >= calendar.startOfDay(for: budget.startDate)
                 && expense.expenseDate <= endOfDay(budget.endDate)
         }
-        let variable = snapshot.homeCalculationVariableExpenses.filter { expense in
-            if request.purpose == .budgetPace {
-                if let cardID = request.cardID, expense.card?.id != UUID(uuidString: cardID) { return false }
-                if let categoryID = request.categoryID {
-                    if categoryID == "uncategorized" { if expense.category != nil { return false } }
-                    else if expense.category?.id != UUID(uuidString: categoryID) { return false }
-                }
-            }
+        let variable = (request.includeFuture ? snapshot.variableExpenses : snapshot.homeCalculationVariableExpenses).filter { expense in
+            if let cardID = request.cardID, expense.card?.id != UUID(uuidString: cardID) { return false }
+            if !acceptsCategory(expense.category, request: request) { return false }
             guard let budget else { return true }
             return cardIDs.contains(expense.card?.id ?? UUID()) && expense.transactionDate >= calendar.startOfDay(for: budget.startDate) && expense.transactionDate <= endOfDay(budget.endDate)
         }
@@ -621,6 +853,9 @@ final class MarinaReadOnlyDataService {
         let actualIncome = incomes.filter { !$0.isPlanned }.reduce(0) { $0 + $1.amount }
         let plannedIncome = incomes.filter(\.isPlanned).reduce(0) { $0 + $1.amount }
         let plannedTotal = planned.filter { contains($0.expenseDate, range) }.reduce(0) { $0 + SavingsMathService.plannedProjectedBudgetImpactAmount(for: $1) }
+        let effectiveTotal = planned.filter { contains($0.expenseDate, range) }.reduce(0) { $0 + SavingsMathService.plannedBudgetImpactAmount(for: $1) }
+        let recordedTotal = planned.filter { contains($0.expenseDate, range) }.reduce(0) { $0 + max(0, $1.actualAmount) }
+        let variableTotal = variable.filter { contains($0.transactionDate, range) }.reduce(0) { $0 + SavingsMathService.variableBudgetImpactAmount(for: $1) }
         let recurring = planned.filter { $0.sourcePresetID != nil && contains($0.expenseDate, range) }.reduce(0) { $0 + SavingsMathService.plannedProjectedBudgetImpactAmount(for: $1) }
         var metrics: [MarinaDataResult.Metric] = [
             .init(label: "Actual income", value: actualIncome), .init(label: "Planned income", value: plannedIncome),
@@ -630,6 +865,13 @@ final class MarinaReadOnlyDataService {
             .init(label: "Safe spend today", value: safe.safeToSpendToday), .init(label: "Actual spend so far", value: safe.actualSpendSoFar),
             .init(label: "Remaining planned spending", value: safe.plannedSpendingRemaining), .init(label: "Recurring commitments", value: recurring)
         ]
+        metrics += [.init(label: "Recorded planned expenses", value: recordedTotal),
+                    .init(label: "Effective planned spending", value: effectiveTotal),
+                    .init(label: "Variable spending", value: variableTotal),
+                    .init(label: "Total", value: effectiveTotal + variableTotal),
+                    .init(label: "Max savings", value: plannedIncome - effectiveTotal)]
+        let savingsProgress = SavingsOutlookCalculator.progress(projected: forecast.projectedSavings, actual: forecast.actualSavings)
+        if let ratio = savingsProgress.ratio { metrics.append(.init(label: "Savings progress percent", value: ratio * 100, unit: .percent)) }
         let toDate = HomeQueryDateRange(startDate: range.startDate, endDate: min(endOfDay(now), range.endDate))
         let actualToDate = now < range.startDate ? 0 : planned.filter { contains($0.expenseDate, toDate) }.reduce(0) { $0 + SavingsMathService.plannedBudgetImpactAmount(for: $1) } + variable.filter { contains($0.transactionDate, toDate) }.reduce(0) { $0 + SavingsMathService.variableBudgetImpactAmount(for: $1) }
         metrics += [.init(label: "Pace actual spending", value: actualToDate), .init(label: "Elapsed period percent", value: progress.elapsedPercent * 100, unit: .percent), .init(label: "Projected spending", value: safe.actualSpendSoFar + safe.plannedSpendingRemaining),
@@ -644,17 +886,49 @@ final class MarinaReadOnlyDataService {
         if let amount = request.hypotheticalSpending {
             metrics += [.init(label: "Hypothetical additional spending", value: amount), .init(label: "Projected savings after hypothetical spending", value: forecast.projectedSavings - amount)]
         }
+        let limitsBudget = budget ?? snapshot.budgets.first { $0.id.uuidString == request.periodBudgetID }
         let availability = HomeCategoryLimitsAggregator.build(
-            budgets: budget.map { [$0] } ?? snapshot.budgets, categories: snapshot.categories,
-            plannedExpenses: snapshot.homeCalculationPlannedExpenses,
-            variableExpenses: snapshot.homeCalculationVariableExpenses,
+            budgets: limitsBudget.map { [$0] } ?? snapshot.budgets, categories: snapshot.categories,
+            plannedExpenses: planned,
+            variableExpenses: variable,
             rangeStart: range.startDate, rangeEnd: range.endDate)
         metrics += [.init(label: "Categories over limit", value: Double(availability.overCount), unit: .number), .init(label: "Categories near limit", value: Double(availability.nearCount), unit: .number)]
-        var records: [MarinaDataResult.Record] = availability.metrics.filter { request.categoryID == nil || $0.categoryID == UUID(uuidString: request.categoryID ?? "") }.map { item in
-            .init(id: item.categoryID.uuidString, kind: "categoryLimit", title: item.name,
-                  amount: item.availableRaw(for: .all),
-                  detail: "Active budget: \(availability.activeBudget?.name ?? "None"); maximum: \(item.maxAmount.map(String.init(describing:)) ?? "unlimited"); spent: \(item.spentTotal); status: \(item.status(for: .all, nearThreshold: HomeCategoryLimitsAggregator.defaultNearThreshold))")
+        var categoryReports: [MarinaReport.CategoryAvailability] = availability.metrics.filter { item in
+            let selected = Set((request.categoryIDs ?? []) + (request.categoryID.map { [$0] } ?? []))
+            return selected.isEmpty || selected.contains(item.categoryID.uuidString)
+        }.map { item in
+            let minimum = availability.activeBudget?.categoryLimits?.first { $0.category?.id == item.categoryID }?.minAmount
+            let status = item.maxAmount == nil ? "unlimited" : String(describing: item.status(for: .all, nearThreshold: HomeCategoryLimitsAggregator.defaultNearThreshold))
+            return .init(id: item.categoryID.uuidString, name: item.name, colorHex: item.colorHex,
+                         minimum: minimum, maximum: item.maxAmount, planned: item.spentPlanned, variable: item.spentVariable,
+                         available: item.availableRaw(for: .all), percentUsed: item.percentUsed(for: .all).map { $0 * 100 }, status: status)
         }
+        let selectedCategoryIDs = Set((request.categoryIDs ?? []) + (request.categoryID.map { [$0] } ?? []))
+        let unclassifiedPlanned = planned.filter { $0.category == nil && contains($0.expenseDate, range) }
+        let unclassifiedVariable = variable.filter { $0.category == nil && contains($0.transactionDate, range) }
+        if (selectedCategoryIDs.isEmpty && (!unclassifiedPlanned.isEmpty || !unclassifiedVariable.isEmpty)) || selectedCategoryIDs.contains("uncategorized") {
+            categoryReports.append(.init(id: "uncategorized", name: "Uncategorized", colorHex: "#808080",
+                planned: unclassifiedPlanned.reduce(0) { $0 + SavingsMathService.plannedBudgetImpactAmount(for: $1) },
+                variable: unclassifiedVariable.reduce(0) { $0 + SavingsMathService.variableBudgetImpactAmount(for: $1) }, status: "unlimited"))
+        }
+        categoryReports = categoryReports.filter { item in
+            switch request.availabilityFilter ?? .all {
+            case .all: true
+            case .over: item.status == "over"
+            case .near: item.status == "near"
+            case .overOrNear: item.status == "over" || item.status == "near"
+            case .ok: item.status == "ok"
+            case .unlimited: item.status == "unlimited"
+            }
+        }
+        var records: [MarinaDataResult.Record] = categoryReports.map { item in
+            .init(id: item.id, kind: "categoryLimit", title: item.name,
+                  amount: item.available,
+                  detail: "Budget: \(availability.activeBudget?.name ?? "None"); minimum: \(item.minimum.map(String.init(describing:)) ?? "none"); maximum: \(item.maximum.map(String.init(describing:)) ?? "unlimited"); spent: \(item.planned + item.variable); status: \(item.status)")
+        }
+        let recordCount = request.purpose == .categoryAvailability ? categoryReports.count
+            : planned.filter { contains($0.expenseDate, range) }.count + variable.filter { contains($0.transactionDate, range) }.count
+        metrics.append(.init(label: "Count", value: Double(recordCount), unit: .number))
         if let unit = request.periodUnit {
             let periods = periodRanges(unit, range: range)
             let summaries = periods.map { period in MarinaSavingsForecastCalculator.calculate(range: period, incomes: incomes, plannedExpenses: planned, variableExpenses: variable, savingsEntries: snapshot.savingsEntries) }
@@ -666,6 +940,33 @@ final class MarinaReadOnlyDataService {
         if request.periodUnit != nil { records = records.filter { $0.kind == "savingsPeriod" } }
         var result = page(records, request: request, scope: scopeText(range))
         result.metrics = metrics
+        var report = MarinaReport()
+        report.budgetName = budget?.name ?? availability.activeBudget?.name
+        report.progressMode = savingsProgress.mode.rawValue
+        if request.purpose == .categoryAvailability { report.categories = Array(categoryReports.dropFirst(request.offset).prefix(request.limit)) }
+        if request.purpose == .savingsTimeline {
+            let ranges = periodRanges(request.periodUnit ?? .month, range: range)
+            let allPoints = SavingsOutlookCalculator.cumulativePoints(ranges: ranges, incomes: incomes,
+                plannedExpenses: planned, variableExpenses: variable, savingsEntries: snapshot.savingsEntries)
+            let points = Array(allPoints.dropFirst(request.offset).prefix(request.limit))
+            report.cumulative = true
+            report.series = [
+                .init(id: "actual", label: "Actual savings", points: points.map { .init(id: dateText($0.startDate), label: friendlyRange(.init(startDate: $0.startDate, endDate: $0.endDate)), date: dateText($0.startDate), value: $0.actual) }),
+                .init(id: "projected", label: "Projected savings", points: points.map { .init(id: dateText($0.startDate), label: friendlyRange(.init(startDate: $0.startDate, endDate: $0.endDate)), date: dateText($0.startDate), value: $0.projected) })
+            ]
+            result.records = points.map { point in
+                .init(id: dateText(point.startDate), kind: "savingsPeriod", title: friendlyRange(.init(startDate: point.startDate, endDate: point.endDate)),
+                      amount: point.actual, detail: "Cumulative projected savings: \(point.projected)")
+            }
+        }
+        var expenseRequest = request
+        expenseRequest.tool = .expenses; expenseRequest.purpose = nil; expenseRequest.periodUnit = nil
+        expenseRequest.operation = .summary
+        var policyResult = MarinaDataResult(scope: scopeText(range))
+        enrichExpenses(&policyResult, rows: expenses(expenseRequest, snapshot: snapshot, range: range),
+                       request: expenseRequest, snapshot: snapshot, range: range)
+        report.policy = policyResult.report?.policy
+        result.report = report
         result.explanation = "Financial calculations use existing savings and safe-spend services. Safe spend and remaining room are clamped to zero and may be constrained by category limits. Future-expense calculation preferences apply. Budget income is workspace income for the period. Hypothetical spending does not change stored records."
         return result
     }
@@ -700,7 +1001,7 @@ final class MarinaReadOnlyDataService {
                 } else { records.append(.init(id: account.id.uuidString, kind: "reconciliationAccount", title: account.name, amount: balance)) }
             }
         }
-        if let search = request.search { records = records.filter { matches($0.title, search) } }
+        if let search = request.search { records = records.filter { request.exactRecordName == true ? sameMerchant($0.title, search) : matches($0.title, search) } }
         if accountID != nil {
             let activityTotal = records.reduce(0) { $0 + ($1.amount ?? 0) }
             metrics.append(.init(label: "Selected period activity total", value: activityTotal))
@@ -711,6 +1012,209 @@ final class MarinaReadOnlyDataService {
         var result = page(records, request: request, scope: scopeText(range))
         result.metrics = metrics
         result.explanation = "Balances are current all-time ledger balances; date filters apply to displayed activity only. Savings and reconciliation are separate. A positive reconciliation balance means money is owed to you; a negative balance means you owe money."
+        return result
+    }
+
+    private func acceptsCategory(_ category: Category?, request: MarinaDataRequest) -> Bool {
+        let ids = Set((request.categoryIDs ?? []) + (request.categoryID.map { [$0] } ?? []))
+        return ids.isEmpty || ids.contains(category?.id.uuidString ?? "uncategorized")
+    }
+
+    private func acceptsTransaction(_ expense: VariableExpense, filter: MarinaDataRequest.TransactionFilter?) -> Bool {
+        switch filter ?? .all {
+        case .all: true
+        case .debit: expense.kind == .debit
+        case .credit: expense.kind == .credit
+        case .adjustment: expense.kind == .adjustment
+        case .split: (expense.allocation?.allocatedAmount ?? 0) > 0
+        case .reconciliationOffset: (expense.offsetSettlement?.amount ?? 0) < 0
+        case .savingsOffset: SavingsMathService.offsetAmount(for: expense) > 0
+        }
+    }
+
+    private func acceptsTransaction(_ expense: PlannedExpense, filter: MarinaDataRequest.TransactionFilter?) -> Bool {
+        switch filter ?? .all {
+        case .all: true
+        case .debit, .credit, .adjustment: false
+        case .split: (expense.allocation?.allocatedAmount ?? 0) > 0
+        case .reconciliationOffset: (expense.offsetSettlement?.amount ?? 0) < 0
+        case .savingsOffset: SavingsMathService.offsetAmount(for: expense) > 0
+        }
+    }
+
+    private func defaultPeriodUnit(_ range: HomeQueryDateRange) -> MarinaDataRequest.PeriodUnit {
+        let days = calendar.dateComponents([.day], from: range.startDate, to: range.endDate).day ?? 0
+        return days < 32 ? .day : days < 367 ? .month : .quarter
+    }
+
+    private func groups(_ rows: [Row], by grouping: MarinaDataRequest.Grouping, ascending: Bool = false) -> [MarinaReport.Group] {
+        let total = rows.reduce(0) { $0 + $1.amount }
+        let grouped = Dictionary(grouping: rows) { row in
+            switch grouping { case .category: row.category; case .card: row.card; default: row.title }
+        }
+        return grouped.map { title, values in
+            let amount = values.reduce(0) { $0 + $1.amount }
+            return MarinaReport.Group(id: title, title: title, amount: amount,
+                plannedAmount: values.filter { $0.kind == "plannedExpense" }.reduce(0) { $0 + $1.amount },
+                variableAmount: values.filter { $0.kind == "variableExpense" }.reduce(0) { $0 + $1.amount },
+                count: values.count, sharePercent: total == 0 ? nil : amount / total * 100)
+        }.sorted { lhs, rhs in
+            if lhs.amount == rhs.amount { return lhs.id < rhs.id }
+            return ascending ? lhs.amount < rhs.amount : lhs.amount > rhs.amount
+        }
+    }
+
+    private func leader(_ rows: [Row], grouping: MarinaDataRequest.Grouping, scope: String) -> MarinaReport.Leader {
+        let ordered = groups(rows, by: grouping)
+        guard let first = ordered.first else { return .init(scope: scope, title: nil, amount: nil, tiedCount: 0) }
+        return .init(scope: scope, title: first.title, amount: first.amount,
+                     tiedCount: ordered.filter { $0.amount == first.amount }.count)
+    }
+
+    private func enrichExpenses(_ result: inout MarinaDataResult, rows: [Row], request: MarinaDataRequest,
+                                snapshot: MarinaWorkspaceSnapshot, range: HomeQueryDateRange?) {
+        var report = result.report ?? MarinaReport()
+        if request.purpose == .cardSummary {
+            let planned = rows.filter { $0.kind == "plannedExpense" }.reduce(0) { $0 + $1.amount }
+            let variable = rows.filter { $0.kind == "variableExpense" }.reduce(0) { $0 + $1.amount }
+            result.metrics += [.init(label: "Planned card spending", value: planned), .init(label: "Variable card spending", value: variable)]
+        }
+        if request.grouping != .none {
+            let all = groups(rows, by: request.grouping, ascending: request.sort == .smallest)
+            report.groups = Array(all.dropFirst(request.offset).prefix(request.limit))
+            if let first = all.first {
+                result.metrics += [.init(label: "Leading group amount", value: first.amount),
+                                   .init(label: "Tied leading groups", value: Double(all.filter { $0.amount == first.amount }.count), unit: .number)]
+            }
+        }
+        if request.operation == .transactions {
+            report.transactions = result.records.compactMap { transaction($0.id, snapshot: snapshot) }
+            if request.limit == 1, let value = result.records.first?.amount {
+                result.metrics.append(.init(label: "Tied expenses", value: Double(rows.filter { $0.amount == value }.count), unit: .number))
+            }
+        }
+        if let range, let unit = request.periodUnit {
+            let buckets = periodRanges(unit, range: range)
+            let values = buckets.map { bucket in (bucket, rows.filter { contains($0.date, bucket) }) }
+            if request.purpose == .spendingPatterns, let peak = values.filter({ !$0.1.isEmpty }).max(by: { lhs, rhs in
+                let l = lhs.1.reduce(0) { $0 + $1.amount }, r = rhs.1.reduce(0) { $0 + $1.amount }
+                return l == r ? lhs.0.startDate > rhs.0.startDate : l < r
+            }) {
+                let contributors = Array(groups(peak.1, by: .category).prefix(5))
+                let category = contributors.first
+                var drilldown = request
+                drilldown.purpose = nil; drilldown.operation = .transactions; drilldown.periodUnit = nil
+                drilldown.metric = nil
+                drilldown.startDate = dateText(peak.0.startDate); drilldown.endDate = dateText(peak.0.endDate)
+                drilldown.relativePeriod = nil; drilldown.allTime = false
+                drilldown.limit = 5; drilldown.offset = 0; drilldown.sort = .largest
+                report.peak = .init(startDate: dateText(peak.0.startDate), endDate: dateText(peak.0.endDate),
+                    amount: peak.1.reduce(0) { $0 + $1.amount }, leadingCategory: category?.title, leadingCategoryAmount: category?.amount,
+                    contributors: contributors, transactionIDs: Array(sorted(peak.1, sort: .largest).prefix(5).map { $0.id.uuidString }),
+                    drilldownRequest: drilldown)
+            }
+            if request.purpose == .spendingPatterns {
+                report.series = [.init(id: "spending", label: "Spending", points: values.dropFirst(request.offset).prefix(request.limit).map { bucket, items in
+                    .init(id: dateText(bucket.startDate), label: friendlyRange(bucket), date: dateText(bucket.startDate), value: items.reduce(0) { $0 + $1.amount })
+                })]
+                report.groups = Array(groups(rows, by: .category).prefix(5))
+                report.merchants = Array(groups(rows, by: .merchant).prefix(5))
+                let debitIDs = Set(snapshot.variableExpenses.filter { $0.kind == .debit }.map(\.id))
+                let frequency = groups(rows.filter { debitIDs.contains($0.id) }, by: .merchant).sorted {
+                    if $0.count == $1.count { return $0.amount == $1.amount ? $0.id < $1.id : $0.amount > $1.amount }
+                    return ($0.count ?? 0) > ($1.count ?? 0)
+                }
+                report.frequentMerchants = Array(frequency.prefix(5))
+            }
+        }
+        func colored(_ groups: [MarinaReport.Group]?) -> [MarinaReport.Group]? {
+            groups?.map { group in
+                var value = group
+                value.colorHex = snapshot.categories.first { $0.name == group.title }?.hexColor
+                return value
+            }
+        }
+        if request.grouping == .category || request.purpose == .spendingPatterns { report.groups = colored(report.groups) }
+        if var peak = report.peak { peak.contributors = colored(peak.contributors); report.peak = peak }
+        var unfiltered = request; unfiltered.includeFuture = true
+        let allRows = expenses(unfiltered, snapshot: snapshot, range: range)
+        let includedIDs = Set(rows.map(\.id))
+        let excluded = allRows.filter { !includedIDs.contains($0.id) }
+        let selectedDateBudget = snapshot.budgets.first { $0.id.uuidString == (request.periodBudgetID ?? "") }
+            ?? (request.startDate == nil && request.relativePeriod == nil && request.budgetID == nil
+                ? snapshot.budgets.first { calendar.startOfDay(for: $0.startDate) <= now && endOfDay($0.endDate) >= now } : nil)
+        report.policy = .init(
+            excludesFuturePlanned: !request.includeFuture && (homeContext?.excludeFuturePlannedExpensesFromCalculations ?? false),
+            excludesFutureVariable: !request.includeFuture && (homeContext?.excludeFutureVariableExpensesFromCalculations ?? false),
+            excludedPlannedCount: excluded.filter { $0.kind == "plannedExpense" }.count,
+            excludedVariableCount: excluded.filter { $0.kind == "variableExpense" }.count,
+            dateBudgetName: selectedDateBudget?.name)
+        result.report = report
+    }
+
+    private func transaction(_ id: String, snapshot: MarinaWorkspaceSnapshot) -> MarinaReport.Transaction? {
+        if let expense = snapshot.variableExpenses.first(where: { $0.id.uuidString == id }) {
+            return .init(id: id, transactionKind: expense.kind.rawValue,
+                grossAmount: SavingsMathService.variableGrossAmount(for: expense), recordedAmount: expense.amount,
+                effectiveAmount: expense.ledgerSignedAmount(), splitAmount: max(0, expense.allocation?.allocatedAmount ?? 0),
+                reconciliationOffset: max(0, -(expense.offsetSettlement?.amount ?? 0)), savingsOffset: SavingsMathService.offsetAmount(for: expense),
+                budgetImpact: SavingsMathService.variableBudgetImpactAmount(for: expense),
+                accountName: expense.allocation?.account?.name ?? expense.offsetSettlement?.account?.name ?? expense.savingsLedgerEntry?.account?.name)
+        }
+        if let expense = snapshot.plannedExpenses.first(where: { $0.id.uuidString == id }) {
+            return .init(id: id, transactionKind: "planned", grossAmount: SavingsMathService.grossEffectiveAmount(for: expense),
+                recordedAmount: expense.actualAmount > 0 ? expense.actualAmount : nil,
+                effectiveAmount: SavingsMathService.grossEffectiveAmount(for: expense), splitAmount: max(0, expense.allocation?.allocatedAmount ?? 0),
+                reconciliationOffset: max(0, -(expense.offsetSettlement?.amount ?? 0)), savingsOffset: SavingsMathService.offsetAmount(for: expense),
+                budgetImpact: SavingsMathService.plannedBudgetImpactAmount(for: expense),
+                accountName: expense.allocation?.account?.name ?? expense.offsetSettlement?.account?.name ?? expense.savingsLedgerEntry?.account?.name,
+                sourcePresetID: expense.sourcePresetID?.uuidString,
+                sourcePresetName: snapshot.presets.first { $0.id == expense.sourcePresetID }?.title,
+                sourceBudgetID: expense.sourceBudgetID?.uuidString,
+                sourceBudgetName: snapshot.budgets.first { $0.id == expense.sourceBudgetID }?.name)
+        }
+        return nil
+    }
+
+    private func incomeTimeline(_ request: MarinaDataRequest, snapshot: MarinaWorkspaceSnapshot, range: HomeQueryDateRange) -> MarinaReport {
+        let buckets = periodRanges(request.periodUnit ?? .month, range: range)
+        var report = MarinaReport()
+        report.cumulative = false
+        report.series = [MarinaDataRequest.State.actual, .planned].map { state in
+            var filtered = request; filtered.state = state
+            let rows = incomes(filtered, snapshot: snapshot, range: range)
+            return .init(id: state.rawValue, label: state == .actual ? "Received income" : "Planned income",
+                         points: buckets.dropFirst(request.offset).prefix(request.limit).map { bucket in
+                .init(id: dateText(bucket.startDate), label: friendlyRange(bucket), date: dateText(bucket.startDate), value: rows.filter { contains($0.date, bucket) }.reduce(0) { $0 + $1.amount })
+            })
+        }
+        return report
+    }
+
+    private func budgetInventory(_ request: MarinaDataRequest, snapshot: MarinaWorkspaceSnapshot, budget: Budget?, range: HomeQueryDateRange) -> MarinaDataResult {
+        guard let budget else {
+            return .init(status: "empty", scope: scopeText(range), metrics: [.init(label: "Count", value: 0, unit: .number)],
+                         explanation: "There is no budget for this period. Choose a budget to inspect its linked records.")
+        }
+        let cardIDs = Set((budget.cardLinks ?? []).compactMap { $0.card?.id })
+        let records: [MarinaDataResult.Record]
+        if request.purpose == .budgetCards {
+            records = snapshot.cards.filter { cardIDs.contains($0.id) }.map {
+                .init(id: $0.id.uuidString, kind: "card", title: $0.name, detail: "Linked to \(budget.name)")
+            }
+        } else {
+            let ids = Set((budget.presetLinks ?? []).compactMap { $0.preset?.id })
+            records = snapshot.presets.filter { ids.contains($0.id) }.map { preset in
+                let card = snapshot.cards.first { $0.id == preset.defaultCard?.id }
+                let cardStatus = card.map { cardIDs.contains($0.id) ? "Card: \($0.name)" : "Card \($0.name) is not linked to this budget" } ?? "No default card"
+                return .init(id: preset.id.uuidString, kind: "preset", title: preset.title, amount: preset.plannedAmount,
+                    detail: "\(PresetScheduleFormatter.humanReadableSchedule(for: preset)); \(preset.isArchived ? "Archived" : "Active"); \(cardStatus)")
+            }
+        }
+        let sorted = records.sorted { $0.title == $1.title ? $0.id < $1.id : $0.title < $1.title }
+        var result = page(sorted, request: request, scope: displayScope(request, snapshot: snapshot, range: range))
+        result.metrics = [.init(label: "Count", value: Double(records.count), unit: .number)]
+        result.report = MarinaReport(budgetName: budget.name)
         return result
     }
 
@@ -761,6 +1265,10 @@ final class MarinaReadOnlyDataService {
         }
     }
     private func contains(_ date: Date, _ range: HomeQueryDateRange?) -> Bool { range.map { date >= $0.startDate && date <= $0.endDate } ?? true }
+    private func sameMerchant(_ left: String, _ right: String) -> Bool {
+        left.compare(right, options: [.caseInsensitive, .diacriticInsensitive]) == .orderedSame
+    }
+
     private func matches(_ value: String, _ search: String) -> Bool { value.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current).contains(search.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)) }
     private func dateFormatter() -> DateFormatter {
         let formatter = DateFormatter()

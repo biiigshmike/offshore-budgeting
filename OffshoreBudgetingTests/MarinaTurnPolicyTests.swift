@@ -29,6 +29,31 @@ struct MarinaTurnPolicyTests {
         }
     }
 
+    @Test func combinedCategoryComparisonMatchesCanonicalCategorySets() {
+        let policy = MarinaTurnPolicy(prompt: "Compare this month's spending with last month.")
+        var request = MarinaDataRequest(operation: .comparison, relativePeriod: .previousMonth, tool: .expenses)
+        request.categoryIDs = ["dining", "groceries"]
+        request.comparisonPeriod = .currentMonth
+        request.comparisonFilter = .init(categoryIDs: ["groceries", "dining"])
+
+        let corrected = policy.constrained(request)
+        #expect(corrected.relativePeriod == .currentMonth && corrected.comparisonPeriod == .previousMonth)
+        #expect(corrected.categoryIDs == request.categoryIDs && corrected.comparisonFilter == request.comparisonFilter)
+        #expect(policy.violation(for: corrected) == nil)
+
+        // Saved singular selections and newer category arrays represent the same scope.
+        request.categoryIDs = nil
+        request.categoryID = "dining"
+        request.comparisonFilter = .init(categoryIDs: ["dining"])
+        #expect(policy.violation(for: request) == nil)
+        #expect(policy.constrained(request).relativePeriod == .currentMonth)
+
+        // A different category must still require scope repair before period correction.
+        request.comparisonFilter?.categoryIDs = ["dining", "groceries"]
+        #expect(policy.constrained(request) == request)
+        #expect(policy.violation(for: request)?.contains("Repair the differing selections") == true)
+    }
+
     @Test func sameScopeComparisonPreservesExplicitPeriodOrderWithoutSwappingTargets() {
         var reversed = MarinaDataRequest(operation: .comparison, relativePeriod: .previousMonth, tool: .expenses,
             startDate: "2026-09-01", endDate: "2026-09-30", cardID: "card", categoryID: "category", search: "Coffee")
@@ -325,6 +350,41 @@ struct MarinaTurnPolicyTests {
                                                                             candidates: sameKind, ambiguousSearch: "Blue"))
         #expect(MarinaTurnPolicy(prompt: "Blue Rewards").confirmsPendingCandidate(kind: "card", name: "Blue Rewards",
                                                                                candidates: sameKind, ambiguousSearch: "Blue"))
+    }
+
+    @Test func offeredPunctuationAndOverlappingNamesResolveWithoutSelectingNegatedNames() {
+        let candidates = [(kind: "merchant", name: "DoorDash"),
+                          (kind: "merchant", name: "DoorDash - BevMo!"),
+                          (kind: "merchant", name: "DoorDash - BevMo! Delivery"),
+                          (kind: "merchant", name: "DoorDash - Market")]
+        for prompt in ["DoorDash - BevMo!", "The DoorDash - BevMo! one", "DoorDash BevMo"] {
+            let policy = MarinaTurnPolicy(prompt: prompt)
+            #expect(policy.confirmsPendingCandidate(kind: "merchant", name: "DoorDash - BevMo!", candidates: candidates, ambiguousSearch: "DoorDash"))
+            #expect(!policy.confirmsPendingCandidate(kind: "merchant", name: "DoorDash", candidates: candidates, ambiguousSearch: "DoorDash"))
+        }
+        for prompt in ["Not DoorDash - BevMo!", "Not DoorDash BevMo", "Everything except DoorDash - BevMo!"] {
+            #expect(!MarinaTurnPolicy(prompt: prompt).confirmsPendingCandidate(kind: "merchant", name: "DoorDash - BevMo!", candidates: candidates, ambiguousSearch: "DoorDash"))
+        }
+        #expect(!MarinaTurnPolicy(prompt: "The merchant, but not DoorDash - BevMo!").confirmsPendingCandidate(
+            kind: "merchant", name: "DoorDash - BevMo!", candidates: [(kind: "merchant", name: "DoorDash - BevMo!")], ambiguousSearch: "DoorDash"))
+        #expect(MarinaTurnPolicy(prompt: "The merchant DoorDash - BevMo!").confirmsPendingCandidate(
+            kind: "merchant", name: "DoorDash - BevMo!", candidates: candidates, ambiguousSearch: "DoorDash - BevMo!"))
+    }
+
+    @Test func typeOnlyClarificationCannotSilentlySubstituteAnotherNamedTarget() {
+        let candidates = [(kind: "card", name: "Apple Card"), (kind: "merchant", name: "Apple")]
+        for prompt in ["The merchant Target", "The merchant called Target", "The merchant named Costco", "El comercio Target",
+                       "The merchant October", "The merchant called October", "The merchant Target on October 17, 2026"] {
+            let policy = MarinaTurnPolicy(prompt: prompt)
+            #expect(!policy.confirmsOnlyPendingKind("merchant"))
+            #expect(!policy.confirmsPendingCandidate(kind: "merchant", name: "Apple", candidates: candidates, ambiguousSearch: "Apple"))
+        }
+        for prompt in ["The merchant, please.", "I mean the merchant, not Apple Card.", "The merchant this month.", "El comercio, por favor.",
+                       "I mean the merchant, only on October 17, 2026."] {
+            let policy = MarinaTurnPolicy(prompt: prompt)
+            #expect(policy.confirmsOnlyPendingKind("merchant"))
+            #expect(policy.confirmsPendingCandidate(kind: "merchant", name: "Apple", candidates: candidates, ambiguousSearch: "Apple"))
+        }
     }
 
     @Test func currentSpanishPeriodDoesNotMeanReceivedIncome() {

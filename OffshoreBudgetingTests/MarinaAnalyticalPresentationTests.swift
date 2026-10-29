@@ -79,7 +79,7 @@ final class MarinaAnalyticalPresentationTests {
         #expect(try service.execute(request).presentation?.budgetPace?.planned == 0)
         for name in ["First", "Second"] { context.insert(Budget(name: name, startDate: date(1), endDate: date(31), workspace: workspace)) }
         try context.save()
-        #expect(try service.execute(request).status == "invalidRequest")
+        #expect(try service.execute(request).status == "needsBudgetChoice")
     }
     @Test func trendSlicesPreserveSelectedMeasureColorsAndExactBucketTotals() throws {
         let (context, workspace, card) = try fixture()

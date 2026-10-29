@@ -17,6 +17,7 @@ struct CategoryMetricRowView: View {
 
     var showsProgressBar: Bool = true
     var showsPercentage: Bool = true
+    var clampsPercentageText: Bool = true
 
     private var metricLayout: AnyLayout {
         dynamicTypeSize.isAccessibilitySize
@@ -80,8 +81,8 @@ struct CategoryMetricRowView: View {
     }
 
     private func percentText(_ value: Double) -> String {
-        let clamped = max(0, min(1, value))
-        return NumberFormatter.localizedString(from: NSNumber(value: clamped), number: .percent)
+        let displayed = clampsPercentageText ? max(0, min(1, value)) : value
+        return NumberFormatter.localizedString(from: NSNumber(value: displayed), number: .percent)
     }
 }
 

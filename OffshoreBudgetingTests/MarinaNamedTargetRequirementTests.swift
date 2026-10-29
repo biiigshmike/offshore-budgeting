@@ -35,7 +35,7 @@ struct MarinaNamedTargetRequirementTests {
         #expect(requirement.recordKind == nil && requirement.isAmbiguous)
         #expect(Set(requirement.candidates.map(\.id)) == [appleCard.id, appleMerchant.id])
         #expect(!requirement.includes(in: .init(tool: .expenses, cardID: card.id)))
-        #expect(requirement.includes(in: .init(tool: .expenses, search: "Apple")))
+        #expect(requirement.includes(in: .init(merchantName: "Apple", tool: .expenses)))
     }
 
     @Test func explicitFullNameWinsOverItsContainedMerchantName() throws {
@@ -43,7 +43,7 @@ struct MarinaNamedTargetRequirementTests {
         let requirement = try #require(requirements.first)
         #expect(requirements.count == 1 && requirement.search == "Apple Card")
         #expect(requirement.recordKind == "card" && requirement.candidates == [appleCard])
-        #expect(!requirement.includes(in: .init(tool: .expenses, search: "Apple")))
+        #expect(!requirement.includes(in: .init(merchantName: "Apple", tool: .expenses)))
         #expect(requirement.includes(in: .init(tool: .expenses, cardID: appleCard.id)))
     }
 
@@ -148,6 +148,23 @@ struct MarinaNamedTargetRequirementTests {
         #expect(Set(requirement.candidates.map(\.id)) == [appleCard.id, appleMerchant.id])
     }
 
+    @Test func sharedCatalogPrefixesRemainRequiredBesideACompleteCardName() {
+        let merchants = ["Parcel - Market", "Parcel - Corner!", "Parcel - Corner! Delivery"].map {
+            Entity(kind: "merchant", id: $0, name: $0)
+        }
+        let records = catalog + merchants
+        let partial = MarinaNamedTargetRequirement.requirements(prompt: "Show Parcel expenses on BlueCard this month", catalog: records)
+        #expect(partial.contains { $0.search == "Parcel" && $0.candidates.count == 3 && $0.isAmbiguous })
+        #expect(partial.contains { $0.search == "BlueCard" })
+        let complete = MarinaNamedTargetRequirement.requirements(prompt: "Show Parcel - Corner! expenses on BlueCard", catalog: records)
+        #expect(!complete.contains { $0.search == "Parcel" })
+        #expect(complete.contains { $0.search == "Parcel - Corner!" })
+        let negated = MarinaNamedTargetRequirement.requirements(prompt: "Show BlueCard expenses, not Parcel", catalog: records)
+        #expect(!negated.contains { $0.search == "Parcel" })
+        let generic = ["The Card Store", "The Card Shop"].map { Entity(kind: "merchant", id: $0, name: $0) }
+        #expect(MarinaNamedTargetRequirement.requirements(prompt: "Show the card this month", catalog: generic).isEmpty)
+    }
+
     @Test func separateCardAndMerchantRetainTheirOwnKindsAndFilters() {
         for prompt in ["Show spending on BlueCard at the Apple merchant this month",
                        "Show spending on the card named BlueCard at the merchant Apple this month"] {
@@ -155,9 +172,9 @@ struct MarinaNamedTargetRequirementTests {
             #expect(requirements.count == 2)
             let merchant = requirements.first { $0.search == "Apple" }
             #expect(merchant?.recordKind == "merchant" && merchant?.candidates == [appleMerchant])
-            let scoped = MarinaDataRequest(tool: .expenses, cardID: card.id, search: "Apple")
+            let scoped = MarinaDataRequest(merchantName: "Apple", tool: .expenses, cardID: card.id)
             #expect(requirements.allSatisfy { $0.includes(in: scoped) })
-            let wrongCard = MarinaDataRequest(tool: .expenses, cardID: appleCard.id, search: "Apple")
+            let wrongCard = MarinaDataRequest(merchantName: "Apple", tool: .expenses, cardID: appleCard.id)
             #expect(!requirements.allSatisfy { $0.includes(in: wrongCard) })
         }
     }

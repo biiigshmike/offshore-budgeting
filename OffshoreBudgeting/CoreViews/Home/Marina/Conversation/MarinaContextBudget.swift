@@ -15,10 +15,10 @@ nonisolated struct MarinaContextBudget: Equatable, Sendable {
 
     /// Calibrated separately for the app's fixed English prose and JSON schemas. The
     /// general-input estimate above is too pessimistic for this known prefix on 4K devices.
-    /// Four schema bytes per token plus framing remains above the measured production
-    /// prefix; the native benchmark enforces that calibration. Count non-ASCII bytes conservatively.
+    /// Four schema bytes per token plus tool-definition/guide framing covers the measured
+    /// production prefix; the native benchmark enforces that calibration. Count non-ASCII bytes conservatively.
     static func estimatedPrefixTokens(instructions: String, schemaBytes: Int) -> Int {
         let ascii = instructions.utf8.reduce(0) { $0 + ($1 < 128 ? 1 : 0) }
-        return (ascii + 3) / 4 + instructions.utf8.count - ascii + (schemaBytes + 3) / 4 + 128
+        return (ascii + 3) / 4 + instructions.utf8.count - ascii + (schemaBytes + 3) / 4 + 192
     }
 }

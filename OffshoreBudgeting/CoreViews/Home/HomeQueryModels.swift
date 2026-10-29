@@ -245,6 +245,8 @@ struct HomeAnswer: Identifiable, Codable, Equatable {
     var responseState: MarinaResponseState?
     var contextStatus: MarinaContextStatus? = nil
     var suppressedPresentationIDs: [String]? = nil
+    /// Durable request metadata for returning to older topics without replaying financial values.
+    var completedFrame: MarinaConversationMemory.CompletedFrame? = nil
 
     init(
         id: UUID = UUID(),
@@ -298,6 +300,7 @@ struct HomeAnswer: Identifiable, Codable, Equatable {
         case responseState
         case contextStatus
         case suppressedPresentationIDs
+        case completedFrame
     }
 
     init(from decoder: Decoder) throws {
@@ -319,6 +322,7 @@ struct HomeAnswer: Identifiable, Codable, Equatable {
         responseState = try? container.decodeIfPresent(MarinaResponseState.self, forKey: .responseState)
         contextStatus = try? container.decodeIfPresent(MarinaContextStatus.self, forKey: .contextStatus)
         suppressedPresentationIDs = try? container.decodeIfPresent([String].self, forKey: .suppressedPresentationIDs)
+        completedFrame = try? container.decodeIfPresent(MarinaConversationMemory.CompletedFrame.self, forKey: .completedFrame)
     }
 
     func encode(to encoder: Encoder) throws {
@@ -340,6 +344,7 @@ struct HomeAnswer: Identifiable, Codable, Equatable {
         try container.encodeIfPresent(responseState, forKey: .responseState)
         try container.encodeIfPresent(contextStatus, forKey: .contextStatus)
         try container.encodeIfPresent(suppressedPresentationIDs, forKey: .suppressedPresentationIDs)
+        try container.encodeIfPresent(completedFrame, forKey: .completedFrame)
     }
 }
 

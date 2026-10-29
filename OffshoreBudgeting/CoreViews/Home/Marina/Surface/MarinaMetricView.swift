@@ -9,11 +9,13 @@ struct MarinaMetricView: View {
             Text(metric.label)
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
             Text(metric.formatted)
                 .font(prominent ? .largeTitle.weight(.semibold) : .title3.weight(.semibold))
                 .monospacedDigit()
                 .fixedSize(horizontal: false, vertical: true)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .combine)
     }
 }

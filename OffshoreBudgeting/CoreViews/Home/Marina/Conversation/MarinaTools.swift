@@ -3,12 +3,24 @@ import Foundation
 #if canImport(FoundationModels)
 import FoundationModels
 
+enum MarinaPendingChoiceResolution {
+    case unhandled
+    case clarification
+    case answer(reference: String)
+}
+
 /// Serializes SwiftData access on the main actor, even when the model calls tools concurrently.
 @available(iOS 26.0, macCatalyst 26.0, *)
 @MainActor
 final class MarinaToolBridge {
 #if DEBUG
     var diagnostics: MarinaTokenDiagnostics?
+    nonisolated static func evaluationTrace(_ label: String, _ value: String) {
+        let environment = ProcessInfo.processInfo.environment
+        guard environment["MARINA_MODEL_EVALUATION"] == "1",
+              environment["MARINA_LONG_EVALUATION_VERBOSE"] == "1" else { return }
+        print("MARINA_FIXTURE_TOOL \(label): \(value.prefix(6000))")
+    }
 #endif
     private var service: MarinaReadOnlyDataService?
     private var onResult: (() -> Void)?
@@ -16,13 +28,73 @@ final class MarinaToolBridge {
     var onValidatedResult: ((MarinaDataRequest, MarinaDataResult) -> Void)?
     var haltOnClarification = false
     var requiresFreshRead = false
+    var hasNarrationEvidence: Bool {
+        !answerResultIndices.isEmpty
+    }
+    var narrationDraft: MarinaNarrationDraft?
     private var results: [MarinaDataResult] = []
+    private var selectedResultIndices: [Int]?
+    private var resultSelectionRejected = false
+    private var pendingFinancialRequest: MarinaDataRequest?
+    /// Entity discovery returns rN selections, not answer references. Keep qN dense
+    /// over eligible answers so a lookup/error cannot be advertised as an answer.
+    private var answerResultIndices: [Int] {
+        results.indices.filter { index in
+            (requests[index].tool != .findRecords || requests[index].search == nil)
+                && ["success", "empty"].contains(results[index].status)
+                && !MarinaNarrationEvidence.facts(request: results[index].resolvedRequest ?? requests[index],
+                    result: results[index], prefix: "").isEmpty
+        }
+    }
+
+    private func answerReference(for index: Int) -> String? {
+        answerResultIndices.firstIndex(of: index).map { "q\($0)" }
+    }
+    var selectedEvidence: [MarinaNarrationEvidence] {
+        let indices = selectedResultIndices ?? Array(results.indices.suffix(1))
+        return indices.enumerated().flatMap { position, index -> [MarinaNarrationEvidence] in
+            guard let reference = answerReference(for: index) else { return [] }
+            return MarinaNarrationEvidence.facts(request: results[index].resolvedRequest ?? requests[index],
+                result: results[index], prefix: reference).map { fact in
+                    var selected = fact
+                    selected.isFocus = position == 0 && fact.isFocus
+                    return selected
+                }
+        }
+    }
+
+    /// Current-turn query references never survive renewal or silently select another read.
+    @discardableResult
+    func selectResults(primary: String?, supporting: [String]) -> Bool {
+        func index(_ reference: String) -> Int? {
+            guard reference.first == "q", let value = Int(reference.dropFirst()),
+                  reference == "q\(value)", answerResultIndices.indices.contains(value) else { return nil }
+            return answerResultIndices[value]
+        }
+        guard let primary, let main = index(primary),
+              !requiresFreshRead || requests[main].tool != .findRecords, supporting.count <= 2,
+              Set([primary] + supporting).count == supporting.count + 1,
+              supporting.allSatisfy({ index($0) != nil }) else {
+            selectedResultIndices = []
+            resultSelectionRejected = true
+            return false
+        }
+        selectedResultIndices = [main] + supporting.compactMap(index)
+        resultSelectionRejected = false
+        // Follow-ups resume the answer the model selected, never its last exploratory read.
+        turnMemory?.record(request: requests[main], result: results[main], answerID: turnAnswerID, prompt: turnPrompt)
+        onValidatedResult?(requests[main], results[main])
+        return true
+    }
     private var evidence: [(tool: MarinaDataRequest.Tool, verified: Bool, answer: HomeAnswer)] = []
     private var previousPresentations: [MarinaPresentation] = []
     private var calls = 0
+    private var isCompiledTurn = false
+    private var turnAnswerID = UUID()
     var conversationMemory: (() -> MarinaConversationMemory?)?
     private var turnMemory: MarinaConversationMemory?
     private var pendingCandidates: [MarinaConversationMemory.Entity] = []
+    private var confirmedPendingSelection: [MarinaConversationMemory.Entity] = []
     private var clarificationCandidates: [MarinaConversationMemory.Entity] = []
     private var clarificationPeriod: MarinaConversationMemory.Period?
     private var clarificationOriginatingPrompt: String?
@@ -42,9 +114,9 @@ final class MarinaToolBridge {
     var hasResults: Bool { !results.isEmpty }
     var hasFinancialResults: Bool { evidence.contains { $0.tool != .findRecords && $0.verified } }
     var hasGroundedAnswer: Bool {
-        hasFinancialResults || zip(requests, results).contains { request, result in
-            request.tool == .findRecords && request.search != nil
-                && (result.status == "candidates" || result.status == "empty")
+        hasFinancialResults || results.contains { ["needsPeriodChoice", "needsBudgetChoice"].contains($0.status) } || zip(requests, results).contains { request, result in
+            request.tool == .findRecords && ((!requiresFreshRead && request.search == nil && ["success", "empty"].contains(result.status))
+                || (request.search != nil && (result.status == "candidates" || result.status == "empty")))
         }
     }
     var hasInvalidRequest: Bool { argumentIssue != nil || results.last?.status == "invalidRequest" }
@@ -58,25 +130,43 @@ final class MarinaToolBridge {
         return argumentError.message
     }
 
-    func begin(service: MarinaReadOnlyDataService, history: [HomeAnswer] = [], prompt: String = "", memory: MarinaConversationMemory? = nil, onResult: @escaping () -> Void) {
+    func begin(service: MarinaReadOnlyDataService, history: [HomeAnswer] = [], prompt: String = "", memory: MarinaConversationMemory? = nil, compiled: Bool = false, onResult: @escaping () -> Void) {
         previousPresentations = MarinaPresentationDisplayPolicy.previousResults(in: history)
         self.service = service
+        isCompiledTurn = compiled
         self.onResult = onResult
         results = []
+        selectedResultIndices = nil
+        resultSelectionRejected = false
+        pendingFinancialRequest = memory?.pendingClarification?.pendingRequest
+        narrationDraft = nil
         evidence = []
         requests = []
         calls = 0
+        turnAnswerID = UUID()
         turnMemory = memory
         turnPrompt = prompt
         turnPolicy = MarinaTurnPolicy(prompt: prompt)
-        pendingCandidates = memory?.pendingClarification?.candidates ?? []
-        clarificationCandidates = pendingCandidates
+        confirmedPendingSelection = memory?.pendingClarification?.selectedEntities ?? []
+        pendingCandidates = confirmedPendingSelection.isEmpty ? memory?.pendingClarification?.candidates ?? [] : []
+        clarificationCandidates = memory?.pendingClarification?.candidates ?? []
         clarificationPeriod = memory?.pendingClarification?.period
         clarificationOriginatingPrompt = memory?.pendingClarification?.originatingPrompt
         clarificationSearch = memory?.pendingClarification?.search
+        if !compiled, let original = clarificationOriginatingPrompt, !turnPolicy.shouldRetainPendingPeriod(from: original) {
+            // A full new question owns its target. The fresh literal-name guards below
+            // still require every explicitly named record, including renewed ambiguity.
+            confirmedPendingSelection = []
+            pendingCandidates = []
+            clarificationCandidates = []
+            clarificationPeriod = nil
+            clarificationOriginatingPrompt = nil
+            clarificationSearch = nil
+            pendingFinancialRequest = nil
+        }
         cachedNamedTargetRequirements = nil
         ambiguityDiscoveredThisTurn = false
-        namedLookupTargets = []
+        namedLookupTargets = confirmedPendingSelection
         argumentIssue = nil
         failedFinancialTool = nil
         invalidReferenceTools = []
@@ -84,10 +174,130 @@ final class MarinaToolBridge {
         unresolvedLookup = nil
     }
 
+    /// Consume a reply to choices already offered by the app before asking the model
+    /// to reinterpret it. Names and IDs are re-read inside the bound workspace.
+    func resolvePendingChoice() throws -> MarinaPendingChoiceResolution {
+        guard let pending = memory?.pendingClarification, !pending.candidates.isEmpty,
+              !turnPolicy.isExplicitFinancialQuestion else { return .unhandled }
+        let choices = pending.candidates.map { ($0.kind, $0.name) }
+        let selected = pending.candidates.filter {
+            turnPolicy.confirmsPendingCandidate(kind: $0.kind, name: $0.name,
+                candidates: choices, ambiguousSearch: pending.search)
+        }
+        let priorHalt = haltOnClarification
+        haltOnClarification = false
+        defer { haltOnClarification = priorHalt }
+        var candidate: MarinaConversationMemory.Entity?
+        if selected.count == 1 { candidate = selected[0] }
+        else {
+            let kinds = Set(pending.candidates.map(\.kind)).filter { turnPolicy.confirmsOnlyPendingKind($0) }
+            guard kinds.count == 1, let kind = kinds.first, let search = pending.search else { return .unhandled }
+            var lookup = MarinaDataRequest(tool: .findRecords)
+            lookup.operation = .inventory; lookup.recordKind = kind; lookup.search = search; lookup.limit = 5
+            _ = try call(lookup)
+            guard let result = results.last, result.status == "success", result.records.count == 1 else { return .clarification }
+            let record = result.records[0]
+            candidate = .init(kind: record.kind, id: record.id, name: record.title)
+        }
+        guard let candidate else { return .unhandled }
+        var lookup = MarinaDataRequest(tool: .findRecords)
+        lookup.operation = .inventory; lookup.recordKind = candidate.kind == "periodBudget" ? "budget" : candidate.kind; lookup.search = candidate.name
+        lookup.exactRecordName = true; lookup.expectedRecordID = candidate.id; lookup.limit = 5
+        if ["needsPeriodChoice", "needsBudgetChoice"].contains(pending.reason) { lookup.allTime = true }
+        _ = try call(lookup)
+        guard let result = results.last, result.status == "success", result.records.count == 1 else { return .clarification }
+        confirmedPendingSelection = [candidate]
+        pendingCandidates = []
+        clarificationCandidates = pending.candidates.contains(candidate) ? pending.candidates : pending.candidates + [candidate]
+        namedLookupTargets = [candidate]
+        ambiguityDiscoveredThisTurn = false
+        let bareChoice = turnPrompt.trimmingCharacters(in: .whitespacesAndNewlines)
+            .compare(candidate.name, options: [.caseInsensitive, .diacriticInsensitive]) == .orderedSame
+        guard bareChoice, turnPolicy.periodCue == .none, !turnPolicy.requiresPeriodComparison,
+              var request = pending.pendingRequest else { return .unhandled }
+        try applyEntities([candidate], to: &request)
+        _ = try call(request)
+        guard let index = results.indices.last, requests[index].tool != .findRecords,
+              let reference = answerReference(for: index) else { return .clarification }
+        return .answer(reference: reference)
+    }
+
     func end() { service = nil; onResult = nil; onStatus = nil; onValidatedResult = nil }
 
+    /// Only the app compiler uses this entry. Model-generated tool arguments keep
+    /// their existing resolution guards in `call`; compiled requests have already
+    /// passed the typed intent/target boundary and share the fresh read below.
+    @discardableResult
+    func executeCompiledRead(_ request: MarinaDataRequest, pendingRequest: MarinaDataRequest? = nil) throws -> MarinaDataResult {
+        guard isCompiledTurn else { throw MarinaToolArgumentError(message: "A compiled request requires a compiled turn.") }
+        calls += 1
+        guard calls <= 8 else { throw ToolLimitError() }
+        guard request.purpose != .cardSummary || request.cardID != nil else {
+            throw MarinaToolArgumentError(message: "Choose a card for its summary.")
+        }
+        pendingFinancialRequest = pendingRequest
+        let previousHalt = haltOnClarification
+        haltOnClarification = false
+        defer { haltOnClarification = previousHalt }
+        _ = try executeRead(request)
+        guard let result = results.last else { throw CancellationError() }
+        return result
+    }
+
+    func selectCompiledResult() -> String? {
+        guard let index = results.indices.last, let reference = answerReference(for: index),
+              selectResults(primary: reference, supporting: []) else { return nil }
+        return reference
+    }
+
+    func presentCompiledDateChoice(_ result: MarinaDataResult, request: MarinaDataRequest) throws {
+        guard isCompiledTurn, ["needsPeriodChoice", "needsBudgetChoice"].contains(result.status) else {
+            throw MarinaToolArgumentError(message: "Expected a verified date choice.")
+        }
+        let previousHalt = haltOnClarification
+        haltOnClarification = false
+        defer { haltOnClarification = previousHalt }
+        _ = try executeRead(request, preparedChoice: result)
+    }
+
     func call(_ request: MarinaDataRequest, diagnosticAttempt: Int? = nil) throws -> String {
-        var request = turnPolicy.constrained(request)
+#if DEBUG
+        if let json = try? JSONEncoder().encode(request) { Self.evaluationTrace("mapped", String(decoding: json, as: UTF8.self)) }
+#endif
+        var request = request
+        if request.tool != .findRecords, let pending = memory?.pendingClarification, let original = pending.pendingRequest,
+           pending.originatingPrompt.map({ turnPolicy.shouldRetainPendingPeriod(from: $0) }) ?? true,
+           let selected = pending.candidates.first(where: { includes($0, in: request) }),
+           (confirmedPendingSelection.contains(selected) || turnPolicy.confirmsPendingCandidate(kind: selected.kind, name: selected.name,
+               candidates: pending.candidates.map { ($0.kind, $0.name) }, ambiguousSearch: pending.search)) {
+            let incoming = request
+            let chosenDates = (request.relativePeriod, request.startDate, request.endDate, request.allTime)
+            request = original
+            request.cardID = request.cardID ?? incoming.cardID
+            request.categoryID = request.categoryID ?? incoming.categoryID
+            request.categoryIDs = request.categoryIDs ?? incoming.categoryIDs
+            request.budgetID = request.budgetID ?? incoming.budgetID
+            request.presetID = request.presetID ?? incoming.presetID
+            request.chartIntent = incoming.chartIntent ?? request.chartIntent
+            // A clarification replaces the unresolved target of that kind. It is not an
+            // additional category or a second incompatible account selection.
+            switch selected.kind {
+            case "category":
+                let unresolved = Set(pending.candidates.filter { $0.kind == "category" }.map(\.id))
+                if let id = request.categoryID, unresolved.contains(id) { request.categoryID = nil }
+                request.categoryIDs = request.categoryIDs?.filter { !unresolved.contains($0) }
+                if request.categoryIDs?.isEmpty == true { request.categoryIDs = nil }
+            case "merchant": request.search = nil; request.merchantName = nil
+            case "savingsAccount", "reconciliationAccount": request.accountID = nil; request.scope = .all
+            default: break
+            }
+            try applyEntities([selected], to: &request)
+            if turnPolicy.periodCue != .none {
+                request.relativePeriod = chosenDates.0; request.startDate = chosenDates.1
+                request.endDate = chosenDates.2; request.allTime = chosenDates.3
+            }
+        }
+        request = turnPolicy.constrained(request)
         if let original = clarificationOriginatingPrompt,
            turnPolicy.explicitlyChangesFinancialTopic(from: original, to: request.tool) {
             pendingCandidates = []
@@ -108,10 +318,13 @@ final class MarinaToolBridge {
             // A reference to an older topic must not silently replace that target.
             request.cardID = previous.selection?.cardID
             request.categoryID = previous.selection?.categoryID
+            request.categoryIDs = previous.selection?.categoryIDs
             request.budgetID = previous.selection?.budgetID
             request.presetID = previous.selection?.presetID
             request.accountID = previous.selection?.accountID
             request.search = previous.selection?.search
+            request.merchantName = previous.selection?.merchantName
+            request.chartIntent = request.chartIntent ?? previous.chartIntent
             if request.tool == .accounts { request.scope = previous.scope ?? .all }
         }
         let ignoredLookup = turnPolicy.ignoresNamedLookup(request)
@@ -139,9 +352,21 @@ final class MarinaToolBridge {
         }
         if request.tool == .findRecords, let proposed = request.search {
             request.search = turnPolicy.lookupSearch(proposed: proposed)
+            if let candidate = clarificationCandidates.first(where: {
+                turnPolicy.confirmsPendingCandidate(kind: $0.kind, name: $0.name,
+                    candidates: clarificationCandidates.map { ($0.kind, $0.name) }, ambiguousSearch: clarificationSearch)
+                    && (MarinaNamedTargetRequirement.containsLiteralName(proposed, in: $0.name)
+                        || proposed.components(separatedBy: CharacterSet.alphanumerics.inverted).filter { !$0.isEmpty }.joined(separator: " ").caseInsensitiveCompare(
+                            $0.name.components(separatedBy: CharacterSet.alphanumerics.inverted).filter { !$0.isEmpty }.joined(separator: " ")) == .orderedSame)
+            }) {
+                request.search = candidate.name
+                request.recordKind = candidate.kind
+                request.exactRecordName = true
+            }
         }
         if request.tool == .findRecords, request.search != nil, let kind = request.recordKind,
-           !turnPrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, !turnPolicy.confirms(kind: kind) {
+           !turnPrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, request.exactRecordName != true,
+           !lookupKindIsGrounded(kind, name: request.search ?? "") {
             // A model-chosen kind must not hide candidates when the person supplied only a name.
             request.recordKind = nil
         }
@@ -157,6 +382,12 @@ final class MarinaToolBridge {
 #endif
         try Task.checkCancellation()
         guard let service else { throw CancellationError() }
+        if request.tool == .findRecords, let search = request.search,
+           search.compare(service.workspaceIdentity.name, options: [.caseInsensitive, .diacriticInsensitive]) == .orderedSame,
+           MarinaNamedTargetRequirement.explicitKind(for: search, in: turnPrompt) == "workspace" {
+            request.recordKind = "workspace"
+            request.exactRecordName = true
+        }
         calls += 1
         guard calls <= 8 else { throw ToolLimitError() }
         if request.tool == .findRecords, let search = request.search,
@@ -164,7 +395,12 @@ final class MarinaToolBridge {
             return try invalidArguments(.init(message: correction), diagnosticAttempt: diagnosticAttempt,
                                         alreadyCounted: true, tool: .findRecords)
         }
-        if requiresFreshRead, request.tool == .findRecords, let search = request.search,
+        if request.tool == .findRecords, let search = request.search,
+           search.compare(service.workspaceIdentity.name, options: [.caseInsensitive, .diacriticInsensitive]) == .orderedSame,
+           !MarinaNamedTargetRequirement.containsLiteralName(search, in: turnPrompt) {
+            return "{\"status\":\"scopeAlreadyResolved\",\"selection\":\"workspace\",\"explanation\":\"The current workspace is already bound by the app. Use workspace for this unnamed question; no name lookup is needed.\"}"
+        }
+        if request.tool == .findRecords, let search = request.search,
            !ignoredLookup, !lookupNameIsGrounded(search) {
             return try invalidArguments(.init(message: "That lookup name was not supplied in this question or its relevant context. Look up only the user's literal target name. Use workspace for unnamed totals or previous for contextual follow-ups; do not invent a name."),
                                         diagnosticAttempt: diagnosticAttempt, alreadyCounted: true, tool: .findRecords)
@@ -172,7 +408,7 @@ final class MarinaToolBridge {
         if turnPolicy.requiresPeriodComparison, [.expenses, .income].contains(request.tool),
            request.operation != .comparison {
             let comparison = request.tool == .income ? "compareIncome" : "compare"
-            return try invalidArguments(.init(message: "The user requested a calculated comparison. Use operation \"\(comparison)\" and comparison {\"selection\":\"workspace\",\"dates\":\"previousMonth\"}, replacing the example selection/dates with the requested other side. Top-level selection/dates identify the first side. Do not use separate reads or switch to a budget tool."),
+            return try invalidArguments(.init(message: "The user requested a calculated comparison. Use the \(comparison) operation with the other side's selection and dates inside it. Top-level selection and dates identify the first side. Preserve the user's named periods and targets. Do not substitute separate reads or a budget summary."),
                                         diagnosticAttempt: diagnosticAttempt, alreadyCounted: true, tool: request.tool)
         }
         if ignoredLookup {
@@ -191,6 +427,7 @@ final class MarinaToolBridge {
         let requiredTargets = namedLookupTargets.filter { !turnPolicy.ignoresSelection(kind: $0.kind, for: request) }
         let lacksExplicitChoice = !ambiguityDiscoveredThisTurn && clarificationCandidates.contains { candidate in
             !turnPolicy.ignoresSelection(kind: candidate.kind, for: request) && includes(candidate, in: request)
+                && !confirmedPendingSelection.contains(candidate)
                 && !turnPolicy.confirmsPendingCandidate(kind: candidate.kind, name: candidate.name,
                     candidates: clarificationCandidates.map { (kind: $0.kind, name: $0.name) },
                     ambiguousSearch: clarificationSearch)
@@ -199,6 +436,7 @@ final class MarinaToolBridge {
            (ambiguityDiscoveredThisTurn && !requiredCandidates.isEmpty)
             || (!requiredCandidates.isEmpty && !requiredCandidates.contains(where: { includes($0, in: request) }))
             || lacksExplicitChoice {
+            retainPendingRequest(request)
             let output = "{\"status\":\"needsClarification\",\"explanation\":\"A lookup found competing records. Ask the person which candidate they mean before reading financial data.\"}"
 #if DEBUG
             diagnosticOutput = output
@@ -215,21 +453,31 @@ final class MarinaToolBridge {
                                         diagnosticAttempt: diagnosticAttempt, alreadyCounted: true)
         }
         if request.tool != .findRecords,
-           let target = requiredTargets.first(where: { Self.accepts(kind: $0.kind, tool: request.tool) && !includes($0, in: request) }) {
-            let ref = memory?.reference(forKind: target.kind, id: target.id)
-            let detail = ref.map { "Use selection \"\($0)\" for \(target.name)." } ?? "Resolve \(target.name) again."
+           requiredTargets.contains(where: { Self.accepts(kind: $0.kind, tool: request.tool) && !includes($0, in: request) }) {
+            let detail = try selectionRepairFeedback(for: request, requiredTargets: requiredTargets)
             return try invalidArguments(.init(message: "The named target was omitted. \(detail) Never replace a resolved target with workspace."),
                                         diagnosticAttempt: diagnosticAttempt, alreadyCounted: true, tool: request.tool)
         }
         if request.tool != .findRecords {
-            let requirements = try currentNamedTargetRequirements()
+            let requirements = try currentNamedTargetRequirements().map { requirement in
+                let chosen = requirement.candidates.filter { candidate in
+                    clarificationCandidates.contains(candidate) && includes(candidate, in: request)
+                        && (confirmedPendingSelection.contains(candidate) || turnPolicy.confirmsPendingCandidate(kind: candidate.kind, name: candidate.name,
+                            candidates: clarificationCandidates.map { ($0.kind, $0.name) }, ambiguousSearch: clarificationSearch))
+                }
+                return chosen.count == 1 ? MarinaNamedTargetRequirement(search: chosen[0].name,
+                    recordKind: chosen[0].kind, candidates: chosen) : requirement
+            }
             if let ambiguous = requirements.first(where: \.isAmbiguous) {
+                retainPendingRequest(request)
                 return try invalidArguments(.init(message: "The current name \(ambiguous.search) matches competing records. Call findRecords to resolve that exact name and ask which record the person means; an earlier reference does not resolve this ambiguity."),
                                             diagnosticAttempt: diagnosticAttempt, alreadyCounted: true, tool: request.tool)
             }
             if let missing = requirements.first(where: { !$0.includes(in: request) }) {
+                retainPendingRequest(request)
                 let kind = missing.recordKind.map { " with kind \($0)" } ?? ""
-                return try invalidArguments(.init(message: "The current question names \(missing.search). Resolve that name\(kind) using findRecords and include its selection; do not substitute an earlier target or workspace."),
+                let detail = try selectionRepairFeedback(for: request, requiredTargets: requiredTargets)
+                return try invalidArguments(.init(message: "The current question names \(missing.search). Resolve that name\(kind) using findRecords and include its selection; do not substitute an earlier target or workspace. \(detail)"),
                                             diagnosticAttempt: diagnosticAttempt, alreadyCounted: true, tool: request.tool)
             }
             if request.tool == .expenses, request.operation != .comparison,
@@ -243,6 +491,25 @@ final class MarinaToolBridge {
                                             diagnosticAttempt: diagnosticAttempt, alreadyCounted: true, tool: request.tool)
             }
         }
+        return try executeRead(request, diagnosticAttempt: diagnosticAttempt)
+    }
+
+    /// Shared execution boundary for model tools and app-compiled requests. The data
+    /// service revalidates all identities, workspace membership and financial semantics.
+    /// The compiled path resolves intent before arriving here; lexical policy must not
+    /// rewrite its operation, dates or filters.
+    private func executeRead(_ request: MarinaDataRequest, diagnosticAttempt: Int? = nil, preparedChoice: MarinaDataResult? = nil) throws -> String {
+        try Task.checkCancellation()
+        guard let service else { throw CancellationError() }
+#if DEBUG
+        var diagnosticOutput: String?
+        var diagnosticStatus = "needsClarification"
+        defer {
+            if let diagnosticAttempt, let diagnosticOutput {
+                diagnostics?.output(attempt: diagnosticAttempt, text: diagnosticOutput, status: diagnosticStatus)
+            }
+        }
+#endif
         let status: MarinaResponseState
         switch request.tool {
         case .findRecords: status = .readingRecords
@@ -256,20 +523,28 @@ final class MarinaToolBridge {
 #if DEBUG
         if let diagnosticAttempt { diagnostics?.database(attempt: diagnosticAttempt) }
 #endif
-        let result = try service.execute(request)
-        turnMemory?.record(request: request, result: result, answerID: UUID(), prompt: turnPrompt)
+        var result = try preparedChoice ?? service.execute(request)
+        if request.tool == .findRecords { result.pendingRequest = pendingFinancialRequest }
+        turnMemory?.record(request: request, result: result, answerID: turnAnswerID, prompt: turnPrompt)
         onValidatedResult?(request, result)
         if result.status == "invalidRequest" {
             argumentIssue = result.explanation ?? "The requested data could not be read."
             if request.tool != .findRecords {
                 failedFinancialTool = request.tool
                 if request.cardID != nil || request.categoryID != nil || request.budgetID != nil
-                    || request.presetID != nil || request.accountID != nil || request.search != nil
+                    || request.presetID != nil || request.accountID != nil || request.search != nil || request.merchantName != nil
                     || request.comparisonFilter != nil {
                     invalidReferenceTools.insert(request.tool)
                     repairableUnknownReferenceTools.remove(request.tool)
                 }
             }
+        }
+        if ["needsPeriodChoice", "needsBudgetChoice"].contains(result.status) {
+            argumentIssue = nil
+            failedFinancialTool = nil
+            ambiguityDiscoveredThisTurn = true
+            pendingCandidates = memory?.pendingClarification?.candidates ?? []
+            clarificationCandidates = pendingCandidates
         }
         if request.tool != .findRecords && ["success", "empty"].contains(result.status) {
             invalidReferenceTools.remove(request.tool)
@@ -303,6 +578,9 @@ final class MarinaToolBridge {
                 failedFinancialTool = nil
             }
             if result.status == "candidates" {
+                clarificationOriginatingPrompt = memory?.pendingClarification?.originatingPrompt ?? clarificationOriginatingPrompt
+                clarificationPeriod = memory?.pendingClarification?.period ?? clarificationPeriod
+                clarificationSearch = memory?.pendingClarification?.search ?? clarificationSearch
                 argumentIssue = nil
                 failedFinancialTool = nil
                 let repeatedPending = !pendingCandidates.isEmpty && entities.allSatisfy { pendingCandidates.contains($0) }
@@ -319,8 +597,10 @@ final class MarinaToolBridge {
                     namedLookupTargets.append(entity)
                 }
                 if !ambiguityDiscoveredThisTurn {
-                    pendingCandidates = []
-                    if !clarificationCandidates.contains(entity) {
+                    if clarificationCandidates.contains(entity) { pendingCandidates = [] }
+                    if !clarificationCandidates.contains(entity),
+                       clarificationOriginatingPrompt == nil || turnPolicy.isExplicitFinancialQuestion {
+                        pendingCandidates = []
                         clarificationCandidates = []
                         clarificationPeriod = nil
                         clarificationOriginatingPrompt = nil
@@ -344,17 +624,53 @@ final class MarinaToolBridge {
         // Presentation metadata describes app behavior; it never chooses or changes the query.
         let currentMemory = memory
         let modelFacts = result.modelFactsJSON(for: request) { kind, id in
-            currentMemory?.reference(forKind: kind, id: id)
+            if kind == "workspace", id == currentMemory?.workspaceID.uuidString { return "workspace" }
+            let referenceKind = result.status == "needsPeriodChoice" && kind == "budget" ? "periodBudget" : kind
+            return currentMemory?.reference(forKind: referenceKind, id: id)
         }
         var facts = (try? JSONSerialization.jsonObject(with: Data(modelFacts.utf8))) as? [String: Any] ?? [:]
         facts["visualPresentation"] = display
+        facts["resultReference"] = answerReference(for: results.count - 1)
+        facts["resultReferences"] = answerResultIndices.enumerated().map { ordinal, index in
+            let request = results[index].resolvedRequest ?? requests[index]
+            var metadata = ["reference": "q\(ordinal)", "tool": request.tool.rawValue,
+                "operation": request.operation.rawValue, "status": results[index].status,
+                "scope": results[index].presentation?.scopeLabel ?? results[index].scope]
+            metadata["purpose"] = request.purpose?.rawValue
+            metadata["metric"] = request.metric?.rawValue
+            if request.grouping != .none { metadata["grouping"] = request.grouping.rawValue }
+            return metadata
+        }
+        facts["purpose"] = request.purpose?.rawValue
+        facts["metric"] = request.metric?.rawValue
+        let narrationEvidence = answerReference(for: results.count - 1).map {
+            MarinaNarrationEvidence.facts(request: result.resolvedRequest ?? request, result: result, prefix: $0)
+        } ?? []
+        if request.tool != .findRecords, verified, !narrationEvidence.isEmpty {
+            // The saved visual retains the complete report. The model needs the compact
+            // authoritative propositions, not duplicate chart, metric and transaction arrays.
+            for key in ["report", "reportIsPreview", "metrics", "records", "explanation"] { facts.removeValue(forKey: key) }
+            if let policy = result.report?.policy,
+               let encoded = try? JSONEncoder().encode(policy),
+               let policyFacts = try? JSONSerialization.jsonObject(with: encoded) {
+                facts["calculationPolicy"] = policyFacts
+            }
+        }
+        let sharedScope = narrationEvidence.first?.scope ?? result.presentation?.scopeLabel ?? result.scope
+        facts["scope"] = sharedScope
+        facts["verifiedSummary"] = narrationEvidence.prefix(3).map { fact in
+            var summary = ["subject": fact.subject, "relation": fact.relation, "value": fact.value]
+            // Comparisons retain the other side's period; ordinary facts share one scope.
+            if fact.scope != sharedScope { summary["scope"] = fact.scope }
+            return summary
+        }
         if let data = try? JSONSerialization.data(withJSONObject: facts, options: [.sortedKeys]),
            let json = String(data: data, encoding: .utf8) {
 #if DEBUG
             diagnosticOutput = json
 #endif
-            if haltOnClarification && request.tool == .findRecords
-                && (result.status == "candidates" || (request.search != nil && result.status == "empty")) {
+            if haltOnClarification && (["needsPeriodChoice", "needsBudgetChoice"].contains(result.status)
+                || (request.tool == .findRecords && (result.status == "candidates" || (request.search != nil && result.status == "empty")))) {
                 throw MarinaClarificationRequired()
             }
             return json
@@ -362,22 +678,48 @@ final class MarinaToolBridge {
 #if DEBUG
         diagnosticOutput = modelFacts
 #endif
-        if haltOnClarification && request.tool == .findRecords
-            && (result.status == "candidates" || (request.search != nil && result.status == "empty")) {
+        if haltOnClarification && (["needsPeriodChoice", "needsBudgetChoice"].contains(result.status)
+            || (request.tool == .findRecords && (result.status == "candidates" || (request.search != nil && result.status == "empty")))) {
             throw MarinaClarificationRequired()
         }
         return modelFacts
     }
 
+    private func retainPendingRequest(_ request: MarinaDataRequest) {
+        pendingFinancialRequest = request
+        guard memory?.pendingClarification != nil else { return }
+        var pending = MarinaDataResult(status: "needsClarification", scope: service?.workspaceIdentity.name ?? "")
+        pending.pendingRequest = request
+        onValidatedResult?(request, pending)
+    }
+
+    private func lookupKindIsGrounded(_ kind: String, name: String) -> Bool {
+        if kind == "workspace", turnPolicy.confirms(kind: kind),
+           MarinaNamedTargetRequirement.containsLiteralName(name, in: turnPrompt) { return true }
+        if clarificationCandidates.contains(where: {
+            $0.kind == kind && MarinaNamedTargetRequirement.containsLiteralName(name, in: $0.name)
+        }), turnPolicy.confirms(kind: kind) { return true }
+        return (try? currentNamedTargetRequirements())?.contains {
+            $0.recordKind == kind && MarinaNamedTargetRequirement.containsLiteralName(name, in: $0.search)
+        } == true
+    }
+
     private func lookupNameIsGrounded(_ name: String) -> Bool {
         guard !turnPrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return true }
         if MarinaNamedTargetRequirement.containsLiteralName(name, in: turnPrompt) { return true }
+        if clarificationCandidates.contains(where: {
+            MarinaNamedTargetRequirement.containsLiteralName(name, in: $0.name)
+                && turnPolicy.confirmsPendingCandidate(kind: $0.kind, name: $0.name,
+                    candidates: clarificationCandidates.map { ($0.kind, $0.name) }, ambiguousSearch: clarificationSearch)
+        }) { return true }
         if let original = clarificationOriginatingPrompt,
            turnPolicy.shouldRetainPendingPeriod(from: original),
            MarinaNamedTargetRequirement.containsLiteralName(name, in: original) { return true }
-        guard turnPolicy.isContextualFinancialFollowUp,
-              let query = memory?.latestFinancialQuery, let selected = query.selection else { return false }
-        if let search = selected.search,
+        guard let query = memory?.latestFinancialQuery, let selected = query.selection else { return false }
+        let words = Set(turnPrompt.lowercased().components(separatedBy: CharacterSet.alphanumerics.inverted))
+        let refersToSelection = !words.isDisjoint(with: ["this", "that", "same", "previous", "selected", "esa", "ese", "misma", "mismo"])
+        guard turnPolicy.isContextualFinancialFollowUp || refersToSelection else { return false }
+        if let search = selected.merchantName ?? selected.search,
            MarinaNamedTargetRequirement.containsLiteralName(name, in: search) { return true }
         let ids = Set([selected.cardID, selected.categoryID, selected.budgetID,
                        selected.presetID, selected.accountID].compactMap { $0 })
@@ -415,6 +757,9 @@ final class MarinaToolBridge {
     fileprivate func invalidArguments(_ error: MarinaToolArgumentError, diagnosticAttempt: Int? = nil, alreadyCounted: Bool = false, tool: MarinaDataRequest.Tool? = nil) throws -> String {
         try Task.checkCancellation()
         guard service != nil else { throw CancellationError() }
+#if DEBUG
+        Self.evaluationTrace("invalidArguments \(tool?.rawValue ?? "unknown")", error.message)
+#endif
         if !alreadyCounted { calls += 1 }
         guard calls <= 8 else { throw ToolLimitError() }
         argumentIssue = error.message
@@ -433,9 +778,31 @@ final class MarinaToolBridge {
     private func currentNamedTargetRequirements() throws -> [MarinaNamedTargetRequirement] {
         if let cachedNamedTargetRequirements { return cachedNamedTargetRequirements }
         guard let service else { throw CancellationError() }
-        let requirements = try service.namedTargetRequirements(prompt: turnPrompt)
+        let original = clarificationOriginatingPrompt.flatMap {
+            turnPolicy.shouldRetainPendingPeriod(from: $0) ? $0 : nil
+        }
+        let requirements = try service.namedTargetRequirements(prompt: original ?? turnPrompt)
         cachedNamedTargetRequirements = requirements
         return requirements
+    }
+
+    private func selectionRepairFeedback(for request: MarinaDataRequest,
+                                         requiredTargets: [MarinaConversationMemory.Entity]) throws -> String {
+        // A repair must preserve the complete resolved scope. Naming only the missing
+        // reference can make the model alternate between two individually valid targets.
+        let unambiguous = try currentNamedTargetRequirements().filter { $0.candidates.count == 1 }.flatMap(\.candidates)
+        var targets: [MarinaConversationMemory.Entity] = []
+        for target in requiredTargets + unambiguous
+        where Self.accepts(kind: target.kind, tool: request.tool) && !turnPolicy.ignoresSelection(kind: target.kind, for: request) {
+            if !targets.contains(where: { $0.kind == target.kind && $0.id == target.id }) { targets.append(target) }
+        }
+        let references = targets.compactMap { memory?.reference(forKind: $0.kind, id: $0.id) }
+        guard !references.isEmpty else { return "Resolve all requested targets before reading their data." }
+        let selection = references.joined(separator: ",")
+        if references.count == targets.count {
+            return "Use selection \"\(selection)\" to keep all resolved targets together."
+        }
+        return "Keep selection \"\(selection)\" and add the remaining target references; do not replace these filters."
     }
 
     private func permitsExplicitWorkspaceRepair(for request: MarinaDataRequest) throws -> Bool {
@@ -473,10 +840,17 @@ final class MarinaToolBridge {
                 if selectionIsExplicitlyUniversal && !invalidReferenceTools.contains(request.tool) { return }
                 throw MarinaToolArgumentError(message: "There is no previous financial selection. Resolve the target or choose workspace explicitly.")
             }
+            request.chartIntent = request.chartIntent ?? query.chartIntent
             guard let selected = query.selection else {
                 try requireToolArgument(query.tool == request.tool || selectionIsExplicitlyUniversal,
                                         "Previous financial query belongs to another topic. Choose workspace or copy a current reference explicitly.")
                 try requireToolArgument(!invalidReferenceTools.contains(request.tool), "Resolve the failed reference before using an unfiltered previous selection.")
+                if request.tool == .expenses && query.tool == .expenses {
+                    request.expenseMeasure = query.measure ?? .budgetImpact
+                    request.scope = query.scope ?? .all
+                    request.includeFuture = query.includeFuture ?? false
+                    if request.transactionFilter == nil { request.transactionFilter = query.transactionFilter }
+                }
                 return
             }
             var entities: [MarinaConversationMemory.Entity] = []
@@ -484,6 +858,7 @@ final class MarinaToolBridge {
                 if let id { entities.append(.init(kind: kind, id: id, name: id)) }
             }
             add("card", selected.cardID); add("category", selected.categoryID)
+            for id in selected.categoryIDs ?? [] where id != selected.categoryID { add("category", id) }
             add("budget", selected.budgetID); add("preset", selected.presetID)
             if let id = selected.accountID {
                 let kind = ["savingsAccount", "reconciliationAccount"].first { memory?.reference(forKind: $0, id: id) != nil }
@@ -491,12 +866,22 @@ final class MarinaToolBridge {
                 guard let kind else { throw MarinaToolArgumentError(message: "Resolve the previous account again before reading it.") }
                 add(kind, id)
             }
-            if let search = selected.search {
-                entities.append(.init(kind: query.tool == .income ? "incomeSource" : "merchant", id: search, name: search))
+            if let name = selected.merchantName {
+                entities.append(.init(kind: "merchant", id: name, name: name))
+            } else if let search = selected.search {
+                if query.tool == .income { entities.append(.init(kind: "incomeSource", id: search, name: search)) }
+                else { request.search = search } // Preserve legacy broad text filters as broad filters.
             }
+            request.chartIntent = request.chartIntent ?? query.chartIntent
             try requireToolArgument(query.tool == request.tool || (!entities.isEmpty && entities.allSatisfy { turnPolicy.ignoresSelection(kind: $0.kind, for: request) }),
                                     "Previous financial query belongs to another topic. Choose workspace or copy a current reference explicitly.")
             try applyEntities(entities, to: &request)
+            if request.tool == .expenses {
+                request.expenseMeasure = query.measure ?? .budgetImpact
+                request.scope = query.scope ?? .all
+                request.includeFuture = query.includeFuture ?? false
+                if request.transactionFilter == nil { request.transactionFilter = query.transactionFilter }
+            }
         case .references(let refs):
             do {
                 try requireToolArgument(!refs.isEmpty && Set(refs).count == refs.count, "Use one or more distinct references from findRecords.")
@@ -520,19 +905,55 @@ final class MarinaToolBridge {
         }
     }
 
+    fileprivate func inheritExpenseContext(for request: inout MarinaDataRequest) {
+        guard request.tool == .expenses, let previous = memory?.latestFinancialQuery,
+              previous.tool == .expenses else { return }
+        let selected = previous.selection
+        let previousCategories = Set((selected?.categoryIDs ?? []) + [selected?.categoryID].compactMap { $0 })
+        let requestedCategories = Set((request.categoryIDs ?? []) + [request.categoryID].compactMap { $0 })
+        guard request.cardID == selected?.cardID, requestedCategories == previousCategories,
+              request.budgetID == selected?.budgetID, request.presetID == selected?.presetID,
+              request.accountID == selected?.accountID, request.search == selected?.search,
+              request.merchantName == selected?.merchantName else { return }
+        // A repeated validated target retains its calculation basis and filters whether
+        // the model chooses its reference again or uses `previous`. Explicit arguments
+        // override these defaults in the tool mapper; dates can change independently.
+        request.expenseMeasure = previous.measure ?? request.expenseMeasure
+        request.scope = previous.scope ?? .all
+        request.includeFuture = previous.includeFuture ?? false
+        request.transactionFilter = request.transactionFilter ?? previous.transactionFilter
+        request.chartIntent = request.chartIntent ?? previous.chartIntent
+    }
+
     private func applyEntities(_ entities: [MarinaConversationMemory.Entity], to request: inout MarinaDataRequest) throws {
         var kinds: Set<String> = []
         for entity in entities {
             if turnPolicy.ignoresSelection(kind: entity.kind, for: request) { continue }
+            if entity.kind == "workspace" {
+                try requireToolArgument(entity.id == memory?.workspaceID.uuidString, "This workspace reference belongs to another workspace.")
+                continue
+            }
             try requireToolArgument(Self.accepts(kind: entity.kind, tool: request.tool), "A \(entity.kind) reference cannot select \(request.tool.rawValue). Resolve the intended target.")
             let kind = ["savingsAccount", "reconciliationAccount"].contains(entity.kind) ? "account" : entity.kind
-            try requireToolArgument(kinds.insert(kind).inserted, "Use at most one \(kind) reference in a selection.")
+            try requireToolArgument(kinds.insert(kind).inserted || kind == "category", "Use at most one \(kind) reference in a selection.")
             switch entity.kind {
             case "card": request.cardID = entity.id
-            case "category": request.categoryID = entity.id
-            case "budget": request.budgetID = entity.id
+            case "category":
+                if let first = request.categoryID, first != entity.id {
+                    request.categoryIDs = Array(Set((request.categoryIDs ?? [first]) + [entity.id])).sorted()
+                    request.categoryID = nil
+                } else if request.categoryIDs != nil {
+                    request.categoryIDs = Array(Set((request.categoryIDs ?? []) + [entity.id])).sorted()
+                } else { request.categoryID = entity.id }
+            case "periodBudget": request.periodBudgetID = entity.id
+            case "budget":
+                if memory?.pendingClarification?.reason == "needsPeriodChoice",
+                   memory?.pendingClarification?.candidates.contains(where: { $0.id == entity.id }) == true {
+                    request.periodBudgetID = entity.id
+                } else { request.budgetID = entity.id }
             case "preset": request.presetID = entity.id
-            case "merchant", "incomeSource": request.search = entity.name
+            case "merchant": request.merchantName = entity.name; request.search = nil
+            case "incomeSource": request.search = entity.name
             case "savingsAccount", "reconciliationAccount":
                 try requireToolArgument(request.scope == .all || (entity.kind == "savingsAccount" ? request.scope == .savings : request.scope == .reconciliation),
                                         "The account reference does not match the requested account kind.")
@@ -545,10 +966,10 @@ final class MarinaToolBridge {
 
     private static func accepts(kind: String, tool: MarinaDataRequest.Tool) -> Bool {
         switch tool {
-        case .expenses: ["card", "category", "budget", "preset", "merchant"].contains(kind)
-        case .income: ["card", "budget", "incomeSource"].contains(kind)
-        case .budgetSummary: ["card", "category", "budget"].contains(kind)
-        case .accounts: ["savingsAccount", "reconciliationAccount"].contains(kind)
+        case .expenses: ["workspace", "periodBudget", "card", "category", "budget", "preset", "merchant"].contains(kind)
+        case .income: ["workspace", "periodBudget", "card", "budget", "incomeSource"].contains(kind)
+        case .budgetSummary: ["workspace", "periodBudget", "card", "category", "budget"].contains(kind)
+        case .accounts: ["workspace", "savingsAccount", "reconciliationAccount"].contains(kind)
         case .findRecords: false
         }
     }
@@ -556,10 +977,13 @@ final class MarinaToolBridge {
     private func includes(_ entity: MarinaConversationMemory.Entity, in request: MarinaDataRequest) -> Bool {
         switch entity.kind {
         case "card": request.cardID == entity.id || request.comparisonFilter?.cardID == entity.id
-        case "category": request.categoryID == entity.id || request.comparisonFilter?.categoryID == entity.id
-        case "budget": request.budgetID == entity.id || request.comparisonFilter?.budgetID == entity.id
+        case "category": request.categoryID == entity.id || request.categoryIDs?.contains(entity.id) == true || request.comparisonFilter?.categoryID == entity.id || request.comparisonFilter?.categoryIDs?.contains(entity.id) == true
+        case "budget": request.budgetID == entity.id || request.periodBudgetID == entity.id || request.comparisonFilter?.budgetID == entity.id
+        case "periodBudget": request.periodBudgetID == entity.id
+        case "workspace": memory?.workspaceID.uuidString == entity.id
         case "preset": request.presetID == entity.id || request.comparisonFilter?.presetID == entity.id
-        case "merchant", "incomeSource": request.search == entity.name || request.comparisonFilter?.search == entity.name
+        case "merchant": request.merchantName == entity.name || request.comparisonFilter?.merchantName == entity.name
+        case "incomeSource": request.search == entity.name || request.comparisonFilter?.search == entity.name
         case "savingsAccount", "reconciliationAccount": request.accountID == entity.id
         default: false
         }
@@ -581,7 +1005,7 @@ final class MarinaToolBridge {
             case .nextSevenDays: request.relativePeriod = .nextSevenDays
             case .allTime: request.allTime = true
             case .previousQuery:
-                guard let previous = memory?.latestFinancialQuery?.period else {
+                guard let previous = memory?.pendingClarification?.period ?? memory?.latestFinancialQuery?.period else {
                     throw MarinaToolArgumentError(message: "There is no previous financial period. Choose dates explicitly.")
                 }
                 request.allTime = previous.allTime == true
@@ -600,12 +1024,21 @@ final class MarinaToolBridge {
         request.comparisonPeriod = dates.relativePeriod; request.comparisonAllTime = dates.allTime
     }
 
-    func answer(id: UUID, prompt: String, narration: String) -> HomeAnswer {
-        let financial = evidence.filter { $0.tool != .findRecords && $0.verified }
-        let visible = financial.isEmpty ? Array(evidence.suffix(1)) : financial
+    func answer(id: UUID, prompt: String, narration: String, failureExplanation: String? = nil) -> HomeAnswer {
+        let unresolvedChoice = confirmedPendingSelection.isEmpty ? results.indices.last {
+            results[$0].status == "candidates" || ["needsPeriodChoice", "needsBudgetChoice"].contains(results[$0].status)
+        } : nil
+        let chosen = selectedResultIndices ?? unresolvedChoice.map { [$0] } ?? Array(results.indices.suffix(1))
+        // Supporting reads validate an explanation. Only an explicitly requested extra
+        // visual joins the primary presentation; evidence selection stays unchanged.
+        let indices = chosen.enumerated().compactMap { position, index in
+            position == 0 || requests[index].forcePresentation == true ? index : nil
+        }
+        let visible = indices.map { evidence[$0] }
         // Preserve typed, independently scoped results rather than flattening their UI.
         var presentations: [MarinaPresentation] = []
-        for (index, result) in results.enumerated() {
+        for index in indices {
+            let result = results[index]
             guard let presentation = result.presentation else { continue }
             let request = requests[index]
             if request.tool == .findRecords && request.search != nil && result.status != "candidates" { continue }
@@ -614,18 +1047,28 @@ final class MarinaToolBridge {
             } else { presentations.append(presentation) }
         }
         presentations = MarinaPresentationDisplayPolicy.coalesced(presentations)
-        // Publish verified financial captions as soon as a read completes. Generated prose
-        // remains available for nonfinancial conversation and clarification questions.
-        let verifiedNarration = zip(requests, results).compactMap { request, result in
-            MarinaVerifiedNarration.text(request: request, result: result)
+        // Publish a verified fallback while the draft is in flight. A completed,
+        // evidence-validated model composition can replace it without changing the visual.
+        let verifiedNarration = chosen.prefix(1).compactMap { index in
+            MarinaVerifiedNarration.text(request: requests[index], result: results[index])
         }
         var seenCaptions = Set<String>()
-        let explanation = hasInvalidRequest || (requiresFreshRead && !hasGroundedAnswer) ? "" : verifiedNarration.isEmpty ? narration
-            : verifiedNarration.filter { seenCaptions.insert($0).inserted }.joined(separator: "\n\n")
+        let allFacts = selectedEvidence
+        let validatedNarration = MarinaNarrationValidator.render(draft: narrationDraft, evidence: allFacts,
+            requiresFinancialEvidence: requiresFreshRead || hasFinancialResults)
+        let fallback = verifiedNarration.filter { seenCaptions.insert($0).inserted }.joined(separator: "\n\n")
+        let conversationFallback: String
+        switch narrationDraft?.act {
+        case .greeting: conversationFallback = "Hi, I’m Marina, your Offshore budgeting assistant. What would you like to look at?"
+        case .clarification, .help: conversationFallback = "Would you like to look at spending, category limits, income, or savings?"
+        default: conversationFallback = narration
+        }
+        let explanation = resultSelectionRejected ? narration : hasInvalidRequest || (requiresFreshRead && !hasGroundedAnswer) ? ""
+            : validatedNarration ?? (fallback.isEmpty ? (hasFinancialResults || requiresFreshRead ? "I couldn’t verify that explanation. The checked results are shown here." : conversationFallback) : fallback)
         let argumentNotice = argumentIssue.map { [HomeAnswerRow(title: $0, value: "", role: .assumption)] } ?? []
         var answer = HomeAnswer(id: id, queryID: id, kind: .message,
                           userPrompt: prompt, title: "", rows: visible.flatMap { $0.answer.rows } + argumentNotice,
-                          explanation: explanation, presentations: presentations)
+                          explanation: failureExplanation ?? explanation, presentations: presentations)
         answer.suppressedPresentationIDs = presentations.filter {
             !MarinaPresentationDisplayPolicy.shouldShow($0, after: previousPresentations)
         }.map(\.id)
@@ -637,6 +1080,8 @@ final class MarinaToolBridge {
     }
 }
 
+@available(iOS 26.0, macCatalyst 26.0, *)
+@Generable enum MarinaChartIntent: String { case periodComparison, movementOverTime }
 @available(iOS 26.0, macCatalyst 26.0, *)
 @Generable enum MarinaDateSelectionKind: String {
     case selectedPeriod, previousPeriod, currentMonth, previousMonth, yearToDate, nextSevenDays, allTime, previousQuery
@@ -718,11 +1163,11 @@ struct MarinaFindRecordsTool: Tool {
     typealias Arguments = RecordLookupArguments
     @Generable struct RecordLookupArguments {
         var showVisual: Bool? = nil
-        @Guide(description: "Named target: resolveName. List entities: inventory.")
         var lookup: MarinaRecordLookup
     }
     func call(arguments: Arguments) async throws -> String {
 #if DEBUG
+        MarinaToolBridge.evaluationTrace(name, arguments.generatedContent.jsonString)
         let attempt = await bridge.diagnostics?.entered(tool: name, arguments: arguments.generatedContent.jsonString)
 #endif
         do {
@@ -760,11 +1205,11 @@ struct MarinaFindRecordsTool: Tool {
 
 @available(iOS 26.0, macCatalyst 26.0, *)
 @Generable enum MarinaExpenseSimpleOperation: String {
-    case summary, transactions, upcomingPresets, largestPurchase, categoryTotals, cardTotals, merchantTotals, categoryShares, cardShares, merchantShares, periodTotals
+    case summary, transactions, upcomingPresets, largestPurchase, smallestPurchase, cardSummary, nextPlannedExpense, spendingPatterns, categoryTotals, cardTotals, merchantTotals, categoryShares, cardShares, merchantShares, periodTotals
 }
 @available(iOS 26.0, macCatalyst 26.0, *)
 nonisolated enum MarinaExpenseOperation: Generable, Sendable {
-    case summary, transactions, upcomingPresets, largestPurchase, categoryTotals, cardTotals, merchantTotals, categoryShares, cardShares, merchantShares, periodTotals
+    case summary, transactions, upcomingPresets, largestPurchase, smallestPurchase, cardSummary, nextPlannedExpense, spendingPatterns, categoryTotals, cardTotals, merchantTotals, categoryShares, cardShares, merchantShares, periodTotals
     case compare(selection: MarinaSelection, dates: MarinaDateSelection)
 
     static var generationSchema: GenerationSchema {
@@ -779,6 +1224,10 @@ nonisolated enum MarinaExpenseOperation: Generable, Sendable {
             case .transactions: self = .transactions
             case .upcomingPresets: self = .upcomingPresets
             case .largestPurchase: self = .largestPurchase
+            case .smallestPurchase: self = .smallestPurchase
+            case .cardSummary: self = .cardSummary
+            case .nextPlannedExpense: self = .nextPlannedExpense
+            case .spendingPatterns: self = .spendingPatterns
             case .categoryTotals: self = .categoryTotals
             case .cardTotals: self = .cardTotals
             case .merchantTotals: self = .merchantTotals
@@ -805,6 +1254,10 @@ nonisolated enum MarinaExpenseOperation: Generable, Sendable {
         case .transactions: MarinaExpenseSimpleOperation.transactions.generatedContent
         case .upcomingPresets: MarinaExpenseSimpleOperation.upcomingPresets.generatedContent
         case .largestPurchase: MarinaExpenseSimpleOperation.largestPurchase.generatedContent
+        case .smallestPurchase: MarinaExpenseSimpleOperation.smallestPurchase.generatedContent
+        case .cardSummary: MarinaExpenseSimpleOperation.cardSummary.generatedContent
+        case .nextPlannedExpense: MarinaExpenseSimpleOperation.nextPlannedExpense.generatedContent
+        case .spendingPatterns: MarinaExpenseSimpleOperation.spendingPatterns.generatedContent
         case .categoryTotals: MarinaExpenseSimpleOperation.categoryTotals.generatedContent
         case .cardTotals: MarinaExpenseSimpleOperation.cardTotals.generatedContent
         case .merchantTotals: MarinaExpenseSimpleOperation.merchantTotals.generatedContent
@@ -823,13 +1276,19 @@ nonisolated enum MarinaSelection: Generable, Sendable {
     case references([String])
 
     static var generationSchema: GenerationSchema {
-        GenerationSchema(type: Self.self,
-            description: "workspace: all records; previous: latest resolved or financial target; otherwise copy a selection returned by findRecords.",
-            anyOf: [String.self])
+        // Keep the framework's native string schema. The decoder enforces canonical
+        // selection syntax; the bridge validates fresh records and workspace scope.
+        String.generationSchema
     }
     private static let validationFeedback = "Selection must be one string: \"workspace\" for an unnamed or all-records scope; \"previous\" only for a relevant follow-up; otherwise copy exact references returned by findRecords, comma-separated without spaces or duplicates. Never invent references or use names, IDs, or an empty selection."
 
     init(_ content: GeneratedContent) throws {
+#if DEBUG
+        if ProcessInfo.processInfo.environment["MARINA_MODEL_EVALUATION"] == "1",
+           ProcessInfo.processInfo.environment["MARINA_LONG_EVALUATION_VERBOSE"] == "1" {
+            print("MarinaSelectionSynthetic content=\(content.jsonString)")
+        }
+#endif
         guard case .string(let value) = content.kind else {
             throw MarinaToolArgumentError(message: Self.validationFeedback)
         }
@@ -866,7 +1325,7 @@ nonisolated enum MarinaSelection: Generable, Sendable {
     var compare: MarinaExpenseComparison
 }
 @available(iOS 26.0, macCatalyst 26.0, *)
-@Generable enum MarinaIncomeSummaryKind: String { case summary, progress }
+@Generable enum MarinaIncomeSummaryKind: String { case summary, progress, timeline }
 @available(iOS 26.0, macCatalyst 26.0, *)
 @Generable struct MarinaIncomeTransactions {
     var order: MarinaDataSort
@@ -895,6 +1354,7 @@ nonisolated enum MarinaSelection: Generable, Sendable {
 nonisolated enum MarinaIncomeOperation: Generable, Sendable {
     case summary
     case progress
+    case timeline
     case transactions(order: MarinaDataSort, offset: Int)
     case groups(by: MarinaDataGrouping, offset: Int)
     case periodTotals(unit: MarinaPeriodUnit, offset: Int)
@@ -911,6 +1371,7 @@ nonisolated enum MarinaIncomeOperation: Generable, Sendable {
             switch try MarinaIncomeSummaryKind(content) {
             case .summary: self = .summary
             case .progress: self = .progress
+            case .timeline: self = .timeline
             }
         case .structure(let properties, _):
             let keys = Set(properties.keys)
@@ -939,6 +1400,7 @@ nonisolated enum MarinaIncomeOperation: Generable, Sendable {
         switch self {
         case .summary: MarinaIncomeSummaryKind.summary.generatedContent
         case .progress: MarinaIncomeSummaryKind.progress.generatedContent
+        case .timeline: MarinaIncomeSummaryKind.timeline.generatedContent
         case .transactions(let order, let offset): MarinaIncomeTransactions(order: order, offset: offset).generatedContent
         case .groups(let by, let offset): MarinaIncomeGroups(by: by, offset: offset).generatedContent
         case .periodTotals(let unit, let offset): MarinaPeriodPage(unit: unit, offset: offset).generatedContent
@@ -947,143 +1409,108 @@ nonisolated enum MarinaIncomeOperation: Generable, Sendable {
     }
 }
 
-/// The model chooses a comparison using the same string-shaped field as ordinary totals.
-/// Swift callers keep the richer operation enum; the other side is required by validation.
-@available(iOS 26.0, macCatalyst 26.0, *)
-@Generable enum MarinaExpenseOperationChoice: String {
-    case summary, transactions, upcomingPresets, largestPurchase, categoryTotals, cardTotals, merchantTotals, categoryShares, cardShares, merchantShares, periodTotals, compare
-
-    init(_ operation: MarinaExpenseOperation) {
-        switch operation {
-        case .summary: self = .summary
-        case .transactions: self = .transactions
-        case .upcomingPresets: self = .upcomingPresets
-        case .largestPurchase: self = .largestPurchase
-        case .categoryTotals: self = .categoryTotals
-        case .cardTotals: self = .cardTotals
-        case .merchantTotals: self = .merchantTotals
-        case .categoryShares: self = .categoryShares
-        case .cardShares: self = .cardShares
-        case .merchantShares: self = .merchantShares
-        case .periodTotals: self = .periodTotals
-        case .compare: self = .compare
-        }
-    }
-}
-
-@available(iOS 26.0, macCatalyst 26.0, *)
-@Generable enum MarinaIncomeOperationLabel: String { case summary, progress, compareIncome }
-
-@available(iOS 26.0, macCatalyst 26.0, *)
-nonisolated enum MarinaIncomeOperationChoice: Generable, Sendable {
-    case standard(MarinaIncomeOperation)
-    case compareIncome
-
-    static var generationSchema: GenerationSchema {
-        GenerationSchema(type: Self.self, anyOf: [MarinaIncomeOperationLabel.self,
-            MarinaIncomeTransactions.self, MarinaIncomeGroups.self, MarinaPeriodPage.self])
-    }
-    init(_ content: GeneratedContent) throws {
-        if case .string("compareIncome") = content.kind { self = .compareIncome; return }
-        if case .structure(let fields, _) = content.kind {
-            let keys = Set(fields.keys)
-            try requireToolArgument(keys == ["order", "offset"] || keys == ["by", "offset"] || keys == ["unit", "offset"],
-                                    "Use an income operation string, or one complete order/offset, by/offset, or unit/offset payload. Put comparison selection/dates in the top-level comparison field.")
-        }
-        self = .standard(try MarinaIncomeOperation(content))
-    }
-    init(_ operation: MarinaIncomeOperation) {
-        if case .compareIncome = operation { self = .compareIncome }
-        else { self = .standard(operation) }
-    }
-    var generatedContent: GeneratedContent {
-        switch self {
-        case .standard(let operation): operation.generatedContent
-        case .compareIncome: "compareIncome".generatedContent
-        }
-    }
-}
-
 @available(iOS 26.0, macCatalyst 26.0, *)
 struct MarinaExpensesTool: Tool {
     let bridge: MarinaToolBridge
     let name = "readExpenses"
-    let description = "Spending and purchases. Resolve names with findRecords; copy its selection string."
+    let description = "Spending, purchases, rankings and patterns."
     typealias Arguments = ExpenseQueryArguments
     @Generable struct ExpenseQueryArguments {
+        var operation: MarinaExpenseOperation
+        var chartIntent: MarinaChartIntent? = nil
         var showVisual: Bool? = nil
-        @Guide(description: "workspace: all records. previous: latest resolved or financial target. Named targets: copy the returned selection.")
+        @Guide(description: "workspace, previous, or returned rN refs; never names.")
         var selection: MarinaSelection
-        @Guide(description: "Requested period; previousQuery reuses the last financial query dates.")
         var dates: MarinaDateSelection
-        @Guide(description: "summary: total; transactions: purchases; compare: calculated comparison requiring comparison.")
-        var operation: MarinaExpenseOperationChoice
-        @Guide(description: "Required only for compare; the other selection and dates.")
-        var comparison: MarinaExpenseComparison? = nil
         var sort: MarinaDataSort?
         var periodUnit: MarinaPeriodUnit?
         var offset: Int?
         var scope: MarinaExpenseScope?
         var measure: MarinaExpenseMeasure?
         var includeFuture: Bool?
+        var metric: MarinaRecordMetric? = nil
+        var limit: Int? = nil
+        var transactionFilter: MarinaTransactionFilter? = nil
+        @Guide(description: "Compare each period's leader by this dimension.")
+        var leadersBy: MarinaDataGrouping? = nil
 
         init(showVisual: Bool? = nil, selection: MarinaSelection, dates: MarinaDateSelection,
              operation: MarinaExpenseOperation, sort: MarinaDataSort? = nil, periodUnit: MarinaPeriodUnit? = nil,
              offset: Int? = nil, scope: MarinaExpenseScope? = nil, measure: MarinaExpenseMeasure? = nil,
              includeFuture: Bool? = nil) {
             self.showVisual = showVisual; self.selection = selection; self.dates = dates
-            self.operation = .init(operation)
-            if case .compare(let selection, let dates) = operation { comparison = .init(selection: selection, dates: dates) }
+            self.operation = operation
             self.sort = sort; self.periodUnit = periodUnit; self.offset = offset; self.scope = scope
             self.measure = measure; self.includeFuture = includeFuture
         }
 
         func validatedOperation() throws -> MarinaExpenseOperation {
-            if operation == .compare {
-                guard let comparison else {
-                    throw MarinaToolArgumentError(message: "operation compare requires comparison containing both selection and dates.")
+            if case .compare = operation {
+                if let leadersBy {
+                    try requireToolArgument([.category, .card, .merchant].contains(leadersBy),
+                        "Compare period leaders by category, card, or merchant.")
                 }
-                return .compare(selection: comparison.selection, dates: comparison.dates)
+            } else {
+                try requireToolArgument(leadersBy == nil, "leadersBy requires the compare operation with selection and dates.")
             }
-            try requireToolArgument(comparison == nil, "Only operation compare accepts a comparison payload.")
-            return try MarinaExpenseOperation(operation.rawValue.generatedContent)
+            return operation
         }
     }
     func call(arguments: Arguments) async throws -> String {
 #if DEBUG
+        MarinaToolBridge.evaluationTrace(name, arguments.generatedContent.jsonString)
         let attempt = await bridge.diagnostics?.entered(tool: name, arguments: arguments.generatedContent.jsonString)
 #endif
         do {
             var request = MarinaDataRequest(tool: .expenses)
             request.forcePresentation = arguments.showVisual
             try await bridge.applyDates(arguments.dates, to: &request)
-            request.limit = 5
+            request.limit = min(50, max(1, arguments.limit ?? 5))
             request.offset = arguments.offset ?? 0
+            request.metric = arguments.metric.flatMap { MarinaDataRequest.MetricFocus(rawValue: $0.rawValue) }
+            request.transactionFilter = arguments.transactionFilter.flatMap { MarinaDataRequest.TransactionFilter(rawValue: $0.rawValue) }
+            if request.metric == .averagePerPeriod { request.periodUnit = periodUnit(arguments.periodUnit) }
             switch try arguments.validatedOperation() {
             case .summary: request.operation = .summary
             case .upcomingPresets: request.purpose = .upcomingPresets
-            case .largestPurchase: request.operation = .transactions; request.sort = .largest; request.limit = 1
+            case .largestPurchase: request.operation = .transactions; request.sort = .largest; request.limit = 1; request.positiveOnly = arguments.measure != .ledger
+            case .smallestPurchase: request.operation = .transactions; request.sort = .smallest; request.limit = 1; request.positiveOnly = arguments.measure != .ledger
+            case .cardSummary: request.purpose = .cardSummary
+            case .nextPlannedExpense: request.purpose = .nextPlannedExpense
+            case .spendingPatterns: request.purpose = .spendingPatterns; request.periodUnit = periodUnit(arguments.periodUnit)
             case .categoryShares: request.operation = .share; request.grouping = .category
             case .cardShares: request.operation = .share; request.grouping = .card
             case .merchantShares: request.operation = .share; request.grouping = .merchant
             case .transactions: request.operation = .transactions; request.sort = sort(arguments.sort)
-            case .categoryTotals: request.operation = .ranking; request.grouping = .category
-            case .cardTotals: request.operation = .ranking; request.grouping = .card
-            case .merchantTotals: request.operation = .ranking; request.grouping = .merchant
+            case .categoryTotals: request.operation = .ranking; request.grouping = .category; request.sort = arguments.sort == .smallest ? .smallest : .largest
+            case .cardTotals: request.operation = .ranking; request.grouping = .card; request.sort = arguments.sort == .smallest ? .smallest : .largest
+            case .merchantTotals: request.operation = .ranking; request.grouping = .merchant; request.sort = arguments.sort == .smallest ? .smallest : .largest
             case .periodTotals: request.operation = .trend; request.periodUnit = periodUnit(arguments.periodUnit)
             case .compare(let otherSelection, let otherDates):
                 request.operation = .comparison
+                if let by = arguments.leadersBy {
+                    try requireToolArgument([MarinaDataGrouping.category, .merchant, .card].contains(by), "Compare leaders by category, merchant or card.")
+                    request.compareLeaders = true
+                    request.grouping = grouping(by)
+                    request.sort = arguments.sort == .smallest ? .smallest : .largest
+                    request.limit = 1
+                }
                 var selection = MarinaDataRequest(tool: .expenses)
                 selection.operation = .comparison
                 try await bridge.applySelection(otherSelection, to: &selection)
-                request.comparisonFilter = .init(cardID: selection.cardID, categoryID: selection.categoryID,
-                                                 budgetID: selection.budgetID, presetID: selection.presetID, search: selection.search)
+                request.comparisonFilter = .init(cardID: selection.cardID, categoryID: selection.categoryID, categoryIDs: selection.categoryIDs,
+                                                 budgetID: selection.budgetID, presetID: selection.presetID, search: selection.search, merchantName: selection.merchantName)
                 try await bridge.applyComparisonDates(otherDates, to: &request)
             }
             try await bridge.applySelection(arguments.selection, to: &request)
-            switch arguments.scope { case .variable: request.scope = .variable; case .planned: request.scope = .planned; default: break }
-            request.includeFuture = arguments.includeFuture ?? false
-            switch arguments.measure { case .ledger: request.expenseMeasure = .ledger; case .spending: request.expenseMeasure = .spending; case .planned: request.expenseMeasure = .planned; case .actual: request.expenseMeasure = .actual; default: break }
+            await bridge.inheritExpenseContext(for: &request)
+            try requireToolArgument(request.purpose != .cardSummary || request.cardID != nil,
+                "cardSummary requires one selected card. For a breakdown across cards use cardTotals; for a combined total use summary. Preserve the requested scope instead of choosing a card arbitrarily.")
+            if let intent = arguments.chartIntent { request.chartIntent = .init(rawValue: intent.rawValue) }
+            switch arguments.scope { case .all: request.scope = .all; case .variable: request.scope = .variable; case .planned: request.scope = .planned; case nil: break }
+            if let includeFuture = arguments.includeFuture { request.includeFuture = includeFuture }
+            switch arguments.measure { case .budgetImpact: request.expenseMeasure = .budgetImpact; case .ledger: request.expenseMeasure = .ledger; case .spending: request.expenseMeasure = .spending; case .planned: request.expenseMeasure = .planned; case .actual: request.expenseMeasure = .actual; case nil: break }
+            if request.positiveOnly != nil { request.positiveOnly = request.expenseMeasure != .ledger }
 #if DEBUG
             return try await bridge.call(request, diagnosticAttempt: attempt)
 #else
@@ -1111,48 +1538,40 @@ struct MarinaIncomeTool: Tool {
     let description = "Income totals, progress, activity and comparisons."
     typealias Arguments = IncomeQueryArguments
     @Generable struct IncomeQueryArguments {
+        var operation: MarinaIncomeOperation
+        var chartIntent: MarinaChartIntent? = nil
         var showVisual: Bool? = nil
+        @Guide(description: "workspace, previous, or returned rN refs; never names.")
         var selection: MarinaSelection
         var dates: MarinaDateSelection
-        @Guide(description: "planned: expected income; actual: received income; all: both.")
         var state: MarinaIncomeState
-        @Guide(description: "summary: one total; progress: planned/received totals and percentage; compareIncome: two-period/target comparison requiring comparison.")
-        var operation: MarinaIncomeOperationChoice
-        @Guide(description: "Required only for compareIncome; the other selection and dates.")
-        var comparison: MarinaIncomeComparison? = nil
+        var metric: MarinaRecordMetric? = nil
+        var periodUnit: MarinaPeriodUnit? = nil
 
         init(showVisual: Bool? = nil, selection: MarinaSelection, dates: MarinaDateSelection,
              state: MarinaIncomeState, operation: MarinaIncomeOperation) {
             self.showVisual = showVisual; self.selection = selection; self.dates = dates; self.state = state
-            self.operation = .init(operation)
-            if case .compareIncome(let selection, let dates) = operation { comparison = .init(selection: selection, dates: dates) }
+            self.operation = operation
         }
 
-        func validatedOperation() throws -> MarinaIncomeOperation {
-            switch operation {
-            case .compareIncome:
-                guard let comparison else {
-                    throw MarinaToolArgumentError(message: "operation compareIncome requires comparison containing both selection and dates.")
-                }
-                return .compareIncome(selection: comparison.selection, dates: comparison.dates)
-            case .standard(let operation):
-                try requireToolArgument(comparison == nil, "Only operation compareIncome accepts a comparison payload.")
-                return operation
-            }
-        }
+        func validatedOperation() throws -> MarinaIncomeOperation { operation }
     }
     func call(arguments: Arguments) async throws -> String {
 #if DEBUG
+        MarinaToolBridge.evaluationTrace(name, arguments.generatedContent.jsonString)
         let attempt = await bridge.diagnostics?.entered(tool: name, arguments: arguments.generatedContent.jsonString)
 #endif
         do {
             var request = MarinaDataRequest(tool: .income)
             request.forcePresentation = arguments.showVisual
+            request.metric = arguments.metric.flatMap { MarinaDataRequest.MetricFocus(rawValue: $0.rawValue) }
+            if request.metric == .averagePerPeriod { request.periodUnit = periodUnit(arguments.periodUnit) }
             try await bridge.applyDates(arguments.dates, to: &request)
             switch arguments.state { case .planned: request.state = .planned; case .all: request.state = .all; case .actual: request.state = .actual }
             switch try arguments.validatedOperation() {
             case .summary: request.operation = .summary
             case .progress: request.purpose = .incomeProgress; request.state = .all
+            case .timeline: request.purpose = .incomeTimeline; request.state = .all; request.periodUnit = periodUnit(arguments.periodUnit)
             case .transactions(let order, let offset):
                 request.operation = .transactions; request.sort = sort(order); request.offset = offset
             case .groups(let by, let offset):
@@ -1169,6 +1588,7 @@ struct MarinaIncomeTool: Tool {
                 try await bridge.applyComparisonDates(dates, to: &request)
             }
             try await bridge.applySelection(arguments.selection, to: &request)
+            if let intent = arguments.chartIntent { request.chartIntent = .init(rawValue: intent.rawValue) }
             request.limit = 5
 #if DEBUG
             return try await bridge.call(request, diagnosticAttempt: attempt)
@@ -1191,11 +1611,12 @@ struct MarinaIncomeTool: Tool {
 }
 
 @available(iOS 26.0, macCatalyst 26.0, *)
-@Generable enum MarinaBudgetSummaryKind: String { case overview, pace }
+@Generable enum MarinaBudgetSummaryKind: String { case overview, pace, details, categoryAvailability, savingsOutlook, savingsTimeline, linkedCards, linkedPresets }
 @available(iOS 26.0, macCatalyst 26.0, *)
 nonisolated enum MarinaBudgetOperation: Generable, Sendable {
     case overview
     case pace
+    case details, categoryAvailability, savingsOutlook, savingsTimeline, linkedCards, linkedPresets
     case savingsTrend(unit: MarinaPeriodUnit, offset: Int)
 
     static var generationSchema: GenerationSchema {
@@ -1208,6 +1629,12 @@ nonisolated enum MarinaBudgetOperation: Generable, Sendable {
             switch try MarinaBudgetSummaryKind(content) {
             case .overview: self = .overview
             case .pace: self = .pace
+            case .details: self = .details
+            case .categoryAvailability: self = .categoryAvailability
+            case .savingsOutlook: self = .savingsOutlook
+            case .savingsTimeline: self = .savingsTimeline
+            case .linkedCards: self = .linkedCards
+            case .linkedPresets: self = .linkedPresets
             }
         case .structure(let properties, _):
             try requireToolArgument(Set(properties.keys) == ["unit", "offset"], "A savings trend requires only unit and offset.")
@@ -1222,6 +1649,12 @@ nonisolated enum MarinaBudgetOperation: Generable, Sendable {
         switch self {
         case .overview: MarinaBudgetSummaryKind.overview.generatedContent
         case .pace: MarinaBudgetSummaryKind.pace.generatedContent
+        case .details: MarinaBudgetSummaryKind.details.generatedContent
+        case .categoryAvailability: MarinaBudgetSummaryKind.categoryAvailability.generatedContent
+        case .savingsOutlook: MarinaBudgetSummaryKind.savingsOutlook.generatedContent
+        case .savingsTimeline: MarinaBudgetSummaryKind.savingsTimeline.generatedContent
+        case .linkedCards: MarinaBudgetSummaryKind.linkedCards.generatedContent
+        case .linkedPresets: MarinaBudgetSummaryKind.linkedPresets.generatedContent
         case .savingsTrend(let unit, let offset): MarinaPeriodPage(unit: unit, offset: offset).generatedContent
         }
     }
@@ -1231,17 +1664,32 @@ nonisolated enum MarinaBudgetOperation: Generable, Sendable {
 struct MarinaBudgetTool: Tool {
     let bridge: MarinaToolBridge
     let name = "readBudgetSummary"
-    let description = "Budget room, pace, category limits and savings forecasts."
+    let description = "Period income/expenses, actual/projected savings, category limits and linked records."
     typealias Arguments = BudgetQueryArguments
     @Generable struct BudgetQueryArguments {
-        var selection: MarinaSelection
         var operation: MarinaBudgetOperation
+        var chartIntent: MarinaChartIntent? = nil
+        @Guide(description: "workspace, previous, or returned rN refs; never names.")
+        var selection: MarinaSelection
         var showVisual: Bool? = nil
         var dates: MarinaDateSelection?
         var hypotheticalSpending: Double?
+        var metric: MarinaMetricFocus? = nil
+        var status: MarinaAvailabilityFilter? = nil
+        var periodUnit: MarinaPeriodUnit? = nil
+
+        init(selection: MarinaSelection, operation: MarinaBudgetOperation, showVisual: Bool? = nil,
+             dates: MarinaDateSelection? = nil, hypotheticalSpending: Double? = nil,
+             metric: MarinaMetricFocus? = nil, status: MarinaAvailabilityFilter? = nil,
+             periodUnit: MarinaPeriodUnit? = nil, chartIntent: MarinaChartIntent? = nil) {
+            self.selection = selection; self.operation = operation; self.showVisual = showVisual
+            self.dates = dates; self.hypotheticalSpending = hypotheticalSpending; self.metric = metric
+            self.status = status; self.periodUnit = periodUnit; self.chartIntent = chartIntent
+        }
     }
     func call(arguments: Arguments) async throws -> String {
 #if DEBUG
+        MarinaToolBridge.evaluationTrace(name, arguments.generatedContent.jsonString)
         let attempt = await bridge.diagnostics?.entered(tool: name, arguments: arguments.generatedContent.jsonString)
 #endif
         do {
@@ -1249,12 +1697,21 @@ struct MarinaBudgetTool: Tool {
             request.forcePresentation = arguments.showVisual
             try await bridge.applyDates(arguments.dates, to: &request)
             try await bridge.applySelection(arguments.selection, to: &request)
+            if let intent = arguments.chartIntent { request.chartIntent = .init(rawValue: intent.rawValue) }
             switch arguments.operation {
             case .overview: break
             case .pace: request.purpose = .budgetPace
+            case .details: request.purpose = .budgetDetails
+            case .categoryAvailability: request.purpose = .categoryAvailability
+            case .savingsOutlook: request.purpose = .savingsOutlook
+            case .savingsTimeline: request.purpose = .savingsTimeline; request.periodUnit = periodUnit(arguments.periodUnit)
+            case .linkedCards: request.purpose = .budgetCards
+            case .linkedPresets: request.purpose = .budgetPresets
             case .savingsTrend(let unit, let offset): request.periodUnit = periodUnit(unit); request.offset = offset
             }
             request.hypotheticalSpending = arguments.hypotheticalSpending
+            request.metric = arguments.metric.flatMap { MarinaDataRequest.MetricFocus(rawValue: $0.rawValue) }
+            request.availabilityFilter = arguments.status.flatMap { MarinaDataRequest.AvailabilityFilter(rawValue: $0.rawValue) }
             request.limit = 5
 #if DEBUG
             return try await bridge.call(request, diagnosticAttempt: attempt)
@@ -1283,6 +1740,7 @@ struct MarinaAccountsTool: Tool {
     let description = "Savings or reconciliation balances and activity."
     typealias Arguments = AccountQueryArguments
     @Generable struct AccountQueryArguments {
+        @Guide(description: "workspace, previous, or returned rN refs; never names.")
         var selection: MarinaSelection
         var showVisual: Bool? = nil
         var scope: MarinaAccountScope?
@@ -1291,6 +1749,7 @@ struct MarinaAccountsTool: Tool {
     }
     func call(arguments: Arguments) async throws -> String {
 #if DEBUG
+        MarinaToolBridge.evaluationTrace(name, arguments.generatedContent.jsonString)
         let attempt = await bridge.diagnostics?.entered(tool: name, arguments: arguments.generatedContent.jsonString)
 #endif
         do {
@@ -1322,6 +1781,12 @@ struct MarinaAccountsTool: Tool {
 
 fileprivate struct MarinaToolArgumentError: LocalizedError {
     let message: String
+    init(message: String) {
+        self.message = message
+#if DEBUG
+        if #available(iOS 26.0, macCatalyst 26.0, *) { MarinaToolBridge.evaluationTrace("argumentError", message) }
+#endif
+    }
     var errorDescription: String? { message }
 }
 

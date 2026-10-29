@@ -373,7 +373,7 @@ final class MarinaPresentationTests {
         _ = memory.reference(for: .init(kind: "incomeSource", id: "Salary", name: "Salary"))
         bridge.conversationMemory = { memory }
         let tool = MarinaIncomeTool(bridge: bridge)
-        let operations: [MarinaIncomeOperation] = [.summary, .progress, .transactions(order: .largest, offset: 5),
+        let operations: [MarinaIncomeOperation] = [.summary, .progress, .timeline, .transactions(order: .largest, offset: 5),
             .groups(by: .source, offset: 10), .periodTotals(unit: .week, offset: 15),
             .compareIncome(selection: .references(["r1", "r2"]), dates: .previousMonth)]
         for operation in operations {
@@ -385,6 +385,7 @@ final class MarinaPresentationTests {
             switch operation {
             case .summary: #expect(request.operation == .summary && request.state == .actual)
             case .progress: #expect(request.purpose == .incomeProgress && request.state == .all)
+            case .timeline: #expect(request.purpose == .incomeTimeline && request.state == .all)
             case .transactions: #expect(request.operation == .transactions && request.sort == .largest && request.offset == 5)
             case .groups: #expect(request.operation == .ranking && request.grouping == .source && request.offset == 10)
             case .periodTotals: #expect(request.operation == .trend && request.periodUnit == .week && request.offset == 15)
@@ -407,13 +408,21 @@ final class MarinaPresentationTests {
         let bridge = MarinaToolBridge()
         defer { bridge.end() }
         let budget = MarinaBudgetTool(bridge: bridge)
-        for operation in [MarinaBudgetOperation.overview, .pace, .savingsTrend(unit: .month, offset: 5)] {
+        for operation in [MarinaBudgetOperation.overview, .pace, .details, .categoryAvailability,
+                          .savingsOutlook, .savingsTimeline, .linkedCards, .linkedPresets,
+                          .savingsTrend(unit: .month, offset: 5)] {
             bridge.begin(service: service, onResult: {})
             _ = try await budget.call(arguments: .init(selection: .workspace, operation: operation, dates: .currentMonth))
             let request = try #require(bridge.requests.last)
             switch operation {
             case .overview: #expect(request.purpose == nil && request.periodUnit == nil)
             case .pace: #expect(request.purpose == .budgetPace)
+            case .details: #expect(request.purpose == .budgetDetails)
+            case .categoryAvailability: #expect(request.purpose == .categoryAvailability)
+            case .savingsOutlook: #expect(request.purpose == .savingsOutlook)
+            case .savingsTimeline: #expect(request.purpose == .savingsTimeline)
+            case .linkedCards: #expect(request.purpose == .budgetCards)
+            case .linkedPresets: #expect(request.purpose == .budgetPresets)
             case .savingsTrend: #expect(request.periodUnit == .month && request.offset == 5)
             }
         }
@@ -454,10 +463,11 @@ final class MarinaPresentationTests {
         _ = try await tool.call(arguments: .init(selection: .references([merchant]),
             dates: .currentMonth, operation: .compare(selection: .workspace,
                 dates: .dates(start: "2026-09-01", end: "2026-09-30"))))
-        #expect(bridge.requests.last?.search == "Coffee")
+        #expect(bridge.requests.last?.merchantName == "Coffee")
         #expect(bridge.requests.last?.comparisonStartDate == "2026-09-01")
         #expect(bridge.requests.last?.comparisonEndDate == "2026-09-30")
         #expect(bridge.requests.last?.comparisonFilter?.search == nil)
+        #expect(bridge.requests.last?.comparisonFilter?.merchantName == nil)
     }
 
     @available(iOS 26.0, macCatalyst 26.0, *)

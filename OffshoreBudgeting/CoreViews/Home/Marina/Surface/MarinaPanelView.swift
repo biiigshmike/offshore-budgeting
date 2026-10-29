@@ -80,6 +80,7 @@ struct MarinaPanelView: View {
     @State private var persistenceErrorMessage: String?
     @State private var answerUpdateTick = 0
     @State private var starterPrompts: [String] = []
+    @State private var peakDrilldown: MarinaPeakDrilldown?
     @FocusState private var isPromptFieldFocused: Bool
 
     @AppStorage("general_defaultBudgetingPeriod")
@@ -224,6 +225,10 @@ struct MarinaPanelView: View {
                 onDelete: deleteChatFromHistory,
                 onDismiss: { isShowingChatHistory = false }
             )
+        }
+        .appSheet(item: $peakDrilldown) { drilldown in
+            MarinaPeakDrilldownView(drilldown: drilldown, workspace: workspace,
+                                    homeContext: homeContext, defaultBudgetingPeriod: defaultBudgetingPeriod)
         }
         .alert(
             String(localized: "assistant.clearHistory.confirmation", defaultValue: "Are you sure you want to clear your chat history?", comment: "Confirmation prompt before clearing assistant chat history."),
@@ -564,7 +569,9 @@ struct MarinaPanelView: View {
         VStack(alignment: .leading, spacing: 10) {
             if let presentations = answer.presentations {
                 ForEach(presentations.filter { MarinaPresentationDisplayPolicy.isVisible($0, in: answer) }) { presentation in
-                    MarinaPresentationView(presentation: presentation) {
+                    MarinaPresentationView(presentation: presentation, onPeakTransactions: {
+                        peakDrilldown = MarinaPeakDrilldown(workspaceID: workspace.id, presentation: presentation)
+                    }) {
                         loadMore(presentation, answerID: answer.id)
                     }
                     .disabled(isResponding)
@@ -830,7 +837,7 @@ struct MarinaPanelView: View {
                     var memory = conversationMemory.flatMap {
                         $0.workspaceID == workspace.id && $0.chatID == activeSessionID ? $0 : nil
                     } ?? MarinaConversationMemory(workspaceID: workspace.id, chatID: activeSessionID)
-                    memory.record(request: request, result: result, answerID: answerID)
+                    memory.recordUIRead(request: request, result: result, answerID: answerID)
                     conversationMemory = memory
                 }
             }

@@ -19,49 +19,14 @@ struct HomeSavingsOutlookTile: View {
 
     // MARK: - Totals
 
-    private var plannedIncomeTotal: Double {
-        incomes
-            .filter { $0.isPlanned && isInRange($0.date) }
-            .reduce(0) { $0 + $1.amount }
+    private var outlook: SavingsOutlookCalculator.Summary {
+        SavingsOutlookCalculator.totals(incomes: incomes, plannedExpenses: plannedExpenses,
+            variableExpenses: variableExpenses, savingsEntries: savingsEntries,
+            startDate: startDate, endDate: endDate)
     }
 
-    private var actualIncomeTotal: Double {
-        incomes
-            .filter { !$0.isPlanned && isInRange($0.date) }
-            .reduce(0) { $0 + $1.amount }
-    }
-
-    private var plannedExpensesPlannedTotal: Double {
-        plannedExpenses
-            .filter { isInRange($0.expenseDate) }
-            .reduce(0) { $0 + SavingsMathService.plannedProjectedBudgetImpactAmount(for: $1) }
-    }
-
-    private var plannedExpensesEffectiveActualTotal: Double {
-        plannedExpenses
-            .filter { isInRange($0.expenseDate) }
-            .reduce(0) { $0 + SavingsMathService.plannedBudgetImpactAmount(for: $1) }
-    }
-
-    private var variableExpensesTotal: Double {
-        variableExpenses
-            .filter { isInRange($0.transactionDate) }
-            .reduce(0) { $0 + SavingsMathService.variableBudgetImpactAmount(for: $1) }
-    }
-
-    private var projectedSavings: Double {
-        plannedIncomeTotal - plannedExpensesPlannedTotal
-    }
-
-    private var actualSavings: Double {
-        actualIncomeTotal
-            - (plannedExpensesEffectiveActualTotal + variableExpensesTotal)
-            + SavingsMathService.actualSavingsAdjustmentTotal(
-                from: savingsEntries,
-                startDate: startDate,
-                endDate: endDate
-            )
-    }
+    private var projectedSavings: Double { outlook.projected }
+    private var actualSavings: Double { outlook.actual }
 
     // MARK: - Styling
 
@@ -85,32 +50,12 @@ struct HomeSavingsOutlookTile: View {
         return 1.0.formatted(.percent.precision(.fractionLength(0)))
     }
 
-    private var fillProgress: Double {
-        guard projectedSavings != 0 else { return 0 }
-
-        if projectedSavings > 0 {
-            let ratio = actualSavings / projectedSavings
-            return min(max(ratio, 0), 1)
-        }
-
-        // Negative projection mode, progress to break-even (0).
-        let progressToBreakeven = (actualSavings - projectedSavings) / abs(projectedSavings)
-        return min(max(progressToBreakeven, 0), 1)
+    private var progress: SavingsOutlookCalculator.Progress {
+        SavingsOutlookCalculator.progress(projected: projectedSavings, actual: actualSavings)
     }
 
-    private var percentText: String {
-        guard projectedSavings != 0 else { return "—" }
-
-        if projectedSavings > 0 {
-            let ratio = actualSavings / projectedSavings
-            let clamped = min(max(ratio, 0), 1)
-            return clamped.formatted(.percent.precision(.fractionLength(0)))
-        }
-
-        let raw = (actualSavings - projectedSavings) / abs(projectedSavings)
-        let clamped = min(max(raw, 0), 1)
-        return clamped.formatted(.percent.precision(.fractionLength(0)))
-    }
+    private var fillProgress: Double { progress.gaugeValue }
+    private var percentText: String { progress.formatted }
 
     var body: some View {
         NavigationLink {
@@ -184,10 +129,6 @@ struct HomeSavingsOutlookTile: View {
 
     private func formattedDate(_ date: Date) -> String {
         AppDateFormat.abbreviatedDate(date)
-    }
-
-    private func isInRange(_ date: Date) -> Bool {
-        (date >= startDate) && (date <= endDate)
     }
 
 }
