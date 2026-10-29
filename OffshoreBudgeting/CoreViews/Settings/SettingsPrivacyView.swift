@@ -174,6 +174,7 @@ struct SettingsPrivacyView: View {
                 await attemptEnableBiometricLock()
             }
         }
+        .blocksAutomaticExpenseReview(while: showingEnableError)
         .alert("Unable to Enable App Lock", isPresented: $showingEnableError) {
             Button("OK", role: .cancel) { }
         } message: {

@@ -247,26 +247,31 @@ struct EditPlannedExpenseView: View {
                 }
             }
         }
+        .blocksAutomaticExpenseReview(while: showingInvalidAmountAlert)
         .alert("Invalid Amount", isPresented: $showingInvalidAmountAlert) {
             Button("OK", role: .cancel) { }
         } message: {
             Text("Please enter a planned amount greater than 0, and an actual amount that is 0 or greater.")
         }
+        .blocksAutomaticExpenseReview(while: showingMissingCardAlert)
         .alert("Select a Card", isPresented: $showingMissingCardAlert) {
             Button("OK", role: .cancel) { }
         } message: {
             Text("Choose a card for this planned expense.")
         }
+        .blocksAutomaticExpenseReview(while: showingInvalidSplitAmountAlert)
         .alert("Invalid Split Amount", isPresented: $showingInvalidSplitAmountAlert) {
             Button("OK", role: .cancel) { }
         } message: {
             Text("Split amount must be 0 or greater and cannot exceed the planned amount.")
         }
+        .blocksAutomaticExpenseReview(while: showingInvalidOffsetAmountAlert)
         .alert("Invalid Offset Amount", isPresented: $showingInvalidOffsetAmountAlert) {
             Button("OK", role: .cancel) { }
         } message: {
             Text("Offset amount must be 0 or greater and cannot exceed the planned amount.")
         }
+        .blocksAutomaticExpenseReview(while: showingInvalidSavingsOffsetAmountAlert)
         .alert("Invalid Savings Offset Amount", isPresented: $showingInvalidSavingsOffsetAmountAlert) {
             Button("OK", role: .cancel) { }
         } message: {

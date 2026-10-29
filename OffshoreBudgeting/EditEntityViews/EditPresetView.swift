@@ -134,11 +134,13 @@ struct EditPresetView: View {
                 }
             }
         }
+        .blocksAutomaticExpenseReview(while: showingInvalidAmountAlert)
         .alert("Invalid Amount", isPresented: $showingInvalidAmountAlert) {
             Button("OK", role: .cancel) { }
         } message: {
             Text("Please enter a planned amount greater than 0.")
         }
+        .blocksAutomaticExpenseReview(while: showingMissingCardAlert)
         .alert("Select a Card", isPresented: $showingMissingCardAlert) {
             Button("OK", role: .cancel) { }
         } message: {

@@ -67,6 +67,7 @@ struct PresetTemplateRecordedPlannedExpensesReviewView: View {
         .onAppear {
             reload()
         }
+        .blocksAutomaticExpenseReview(while: showingDeleteExpenseConfirm)
         .alert("Delete Expense?", isPresented: $showingDeleteExpenseConfirm) {
             Button("Delete", role: .destructive) {
                 pendingExpenseDelete?()

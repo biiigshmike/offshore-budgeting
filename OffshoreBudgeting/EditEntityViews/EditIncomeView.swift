@@ -91,16 +91,19 @@ struct EditIncomeView: View {
                     .disabled(!canSave)
             }
         }
+        .blocksAutomaticExpenseReview(while: showingInvalidAmountAlert)
         .alert("Invalid Amount", isPresented: $showingInvalidAmountAlert) {
             Button("OK", role: .cancel) { }
         } message: {
             Text("Please enter a valid amount greater than 0.")
         }
+        .blocksAutomaticExpenseReview(while: showingInvalidRepeatAlert)
         .alert("Repeat Requires an End Date", isPresented: $showingInvalidRepeatAlert) {
             Button("OK", role: .cancel) { }
         } message: {
             Text("When Repeat is set, you must also set an End Date (and it cannot be before the start date).")
         }
+        .blocksAutomaticExpenseReview(while: showingSeriesApplyDialog)
         .alert(
             "Apply changes to…",
             isPresented: $showingSeriesApplyDialog

@@ -474,6 +474,7 @@ struct SavingsAccountView<TrailingToolbar: ToolbarContent>: View {
             lastHandledCommandSequence = sequence
             handleCommand(commandHub.latestCommandID)
         }
+        .blocksAutomaticExpenseReview(while: showingDeleteConfirm)
         .alert("Delete Entry?", isPresented: $showingDeleteConfirm) {
             Button("Delete", role: .destructive) {
                 if let pendingDeleteEntry {
@@ -964,6 +965,7 @@ private struct SavingsLedgerEntryFormView: View {
                 Button("Save") { save() }
             }
         }
+        .blocksAutomaticExpenseReview(while: showingInvalidAmount)
         .alert("Invalid Amount", isPresented: $showingInvalidAmount) {
             Button("OK", role: .cancel) { }
         } message: {

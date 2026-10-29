@@ -194,6 +194,7 @@ struct SettingsNotificationsView: View {
             // If authorized and enabled, make sure schedules match current toggles/time.
             await syncSchedulesIfPossible()
         }
+        .blocksAutomaticExpenseReview(while: showingErrorAlert)
         .alert("Notification Error", isPresented: $showingErrorAlert) {
             Button("OK", role: .cancel) { }
         } message: {

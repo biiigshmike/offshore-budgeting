@@ -113,13 +113,14 @@ struct PillDatePickerField: View {
 
         if PillPickerPlatform.isMacCatalyst {
             triggerButton(text: dateText, accessibilityText: "\(title) \(dateText)")
+                .blocksAutomaticExpenseReview(while: isPresented)
                 .popover(isPresented: $isPresented, attachmentAnchor: .rect(.bounds), arrowEdge: .top) {
                     macPopoverContent
                         .presentationCompactAdaptation(.popover)
                 }
         } else {
             triggerButton(text: dateText, accessibilityText: "\(title) \(dateText)")
-                .sheet(isPresented: $isPresented) {
+                .appSheet(isPresented: $isPresented, usesPageSizing: false) {
                     mobileSheetContent
                         .presentationSizing(.form)
                 }
@@ -292,6 +293,7 @@ struct PillTimePickerField: View {
 
         if PillPickerPlatform.isMacCatalyst {
             triggerButton(text: timeText, accessibilityText: "\(title) \(timeText)")
+                .blocksAutomaticExpenseReview(while: isPresented)
                 .popover(isPresented: $isPresented, attachmentAnchor: .rect(.bounds), arrowEdge: .top) {
                     macPopoverContent
                         .presentationCompactAdaptation(.popover)

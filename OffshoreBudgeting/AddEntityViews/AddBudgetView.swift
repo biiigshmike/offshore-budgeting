@@ -109,11 +109,13 @@ struct AddBudgetView: View {
             applyDefaultPeriodRange()
             autoFillNameIfNeeded()
         }
+        .blocksAutomaticExpenseReview(while: showingInvalidDatesAlert)
         .alert("Invalid Dates", isPresented: $showingInvalidDatesAlert) {
             Button("OK", role: .cancel) { }
         } message: {
             Text("Start date must be on or before the end date.")
         }
+        .blocksAutomaticExpenseReview(while: showingBudgetSaveError)
         .alert("Couldn’t Save Budget", isPresented: $showingBudgetSaveError) {
             Button("OK", role: .cancel) { }
         } message: {

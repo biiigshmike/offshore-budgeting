@@ -26,6 +26,7 @@ enum UITestSupport {
         case iCloudHasExistingWorkspace
         case iCloudEmpty
         case iCloudDelayedWorkspace
+        case uncategorizedReview
     }
 
     static var scenario: Scenario? {
@@ -33,6 +34,7 @@ enum UITestSupport {
         if args.contains("-uiTestScenarioICloudHasExistingWorkspace") { return .iCloudHasExistingWorkspace }
         if args.contains("-uiTestScenarioICloudEmpty") { return .iCloudEmpty }
         if args.contains("-uiTestScenarioICloudDelayedWorkspace") { return .iCloudDelayedWorkspace }
+        if args.contains("-uiTestScenarioUncategorizedReview") { return .uncategorizedReview }
         return nil
     }
 
@@ -52,6 +54,7 @@ enum UITestSupport {
         defaults.set(false, forKey: "didSeedDefaultWorkspaces")
         defaults.set(false, forKey: "general_hideFuturePlannedExpenses")
         defaults.set(false, forKey: "general_excludeFuturePlannedExpensesFromCalculations")
+        defaults.set(false, forKey: "general_reviewUncategorizedExpensesOnOpen")
         defaults.set(false, forKey: "general_hideFutureVariableExpenses")
         defaults.set(false, forKey: "general_excludeFutureVariableExpensesFromCalculations")
 
@@ -80,6 +83,38 @@ enum UITestSupport {
 
         case .iCloudDelayedWorkspace:
             scheduleDelayedWorkspaceInsert(using: container)
+
+        case .uncategorizedReview:
+            let workspace = Workspace(name: "Review Workspace", hexColor: "#3B82F6")
+            let card = Card(name: "Review Card", workspace: workspace)
+            let category = Category(name: "Dining", hexColor: "#00AA00", workspace: workspace)
+            let archived = Category(name: "Archived Review Category", hexColor: "#AAAAAA", workspace: workspace, isArchived: true)
+            let expense = VariableExpense(descriptionText: "Review Coffee", amount: 6.50,
+                transactionDate: .now, workspace: workspace, card: card)
+            let other = Workspace(name: "Other Workspace", hexColor: "#FF0000")
+            let foreign = VariableExpense(descriptionText: "Foreign Expense", amount: 99,
+                transactionDate: .now, workspace: other)
+            context.insert(workspace)
+            context.insert(card)
+            context.insert(category)
+            context.insert(archived)
+            context.insert(expense)
+            context.insert(other)
+            context.insert(foreign)
+            let defaults = UserDefaults.standard
+            defaults.set(true, forKey: "didCompleteOnboarding")
+            defaults.set(true, forKey: "onboarding_didChooseDataSource")
+            defaults.set(true, forKey: "didSeedDefaultWorkspaces")
+            defaults.set(workspace.id.uuidString, forKey: "selectedWorkspaceID")
+            defaults.set(false, forKey: "privacy_requireBiometrics")
+            defaults.set(!ProcessInfo.processInfo.arguments.contains("-uiTestReviewDisabled"),
+                forKey: "general_reviewUncategorizedExpensesOnOpen")
+            if !ProcessInfo.processInfo.arguments.contains("-uiTestReviewReleaseFirst"),
+               let release = SettingsReleaseLogsView.currentReleaseSection {
+                defaults.set(release.id, forKey: "releaseLogs_seenReleaseIDs")
+            } else {
+                defaults.set("", forKey: "releaseLogs_seenReleaseIDs")
+            }
         }
 
         do {

@@ -25,14 +25,18 @@ struct DateRangeToolbarControls: View {
         if UIDevice.current.userInterfaceIdiom == .phone {
             editorButton.appSheet(item: $editorDraft) { draft in
                 DateRangeEditorView(draft: draft, onApply: onApply)
+                    .presentationDetents([.medium, .large])
+                    .presentationDragIndicator(.visible)
             }
         } else {
-            editorButton.popover(item: $editorDraft, arrowEdge: .top) { draft in
-                DateRangeEditorView(draft: draft, onApply: onApply)
-                    .frame(minWidth: 320, idealWidth: 380, maxWidth: 440,
-                           minHeight: 200, idealHeight: 260, maxHeight: 400)
-                    .presentationCompactAdaptation(.popover)
-            }
+            editorButton
+                .blocksAutomaticExpenseReview(while: editorDraft != nil)
+                .popover(item: $editorDraft, arrowEdge: .top) { draft in
+                    DateRangeEditorView(draft: draft, onApply: onApply)
+                        .frame(minWidth: 320, idealWidth: 380, maxWidth: 440,
+                               minHeight: 200, idealHeight: 260, maxHeight: 400)
+                        .presentationCompactAdaptation(.popover)
+                }
         }
 
         Menu {

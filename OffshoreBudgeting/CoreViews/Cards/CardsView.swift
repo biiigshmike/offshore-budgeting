@@ -150,6 +150,7 @@ struct CardsView: View {
                 )
             ]
         )
+        .blocksAutomaticExpenseReview(while: showingCardDeleteConfirm)
         .alert("Delete Card?", isPresented: $showingCardDeleteConfirm) {
             Button("Delete", role: .destructive) {
                 pendingCardDelete?()

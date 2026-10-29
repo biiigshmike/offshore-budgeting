@@ -98,6 +98,7 @@ struct SettingsiCloudView: View {
         }
         .listStyle(.insetGrouped)
         .navigationTitle("iCloud")
+        .blocksAutomaticExpenseReview(while: showingUnavailableAlert)
         .alert("iCloud Unavailable", isPresented: $showingUnavailableAlert) {
             #if canImport(UIKit)
             Button("Open Settings") { openSystemSettings() }
@@ -106,6 +107,7 @@ struct SettingsiCloudView: View {
         } message: {
             Text("To use iCloud sync, sign in to iCloud in the Settings app, then return here and try again.")
         }
+        .blocksAutomaticExpenseReview(while: showingEnableConfirm)
         .alert("Switch to iCloud?", isPresented: $showingEnableConfirm) {
             Button("Enable iCloud") { requestEnableICloud() }
             Button("Cancel", role: .cancel) { }

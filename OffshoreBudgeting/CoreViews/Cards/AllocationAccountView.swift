@@ -133,6 +133,7 @@ struct AllocationAccountView: View {
             .padding(.horizontal)
             .padding(.bottom, 8)
         }
+        .blocksAutomaticExpenseReview(while: showingSharedBalanceDeleteConfirm)
         .alert("Delete Reconciliation?", isPresented: $showingSharedBalanceDeleteConfirm) {
             Button("Delete", role: .destructive) {
                 pendingSharedBalanceDelete?()
@@ -144,6 +145,7 @@ struct AllocationAccountView: View {
         } message: {
             Text("This deletes the Reconciliation permanently.")
         }
+        .blocksAutomaticExpenseReview(while: showingSharedBalanceArchiveConfirm)
         .alert("Archive Reconciliation?", isPresented: $showingSharedBalanceArchiveConfirm) {
             Button("Archive", role: .destructive) {
                 pendingSharedBalanceArchive?()

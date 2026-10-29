@@ -381,6 +381,7 @@ struct WhatIfScenarioPlannerView: View {
                 guard didLoad, let id = newValue else { return }
                 loadScenarioIntoUI(id: id, persistsSelection: isApplyingSyncedScenarioState == false)
             }
+            .blocksAutomaticExpenseReview(while: showNewScenarioPrompt)
             .alert(String(localized: "whatIf.alert.newScenarioTitle", defaultValue: "New Scenario", comment: "Alert title for creating a new What If scenario."), isPresented: $showNewScenarioPrompt) {
                 TextField(String(localized: "common.name", defaultValue: "Name", comment: "Common label for a name field."), text: $newScenarioName)
                 Button(String(localized: "common.create", defaultValue: "Create", comment: "Common action to create an item.")) { createScenario() }
@@ -388,6 +389,7 @@ struct WhatIfScenarioPlannerView: View {
             } message: {
                 Text(String(localized: "whatIf.alert.newScenarioMessage", defaultValue: "Create a named scenario for this workspace.", comment: "Alert message for creating a new What If scenario."))
             }
+            .blocksAutomaticExpenseReview(while: showRenamePrompt)
             .alert(String(localized: "whatIf.alert.renameScenarioTitle", defaultValue: "Rename Scenario", comment: "Alert title for renaming a What If scenario."), isPresented: $showRenamePrompt) {
                 TextField(String(localized: "common.name", defaultValue: "Name", comment: "Common label for a name field."), text: $renameScenarioName)
                 Button(String(localized: "common.save", defaultValue: "Save", comment: "Common action to save changes.")) { renameScenario() }
@@ -395,6 +397,7 @@ struct WhatIfScenarioPlannerView: View {
             } message: {
                 Text(String(localized: "whatIf.alert.renameScenarioMessage", defaultValue: "Rename the current scenario.", comment: "Alert message for renaming a What If scenario."))
             }
+            .blocksAutomaticExpenseReview(while: showDuplicatePrompt)
             .alert(String(localized: "whatIf.alert.duplicateScenarioTitle", defaultValue: "Duplicate Scenario", comment: "Alert title for duplicating a What If scenario."), isPresented: $showDuplicatePrompt) {
                 TextField(String(localized: "common.name", defaultValue: "Name", comment: "Common label for a name field."), text: $duplicateScenarioName)
                 Button(String(localized: "common.duplicate", defaultValue: "Duplicate", comment: "Common action label for duplicating.")) { duplicateScenario() }
@@ -402,6 +405,7 @@ struct WhatIfScenarioPlannerView: View {
             } message: {
                 Text(String(localized: "whatIf.alert.duplicateScenarioMessage", defaultValue: "Make a copy of the current scenario.", comment: "Alert message for duplicating a What If scenario."))
             }
+            .blocksAutomaticExpenseReview(while: showDeleteConfirm)
             .alert(String(localized: "whatIf.alert.deleteScenarioTitle", defaultValue: "Delete this scenario?", comment: "Alert title for deleting a What If scenario."), isPresented: $showDeleteConfirm) {
                 Button(String(localized: "whatIf.deleteScenario", defaultValue: "Delete Scenario", comment: "Destructive action label to delete selected scenario."), role: .destructive) { deleteScenario() }
                 Button(String(localized: "common.cancel", defaultValue: "Cancel", comment: "Common cancel action label."), role: .cancel) {}

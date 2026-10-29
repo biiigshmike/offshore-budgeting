@@ -109,6 +109,7 @@ struct EditBudgetView: View {
                 }
             }
         }
+        .blocksAutomaticExpenseReview(while: showingInvalidDatesAlert)
         .alert("Invalid Dates", isPresented: $showingInvalidDatesAlert) {
             Button("OK", role: .cancel) { }
         } message: {

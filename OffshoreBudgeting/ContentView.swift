@@ -45,6 +45,11 @@ struct ContentView: View {
     @AppStorage("general_excludeFutureVariableExpensesFromCalculations")
     private var excludeFutureVariableExpensesFromCalculations: Bool = false
 
+    @AppStorage("general_reviewUncategorizedExpensesOnOpen")
+    private var reviewUncategorizedExpensesOnOpen = false
+    @State private var expenseReviewSession = UncategorizedExpenseReviewSession()
+    @State private var presentationActivity = AppPresentationActivity()
+
     // MARK: - Notifications
 
     @AppStorage("notifications_enabled") private var notificationsEnabled: Bool = false
@@ -101,6 +106,14 @@ struct ContentView: View {
                         initialSectionOverride: initialSectionOverride,
                         onTabInteraction: handleTabInteraction
                     )
+                    .modifier(UncategorizedExpenseReviewPresenter(
+                        workspace: selected,
+                        session: expenseReviewSession,
+                        activity: presentationActivity,
+                        onSave: {
+                            Task { _ = await widgetRefreshExecutor.refreshAll(workspaceID: selected.id) }
+                        }
+                    ))
                 } else {
                     NavigationStack {
                         WorkspacePickerView(
@@ -279,11 +292,13 @@ struct ContentView: View {
                     includesNotifications: true
                 )
             }
+            .blocksAutomaticExpenseReview(while: showingCannotDeleteLastWorkspaceAlert)
             .alert("You must keep at least one workspace.", isPresented: $showingCannotDeleteLastWorkspaceAlert) {
                 Button("OK", role: .cancel) { }
             } message: {
                 Text("Create another workspace first, then you can delete this one.")
             }
+            .blocksAutomaticExpenseReview(while: showingWorkspaceDeleteConfirm)
             .alert("Delete?", isPresented: $showingWorkspaceDeleteConfirm) {
                 Button("Delete", role: .destructive) {
                     pendingWorkspaceDelete?()
@@ -302,6 +317,16 @@ struct ContentView: View {
                     changedKeys: ICloudPreferenceSyncService.changedKeys(from: notification)
                 )
             }
+        }
+        .environment(\.appPresentationActivity, presentationActivity)
+        .onChange(of: scenePhase, initial: true) { _, phase in
+            expenseReviewSession.update(phase: phase, enabled: reviewUncategorizedExpensesOnOpen)
+        }
+        .onChange(of: selectedWorkspaceID) { _, value in
+            expenseReviewSession.selectWorkspace(UUID(uuidString: value))
+        }
+        .onChange(of: reviewUncategorizedExpensesOnOpen) { _, enabled in
+            if !enabled { expenseReviewSession.consume() }
         }
     }
 

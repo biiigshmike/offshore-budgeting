@@ -508,6 +508,7 @@ struct CardDetailView: View {
             .toolbar {
                 toolbarContent
             }
+            .blocksAutomaticExpenseReview(while: showingCardDeleteConfirm)
             .alert("Delete Card?", isPresented: $showingCardDeleteConfirm) {
                 Button("Delete", role: .destructive) {
                     pendingCardDelete?()
@@ -519,6 +520,7 @@ struct CardDetailView: View {
             } message: {
                 Text("This deletes the card and all of its expenses.")
             }
+            .blocksAutomaticExpenseReview(while: showingExpenseDeleteConfirm)
             .alert("Delete Expense?", isPresented: $showingExpenseDeleteConfirm) {
                 Button("Delete", role: .destructive) {
                     pendingExpenseDelete?()

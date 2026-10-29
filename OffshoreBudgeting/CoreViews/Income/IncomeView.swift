@@ -451,6 +451,7 @@ struct IncomeView: View {
             )
             .searchFocused($searchFocused)
             .toolbar { incomeToolbar }
+            .blocksAutomaticExpenseReview(while: showingIncomeDeleteConfirm)
             .alert("Delete?", isPresented: $showingIncomeDeleteConfirm) {
                 Button("Delete", role: .destructive) {
                     pendingIncomeDelete?()

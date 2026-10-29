@@ -317,6 +317,7 @@ struct ManagePresetsView: View {
                 }
             }
         }
+        .blocksAutomaticExpenseReview(while: showingPresetDeleteConfirm)
         .alert("Delete?", isPresented: $showingPresetDeleteConfirm) {
             Button("Delete", role: .destructive) {
                 pendingPresetDelete?()

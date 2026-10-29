@@ -482,6 +482,7 @@ struct HelpTopicDetailView: View {
                     proxy.scrollTo(topAnchorID, anchor: .top)
                 }
             }
+            .blocksAutomaticExpenseReview(while: fullscreenPresentation != nil)
             .fullScreenCover(item: $fullscreenPresentation) { presentation in
                 HelpSectionFullscreenViewer(topicTitle: currentTopic.title, presentation: presentation)
             }

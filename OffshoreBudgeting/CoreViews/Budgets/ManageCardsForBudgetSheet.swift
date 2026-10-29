@@ -82,6 +82,7 @@ struct ManageCardsForBudgetSheet: View {
 
         // MARK: - Unlink Policy Prompt (native)
 
+        .blocksAutomaticExpenseReview(while: showingUnlinkPolicyAlert)
         .alert("Unlink Card?", isPresented: $showingUnlinkPolicyAlert) {
             Button("Keep All Expenses") {
                 guard let card = pendingCardForUnlink else { return }
@@ -102,6 +103,7 @@ struct ManageCardsForBudgetSheet: View {
             Text("This card has planned expenses created for this budget. What should Offshore do with them?")
         }
 
+        .blocksAutomaticExpenseReview(while: showingDetachPresetsChoiceAlert)
         .alert("Also remove presets?", isPresented: $showingDetachPresetsChoiceAlert) {
             Button("Delete Expenses Only", role: .destructive) {
                 guard let card = pendingCardForUnlink else { return }
@@ -123,6 +125,7 @@ struct ManageCardsForBudgetSheet: View {
             Text("If presets stay linked to this budget, they may apply again when you re-link this card.")
         }
 
+        .blocksAutomaticExpenseReview(while: showingNothingToDeleteAlert)
         .alert("Nothing to delete", isPresented: $showingNothingToDeleteAlert) {
             Button("OK", role: .cancel) { }
         } message: {

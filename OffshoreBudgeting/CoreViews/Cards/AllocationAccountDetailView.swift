@@ -209,6 +209,7 @@ struct AllocationAccountDetailView: View {
                 }
             }
         }
+        .blocksAutomaticExpenseReview(while: showingArchiveConfirm)
         .alert("Archive Reconciliation?", isPresented: $showingArchiveConfirm) {
             Button("Archive", role: .destructive) {
                 archiveAccountAndDismiss()
@@ -217,6 +218,7 @@ struct AllocationAccountDetailView: View {
         } message: {
             Text("Archived Reconciliations stay in history but are hidden from new allocation choices.")
         }
+        .blocksAutomaticExpenseReview(while: showingDeleteConfirm)
         .alert("Delete Reconciliation?", isPresented: $showingDeleteConfirm) {
             Button("Delete", role: .destructive) {
                 deleteAccountAndDismiss()
@@ -225,6 +227,7 @@ struct AllocationAccountDetailView: View {
         } message: {
             Text("This deletes the Reconciliation permanently.")
         }
+        .blocksAutomaticExpenseReview(while: showingSettlementDeleteConfirm)
         .alert("Delete Settlement?", isPresented: $showingSettlementDeleteConfirm) {
             Button("Delete", role: .destructive) {
                 performPendingSettlementDelete()
@@ -239,6 +242,7 @@ struct AllocationAccountDetailView: View {
                 Text("This settlement will be deleted.")
             }
         }
+        .blocksAutomaticExpenseReview(while: showingChargeDeleteConfirm)
         .alert("Delete Split Charge?", isPresented: $showingChargeDeleteConfirm) {
             Button("Delete", role: .destructive) {
                 performPendingChargeDelete()
@@ -249,6 +253,7 @@ struct AllocationAccountDetailView: View {
         } message: {
             Text("Deleting this split charge will remove the split without changing the original expense amount.")
         }
+        .blocksAutomaticExpenseReview(while: showingSettlementActionError)
         .alert("Couldn't Update Settlement", isPresented: $showingSettlementActionError) {
             Button("OK", role: .cancel) { }
         } message: {
@@ -1242,11 +1247,13 @@ private struct EditSharedBalanceEntryView: View {
                 }
             }
         }
+        .blocksAutomaticExpenseReview(while: showingInvalidAmountAlert)
         .alert("Invalid Amount", isPresented: $showingInvalidAmountAlert) {
             Button("OK", role: .cancel) { }
         } message: {
             Text("Please enter a valid amount that matches this action.")
         }
+        .blocksAutomaticExpenseReview(while: showingSaveErrorAlert)
         .alert("Couldn't Save", isPresented: $showingSaveErrorAlert) {
             Button("OK", role: .cancel) { }
         } message: {
@@ -1635,6 +1642,7 @@ private struct AddAllocationSettlementView: View {
                 }
             }
         }
+        .blocksAutomaticExpenseReview(while: showingInvalidAmountAlert)
         .alert("Invalid Amount", isPresented: $showingInvalidAmountAlert) {
             Button("OK", role: .cancel) { }
         } message: {

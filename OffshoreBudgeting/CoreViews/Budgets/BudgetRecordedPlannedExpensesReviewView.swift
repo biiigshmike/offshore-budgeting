@@ -111,6 +111,7 @@ struct BudgetRecordedPlannedExpensesReviewView: View {
         .onAppear {
             reload()
         }
+        .blocksAutomaticExpenseReview(while: showingDeleteExpenseConfirm)
         .alert("Delete?", isPresented: $showingDeleteExpenseConfirm) {
             Button("Delete", role: .destructive) {
                 pendingExpenseDelete?()
@@ -121,6 +122,7 @@ struct BudgetRecordedPlannedExpensesReviewView: View {
                 pendingExpenseDelete = nil
             }
         }
+        .blocksAutomaticExpenseReview(while: showingDeleteBudgetConfirm)
         .alert("Delete Budget?", isPresented: $showingDeleteBudgetConfirm) {
             Button("Delete Budget", role: .destructive) {
                 onDeleteBudget()

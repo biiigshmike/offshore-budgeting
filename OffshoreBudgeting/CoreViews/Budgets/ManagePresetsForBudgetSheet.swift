@@ -97,6 +97,7 @@ struct ManagePresetsForBudgetSheet: View {
         .onAppear {
             cleanupOrphanLinks()
         }
+        .blocksAutomaticExpenseReview(while: showingUnlinkDeleteConfirm)
         .alert("Delete?", isPresented: $showingUnlinkDeleteConfirm) {
             Button("Delete", role: .destructive) {
                 pendingUnlinkDelete?()

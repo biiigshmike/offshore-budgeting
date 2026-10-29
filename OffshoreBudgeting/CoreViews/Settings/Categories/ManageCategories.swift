@@ -137,6 +137,7 @@ struct ManageCategoriesView: View {
                 }
             }
         }
+        .blocksAutomaticExpenseReview(while: showingCategoryDeleteConfirm)
         .alert("Delete?", isPresented: $showingCategoryDeleteConfirm) {
             Button("Delete", role: .destructive) {
                 pendingCategoryDelete?()

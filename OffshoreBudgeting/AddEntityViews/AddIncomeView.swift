@@ -81,11 +81,13 @@ struct AddIncomeView: View {
                 }
             }
         }
+        .blocksAutomaticExpenseReview(while: showingInvalidAmountAlert)
         .alert("Invalid Amount", isPresented: $showingInvalidAmountAlert) {
             Button("OK", role: .cancel) { }
         } message: {
             Text("Please enter a valid amount greater than 0.")
         }
+        .blocksAutomaticExpenseReview(while: showingInvalidRepeatAlert)
         .alert("Repeat Requires an End Date", isPresented: $showingInvalidRepeatAlert) {
             Button("OK", role: .cancel) { }
         } message: {

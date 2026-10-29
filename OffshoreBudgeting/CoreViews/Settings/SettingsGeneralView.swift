@@ -26,6 +26,9 @@ struct SettingsGeneralView: View {
     @AppStorage("general_excludeFutureVariableExpensesFromCalculations")
     private var excludeFutureVariableExpensesFromCalculations: Bool = false
 
+    @AppStorage("general_reviewUncategorizedExpensesOnOpen")
+    private var reviewUncategorizedExpensesOnOpen = false
+
     @State private var eraseResultMessage: String = ""
 
     @State private var activeAlert: ActiveAlert? = nil
@@ -92,6 +95,14 @@ struct SettingsGeneralView: View {
                     .font(.footnote)
                     .foregroundStyle(.secondary)
 
+                Toggle("Review Uncategorized Expenses on Open", isOn: $reviewUncategorizedExpensesOnOpen)
+                    .tint(Color("AccentColor"))
+                    .accessibilityIdentifier("reviewUncategorizedExpensesOnOpen")
+
+                Text("When enabled, review uncategorized expenses in your selected workspace when you next open or return to the app. You can choose Later to skip a review.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+
                 NavigationLink {
                     SettingsExpenseDisplayView(
                         hideFuturePlannedExpenses: $hideFuturePlannedExpenses,
@@ -128,6 +139,7 @@ struct SettingsGeneralView: View {
         }
         .listStyle(.insetGrouped)
         .navigationTitle("General")
+        .blocksAutomaticExpenseReview(while: activeAlert != nil)
         .alert(item: $activeAlert) { alert in
             switch alert {
             case .repeatOnboardingConfirm:
@@ -331,6 +343,7 @@ private struct SettingsMaintenanceView: View {
         }
         .listStyle(.insetGrouped)
         .navigationTitle("Maintenance")
+        .blocksAutomaticExpenseReview(while: activeMaintenanceAlert != nil)
         .alert(item: $activeMaintenanceAlert) { alert in
             switch alert {
             case .resetConfirm:

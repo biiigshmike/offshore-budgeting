@@ -629,6 +629,7 @@ struct BudgetDetailView: View {
 
         // MARK: - Deletion UI
 
+        .blocksAutomaticExpenseReview(while: showingBudgetDeleteOptionsDialog)
         .alert(
             String(localized: "budgetDetail.deleteBudget.title", defaultValue: "Delete Budget?", comment: "Alert title for deleting a budget."),
             isPresented: $showingBudgetDeleteOptionsDialog
@@ -646,6 +647,7 @@ struct BudgetDetailView: View {
             Text(String(localized: "budgetDetail.deleteBudget.message", defaultValue: "This budget created planned expenses on your cards. What should Offshore do with them?", comment: "Delete budget options message."))
         }
 
+        .blocksAutomaticExpenseReview(while: showingBudgetDeleteConfirm)
         .alert(String(localized: "common.deleteQuestion", defaultValue: "Delete?", comment: "Generic delete confirmation title."), isPresented: $showingBudgetDeleteConfirm) {
             Button(String(localized: "common.delete", defaultValue: "Delete", comment: "Delete action label."), role: .destructive) {
                 pendingBudgetDelete?()
@@ -656,17 +658,20 @@ struct BudgetDetailView: View {
             }
         }
 
+        .blocksAutomaticExpenseReview(while: showingNothingToDeleteAlert)
         .alert(String(localized: "budgetDetail.nothingToDelete.title", defaultValue: "Nothing to delete", comment: "Alert title when nothing can be deleted."), isPresented: $showingNothingToDeleteAlert) {
             Button(String(localized: "common.ok", defaultValue: "OK", comment: "OK action label."), role: .cancel) { }
         } message: {
             Text(String(localized: "budgetDetail.nothingToDelete.message", defaultValue: "These planned expenses have actual spending recorded.", comment: "Alert message when deletion is blocked due recorded spending."))
         }
+        .blocksAutomaticExpenseReview(while: showingBudgetMutationError)
         .alert("Couldn’t Update Budget", isPresented: $showingBudgetMutationError) {
             Button("OK", role: .cancel) { }
         } message: {
             Text(budgetMutationErrorMessage)
         }
 
+        .blocksAutomaticExpenseReview(while: showingExpenseDeleteConfirm)
         .alert("Delete?", isPresented: $showingExpenseDeleteConfirm) {
             Button("Delete", role: .destructive) {
                 pendingExpenseDelete?()

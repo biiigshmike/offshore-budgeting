@@ -109,11 +109,13 @@ struct WorkspacePickerView: View {
                 iCloudBootstrapStartedAt = 0
             }
         }
+        .blocksAutomaticExpenseReview(while: showingICloudUnavailable)
         .alert("iCloud Unavailable", isPresented: $showingICloudUnavailable) {
             Button("OK", role: .cancel) { }
         } message: {
             Text("To use iCloud sync, sign in to iCloud in the Settings app, then try again.")
         }
+        .blocksAutomaticExpenseReview(while: showingWorkspaceDeleteConfirm)
         .alert("Delete Workspace?", isPresented: $showingWorkspaceDeleteConfirm) {
             Button("Delete", role: .destructive) {
                 if let offsets = pendingWorkspaceDeleteOffsets {
@@ -133,6 +135,7 @@ struct WorkspacePickerView: View {
                 Text("“\(pendingWorkspaceDeleteName)” will be deleted.")
             }
         }
+        .blocksAutomaticExpenseReview(while: transferAlert != nil)
         .alert(item: $transferAlert) { alert in
             Alert(
                 title: Text(alert.title),
