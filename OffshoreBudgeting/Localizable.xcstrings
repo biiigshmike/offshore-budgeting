@@ -6584,6 +6584,7 @@
       }
     },
     "Budget" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -15225,6 +15226,7 @@
       }
     },
     "Create Budget" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -19020,6 +19022,7 @@
       }
     },
     "Enter an amount greater than 0 to add income." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -28900,6 +28903,7 @@
       }
     },
     "Income Added" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -29118,6 +29122,7 @@
       }
     },
     "Income Type" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -31679,6 +31684,7 @@
       }
     },
     "No budgets yet." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -32079,6 +32085,7 @@
       }
     },
     "No income added during onboarding." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -37195,6 +37202,7 @@
       }
     },
     "Preset" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -38740,6 +38748,7 @@
       }
     },
     "Quick Income Capture" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -41412,6 +41421,7 @@
       }
     },
     "Sample" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -57138,6 +57148,7 @@
       }
     },
     "You can change this later in Income." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {

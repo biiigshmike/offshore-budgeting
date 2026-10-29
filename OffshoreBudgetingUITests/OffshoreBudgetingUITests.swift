@@ -117,6 +117,9 @@ final class OffshoreBudgetingUITests: XCTestCase {
         XCTAssertTrue(onDeviceButton.waitForExistence(timeout: 5))
         onDeviceButton.tap()
 
+        app.buttons["Next"].tap()
+        XCTAssertTrue(app.alerts["Workspace Required"].waitForExistence(timeout: 5))
+        app.alerts["Workspace Required"].buttons["OK"].tap()
         app.buttons["Add Workspace"].tap()
 
         let workspaceNameField = app.textFields["Name"].firstMatch
@@ -129,17 +132,17 @@ final class OffshoreBudgetingUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Privacy and Notifications"].firstMatch.waitForExistence(timeout: 5))
 
         app.buttons["Next"].tap()
-        XCTAssertTrue(app.staticTexts["Gestures & Editing"].firstMatch.waitForExistence(timeout: 5))
-
-        app.buttons["Next"].tap()
         XCTAssertTrue(app.staticTexts["Categories"].firstMatch.waitForExistence(timeout: 5))
 
         app.buttons["Next"].tap()
         XCTAssertTrue(app.staticTexts["Cards"].firstMatch.waitForExistence(timeout: 5))
+        app.buttons["Next"].tap()
+        XCTAssertTrue(app.alerts["Card Required"].waitForExistence(timeout: 5))
+        app.alerts["Card Required"].buttons["OK"].tap()
 
         app.buttons["Add Card"].tap()
 
-        let cardNameField = app.textFields["Name"].firstMatch
+        let cardNameField = app.textFields["Apple Card"].firstMatch
         XCTAssertTrue(cardNameField.waitForExistence(timeout: 5))
         cardNameField.tap()
         cardNameField.typeText("Checking")
@@ -148,15 +151,11 @@ final class OffshoreBudgetingUITests: XCTestCase {
         app.buttons["Next"].tap()
         XCTAssertTrue(app.staticTexts["Presets"].firstMatch.waitForExistence(timeout: 5))
 
-        app.buttons["Next"].tap()
-        XCTAssertTrue(app.staticTexts["Income"].firstMatch.waitForExistence(timeout: 5))
-
-        app.buttons["Next"].tap()
-        XCTAssertTrue(app.staticTexts["Budgets"].firstMatch.waitForExistence(timeout: 5))
-        XCTAssertTrue(app.staticTexts["No budgets yet."].firstMatch.exists)
-
-        app.buttons["Next"].tap()
         XCTAssertTrue(app.buttons["Done"].firstMatch.waitForExistence(timeout: 5))
+        app.buttons["Back"].tap()
+        XCTAssertTrue(app.staticTexts["Cards"].firstMatch.waitForExistence(timeout: 5))
+        app.buttons["Next"].tap()
+        XCTAssertTrue(app.staticTexts["Presets"].firstMatch.waitForExistence(timeout: 5))
         app.buttons["Done"].tap()
 
         let budgetsTab = app.tabBars.buttons["Budgets"].firstMatch
