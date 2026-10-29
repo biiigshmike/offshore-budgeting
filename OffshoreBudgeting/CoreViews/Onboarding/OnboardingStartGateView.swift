@@ -107,6 +107,7 @@ struct OnboardingStartGateView: View {
                     systemImage: "externaldrive",
                     description: Text("Pick where your data is stored. You can switch later from Manage Workspaces.")
                 )
+                .frame(maxWidth: .infinity, alignment: .center)
                 .listRowBackground(Color.clear)
             }
 
