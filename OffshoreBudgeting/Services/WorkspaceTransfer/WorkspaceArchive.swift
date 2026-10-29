@@ -10,6 +10,7 @@ enum WorkspaceTransferSection: String, Codable, CaseIterable, Identifiable, Hash
     case reconciliations
     case savings
     case importRules
+    // Decode retired sections from version-1 backups; never offer or export this section.
     case marinaAliases
 
     var id: String { rawValue }
@@ -75,6 +76,7 @@ struct WorkspaceArchive: Codable, Equatable {
     var savingsAccounts: [SavingsAccountPayload]
     var savingsLedgerEntries: [SavingsLedgerEntryPayload]
     var importMerchantRules: [ImportMerchantRulePayload]
+    // Retained for version-1 backup compatibility. New exports write an empty array.
     var assistantAliasRules: [AssistantAliasRulePayload]
     var incomeSeries: [IncomeSeriesPayload]
     var incomes: [IncomePayload]
@@ -335,18 +337,17 @@ struct WorkspaceArchivePayloadCounts: Equatable {
     var savingsAccounts: Int
     var savingsLedgerEntries: Int
     var importMerchantRules: Int
-    var assistantAliasRules: Int
     var incomeSeries: Int
     var incomes: Int
 
     var totalRecords: Int {
         budgets + budgetCardLinks + budgetPresetLinks + budgetCategoryLimits + cards + categories + presets +
         plannedExpenses + variableExpenses + allocationAccounts + expenseAllocations + allocationSettlements +
-        savingsAccounts + savingsLedgerEntries + importMerchantRules + assistantAliasRules + incomeSeries + incomes
+        savingsAccounts + savingsLedgerEntries + importMerchantRules + incomeSeries + incomes
     }
 
     var userVisibleTotalRecords: Int {
-        totalRecords - assistantAliasRules
+        totalRecords
     }
 
     init(archive: WorkspaceArchive) {
@@ -365,7 +366,6 @@ struct WorkspaceArchivePayloadCounts: Equatable {
         savingsAccounts = archive.savingsAccounts.count
         savingsLedgerEntries = archive.savingsLedgerEntries.count
         importMerchantRules = archive.importMerchantRules.count
-        assistantAliasRules = archive.assistantAliasRules.count
         incomeSeries = archive.incomeSeries.count
         incomes = archive.incomes.count
     }

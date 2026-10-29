@@ -253,7 +253,6 @@ enum GeneratedHelpContent {
             leafTopicIDs: [
                 "home-overview",
                 "home-customization",
-                "home-marina",
                 "home-widgets"
             ]
         ),
@@ -664,26 +663,6 @@ enum GeneratedHelpContent {
                             assetName: "Help/CoreScreens/Home/Customization/edit-home-3",
                             bodyText: "This final step confirms and saves your updated Home layout. After saving, perform a quick scan to verify the new order feels right in real use. If a tile is still out of place, adjust it now while the workflow is fresh. Regular small refinements keep the Home experience aligned with your budgeting habits.",
                             fullscreenCaptionText: "Save and test the new layout, then make small tweaks until the flow feels natural."
-                        )
-                    ]
-                )
-            ]
-        ),
-        GeneratedHelpLeafTopic(
-            id: "home-marina",
-            destinationID: "home",
-            title: "Marina",
-            sections: [
-                mediaSection(
-                    id: "home-marina-1",
-                    header: "Marina",
-                    body: "Open Marina from Home for workspace-scoped read-only chat about spending, income, categories, cards, budgets, and savings. Use the + menu for explicit create forms.\n\nFor edits, deletes, and deeper review flows, use the owning app screens so records stay clear and traceable.",
-                    media: [
-                        mediaItem(
-                            id: "home-marina-1-image-1",
-                            assetName: "Help/CoreScreens/Home/Marina/marina",
-                            bodyText: "Open Marina from Home for read-only chat. Use Marina's + menu for explicit create forms, and use owning screens for edits, deletes, and review.",
-                            fullscreenCaptionText: "Marina keeps chat read-only and creation explicit."
                         )
                     ]
                 )
@@ -1211,7 +1190,7 @@ enum GeneratedHelpContent {
                 mediaSection(
                     id: "settings-categories-overview",
                     header: "Categories Overview",
-                    body: "Categories define the language your spending data uses across Budgets, Accounts, and Home insights. Clean category structure improves filters, trend interpretation, and assistant guidance quality. This is one of the highest-leverage maintenance areas in Settings.\n\nReview category naming periodically to reduce overlap and ambiguity. Broad or duplicate labels make analysis harder and decisions slower. Clear taxonomy leads to clearer action.\n\nWhen spending patterns evolve, update categories deliberately rather than forcing everything into old buckets. Maintenance here protects long-term report quality. Category hygiene compounds over time.",
+                    body: "Categories define the language your spending data uses across Budgets, Accounts, and Home insights. Clean category structure improves filters and trend interpretation. This is one of the highest-leverage maintenance areas in Settings.\n\nReview category naming periodically to reduce overlap and ambiguity. Broad or duplicate labels make analysis harder and decisions slower. Clear taxonomy leads to clearer action.\n\nWhen spending patterns evolve, update categories deliberately rather than forcing everything into old buckets. Maintenance here protects long-term report quality. Category hygiene compounds over time.",
                     media: [
                         mediaItem(
                             id: "settings-categories-overview-image-1",

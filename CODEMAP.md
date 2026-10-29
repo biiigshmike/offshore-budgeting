@@ -4,7 +4,7 @@ This file is a fast orientation guide for GitHub, Atlas, and code assistants. Fo
 
 ## Core App And Schema
 
-- `OffshoreBudgeting/Models.swift` defines the SwiftData models: workspaces, budgets, cards, planned and variable expenses, categories, presets, income, savings, reconciliation/allocation accounts, imports, and assistant aliases.
+- `OffshoreBudgeting/Models.swift` defines the SwiftData models: workspaces, budgets, cards, planned and variable expenses, categories, presets, income, savings, reconciliation/allocation accounts, imports, and inactive legacy assistant compatibility records.
 - `OffshoreBudgeting/OffshoreBudgetingApp.swift` defines the live app model schema and app bootstrap.
 - `OffshoreBudgeting/CoreViews/` contains the primary SwiftUI feature surfaces.
 - `OffshoreBudgeting/Localizable.xcstrings` contains app localization strings and is large; inspect only when changing user-facing copy.
@@ -23,24 +23,6 @@ Useful search terms:
 - `AllocationLedgerService`
 - `BudgetPlannedExpenseStore`
 - `WorkspaceTransferService`
-
-## Marina And Natural Language Queries
-
-- `OffshoreBudgeting/CoreViews/Home/Marina/Surface/` contains Marina UI, conversation persistence, inline create forms, and prompt submission behavior.
-- `OffshoreBudgeting/CoreViews/Home/Marina/Brain/` contains interpreters, semantic request types, candidate resolution, validation, query planning, query execution, answer seeds, and answer presentation.
-- `OffshoreBudgeting/CoreViews/Home/HomeQueryModels.swift` defines home query models, lookup object types, clarification choices, and query-facing data shapes.
-
-Useful search terms:
-
-- `MarinaBrain`
-- `MarinaHybridInterpreter`
-- `MarinaSemanticTypes`
-- `MarinaSemanticRequestValidator`
-- `MarinaSemanticCandidateResolver`
-- `MarinaQueryPlanner`
-- `MarinaQueryExecutor`
-- `MarinaAnswerPresenter`
-- `MarinaCreateService`
 
 ## Widgets, Shortcuts, And AppIntents
 
@@ -70,15 +52,13 @@ For focused changes, start near these tests:
 - `OffshoreBudgetingTests/AllocationLedgerServiceTests.swift`
 - `OffshoreBudgetingTests/AddExpenseShortcutExecutorTests.swift`
 - `OffshoreBudgetingTests/OffshoreIntentDataStoreResolutionTests.swift`
-- `OffshoreBudgetingTests/HomeQueryEngineTests.swift`
-- `OffshoreBudgetingTests/MarinaCreateServiceTests.swift`
-- `OffshoreBudgetingTests/MarinaSemanticPromptSuiteTests.swift`
-- `OffshoreBudgetingTests/MarinaFoundationModelPromptEvaluationTests.swift`
+- `OffshoreBudgetingTests/SavingsOutlookCalculatorTests.swift`
+- `OffshoreBudgetingTests/HomeSpendTrendsAggregatorTests.swift`
+- `OffshoreBudgetingTests/HelpFAQEngineTests.swift`
 
 ## Usually Ignore During Code Analysis
 
 - `OffshoreBudgeting/Assets.xcassets/**` image files, unless changing app icons, help screenshots, or asset packaging.
 - `OffshoreBudgetingWidgets/Assets.xcassets/**` image files, unless changing widget assets.
 - `Templates/`, unless the task mentions templates.
-- `Docs/MarinaEntityParity/inventory-index.json`, unless the task concerns Marina entity parity inventory.
 - Local build folders such as `.build/` and `.deriveddata/`.

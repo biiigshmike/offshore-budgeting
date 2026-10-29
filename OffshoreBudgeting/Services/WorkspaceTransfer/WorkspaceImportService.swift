@@ -36,7 +36,7 @@ struct WorkspaceImportService {
             workspaceName: archive.workspace.name,
             exportedAt: archive.exportedAt,
             sourceWorkspaceID: archive.sourceWorkspaceID,
-            selectedSections: archive.selectedSections,
+            selectedSections: archive.selectedSections.filter { $0 != .marinaAliases },
             counts: WorkspaceArchivePayloadCounts(archive: archive)
         )
     }
@@ -357,19 +357,6 @@ struct WorkspaceImportService {
                     updatedAt: payload.updatedAt
                 )
                 modelContext.insert(rule)
-            }
-
-            for payload in archive.assistantAliasRules {
-                let alias = AssistantAliasRule(
-                    id: UUID(),
-                    aliasKey: payload.aliasKey,
-                    targetValue: payload.targetValue,
-                    entityType: MarinaAliasEntityType(rawValue: payload.entityTypeRaw) ?? .category,
-                    workspace: importedWorkspace,
-                    createdAt: payload.createdAt,
-                    updatedAt: payload.updatedAt
-                )
-                modelContext.insert(alias)
             }
 
             for account in savingsAccountsByOldID.values {

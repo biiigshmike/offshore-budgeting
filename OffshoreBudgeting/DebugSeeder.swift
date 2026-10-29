@@ -27,7 +27,6 @@ enum DebugSeeder {
         } else {
             if hasAnyWorkspace(context: context) {
                 applyPinnedHomeOrderForExistingWorkspaceIfPossible(context: context)
-                refreshMarinaConversationForExistingWorkspaceIfPossible(context: context, now: now)
                 refreshScreenshotSavingsForExistingWorkspaceIfPossible(context: context, now: now)
                 _ = ensureDebugImportSampleCSV(modelContext: context)
                 return
@@ -660,7 +659,6 @@ enum DebugSeeder {
         )
 
         seedScreenshotSavingsLedger(context: context, workspace: workspace, now: now)
-        seedMarinaConversation(workspace: workspace, modelContext: context, now: now)
         seedExcursionModeActive(now: now)
     }
 
@@ -1418,125 +1416,6 @@ enum DebugSeeder {
 
     private static func roundedToCents(_ value: Double) -> Double {
         (value * 100).rounded() / 100
-    }
-
-    // MARK: - Marina
-
-    private struct DebugMarinaSeedQuerySpec {
-        let prompt: String
-        let query: HomeQuery
-        let generatedAt: Date
-    }
-
-    private static func refreshMarinaConversationForExistingWorkspaceIfPossible(context: ModelContext, now: Date) {
-        do {
-            let workspaces = try context.fetch(FetchDescriptor<Workspace>())
-            guard let workspace = pickPinnedWorkspace(from: workspaces) else {
-                assertionFailure("DebugSeeder could not find a workspace for Marina conversation seeding.")
-                return
-            }
-
-            seedMarinaConversation(workspace: workspace, modelContext: context, now: now)
-        } catch {
-            assertionFailure("DebugSeeder failed to refresh Marina conversation: \(error)")
-        }
-    }
-
-    private static func seedMarinaConversation(workspace: Workspace, modelContext: ModelContext, now: Date) {
-        let engine = HomeQueryEngine()
-        let monthRange = HomeQueryDateRange(
-            startDate: startOfMonth(containing: now, calendar: .current),
-            endDate: endOfMonth(containing: now, calendar: .current)
-        )
-
-        let specs: [DebugMarinaSeedQuerySpec] = [
-            DebugMarinaSeedQuerySpec(
-                prompt: "How am I doing this month?",
-                query: HomeQuery(intent: .periodOverview, dateRange: monthRange),
-                generatedAt: now.addingTimeInterval(-1_200)
-            ),
-            DebugMarinaSeedQuerySpec(
-                prompt: "Compare this month to last month.",
-                query: HomeQuery(intent: .compareThisMonthToPreviousMonth, dateRange: monthRange),
-                generatedAt: now.addingTimeInterval(-900)
-            ),
-            DebugMarinaSeedQuerySpec(
-                prompt: "Where am I spending the most this month?",
-                query: HomeQuery(intent: .topCategoriesThisMonth, dateRange: monthRange, resultLimit: 3),
-                generatedAt: now.addingTimeInterval(-600)
-            ),
-            DebugMarinaSeedQuerySpec(
-                prompt: "How am I doing this month with my savings?",
-                query: HomeQuery(intent: .savingsStatus, dateRange: monthRange),
-                generatedAt: now.addingTimeInterval(-300)
-            )
-        ]
-
-        let categories = workspace.categories ?? []
-        let presets = workspace.presets ?? []
-        let plannedExpenses = workspace.plannedExpenses ?? []
-        let variableExpenses = workspace.variableExpenses ?? []
-        let incomes = workspace.incomes ?? []
-
-        let answers = specs.map { spec in
-            let generated = engine.execute(
-                query: spec.query,
-                categories: categories,
-                presets: presets,
-                plannedExpenses: plannedExpenses,
-                variableExpenses: variableExpenses,
-                incomes: incomes,
-                now: now
-            )
-
-            return HomeAnswer(
-                id: generated.id,
-                queryID: generated.queryID,
-                kind: generated.kind,
-                userPrompt: spec.prompt,
-                title: generated.title,
-                subtitle: generated.subtitle,
-                primaryValue: generated.primaryValue,
-                rows: generated.rows,
-                generatedAt: spec.generatedAt
-            )
-        }
-
-        do {
-            let encoder = JSONEncoder()
-            let existingSession = try existingMarinaChatSession(workspaceID: workspace.id, modelContext: modelContext)
-            let session = existingSession
-                ?? MarinaChatSession(
-                    title: answers.first?.userPrompt ?? MarinaChatSessionStore.defaultTitle,
-                    workspace: workspace,
-                    createdAt: now,
-                    updatedAt: now,
-                    lastOpenedAt: now
-                )
-
-            if existingSession == nil {
-                modelContext.insert(session)
-            }
-
-            session.title = answers.first?.userPrompt ?? MarinaChatSessionStore.defaultTitle
-            session.hasCustomTitle = false
-            session.visibleAnswersData = try encoder.encode(answers)
-            session.followUpContextData = Data()
-            session.updatedAt = now
-            session.lastOpenedAt = now
-            try modelContext.save()
-        } catch {
-            assertionFailure("DebugSeeder failed to seed Marina chat session: \(error)")
-        }
-    }
-
-    private static func existingMarinaChatSession(workspaceID: UUID, modelContext: ModelContext) throws -> MarinaChatSession? {
-        var descriptor = FetchDescriptor<MarinaChatSession>(
-            predicate: #Predicate<MarinaChatSession> { $0.workspace?.id == workspaceID },
-            sortBy: [SortDescriptor(\MarinaChatSession.lastOpenedAt, order: .reverse)]
-        )
-        descriptor.fetchLimit = 1
-        return try modelContext.fetch(descriptor).first
     }
 
     // MARK: - Excursion

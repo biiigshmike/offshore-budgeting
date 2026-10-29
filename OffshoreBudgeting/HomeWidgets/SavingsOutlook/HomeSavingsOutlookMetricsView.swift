@@ -319,7 +319,7 @@ struct HomeSavingsOutlookMetricsView: View {
 
     private func buildChartPoints(for range: (start: Date, end: Date, granularity: BucketGranularity)) -> [SavingsPoint] {
         let ranges = makeBuckets(from: range.start, to: range.end, granularity: range.granularity)
-            .map { HomeQueryDateRange(startDate: $0.start, endDate: $0.end) }
+            .map { SavingsOutlookDateRange(startDate: $0.start, endDate: $0.end) }
         let points = SavingsOutlookCalculator.cumulativePoints(ranges: ranges, incomes: incomes,
             plannedExpenses: plannedExpenses, variableExpenses: variableExpenses, savingsEntries: savingsEntries)
             .map { SavingsPoint(date: $0.startDate, actualRunning: $0.actual, projectedRunning: $0.projected) }

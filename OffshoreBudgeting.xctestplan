@@ -1,143 +1,36 @@
 {
-  "configurations" : [
+  "configurations": [
     {
-      "id" : "E1E80921-F9F7-443C-9D45-5943FB00CAF1",
-      "name" : "Test Scheme Action",
-      "options" : {
-
-      }
+      "id": "E1E80921-F9F7-443C-9D45-5943FB00CAF1",
+      "name": "Test Scheme Action",
+      "options": {}
     }
   ],
-  "defaultOptions" : {
-    "performanceAntipatternCheckerEnabled" : true,
-    "targetForVariableExpansion" : {
-      "containerPath" : "container:OffshoreBudgeting.xcodeproj",
-      "identifier" : "4C96F8502F20523700541774",
-      "name" : "OffshoreBudgeting"
+  "defaultOptions": {
+    "performanceAntipatternCheckerEnabled": true,
+    "targetForVariableExpansion": {
+      "containerPath": "container:OffshoreBudgeting.xcodeproj",
+      "identifier": "4C96F8502F20523700541774",
+      "name": "OffshoreBudgeting"
     }
   },
-  "testTargets" : [
+  "testTargets": [
     {
-      "enabled" : false,
-      "target" : {
-        "containerPath" : "container:OffshoreBudgeting.xcodeproj",
-        "identifier" : "4C96F8672F20523900541774",
-        "name" : "OffshoreBudgetingUITests"
+      "enabled": true,
+      "target": {
+        "containerPath": "container:OffshoreBudgeting.xcodeproj",
+        "identifier": "4C96F8672F20523900541774",
+        "name": "OffshoreBudgetingUITests"
       }
     },
     {
-      "parallelizable" : true,
-      "skippedTests" : {
-        "suites" : [
-          {
-            "name" : "AddExpenseShortcutExecutorTests"
-          },
-          {
-            "name" : "AllocationLedgerServiceTests"
-          },
-          {
-            "name" : "AppCommandHubPolicyTests"
-          },
-          {
-            "name" : "AppRootLaunchSectionResolverTests"
-          },
-          {
-            "name" : "BudgetDeletionServiceTests"
-          },
-          {
-            "name" : "BudgetPlannedExpenseStoreTests"
-          },
-          {
-            "name" : "CategoryArchiveBehaviorTests"
-          },
-          {
-            "name" : "ContentViewResumeCoordinatorTests"
-          },
-          {
-            "name" : "ContentViewWidgetRefreshExecutorTests"
-          },
-          {
-            "name" : "DateRangeEditorDraftTests"
-          },
-          {
-            "name" : "DebugFeatureFlagResolverTests"
-          },
-          {
-            "name" : "ExcursionModeReliabilityTests"
-          },
-          {
-            "name" : "ExpenseImageAndPaystubImportParserTests"
-          },
-          {
-            "name" : "HomeCategoryMetricsCalculatorTests"
-          },
-          {
-            "name" : "HomeNextPlannedExpenseFinderTests"
-          },
-          {
-            "name" : "HomePinnedStoresTests"
-          },
-          {
-            "name" : "HomeSpendTrendsAggregatorTests"
-          },
-          {
-            "name" : "ICloudPreferenceSyncServiceTests"
-          },
-          {
-            "name" : "OffshoreBudgetingTests"
-          },
-          {
-            "name" : "OffshoreIntentDataStoreResolutionTests"
-          },
-          {
-            "name" : "PlannedExpenseDisplaySubtitleTests"
-          },
-          {
-            "name" : "PlannedExpenseFuturePolicyTests"
-          },
-          {
-            "name" : "PostBoardingTipsStoreTests"
-          },
-          {
-            "name" : "ReconciliationDetailSearchTests"
-          },
-          {
-            "name" : "SavingsAccountServiceTests"
-          },
-          {
-            "name" : "SnapshotContentSignatureTests"
-          },
-          {
-            "name" : "StatementPDFImportParserTests"
-          },
-          {
-            "name" : "SwiftDataCRUDTests"
-          },
-          {
-            "name" : "SwiftDataDeletionRulesTests"
-          },
-          {
-            "name" : "WhatIfScenarioStoreTests"
-          },
-          {
-            "name" : "WorkspaceTransferServiceTests"
-          }
-        ],
-        "xctestClasses" : [
-          {
-            "name" : "ICloudBootstrapTests"
-          },
-          {
-            "name" : "OnboardingResetServiceTests"
-          }
-        ]
-      },
-      "target" : {
-        "containerPath" : "container:OffshoreBudgeting.xcodeproj",
-        "identifier" : "4C96F85D2F20523900541774",
-        "name" : "OffshoreBudgetingTests"
+      "parallelizable": true,
+      "target": {
+        "containerPath": "container:OffshoreBudgeting.xcodeproj",
+        "identifier": "4C96F85D2F20523900541774",
+        "name": "OffshoreBudgetingTests"
       }
     }
   ],
-  "version" : 1
+  "version": 1
 }

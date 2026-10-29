@@ -76,8 +76,6 @@ struct HomeView: View {
     @State private var isShowingWhatIfPlanner: Bool = false
     @State private var whatIfInitialScenarioID: UUID? = nil
     @State private var whatIfInitialDraft: WhatIfPlannerDraft? = nil
-    @State private var isShowingAssistantPanel: Bool = false
-    @State private var assistantPanelHomeContext: MarinaPanelHomeContext? = nil
 
     // MARK: - Data Fixups
 
@@ -153,7 +151,6 @@ struct HomeView: View {
 
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.accessibilityVoiceOverEnabled) private var voiceOverEnabled
-    @Environment(\.marinaToolbarContext) private var assistantToolbarContext
     @Environment(\.appTabActivationContext) private var tabActivationContext
     @Environment(\.appCommandHub) private var commandHub
     @Environment(\.modelContext) private var modelContext
@@ -307,14 +304,6 @@ struct HomeView: View {
                 initialDraft: whatIfInitialDraft
             )
         }
-        .fullScreenCover(isPresented: $isShowingAssistantPanel, onDismiss: dismissAssistantPanel) {
-            MarinaPanelView(
-                workspace: workspace,
-                onDismiss: dismissAssistantPanel,
-                shouldUseLargeMinimumSize: false,
-                homeContext: assistantPanelHomeContext ?? currentMarinaHomeContext
-            )
-        }
         .postBoardingTip(
             key: "tip.home.v1",
             title: String(localized: "app.section.home", defaultValue: "Home", comment: "Main tab title for the Home section."),
@@ -367,14 +356,6 @@ struct HomeView: View {
 
                 ToolbarItemGroup(placement: .primaryAction) {
                     homeActionsToolbarButton
-                }
-
-                if showsAssistantToolbarButton {
-                    ToolbarSpacer(.flexible, placement: .primaryAction)
-
-                    ToolbarItemGroup(placement: .primaryAction) {
-                        assistantToolbarButtoniOS26
-                    }
                 }
             } else {
                 ToolbarItemGroup(placement: .primaryAction) {
@@ -433,7 +414,6 @@ struct HomeView: View {
             scheduleActivationEnrichment(reason: "onAppear")
         }
         .onDisappear {
-            dismissAssistantPanel()
             cancelDashboardSnapshotRefresh(reason: "onDisappear")
             cancelPostSettleHousekeeping()
             cancelActivationEnrichment()
@@ -512,41 +492,7 @@ struct HomeView: View {
     private func openWhatIfPlanner(_ draft: WhatIfPlannerDraft) {
         whatIfInitialScenarioID = nil
         whatIfInitialDraft = draft
-        if isShowingAssistantPanel {
-            dismissAssistantPanel()
-            DispatchQueue.main.async {
-                isShowingWhatIfPlanner = true
-            }
-        } else {
-            isShowingWhatIfPlanner = true
-        }
-    }
-
-    private func presentAssistantPanel() {
-        guard #available(iOS 26.0, macCatalyst 26.0, *) else { return }
-        let context = currentMarinaHomeContext
-        if isPhone {
-            assistantPanelHomeContext = context
-            isShowingAssistantPanel = true
-        } else {
-            assistantToolbarContext.openAssistant(context)
-        }
-    }
-
-    private func dismissAssistantPanel() {
-        isShowingAssistantPanel = false
-        assistantPanelHomeContext = nil
-    }
-
-    private var currentMarinaHomeContext: MarinaPanelHomeContext {
-        MarinaPanelHomeContext(
-            dateRange: HomeQueryDateRange(
-                startDate: appliedStartDate,
-                endDate: appliedEndDate
-            ),
-            excludeFuturePlannedExpensesFromCalculations: excludeFuturePlannedExpensesFromCalculationsInView,
-            excludeFutureVariableExpensesFromCalculations: excludeFutureVariableExpensesFromCalculationsInView
-        )
+        isShowingWhatIfPlanner = true
     }
 
     private func handleCommand(_ commandID: String) {
@@ -1348,25 +1294,6 @@ struct HomeView: View {
             Image(systemName: "eye")
         }
         .accessibilityLabel(String(localized: "home.actions", defaultValue: "Home Actions", comment: "Accessibility label for home actions menu."))
-    }
-
-    private var showsAssistantToolbarButton: Bool {
-        guard #available(iOS 26.0, macCatalyst 26.0, *) else { return false }
-        if isPhone {
-            return true
-        }
-
-        return assistantToolbarContext.isToolbarButtonVisible
-    }
-
-    @available(iOS 26.0, macCatalyst 26.0, *)
-    private var assistantToolbarButtoniOS26: some View {
-        Button(action: presentAssistantPanel) {
-            Image(systemName: "figure.wave")
-        }
-        .glassProminentButtonStyleCompat()
-        .accessibilityLabel(String(localized: "assistant.open", defaultValue: "Open Assistant", comment: "Accessibility label for opening assistant."))
-        .accessibilityIdentifier("home.assistant.openButton")
     }
 
     // MARK: - Date Range

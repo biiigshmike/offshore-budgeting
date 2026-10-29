@@ -7,28 +7,28 @@ struct HelpFAQEngineTests {
 
     // MARK: - Answering
 
-    @Test func answer_exactTopicQuestion_returnsMarinaTopic() {
+    @Test func answer_exactTopicQuestion_returnsHomeTopic() {
         let engine = HelpFAQEngine()
 
         let answer = engine.answer(
-            prompt: "How does Marina assistant work in Home?",
+            prompt: "How do I customize Home?",
             topics: GeneratedHelpContent.allLeafTopics
         )
 
         #expect(answer != nil)
-        #expect(answer?.match.topicID == "home-marina")
+        #expect(answer?.match.topicID == "home-customization")
     }
 
-    @Test func answer_marinaCapabilityQuestion_returnsMarinaTopic() {
+    @Test func answer_budgetQuestion_returnsBudgetTopic() {
         let engine = HelpFAQEngine()
 
         let answer = engine.answer(
-            prompt: "What kinds of questions should I ask Marina?",
+            prompt: "How do I create a budget?",
             topics: GeneratedHelpContent.allLeafTopics
         )
 
         #expect(answer != nil)
-        #expect(answer?.match.topicID == "home-marina")
+        #expect(answer?.match.topicID == "budgets-overview")
     }
 
     @Test func answer_sectionHeaderLanguage_resolvesBudgetOverviewTopic() {

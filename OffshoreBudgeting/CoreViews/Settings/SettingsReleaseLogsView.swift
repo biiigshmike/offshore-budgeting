@@ -82,11 +82,6 @@ struct SettingsReleaseLogsView: View {
             build: "22",
             items: [
                 ReleaseItem(
-                    systemImage: "figure.wave",
-                    title: "Futher Enhancements to Marina",
-                    description: "Marina has had some additional training to ensure a more enriched, natural experience so that she can help users understand their budgeting data in plain English."
-                ),
-                ReleaseItem(
                     systemImage: "widget.extralarge",
                     title: "Layout Adjustments for Extra Large Income and Next Planned Expense Widgets",
                     description: "Fixed truncation of text in the Extra Large Income and Next Planned Expense widgets. This update also delivers a more effective way of keeping all of the iOS and macOS widgets up-to-date without the app needing to be opened."
@@ -100,11 +95,6 @@ struct SettingsReleaseLogsView: View {
                     systemImage: "desktopcomputer",
                     title: "Optimized Interface for Mac",
                     description: "Reconfigured the user interface for a better experience while using a Mac."
-                ),
-                ReleaseItem(
-                    systemImage: "calendar",
-                    title: "Filtering by Date",
-                    description: "Filtering by Date has moved to the top toolbar on Home, Cards, Reconciliations, and Savings."
                 )
             ]
         ),
@@ -112,11 +102,6 @@ struct SettingsReleaseLogsView: View {
             version: "2.4",
             build: "21",
             items: [
-                ReleaseItem(
-                    systemImage: "figure.wave",
-                    title: "Marina: Now Powered by Apple Intelligence",
-                    description: "Marina has finally finished her training. Try chatting with her to gain insights into your budget, expenses, income, and more. Marina requires Apple Intelligence, plus a device running iOS 26.0, iPadOS 26.0, or macOS 26.0 or later. Available in English. Look for updates with additional language support in the future."
-                ),
                 ReleaseItem(
                     systemImage: "widget.small",
                     title: "Two New Widgets",
@@ -277,11 +262,6 @@ struct SettingsReleaseLogsView: View {
             version: "2.3",
             build: "9",
             items: [
-                ReleaseItem(
-                    systemImage: "figure.wave",
-                    title: "Welcome Aboard, Marina!",
-                    description: "Marina is Offshore's on-device financial assistant on the Home tab. Ask read-only questions about spending, income, savings, categories, cards, and budgets, then use Marina's + menu for explicit create forms. Edits and deletes stay on the screens that own those records so changes remain clear and traceable."
-                ),
                 ReleaseItem(
                     systemImage: "sailboat.fill",
                     title: "Excursion Mode",

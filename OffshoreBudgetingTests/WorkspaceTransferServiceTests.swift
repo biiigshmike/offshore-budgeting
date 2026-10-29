@@ -65,7 +65,8 @@ struct WorkspaceTransferServiceTests {
         #expect(archive.savingsAccounts.count == 1)
         #expect(archive.savingsLedgerEntries.count == 1)
         #expect(archive.importMerchantRules.count == 1)
-        #expect(archive.assistantAliasRules.count == 1)
+        #expect(archive.assistantAliasRules.isEmpty)
+        #expect(!archive.selectedSections.contains(.marinaAliases))
         #expect(archive.incomeSeries.count == 1)
         #expect(archive.incomes.count == 1)
 
@@ -152,13 +153,79 @@ struct WorkspaceTransferServiceTests {
         #expect(importedRules.first?.preferredCategory?.id == importedCategory.id)
 
         let importedAliases = try fetchAll(AssistantAliasRule.self, in: context).filter { $0.workspace?.id == imported.id }
-        #expect(importedAliases.first?.entityType == .card)
+        #expect(importedAliases.isEmpty)
 
         let importedIncomeSeries = try fetchAll(IncomeSeries.self, in: context).filter { $0.workspace?.id == imported.id }
         let importedSeries = try #require(importedIncomeSeries.first)
         let importedIncomes = try fetchAll(Income.self, in: context).filter { $0.workspace?.id == imported.id }
         #expect(importedIncomes.first?.series?.id == importedSeries.id)
         #expect(importedIncomes.first?.card?.id == importedCard.id)
+    }
+
+    @Test func legacyVersionOneArchive_ignoresAliasesAndPreservesFinancialRecords() throws {
+        let context = try makeContext()
+        let source = try seedTransferWorkspace(in: context)
+        var legacyArchive = try WorkspaceExportService().exportArchive(
+            for: source.workspace,
+            sections: Set(WorkspaceTransferSection.allCases),
+            modelContext: context
+        )
+        let expectedRecordCount = WorkspaceArchivePayloadCounts(archive: legacyArchive).totalRecords
+        legacyArchive.selectedSections.append(.marinaAliases)
+        legacyArchive.assistantAliasRules = [
+            AssistantAliasRulePayload(
+                id: UUID(),
+                aliasKey: "main card",
+                targetValue: "Visa",
+                entityTypeRaw: "card",
+                createdAt: date(2026, 6, 1),
+                updatedAt: date(2026, 6, 2)
+            )
+        ]
+
+        let data = try WorkspaceArchiveCoding.encode(legacyArchive)
+        let decoded = try WorkspaceArchiveCoding.decode(data)
+        #expect(decoded.schemaVersion == 1)
+        #expect(decoded.selectedSections.contains(.marinaAliases))
+        #expect(decoded.assistantAliasRules.count == 1)
+
+        let importer = WorkspaceImportService()
+        let preview = try importer.preview(for: decoded)
+        #expect(!preview.selectedSections.contains(.marinaAliases))
+        #expect(preview.counts.totalRecords == expectedRecordCount)
+        #expect(preview.counts.userVisibleTotalRecords == expectedRecordCount)
+
+        let imported = try importer.importArchive(
+            decoded,
+            existingWorkspaces: try fetchAll(Workspace.self, in: context),
+            modelContext: context
+        )
+        let importedAliases = try fetchAll(AssistantAliasRule.self, in: context)
+            .filter { $0.workspace?.id == imported.id }
+        #expect(importedAliases.isEmpty)
+        #expect(try fetchAll(AssistantAliasRule.self, in: context).count == 1)
+
+        let reexported = try WorkspaceExportService().exportArchive(
+            for: imported,
+            sections: Set(WorkspaceTransferSection.allCases),
+            modelContext: context
+        )
+        #expect(reexported.assistantAliasRules.isEmpty)
+        #expect(!reexported.selectedSections.contains(.marinaAliases))
+        #expect(WorkspaceArchivePayloadCounts(archive: reexported).totalRecords == expectedRecordCount)
+        #expect(reexported.plannedExpenses.first?.plannedAmount == 1200)
+        #expect(reexported.plannedExpenses.first?.actualAmount == 1195)
+        #expect(reexported.variableExpenses.first?.amount == 12)
+        #expect(reexported.expenseAllocations.first?.allocatedAmount == 4)
+        #expect(reexported.allocationSettlements.first?.amount == 600)
+        #expect(reexported.savingsLedgerEntries.first?.amount == -12)
+        #expect(reexported.savingsAccounts.first?.total == -12)
+        #expect(reexported.incomes.first?.amount == 2000)
+        #expect(reexported.importMerchantRules.first?.preferredName == "Coffee Shop")
+
+        let exportedData = try WorkspaceArchiveCoding.encode(reexported)
+        let exportedJSON = try #require(JSONSerialization.jsonObject(with: exportedData) as? [String: Any])
+        #expect((exportedJSON["assistantAliasRules"] as? [Any])?.isEmpty == true)
     }
 
     @Test func export_skipsOtherWorkspaceRecords() throws {

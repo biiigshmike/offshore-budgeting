@@ -9,7 +9,7 @@ struct WorkspaceExportService {
         modelContext: ModelContext,
         now: Date = .now
     ) throws -> WorkspaceArchive {
-        let orderedSections = WorkspaceTransferSection.allCases.filter { sections.contains($0) }
+        let orderedSections = WorkspaceTransferSection.userVisibleCases.filter { sections.contains($0) }
         let workspaceID = workspace.id
 
         let budgets = sections.contains(.budgets) ? try fetchBudgets(workspaceID: workspaceID, modelContext: modelContext) : []
@@ -24,7 +24,6 @@ struct WorkspaceExportService {
         let savingsAccounts = sections.contains(.savings) ? try fetchSavingsAccounts(workspaceID: workspaceID, modelContext: modelContext) : []
         let savingsLedgerEntries = sections.contains(.savings) ? try fetchSavingsLedgerEntries(workspaceID: workspaceID, modelContext: modelContext) : []
         let importMerchantRules = sections.contains(.importRules) ? try fetchImportMerchantRules(workspaceID: workspaceID, modelContext: modelContext) : []
-        let assistantAliasRules = sections.contains(.marinaAliases) ? try fetchAssistantAliasRules(workspaceID: workspaceID, modelContext: modelContext) : []
         let incomeSeries = sections.contains(.incomes) ? try fetchIncomeSeries(workspaceID: workspaceID, modelContext: modelContext) : []
         let incomes = sections.contains(.incomes) ? try fetchIncomes(workspaceID: workspaceID, modelContext: modelContext) : []
 
@@ -201,16 +200,7 @@ struct WorkspaceExportService {
                     updatedAt: $0.updatedAt
                 )
             },
-            assistantAliasRules: assistantAliasRules.map {
-                AssistantAliasRulePayload(
-                    id: $0.id,
-                    aliasKey: $0.aliasKey,
-                    targetValue: $0.targetValue,
-                    entityTypeRaw: $0.entityTypeRaw,
-                    createdAt: $0.createdAt,
-                    updatedAt: $0.updatedAt
-                )
-            },
+            assistantAliasRules: [],
             incomeSeries: incomeSeries.map {
                 IncomeSeriesPayload(
                     id: $0.id,
@@ -348,13 +338,6 @@ struct WorkspaceExportService {
         return try modelContext.fetch(descriptor).sortedByID()
     }
 
-    private func fetchAssistantAliasRules(workspaceID: UUID, modelContext: ModelContext) throws -> [AssistantAliasRule] {
-        let descriptor = FetchDescriptor<AssistantAliasRule>(
-            predicate: #Predicate<AssistantAliasRule> { $0.workspace?.id == workspaceID }
-        )
-        return try modelContext.fetch(descriptor).sortedByID()
-    }
-
     private func fetchIncomeSeries(workspaceID: UUID, modelContext: ModelContext) throws -> [IncomeSeries] {
         let descriptor = FetchDescriptor<IncomeSeries>(
             predicate: #Predicate<IncomeSeries> { $0.workspace?.id == workspaceID }
@@ -399,6 +382,5 @@ extension AllocationSettlement: WorkspaceTransferIdentifiable { var workspaceTra
 extension SavingsAccount: WorkspaceTransferIdentifiable { var workspaceTransferID: UUID { id } }
 extension SavingsLedgerEntry: WorkspaceTransferIdentifiable { var workspaceTransferID: UUID { id } }
 extension ImportMerchantRule: WorkspaceTransferIdentifiable { var workspaceTransferID: UUID { id } }
-extension AssistantAliasRule: WorkspaceTransferIdentifiable { var workspaceTransferID: UUID { id } }
 extension IncomeSeries: WorkspaceTransferIdentifiable { var workspaceTransferID: UUID { id } }
 extension Income: WorkspaceTransferIdentifiable { var workspaceTransferID: UUID { id } }

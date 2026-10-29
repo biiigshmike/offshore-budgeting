@@ -229,14 +229,6 @@ struct OffshoreBudgetingApp: App {
                 Income.self
             ])
 
-            #if DEBUG
-            // Real-model evaluations run against synthetic fixtures, never the Mac's saved budget store.
-            if ProcessInfo.processInfo.environment["MARINA_MODEL_EVALUATION"] == "1" {
-                let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true, cloudKitDatabase: .none)
-                return try ModelContainer(for: schema, configurations: [configuration])
-            }
-            #endif
-
             let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
             try FileManager.default.createDirectory(at: appSupport, withIntermediateDirectories: true)
 

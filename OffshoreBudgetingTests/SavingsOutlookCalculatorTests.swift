@@ -8,6 +8,21 @@ struct SavingsOutlookCalculatorTests {
         Calendar.current.date(from: DateComponents(year: 2026, month: 10, day: day, hour: hour))!
     }
 
+    @Test func reversedRangeIncludesBothBoundaryDates() {
+        let range = SavingsOutlookDateRange(startDate: date(2), endDate: date(1))
+        let incomes = [
+            Income(source: "First day", amount: 100, date: date(1), isPlanned: false),
+            Income(source: "Last day", amount: 200, date: date(2), isPlanned: false),
+            Income(source: "Outside", amount: 400, date: date(3), isPlanned: false)
+        ]
+        let points = SavingsOutlookCalculator.cumulativePoints(
+            ranges: [range], incomes: incomes, plannedExpenses: [], variableExpenses: [], savingsEntries: []
+        )
+        #expect(points.first?.startDate == date(1))
+        #expect(points.first?.endDate == date(2))
+        #expect(points.first?.actual == 300)
+    }
+
     @Test func cumulativeSavingsEndAtTheSameTotalIncludingManualAdjustments() throws {
         let incomes = [
             Income(source: "Expected", amount: 1_000, date: date(1), isPlanned: true),
@@ -21,8 +36,8 @@ struct SavingsOutlookCalculatorTests {
             SavingsLedgerEntry(date: date(3), amount: 100, note: "Outside", kindRaw: SavingsLedgerEntryKind.manualAdjustment.rawValue)
         ]
         let end = date(3).addingTimeInterval(-0.001)
-        let ranges = [HomeQueryDateRange(startDate: date(1), endDate: date(2).addingTimeInterval(-0.001)),
-                      HomeQueryDateRange(startDate: date(2), endDate: end)]
+        let ranges = [SavingsOutlookDateRange(startDate: date(1), endDate: date(2).addingTimeInterval(-0.001)),
+                      SavingsOutlookDateRange(startDate: date(2), endDate: end)]
         let points = SavingsOutlookCalculator.cumulativePoints(ranges: ranges, incomes: incomes,
             plannedExpenses: planned, variableExpenses: variable, savingsEntries: entries)
         let total = SavingsOutlookCalculator.totals(incomes: incomes, plannedExpenses: planned,
@@ -50,8 +65,8 @@ struct SavingsOutlookCalculatorTests {
     @Test func cumulativeSavingsPreserveEmptyBucketsAndSignedActivity() {
         let credit = VariableExpense(descriptionText: "Refund", amount: 20, kindRaw: VariableExpenseKind.credit.rawValue, transactionDate: date(2))
         let adjustment = VariableExpense(descriptionText: "Ledger adjustment", amount: 500, kindRaw: VariableExpenseKind.adjustment.rawValue, transactionDate: date(2))
-        let ranges = [HomeQueryDateRange(startDate: date(1), endDate: date(2).addingTimeInterval(-0.001)),
-                      HomeQueryDateRange(startDate: date(2), endDate: date(3).addingTimeInterval(-0.001))]
+        let ranges = [SavingsOutlookDateRange(startDate: date(1), endDate: date(2).addingTimeInterval(-0.001)),
+                      SavingsOutlookDateRange(startDate: date(2), endDate: date(3).addingTimeInterval(-0.001))]
         let points = SavingsOutlookCalculator.cumulativePoints(ranges: ranges, incomes: [],
             plannedExpenses: [], variableExpenses: [credit, adjustment], savingsEntries: [])
         #expect(points.map(\.actual) == [0, 20])

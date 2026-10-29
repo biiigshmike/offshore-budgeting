@@ -50,7 +50,7 @@ enum SavingsOutlookCalculator {
 
     /// Ranges are inclusive, ordered, disjoint buckets within the selected period.
     /// Each running value uses the same calculation as the headline, including manual adjustments.
-    static func cumulativePoints(ranges: [HomeQueryDateRange], incomes: [Income],
+    static func cumulativePoints(ranges: [SavingsOutlookDateRange], incomes: [Income],
                                  plannedExpenses: [PlannedExpense], variableExpenses: [VariableExpense],
                                  savingsEntries: [SavingsLedgerEntry]) -> [Point] {
         var actual = 0.0

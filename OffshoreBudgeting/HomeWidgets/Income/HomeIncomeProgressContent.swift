@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Display-only income summary shared by Home and saved Marina answers.
+/// Display-only income summary for Home.
 struct HomeIncomeProgressContent: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 

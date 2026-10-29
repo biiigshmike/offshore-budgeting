@@ -345,6 +345,7 @@ final class Workspace {
     @Relationship(deleteRule: .cascade)
     var importMerchantRules: [ImportMerchantRule]? = nil
 
+    // Retired assistant storage: preserve relationship names and cascades for existing stores.
     @Relationship(deleteRule: .cascade)
     var assistantAliasRules: [AssistantAliasRule]? = nil
 
@@ -1188,7 +1189,9 @@ final class ImportMerchantRule {
     }
 }
 
-// MARK: - Assistant Alias Rule
+// MARK: - Retired Assistant Alias Storage
+
+// Compatibility only. Keep persisted names, fields, and relationships unchanged for local/iCloud upgrades.
 
 enum MarinaAliasEntityType: String, Codable, CaseIterable, Identifiable {
     case card
@@ -1239,7 +1242,9 @@ final class AssistantAliasRule {
     }
 }
 
-// MARK: - Marina Chat Session
+// MARK: - Retired Chat Session Storage
+
+// Compatibility only. Opaque payloads remain dormant; no chat runtime reads or writes them.
 
 @Model
 final class MarinaChatSession {
