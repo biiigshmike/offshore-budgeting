@@ -304,7 +304,7 @@ struct BudgetDetailView: View {
             .sorted { $0.transactionDate > $1.transactionDate }
 
         var categoriesByID: [UUID: Category] = [:]
-        for category in workspaceCategories {
+        for category in CategoryArchivePolicy.activeCategories(from: workspaceCategories) {
             categoriesByID[category.id] = category
         }
         for category in (plannedExpensesInBudget.compactMap { $0.category } + variableExpensesInBudget.compactMap { $0.category }) {

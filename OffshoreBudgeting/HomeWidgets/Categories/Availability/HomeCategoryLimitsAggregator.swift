@@ -157,14 +157,31 @@ struct HomeCategoryLimitsAggregator {
         }
 
         // 3) Decide which categories participate
+        // Archived categories remain relevant through dated history or this budget's limits,
+        // even when their net budget impact is zero.
+        var referencedCategoryIDs = Set(limitByCategoryID.keys)
+        for expense in plannedExpenses where expense.expenseDate >= range.start && expense.expenseDate <= range.end {
+            if let categoryID = expense.category?.id {
+                referencedCategoryIDs.insert(categoryID)
+            }
+        }
+        for expense in variableExpenses where expense.transactionDate >= range.start && expense.transactionDate <= range.end {
+            if let categoryID = expense.category?.id {
+                referencedCategoryIDs.insert(categoryID)
+            }
+        }
+        let relevantCategories = categories.filter {
+            !$0.isArchived || referencedCategoryIDs.contains($0.id)
+        }
+
         let participatingCategories: [Category]
         switch inclusionPolicy {
         case .limitsOnly:
             let limitedIDs = Set(limitByCategoryID.keys)
-            participatingCategories = categories.filter { limitedIDs.contains($0.id) }
+            participatingCategories = relevantCategories.filter { limitedIDs.contains($0.id) }
 
         case .allCategoriesInfinityWhenMissing:
-            participatingCategories = categories
+            participatingCategories = relevantCategories
         }
 
         // If there is no budget or no categories, still return a valid result
