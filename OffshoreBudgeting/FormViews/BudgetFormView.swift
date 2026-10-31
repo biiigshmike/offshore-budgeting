@@ -187,8 +187,44 @@ struct BudgetFormView: View {
                     onEndDateChanged(newValue)
                 }
 
+                #if targetEnvironment(macCatalyst)
+                BudgetSelectionChecklist(
+                    title: "Cards",
+                    items: cards,
+                    selectedCount: selectedCardIDs.count,
+                    accessibilityID: "budget.cards",
+                    selection: bindingForCard,
+                    onToggleAll: onToggleAllCards
+                ) { card in
+                    CardMenuLabel(card: card)
+                }
+
+                BudgetSelectionChecklist(
+                    title: "Presets",
+                    items: presets,
+                    selectedCount: selectedPresetIDs.count,
+                    accessibilityID: "budget.presets",
+                    selection: bindingForPreset,
+                    onToggleAll: onToggleAllPresets
+                ) { preset in
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack(spacing: 8) {
+                            Text(preset.title)
+                            if preset.isArchived {
+                                Text("Archived")
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        Text("\(CurrencyFormatter.string(from: preset.plannedAmount)) • \(scheduleString(preset))")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                #else
                 cardsMenu
                 presetsMenu
+                #endif
 
                 Button {
                     showingCategoryGoals = true
