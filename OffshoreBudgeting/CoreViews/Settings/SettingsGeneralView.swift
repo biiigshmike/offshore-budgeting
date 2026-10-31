@@ -95,7 +95,7 @@ struct SettingsGeneralView: View {
                     .font(.footnote)
                     .foregroundStyle(.secondary)
 
-                Toggle("Review Uncategorized Expenses on Open", isOn: $reviewUncategorizedExpensesOnOpen)
+                Toggle("Review Uncategorized Expenses on App Open", isOn: $reviewUncategorizedExpensesOnOpen)
                     .tint(Color("AccentColor"))
                     .accessibilityIdentifier("reviewUncategorizedExpensesOnOpen")
 

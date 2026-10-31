@@ -97,6 +97,11 @@ struct SettingsReleaseLogsView: View {
                     description: "Workspaces can now be saved to a file and imported later as a new copy, making it easier to back up your data, move between Local and iCloud, or recover after a reinstall."
                 ),
                 ReleaseItem(
+                    systemImage: "tag.fill",
+                    title: "Uncategorized Expenses",
+                    description: "When enabled, review uncategorized expenses when you next open the app or return it to the foreground.\n\nHow to enable: Settings > General > Behavior"
+                ),
+                ReleaseItem(
                     systemImage: "desktopcomputer",
                     title: "Optimized Interface for Mac",
                     description: "Reconfigured the user interface for a better experience while using a Mac."
