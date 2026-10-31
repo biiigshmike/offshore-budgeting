@@ -372,6 +372,7 @@ struct HomeView: View {
                 cards: cards,
                 workspaceID: workspace.id,
                 showsTileSizePicker: showsTileSizePicker,
+                showsTileSizeFootnote: isPhone,
                 pinnedItems: $pinnedItems
             )
             .onDisappear {
@@ -385,6 +386,7 @@ struct HomeView: View {
                     cards: cards,
                     workspaceID: workspace.id,
                     showsTileSizePicker: showsTileSizePicker,
+                    showsTileSizeFootnote: isPhone,
                     pinnedItems: $pinnedItems
                 )
             }
@@ -1528,7 +1530,11 @@ enum HomeLayoutCapabilities {
         dynamicTypeSize: DynamicTypeSize,
         gridSpacing: CGFloat
     ) -> Bool {
-        supportsMultiColumnLayout(
+        guard voiceOverEnabled == false, dynamicTypeSize.isAccessibilitySize == false else {
+            return false
+        }
+        // Let iPhone users choose sizes before rotating to a wider layout.
+        return isPhone || supportsMultiColumnLayout(
             usableWidth: usableWidth,
             isPhone: isPhone,
             horizontalSizeClass: horizontalSizeClass,

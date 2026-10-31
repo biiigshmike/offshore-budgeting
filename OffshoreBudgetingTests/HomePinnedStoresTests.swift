@@ -349,6 +349,18 @@ struct HomePinnedStoresTests {
         #expect(supports == false)
     }
 
+    @Test(arguments: [0.0, 350.0, 900.0])
+    func layoutCapabilities_compactPhoneAllowsSizeChoices(usableWidth: Double) {
+        #expect(HomeLayoutCapabilities.supportsTileSizeControl(
+            usableWidth: usableWidth,
+            isPhone: true,
+            horizontalSizeClass: .compact,
+            voiceOverEnabled: false,
+            dynamicTypeSize: .large,
+            gridSpacing: 12
+        ))
+    }
+
     @Test func layoutCapabilities_nonPhoneWideWidthSupportsMultiColumn() throws {
         let supports = HomeLayoutCapabilities.supportsMultiColumnLayout(
             usableWidth: 700,
@@ -404,7 +416,7 @@ struct HomePinnedStoresTests {
 
         #expect(columns == expectedColumns)
         #expect(supports == (expectedColumns >= 2))
-        #expect(showsControls == supports)
+        #expect(showsControls)
     }
 
     @Test func layoutCapabilities_unknownPhoneSizeClassStaysStacked() {
@@ -422,7 +434,7 @@ struct HomePinnedStoresTests {
             voiceOverEnabled: false,
             dynamicTypeSize: .large,
             gridSpacing: 12
-        ) == false)
+        ))
     }
 
     @Test(arguments: [false, true])

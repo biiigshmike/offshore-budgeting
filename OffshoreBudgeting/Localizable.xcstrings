@@ -26112,6 +26112,17 @@
         }
       }
     },
+    "homeEdit.footer.phoneTileSize" : {
+      "comment" : "Footnote explaining when Home widget size choices take effect on iPhone.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Size choices apply in landscape when there’s enough room. Widgets stay stacked in portrait."
+          }
+        }
+      }
+    },
     "homeEdit.missingCard" : {
       "comment" : "Fallback title when a pinned card can no longer be found.",
       "localizations" : {

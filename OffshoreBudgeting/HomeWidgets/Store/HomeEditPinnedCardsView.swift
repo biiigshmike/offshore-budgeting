@@ -12,6 +12,7 @@ struct HomeEditPinnedCardsView: View {
     let cards: [Card]
     let workspaceID: UUID
     let showsTileSizePicker: Bool
+    let showsTileSizeFootnote: Bool
 
     @Binding var pinnedItems: [HomePinnedItem]
 
@@ -26,13 +27,7 @@ struct HomeEditPinnedCardsView: View {
 
             // MARK: - Pinned on Home (combined)
 
-            Section(
-                String(
-                    localized: "homeEdit.section.pinnedOnDashboard",
-                    defaultValue: "Pinned on Dashboard",
-                    comment: "Section title for items currently pinned to the Home dashboard."
-                )
-            ) {
+            Section {
                 if pinnedItems.isEmpty {
                     Text(
                         String(
@@ -50,6 +45,24 @@ struct HomeEditPinnedCardsView: View {
                     }
                     .onMove(perform: movePinnedItems)
                     .onDelete(perform: deletePinnedItems)
+                }
+            } header: {
+                Text(
+                    String(
+                        localized: "homeEdit.section.pinnedOnDashboard",
+                        defaultValue: "Pinned on Dashboard",
+                        comment: "Section title for items currently pinned to the Home dashboard."
+                    )
+                )
+            } footer: {
+                if showsTileSizePicker && showsTileSizeFootnote {
+                    Text(
+                        String(
+                            localized: "homeEdit.footer.phoneTileSize",
+                            defaultValue: "Size choices apply in landscape when there’s enough room. Widgets stay stacked in portrait.",
+                            comment: "Footnote explaining when Home widget size choices take effect on iPhone."
+                        )
+                    )
                 }
             }
 
