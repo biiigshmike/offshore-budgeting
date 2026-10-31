@@ -420,51 +420,19 @@ struct EditBudgetView: View {
     // MARK: - Display
 
     private func scheduleString(for preset: Preset) -> String {
+        guard preset.interval > 1 else { return preset.frequency.displayName }
         switch preset.frequency {
         case .none:
-            return "None"
-
+            return preset.frequency.displayName
         case .daily:
-            return preset.interval == 1 ? "Daily" : "Every \(localizedInt(preset.interval)) days"
-
+            return String(localized: "Every \(localizedInt(preset.interval)) days")
         case .weekly:
-            let day = weekdayName(preset.weeklyWeekday)
-            return preset.interval == 1 ? "Weekly • \(day)" : "Every \(localizedInt(preset.interval)) weeks • \(day)"
-
+            return String(localized: "Every \(localizedInt(preset.interval)) weeks")
         case .monthly:
-            if preset.monthlyIsLastDay {
-                return preset.interval == 1 ? "Monthly • Last day" : "Every \(localizedInt(preset.interval)) months • Last day"
-            } else {
-                let day = ordinalDay(preset.monthlyDayOfMonth)
-                return preset.interval == 1 ? "Monthly • \(day)" : "Every \(localizedInt(preset.interval)) months • \(day)"
-            }
-
+            return String(localized: "Every \(localizedInt(preset.interval)) months")
         case .yearly:
-            let month = monthName(preset.yearlyMonth)
-            let day = ordinalDay(preset.yearlyDayOfMonth)
-            return preset.interval == 1 ? "Yearly • \(month) \(day)" : "Every \(localizedInt(preset.interval)) years • \(month) \(day)"
+            return String(localized: "Every \(localizedInt(preset.interval)) years")
         }
-    }
-
-    private func weekdayName(_ weekday: Int) -> String {
-        let clamped = min(7, max(1, weekday))
-        return Calendar.current.weekdaySymbols[clamped - 1]
-    }
-
-    private func monthName(_ month: Int) -> String {
-        let clamped = min(12, max(1, month))
-        return Calendar.current.monthSymbols[clamped - 1]
-    }
-
-    private func ordinalDay(_ day: Int) -> String {
-        let clamped = min(31, max(1, day))
-        if Locale.current.identifier.hasPrefix("es") {
-            return localizedInt(clamped)
-        }
-        let formatter = NumberFormatter()
-        formatter.numberStyle = .ordinal
-        formatter.locale = .current
-        return formatter.string(from: NSNumber(value: clamped)) ?? localizedInt(clamped)
     }
 
     private func localizedInt(_ value: Int) -> String {

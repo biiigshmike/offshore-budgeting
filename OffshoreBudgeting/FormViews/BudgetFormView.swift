@@ -74,6 +74,7 @@ struct BudgetFormView: View {
             ForEach(presets) { preset in
                 Toggle(isOn: bindingForPreset(preset)) {
                     Text(verbatim: presetMenuTitle(preset))
+                    Text(scheduleString(preset))
                 }
                 .menuActionDismissBehavior(.disabled)
             }
@@ -99,10 +100,9 @@ struct BudgetFormView: View {
     }
 
     private func presetMenuTitle(_ preset: Preset) -> String {
-        let title = preset.isArchived
+        preset.isArchived
             ? "\(preset.title) (\(String(localized: "Archived")))"
             : preset.title
-        return "\(title) • \(CurrencyFormatter.string(from: preset.plannedAmount)) • \(scheduleString(preset))"
     }
 
     private func selectionMenuLabel<Summary: View>(
@@ -216,7 +216,7 @@ struct BudgetFormView: View {
                                     .foregroundStyle(.secondary)
                             }
                         }
-                        Text("\(CurrencyFormatter.string(from: preset.plannedAmount)) • \(scheduleString(preset))")
+                        Text(scheduleString(preset))
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                     }

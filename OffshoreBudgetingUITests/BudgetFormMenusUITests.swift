@@ -39,9 +39,11 @@ final class BudgetFormMenusUITests: XCTestCase {
         app.buttons["Clear All"].tap()
         let rent = app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH %@", "Rent")).firstMatch
         XCTAssertTrue(rent.waitForExistence(timeout: 5))
+        XCTAssertFalse(rent.label.contains("$"))
         rent.tap()
         let internet = app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH %@", "Internet")).firstMatch
         XCTAssertTrue(internet.waitForExistence(timeout: 3))
+        XCTAssertFalse(internet.label.contains("$"))
         internet.tap()
         XCTAssertTrue(app.buttons["Clear All"].waitForExistence(timeout: 3))
         app.buttons["Clear All"].tap()
