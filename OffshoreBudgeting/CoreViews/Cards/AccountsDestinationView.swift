@@ -103,7 +103,9 @@ struct AccountsDestinationView: View {
 
     @ToolbarContentBuilder
     private var accountsToolbar: some ToolbarContent {
-        if let directSelection {
+        // Sidebar destinations are roots. Only phone shortcuts need a way
+        // back to the Accounts overview without a native stack push.
+        if isPhone, let directSelection {
             ToolbarItem(placement: .topBarLeading) {
                 Button {
                     directSelection.wrappedValue = nil
