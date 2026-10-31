@@ -4,6 +4,8 @@ import SwiftUI
 struct HelpTopicLink: View {
     let topicID: String
     var title: LocalizedStringKey = "Learn More"
+    // Supporting links use footnote; standalone help rows opt into body.
+    var font: Font = .footnote
 
     @State private var isShowingHelp = false
 
@@ -15,7 +17,7 @@ struct HelpTopicLink: View {
                 Label(title, systemImage: "questionmark.circle")
                     .frame(minHeight: 44, alignment: .leading)
             }
-            .font(.footnote)
+            .font(font)
             .buttonStyle(.borderless)
             .blocksAutomaticExpenseReview(while: isShowingHelp)
             .appSheet(isPresented: $isShowingHelp) {

@@ -34,7 +34,7 @@ final class SavingsRefreshUITests: XCTestCase {
             XCTAssertEqual(toggle.value as? String, "1")
         }
         app.buttons["Save"].tap()
-        XCTAssertTrue(app.navigationBars["Offshore Savings"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.navigationBars["Savings"].waitForExistence(timeout: 5))
     }
 
     private func ledgerRow(_ note: String, in app: XCUIApplication) -> XCUIElement {
@@ -46,7 +46,7 @@ final class SavingsRefreshUITests: XCTestCase {
         return row
     }
 
-    func testRunningTotalUpdatesAfterAddEditDeleteAndRefreshWithoutRelaunch() throws {
+    func testRunningTotalUpdatesAfterAddEditDeleteWithoutRelaunch() throws {
         let app = XCUIApplication()
         app.launchArguments = [
             "-uiTesting", "-uiTestingReset", "-uiTestScenarioBudgetMenus",
@@ -57,8 +57,20 @@ final class SavingsRefreshUITests: XCTestCase {
         XCTAssertTrue(app.navigationBars["Home"].waitForExistence(timeout: 15))
         app.tabBars.buttons["Accounts"].tap()
         app.buttons["accounts.destination.savings"].tap()
-        XCTAssertTrue(app.navigationBars["Offshore Savings"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.navigationBars["Savings"].waitForExistence(timeout: 5))
         assertBalance("0.00", in: app)
+        XCTAssertFalse(app.buttons["Refresh Savings"].exists)
+        XCTAssertFalse(app.staticTexts["Offshore Savings is up to date."].exists)
+        let guide = app.buttons["Savings guide"]
+        for _ in 0..<4 {
+            if guide.exists && guide.isHittable { break }
+            app.swipeUp()
+        }
+        XCTAssertTrue(guide.isHittable)
+        let overview = XCTAttachment(screenshot: app.screenshot())
+        overview.name = "Savings guide and compact phone title"
+        overview.lifetime = .keepAlways
+        add(overview)
 
         addEntry("100", note: "Live balance entry", in: app)
         assertBalance("100.00", in: app)
@@ -75,16 +87,6 @@ final class SavingsRefreshUITests: XCTestCase {
         assertBalance("60.00", in: app)
 
         addEntry("10", note: "Reserved balance entry", setAside: true, in: app)
-        assertBalance("50.00", in: app)
-
-        // A display refresh must work even when no ledger repairs are needed.
-        let refresh = app.buttons["Refresh Savings"]
-        for _ in 0..<4 {
-            if refresh.exists && refresh.isHittable { break }
-            app.swipeUp()
-        }
-        XCTAssertTrue(refresh.isEnabled)
-        refresh.tap()
         assertBalance("50.00", in: app)
 
         let reserved = ledgerRow("Reserved balance entry", in: app)

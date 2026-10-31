@@ -3,6 +3,32 @@ import SwiftData
 
 @MainActor
 enum BudgetCategoryGoalStore {
+    /// Previews only spending that will participate in the new budget's category totals.
+    static func plannedContributions(
+        presets: [Preset],
+        selectedPresetIDs: Set<UUID>,
+        selectedCardIDs: Set<UUID>,
+        workspaceID: UUID,
+        startDate: Date,
+        endDate: Date,
+        calendar: Calendar = .current
+    ) -> [UUID: Double] {
+        var totals: [UUID: Double] = [:]
+        for preset in presets {
+            guard selectedPresetIDs.contains(preset.id), !preset.isArchived,
+                  preset.workspace?.id == workspaceID,
+                  let card = preset.defaultCard, card.workspace?.id == workspaceID,
+                  selectedCardIDs.contains(card.id),
+                  let category = preset.defaultCategory, category.workspace?.id == workspaceID else { continue }
+            let count = PresetScheduleEngine.occurrences(
+                for: preset, startDate: startDate, endDate: endDate, calendar: calendar
+            ).count
+            guard count > 0 else { continue }
+            totals[category.id, default: 0] += preset.plannedAmount * Double(count)
+        }
+        return totals
+    }
+
     static func drafts(for budget: Budget) -> [UUID: CategoryGoalDraft] {
         var result: [UUID: CategoryGoalDraft] = [:]
         for goal in budget.categoryLimits ?? [] {

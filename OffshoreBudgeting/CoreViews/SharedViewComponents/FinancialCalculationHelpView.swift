@@ -49,7 +49,7 @@ struct FinancialCalculationHelpView: View {
 
                 if let helpTopicID {
                     Section {
-                        HelpTopicLink(topicID: helpTopicID, title: "Learn more in Help")
+                        HelpTopicLink(topicID: helpTopicID, title: "Learn more in Help", font: .body)
                     }
                 }
             }

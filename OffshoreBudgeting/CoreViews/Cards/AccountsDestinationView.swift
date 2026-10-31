@@ -451,6 +451,11 @@ struct AccountsDestinationView: View {
     }
 
     private var navigationTitleText: String {
-        selectedSegment.title
+        // Leave room for the calendar, sort, and add controls in the phone's
+        // inline navigation bar. The Accounts destination keeps its full name.
+        if isPhone, selectedSegment == .savings {
+            return String(localized: "accounts.savings.phoneTitle", defaultValue: "Savings", comment: "Short savings navigation title on iPhone, leaving room for toolbar controls.")
+        }
+        return selectedSegment.title
     }
 }

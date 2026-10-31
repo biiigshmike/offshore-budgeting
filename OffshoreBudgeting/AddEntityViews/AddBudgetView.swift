@@ -77,6 +77,14 @@ struct AddBudgetView: View {
             presets: presets,
             categories: CategoryArchivePolicy.activeCategories(from: categories),
             scheduleString: scheduleString(for:),
+            plannedGoalContributions: BudgetCategoryGoalStore.plannedContributions(
+                presets: presets,
+                selectedPresetIDs: selectedPresetIDs,
+                selectedCardIDs: selectedCardIDs,
+                workspaceID: workspace.id,
+                startDate: startDate,
+                endDate: endDate
+            ),
             name: $name,
             userEditedName: $userEditedName,
             startDate: $startDate,

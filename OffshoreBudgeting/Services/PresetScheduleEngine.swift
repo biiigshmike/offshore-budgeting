@@ -10,11 +10,21 @@ import Foundation
 struct PresetScheduleEngine {
 
     static func occurrences(for preset: Preset, in budget: Budget, calendar: Calendar = .current) -> [Date] {
+        occurrences(for: preset, startDate: budget.startDate, endDate: budget.endDate, calendar: calendar)
+    }
+
+    /// The same budget-anchored schedule, available before a budget is saved.
+    static func occurrences(
+        for preset: Preset,
+        startDate: Date,
+        endDate: Date,
+        calendar: Calendar = .current
+    ) -> [Date] {
         var cal = calendar
         cal.timeZone = .current
 
-        let windowStart = cal.startOfDay(for: budget.startDate)
-        let windowEnd = cal.startOfDay(for: budget.endDate)
+        let windowStart = cal.startOfDay(for: startDate)
+        let windowEnd = cal.startOfDay(for: endDate)
 
         guard windowStart <= windowEnd else { return [] }
 

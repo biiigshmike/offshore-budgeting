@@ -90,8 +90,12 @@ enum UITestSupport {
             let workspace = Workspace(name: "Budget Menu Workspace", hexColor: "#3B82F6")
             let cardA = Card(name: "Ruby Card", theme: "ruby", effect: "plastic", workspace: workspace)
             let cardB = Card(name: "Ocean Card", theme: "aqua", effect: "plastic", workspace: workspace)
-            let presetA = Preset(title: "Internet", plannedAmount: 60, workspace: workspace, defaultCard: cardA)
-            let presetB = Preset(title: "Rent", plannedAmount: 800, workspace: workspace, defaultCard: cardB)
+            let category = Category(name: "Bills", hexColor: "#3B82F6", workspace: workspace)
+            let presetA = Preset(title: "Internet", plannedAmount: 60, workspace: workspace,
+                                 defaultCard: cardA, defaultCategory: category)
+            let presetB = Preset(title: "Rent", plannedAmount: 800, workspace: workspace,
+                                 defaultCard: cardB, defaultCategory: category)
+            context.insert(category)
             let range = Calendar.current.dateInterval(of: .month, for: .now)!
             let budget = Budget(name: "Existing Menu Budget", startDate: range.start,
                 endDate: Calendar.current.date(byAdding: .day, value: -1, to: range.end)!, workspace: workspace)

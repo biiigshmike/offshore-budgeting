@@ -229,17 +229,6 @@ struct SavingsAccountView<TrailingToolbar: ToolbarContent>: View {
         accountScopedEntries.reduce(0) { $0 + $1.amount }
     }
 
-    private var manualSyncStatus: SavingsAccountService.ManualSavingsSyncStatus {
-        SavingsAccountService.manualSyncStatus(
-            for: workspace,
-            defaultBudgetingPeriodRaw: defaultBudgetingPeriodRaw,
-            incomes: incomes,
-            plannedExpenses: plannedExpenses,
-            variableExpenses: variableExpenses,
-            modelContext: modelContext
-        )
-    }
-
     private var currentPeriodChartPoints: [SavingsChartPoint] {
         if let graphSnapshot {
             return graphSnapshot.currentPeriodPoints.map { point in
@@ -370,17 +359,7 @@ struct SavingsAccountView<TrailingToolbar: ToolbarContent>: View {
                     showingCalculationHelp = true
                 }
 
-                HelpTopicLink(topicID: "accounts-savings-account", title: "Savings guide")
-
-                Button {
-                    runManualSync()
-                } label: {
-                    Label("Refresh Savings", systemImage: "arrow.clockwise")
-                }
-
-                Text(manualSyncStatus.reason.message)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
+                HelpTopicLink(topicID: "accounts-savings-account", title: "Savings guide", font: .body)
             }
 
             Section("Ledger") {
@@ -784,21 +763,6 @@ struct SavingsAccountView<TrailingToolbar: ToolbarContent>: View {
     private func deleteEntry(_ entry: SavingsLedgerEntry) {
         SavingsAccountService.deleteEntry(entry, modelContext: modelContext)
         rebuildGraphSnapshot(reason: "entryDeleted")
-    }
-
-    private func runManualSync() {
-        _ = SavingsAccountService.runManualSyncIfNeeded(
-            for: workspace,
-            defaultBudgetingPeriodRaw: defaultBudgetingPeriodRaw,
-            incomes: incomes,
-            plannedExpenses: plannedExpenses,
-            variableExpenses: variableExpenses,
-            modelContext: modelContext
-        )
-
-        // Ledger synchronization can be current while the displayed cache is
-        // stale. Refresh the display regardless of whether repairs were needed.
-        rebuildGraphSnapshot(reason: "manualSavingsSync")
     }
 
     private func handleCommand(_ commandID: String) {

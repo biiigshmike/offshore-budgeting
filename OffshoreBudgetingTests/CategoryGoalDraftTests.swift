@@ -185,6 +185,83 @@ struct CategoryGoalDraftTests {
                                                       modelContext: context))
     }
 
+    @Test func presetMinimumPreviewCountsOccurrencesAndBothDateBoundaries() throws {
+        let context = try makeContext()
+        let workspace = Workspace(name: "Personal", hexColor: "#000000")
+        context.insert(workspace)
+        let category = Category(name: "Bills", hexColor: "#123456", workspace: workspace)
+        let card = Card(name: "Card", workspace: workspace)
+        let weekly = Preset(title: "Weekly", plannedAmount: 10,
+                            frequencyRaw: RecurrenceFrequency.weekly.rawValue,
+                            weeklyWeekday: 5, workspace: workspace, defaultCard: card, defaultCategory: category)
+        let monthly = Preset(title: "Month end", plannedAmount: 25, monthlyDayOfMonth: 31,
+                             workspace: workspace, defaultCard: card, defaultCategory: category)
+        context.insert(weekly)
+        context.insert(monthly)
+        try context.save()
+        let calendar = Calendar.current
+        let start = try #require(calendar.date(from: DateComponents(year: 2026, month: 1, day: 1)))
+        let end = try #require(calendar.date(from: DateComponents(year: 2026, month: 1, day: 31)))
+        let totals = BudgetCategoryGoalStore.plannedContributions(
+            presets: [weekly, monthly], selectedPresetIDs: [weekly.id, monthly.id],
+            selectedCardIDs: [card.id], workspaceID: workspace.id, startDate: start, endDate: end
+        )
+        // Five Thursdays starting Jan 1, plus the monthly occurrence on Jan 31.
+        #expect(totals == [category.id: 75])
+        #expect(!context.hasChanges)
+        #expect(try context.fetchCount(FetchDescriptor<Budget>()) == 0)
+        #expect(try context.fetchCount(FetchDescriptor<PlannedExpense>()) == 0)
+        #expect(try context.fetchCount(FetchDescriptor<BudgetCategoryLimit>()) == 0)
+        let shortened = BudgetCategoryGoalStore.plannedContributions(
+            presets: [weekly, monthly], selectedPresetIDs: [monthly.id], selectedCardIDs: [card.id],
+            workspaceID: workspace.id, startDate: start, endDate: start
+        )
+        #expect(shortened.isEmpty)
+    }
+
+    @Test func presetMinimumPreviewRespectsSelectionsAndWorkspaceBoundaries() throws {
+        let workspace = Workspace(name: "Personal", hexColor: "#000000")
+        let other = Workspace(name: "Work", hexColor: "#000000")
+        let category = Category(name: "Bills", hexColor: "#123456", workspace: workspace)
+        let foreignCategory = Category(name: "Work", hexColor: "#123456", workspace: other)
+        let card = Card(name: "Card", workspace: workspace)
+        let unselectedCard = Card(name: "Other card", workspace: workspace)
+        let foreignCard = Card(name: "Work card", workspace: other)
+        let included = Preset(title: "Included", plannedAmount: 10, workspace: workspace,
+                              defaultCard: card, defaultCategory: category)
+        let omitted = Preset(title: "Not selected", plannedAmount: 100, workspace: workspace,
+                            defaultCard: card, defaultCategory: category)
+        let wrongCard = Preset(title: "Unselected card", plannedAmount: 100, workspace: workspace,
+                              defaultCard: unselectedCard, defaultCategory: category)
+        let archived = Preset(title: "Archived", plannedAmount: 100, workspace: workspace,
+                             defaultCard: card, defaultCategory: category, isArchived: true)
+        let foreign = Preset(title: "Foreign", plannedAmount: 100, workspace: other,
+                             defaultCard: card, defaultCategory: category)
+        let badCategory = Preset(title: "Foreign category", plannedAmount: 100, workspace: workspace,
+                                defaultCard: card, defaultCategory: foreignCategory)
+        let badCard = Preset(title: "Foreign card", plannedAmount: 100, workspace: workspace,
+                            defaultCard: foreignCard, defaultCategory: category)
+        let uncategorized = Preset(title: "Uncategorized", plannedAmount: 100, workspace: workspace,
+                                  defaultCard: card)
+        let presets = [included, omitted, wrongCard, archived, foreign, badCategory, badCard, uncategorized]
+        let calendar = Calendar.current
+        let start = try #require(calendar.date(from: DateComponents(year: 2026, month: 1, day: 1)))
+        let end = try #require(calendar.date(from: DateComponents(year: 2026, month: 1, day: 31)))
+        let totals = BudgetCategoryGoalStore.plannedContributions(
+            presets: presets, selectedPresetIDs: Set(presets.filter { $0.id != omitted.id }.map(\.id)),
+            selectedCardIDs: [card.id, foreignCard.id], workspaceID: workspace.id, startDate: start, endDate: end
+        )
+        #expect(totals == [category.id: 10])
+        #expect(BudgetCategoryGoalStore.plannedContributions(
+            presets: presets, selectedPresetIDs: Set(presets.map(\.id)), selectedCardIDs: [],
+            workspaceID: workspace.id, startDate: start, endDate: end
+        ).isEmpty)
+        #expect(BudgetCategoryGoalStore.plannedContributions(
+            presets: presets, selectedPresetIDs: [included.id], selectedCardIDs: [card.id],
+            workspaceID: workspace.id, startDate: end, endDate: start
+        ).isEmpty)
+    }
+
     private func makeContext() throws -> ModelContext {
         let schema = Schema([
             Workspace.self, Budget.self, BudgetCategoryLimit.self, Card.self, BudgetCardLink.self,

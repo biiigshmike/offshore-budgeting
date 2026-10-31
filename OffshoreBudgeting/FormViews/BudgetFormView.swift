@@ -18,6 +18,7 @@ struct BudgetFormView: View {
     let categories: [Category]
     
     let scheduleString: (Preset) -> String
+    var plannedGoalContributions: [UUID: Double]? = nil
     
     // MARK: - Multiple-selection menus
 
@@ -261,7 +262,12 @@ struct BudgetFormView: View {
         }
         .navigationTitle(modeTitle)
         .appSheet(isPresented: $showingCategoryGoals) {
-            CategoryGoalsEditorView(categories: categories, drafts: categoryGoalDrafts) { updatedDrafts in
+            CategoryGoalsEditorView(
+                categories: categories,
+                drafts: categoryGoalDrafts,
+                plannedContributions: plannedGoalContributions ?? [:],
+                allowsPlannedMinimum: plannedGoalContributions != nil
+            ) { updatedDrafts in
                 categoryGoalDrafts = updatedDrafts
             }
         }

@@ -6,6 +6,7 @@ struct CategoryGoalsEditorView: View {
     let categories: [Category]
     let plannedContributions: [UUID: Double]
     let variableContributions: [UUID: Double]
+    let allowsPlannedMinimum: Bool
     let onSave: ([UUID: CategoryGoalDraft]) -> Void
 
     @Environment(\.dismiss) private var dismiss
@@ -16,11 +17,13 @@ struct CategoryGoalsEditorView: View {
         drafts: [UUID: CategoryGoalDraft],
         plannedContributions: [UUID: Double] = [:],
         variableContributions: [UUID: Double] = [:],
+        allowsPlannedMinimum: Bool = false,
         onSave: @escaping ([UUID: CategoryGoalDraft]) -> Void
     ) {
         self.categories = categories
         self.plannedContributions = plannedContributions
         self.variableContributions = variableContributions
+        self.allowsPlannedMinimum = allowsPlannedMinimum
         self.onSave = onSave
         _drafts = State(initialValue: drafts)
     }
@@ -35,7 +38,8 @@ struct CategoryGoalsEditorView: View {
                                 category: category,
                                 draft: draftBinding(for: category.id),
                                 plannedContribution: plannedContributions[category.id] ?? 0,
-                                variableContribution: variableContributions[category.id] ?? 0
+                                variableContribution: variableContributions[category.id] ?? 0,
+                                allowsPlannedMinimum: allowsPlannedMinimum
                             )
                         } label: {
                             VStack(alignment: .leading, spacing: 6) {
@@ -54,7 +58,7 @@ struct CategoryGoalsEditorView: View {
                     Text("Goals apply only to this budget. Leave either amount blank if you don't want that goal.")
                 }
                 Section {
-                    HelpTopicLink(topicID: "budgets-category-goals", title: "Category Goals guide")
+                    HelpTopicLink(topicID: "budgets-category-goals", title: "Category Goals guide", font: .body)
                 }
             }
             .overlay {

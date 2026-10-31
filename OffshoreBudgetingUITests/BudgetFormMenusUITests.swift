@@ -70,7 +70,20 @@ final class BudgetFormMenusUITests: XCTestCase {
         app.buttons["Add Budget"].tap()
         XCTAssertTrue(app.navigationBars["Add Budget"].waitForExistence(timeout: 5))
         exerciseMenus(app, formTitle: "Add Budget")
-        // Saving uses the existing creation flow, including both selections.
+        app.buttons["budget.categoryGoals"].tap()
+        XCTAssertTrue(app.navigationBars["Category Goals"].waitForExistence(timeout: 5))
+        app.staticTexts["Bills"].firstMatch.tap()
+        XCTAssertTrue(app.navigationBars["Bills"].waitForExistence(timeout: 5))
+        app.buttons["categoryGoals.usePlannedMinimum"].tap()
+        XCTAssertEqual(app.textFields["Minimum"].value as? String, "860.00")
+        let goals = XCTAttachment(screenshot: app.screenshot())
+        goals.name = "Preset-based minimum during budget creation"
+        goals.lifetime = .keepAlways
+        add(goals)
+        app.navigationBars["Bills"].buttons["Category Goals"].tap()
+        app.buttons["Done"].tap()
+        XCTAssertTrue(app.navigationBars["Add Budget"].waitForExistence(timeout: 5))
+        // Saving uses the existing creation flow, including selections and the goal draft.
         app.buttons["Save"].tap()
         XCTAssertTrue(app.navigationBars["Budgets"].waitForExistence(timeout: 5))
 
