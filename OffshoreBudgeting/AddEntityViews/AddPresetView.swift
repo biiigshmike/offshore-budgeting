@@ -32,6 +32,7 @@ struct AddPresetView: View {
     @State private var yearlyMonth: Int = 1
     @State private var yearlyDayOfMonth: Int = 15
 
+    @AppStorage("sort.cards.mode") private var cardsSortModeRaw: String = "az"
     @State private var selectedCardID: UUID? = nil
     @State private var selectedCategoryID: UUID? = nil
 
@@ -55,6 +56,18 @@ struct AddPresetView: View {
         )
     }
 
+    private var sortedCards: [Card] {
+        cards.sorted {
+            let comparison = $0.name.localizedCaseInsensitiveCompare($1.name)
+            return cardsSortModeRaw == "za" ? comparison == .orderedDescending : comparison == .orderedAscending
+        }
+    }
+
+    private func selectInitialCardIfNeeded() {
+        guard selectedCardID == nil else { return }
+        selectedCardID = sortedCards.first?.id
+    }
+
     private var trimmedTitle: String {
         PresetFormView.trimmedTitle(title)
     }
@@ -75,7 +88,7 @@ struct AddPresetView: View {
     var body: some View {
         PresetFormView(
             workspace: workspace,
-            cards: cards,
+            cards: sortedCards,
             categories: categories,
             title: $title,
             plannedAmountText: $plannedAmountText,
@@ -122,7 +135,11 @@ struct AddPresetView: View {
         } message: {
             Text("Choose a default card for this preset.")
         }
+        .onChange(of: cards.map(\.id)) { _, _ in
+            selectInitialCardIfNeeded()
+        }
         .onAppear {
+            defer { selectInitialCardIfNeeded() }
             guard DebugScreenshotFormDefaults.isEnabled else { return }
 
             if trimmedTitle.isEmpty {

@@ -5,6 +5,7 @@ struct EntityMenuPicker<Item: Identifiable, ItemLabel: View>: View where Item.ID
     let title: LocalizedStringKey
     let items: [Item]
     @Binding var selection: UUID?
+    private let showsTitle: Bool
     private let allowsEmptySelection: Bool
     private let itemLabel: (Item?) -> ItemLabel
 
@@ -13,9 +14,11 @@ struct EntityMenuPicker<Item: Identifiable, ItemLabel: View>: View where Item.ID
         items: [Item],
         selection: Binding<UUID?>,
         allowsEmptySelection: Bool = true,
+        showsTitle: Bool = true,
         @ViewBuilder label: @escaping (Item?) -> ItemLabel
     ) {
         self.title = title
+        self.showsTitle = showsTitle
         self.items = items
         _selection = selection
         self.allowsEmptySelection = allowsEmptySelection
@@ -42,16 +45,23 @@ struct EntityMenuPicker<Item: Identifiable, ItemLabel: View>: View where Item.ID
         } label: {
             ViewThatFits(in: .horizontal) {
                 HStack(spacing: 12) {
-                    Text(title)
-                        .foregroundStyle(.primary)
-                        .fixedSize(horizontal: true, vertical: false)
-                    Spacer(minLength: 0)
+                    if showsTitle {
+                        Text(title)
+                            .foregroundStyle(.primary)
+                            .fixedSize(horizontal: true, vertical: false)
+                        Spacer(minLength: 0)
+                    }
                     selectedLabel
+                    if !showsTitle {
+                        Spacer(minLength: 0)
+                    }
                 }
                 VStack(alignment: .leading, spacing: 8) {
-                    Text(title)
-                        .foregroundStyle(.primary)
-                        .fixedSize(horizontal: false, vertical: true)
+                    if showsTitle {
+                        Text(title)
+                            .foregroundStyle(.primary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                     HStack {
                         selectedLabel
                         Spacer(minLength: 0)
