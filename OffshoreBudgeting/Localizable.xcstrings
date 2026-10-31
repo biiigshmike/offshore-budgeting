@@ -1,100 +1,6 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
-    "Sets category minimums from attached presets within the budget dates. Only presets assigned to selected cards are included. You can still edit each category’s Min and Max. Turning this off restores previous minimums unless you edited them." : {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Sets category minimums from attached presets within the budget dates. Only presets assigned to selected cards are included. You can still edit each category’s Min and Max. Turning this off restores previous minimums unless you edited them."
-          }
-        },
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "يضبط الحدود الدنيا للفئات من القوالب المرفقة ضمن تواريخ الميزانية. تُدرج فقط القوالب المرتبطة بالبطاقات المحددة. يمكنك تعديل الحدين الأدنى والأقصى لكل فئة. يؤدي إيقاف هذا الخيار إلى استعادة الحدود الدنيا السابقة ما لم تعدّلها."
-          }
-        },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Legt Kategorie-Mindestwerte anhand verknüpfter Vorlagen innerhalb des Budgetzeitraums fest. Nur Vorlagen ausgewählter Karten werden berücksichtigt. Min und Max jeder Kategorie bleiben bearbeitbar. Beim Ausschalten werden vorherige Mindestwerte wiederhergestellt, sofern du sie nicht bearbeitet hast."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Establece los mínimos por categoría a partir de los preajustes asociados dentro de las fechas del presupuesto. Solo incluye preajustes de las tarjetas seleccionadas. Puedes editar el mínimo y máximo de cada categoría. Al desactivarlo, se restauran los mínimos anteriores salvo que los hayas editado."
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Définit les minimums par catégorie à partir des modèles associés pendant la période du budget. Seuls les modèles des cartes sélectionnées sont inclus. Vous pouvez modifier le minimum et le maximum de chaque catégorie. La désactivation rétablit les minimums précédents, sauf si vous les avez modifiés."
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Define os mínimos por categoria com base nos modelos vinculados dentro das datas do orçamento. Inclui apenas modelos dos cartões selecionados. Você ainda pode editar o mínimo e o máximo de cada categoria. Ao desativar, os mínimos anteriores são restaurados, exceto os que você editou."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "根据预算日期范围内关联的预设设置各类别的最低金额。仅包含分配给所选卡片的预设。您仍可编辑各类别的最低和最高金额。关闭后将恢复原来的最低金额，但您手动编辑过的值会保留。"
-          }
-        }
-      }
-    },
-    "Auto-Configure" : {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Auto-Configure"
-          }
-        },
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "تهيئة تلقائية"
-          }
-        },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Automatisch konfigurieren"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Configurar automáticamente"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Configuration automatique"
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Configurar automaticamente"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "自动配置"
-          }
-        }
-      }
-    },
     "" : {
       "localizations" : {
         "ar" : {
@@ -6370,6 +6276,53 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "进行身份验证以继续。"
+          }
+        }
+      }
+    },
+    "Auto-Configure" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تهيئة تلقائية"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Automatisch konfigurieren"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Auto-Configure"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Configurar automáticamente"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Configuration automatique"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Configurar automaticamente"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自动配置"
           }
         }
       }
@@ -18691,6 +18644,7 @@
       "isCommentAutoGenerated" : true
     },
     "Default Category" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -48714,6 +48668,53 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "设定支出限额"
+          }
+        }
+      }
+    },
+    "Sets category minimums from attached presets within the budget dates. Only presets assigned to selected cards are included. You can still edit each category’s Min and Max. Turning this off restores previous minimums unless you edited them." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "يضبط الحدود الدنيا للفئات من القوالب المرفقة ضمن تواريخ الميزانية. تُدرج فقط القوالب المرتبطة بالبطاقات المحددة. يمكنك تعديل الحدين الأدنى والأقصى لكل فئة. يؤدي إيقاف هذا الخيار إلى استعادة الحدود الدنيا السابقة ما لم تعدّلها."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Legt Kategorie-Mindestwerte anhand verknüpfter Vorlagen innerhalb des Budgetzeitraums fest. Nur Vorlagen ausgewählter Karten werden berücksichtigt. Min und Max jeder Kategorie bleiben bearbeitbar. Beim Ausschalten werden vorherige Mindestwerte wiederhergestellt, sofern du sie nicht bearbeitet hast."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sets category minimums from attached presets within the budget dates. Only presets assigned to selected cards are included. You can still edit each category’s Min and Max. Turning this off restores previous minimums unless you edited them."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Establece los mínimos por categoría a partir de los preajustes asociados dentro de las fechas del presupuesto. Solo incluye preajustes de las tarjetas seleccionadas. Puedes editar el mínimo y máximo de cada categoría. Al desactivarlo, se restauran los mínimos anteriores salvo que los hayas editado."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Définit les minimums par catégorie à partir des modèles associés pendant la période du budget. Seuls les modèles des cartes sélectionnées sont inclus. Vous pouvez modifier le minimum et le maximum de chaque catégorie. La désactivation rétablit les minimums précédents, sauf si vous les avez modifiés."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Define os mínimos por categoria com base nos modelos vinculados dentro das datas do orçamento. Inclui apenas modelos dos cartões selecionados. Você ainda pode editar o mínimo e o máximo de cada categoria. Ao desativar, os mínimos anteriores são restaurados, exceto os que você editou."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "根据预算日期范围内关联的预设设置各类别的最低金额。仅包含分配给所选卡片的预设。您仍可编辑各类别的最低和最高金额。关闭后将恢复原来的最低金额，但您手动编辑过的值会保留。"
           }
         }
       }

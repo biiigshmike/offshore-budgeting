@@ -200,7 +200,7 @@ struct ExpenseFormView: View {
                 Text("No cards yet. Create a card first to add expenses.")
                     .foregroundStyle(.secondary)
             } else {
-                EntityMenuPicker(title: "Card", items: cards, selection: $selectedCardID, allowsEmptySelection: false) { card in
+                EntityMenuPicker(title: "Card", items: cards, selection: $selectedCardID, allowsEmptySelection: false, showsTitle: false) { card in
                     CardMenuLabel(card: card)
                 }
             }
@@ -215,7 +215,7 @@ struct ExpenseFormView: View {
                 PillDatePickerField(title: "Date", date: $transactionDate)
             }
 
-            EntityMenuPicker(title: "Category", items: categories, selection: $selectedCategoryID) { category in
+            EntityMenuPicker(title: "Category", items: categories, selection: $selectedCategoryID, showsTitle: false) { category in
                 CategoryMenuLabel(category: category)
             }
         } header: {

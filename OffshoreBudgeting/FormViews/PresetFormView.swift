@@ -76,7 +76,7 @@ struct PresetFormView: View {
                 TextField("Planned Amount", text: $plannedAmountText)
                     .keyboardType(.decimalPad)
 
-                EntityMenuPicker(title: "Default Category", items: categories, selection: $selectedCategoryID) { category in
+                EntityMenuPicker(title: "Category", items: categories, selection: $selectedCategoryID, showsTitle: false) { category in
                     CategoryMenuLabel(category: category)
                 }
             }
