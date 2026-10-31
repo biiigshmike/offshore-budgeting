@@ -23,7 +23,7 @@ nonisolated enum HomeWidgetID: String, CaseIterable, Identifiable, Codable {
         case .income:
             return String(localized: "homeWidget.income", defaultValue: "Income", comment: "Pinned home widget title for income metrics.")
         case .savingsOutlook:
-            return String(localized: "homeWidget.savingsOutlook", defaultValue: "Savings Outlook", comment: "Pinned home widget title for savings outlook.")
+            return String(localized: "homeWidget.savingsOutlook", defaultValue: "Savings Outlook", comment: "Pinned home widget title for Offshore Savings outlook.")
         case .nextPlannedExpense:
             return String(localized: "homeWidget.nextPlannedExpense", defaultValue: "Next Planned Expense", comment: "Pinned home widget title for next planned expense.")
         case .categorySpotlight:

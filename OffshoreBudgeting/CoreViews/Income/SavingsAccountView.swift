@@ -345,7 +345,7 @@ struct SavingsAccountView<TrailingToolbar: ToolbarContent>: View {
                     .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
             }
 
-            Section("Savings Account") {
+            Section("Offshore Savings") {
                 HStack {
                     Text(String(localized: "Running Total", defaultValue: "Running Total", comment: "Label for the running total savings value."))
                     Spacer()
@@ -354,7 +354,7 @@ struct SavingsAccountView<TrailingToolbar: ToolbarContent>: View {
                         .foregroundStyle(runningTotal >= 0 ? .green : .red)
                 }
 
-                Text("Running Total includes all dates in your savings ledger.")
+                Text("Offshore Savings tracks money left over at the end of each budgeting period. Your running total includes all dates in your savings ledger.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
 
@@ -885,7 +885,8 @@ private struct SavingsLedgerEntryFormView: View {
 
     @State private var showingInvalidAmount: Bool = false
 
-    private let transferDefaultNote: String = "Transfer to True Savings"
+    private let transferDefaultNote: String = "Set Aside as Savings"
+    private let legacyTransferDefaultNote: String = "Transfer to True Savings"
 
     private var saveTitle: String {
         entry == nil ? "Add Savings Entry" : "Edit Savings Entry"
@@ -926,7 +927,7 @@ private struct SavingsLedgerEntryFormView: View {
 
                 TextField("Note", text: $note)
 
-                Toggle("Move to True Savings", isOn: $isTransferToTrueSavings)
+                Toggle("Set Aside as Savings", isOn: $isTransferToTrueSavings)
                     .onChange(of: isTransferToTrueSavings) { _, isEnabled in
                         guard isEnabled else { return }
                         if note.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
@@ -935,11 +936,9 @@ private struct SavingsLedgerEntryFormView: View {
                         normalizeAmountTextForTransfer()
                     }
 
-                if isTransferToTrueSavings {
-                    Text("This saves a negative manual adjustment so your running total reflects spendable savings.")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                }
+                Text("Record money you've set aside by subtracting this amount from Offshore Savings. The remaining balance is available for future spending. This does not transfer money between bank accounts.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
 
                 HStack {
                     Text("Type")
@@ -989,7 +988,7 @@ private struct SavingsLedgerEntryFormView: View {
                 isTransferToTrueSavings = (
                     entry.kind == .manualAdjustment &&
                     entry.amount < 0 &&
-                    entry.note == transferDefaultNote
+                    (entry.note == transferDefaultNote || entry.note == legacyTransferDefaultNote)
                 )
             }
         }

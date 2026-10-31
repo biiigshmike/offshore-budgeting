@@ -785,7 +785,7 @@ struct BudgetDetailView: View {
                 )
 
                 BudgetSummaryBucketCard(
-                    title: String(localized: "accounts.segment.savings", defaultValue: "Savings", comment: "Accounts section segment for savings."),
+                    title: String(localized: "accounts.segment.savings", defaultValue: "Offshore Savings", comment: "Accounts section segment for Offshore Savings."),
                     titleColor: .green,
                     rows: [
                         .init(label: String(localized: "budgetDetail.summary.maxSavings", defaultValue: "Max Savings", comment: "Budget detail summary row for max savings."), value: derived.maxSavings),

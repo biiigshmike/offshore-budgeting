@@ -25,7 +25,7 @@ enum SavingsAccountService {
         var message: String {
             switch self {
             case .upToDate:
-                return "Savings Account is up to date."
+                return "Offshore Savings is up to date."
             case .closedPeriodsNeedRefresh:
                 return "Closed periods need to be refreshed."
             case .runningTotalNeedsRebuild:

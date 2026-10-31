@@ -155,8 +155,8 @@ struct SettingsReleaseLogsView: View {
                 ),
                 ReleaseItem(
                     systemImage: "banknote.fill",
-                    title: "Savings Account Refinement",
-                    description: "Fixes an issue where post‑dated budgets didn’t always update the Savings Account running total.\n\nNote: If the graph or running total doesn’t update right away, edit and save a budget that includes post‑dated entries (for example, adjust an expense), then return and undo the change. This should trigger the update and reflect accurate totals."
+                    title: "Offshore Savings Refinement",
+                    description: "Fixes an issue where post‑dated budgets didn’t always update the Offshore Savings running total.\n\nNote: If the graph or running total doesn’t update right away, edit and save a budget that includes post‑dated entries (for example, adjust an expense), then return and undo the change. This should trigger the update and reflect accurate totals."
                 ),
                 ReleaseItem(
                     systemImage: "square.2.layers.3d",
@@ -182,7 +182,7 @@ struct SettingsReleaseLogsView: View {
                 ReleaseItem(
                     systemImage: "person.2.fill",
                     title: "Improved Reconciliations and Savings",
-                    description: "Fixed an issue where split transactions counted toward savings. Amounts split to a Reconciliation now affect only that balance and no longer impact Savings Outlook."
+                    description: "Fixed an issue where split transactions counted toward savings. Amounts split to a Reconciliation now affect only that balance and no longer impact Offshore Savings Outlook."
                 ),
                 ReleaseItem(
                     systemImage: "sailboat.fill",
@@ -222,8 +222,8 @@ struct SettingsReleaseLogsView: View {
                 ),
                 ReleaseItem(
                     systemImage: "banknote.fill",
-                    title: "Savings Account",
-                    description: "The Savings Account graph now offers two views: Running Total and Current Period."
+                    title: "Offshore Savings",
+                    description: "The Offshore Savings graph now offers two views: Running Total and Current Period."
                 ),
                 ReleaseItem(
                     systemImage: "hand.tap.fill",
@@ -258,8 +258,8 @@ struct SettingsReleaseLogsView: View {
                 ),
                 ReleaseItem(
                     systemImage: "banknote.fill",
-                    title: "Enhancements to Savings Account",
-                    description: "The in-app, workspace-scoped Savings Account now supports adding negative manual entries to transfer any amount of the running balance 'out' of the savings account to reflect when funds are moved to your actual bank's savings account."
+                    title: "Enhancements to Offshore Savings",
+                    description: "The in-app, workspace-scoped Offshore Savings now supports adding negative manual entries to transfer any amount of the running balance 'out' of Offshore Savings to reflect when funds are moved to your actual bank's savings account."
                 ),
                 ReleaseItem(
                     systemImage: "slider.horizontal.below.rectangle",
@@ -280,7 +280,7 @@ struct SettingsReleaseLogsView: View {
                 ReleaseItem(
                     systemImage: "creditcard.fill",
                     title: "Reconciliations and Savings: Now on the Accounts Tab",
-                    description: "Accounts is now your place for Cards, Reconciliations, and a workspace-scoped Savings Account! You can now split expenses and track reconciliations. When adding or editing an expense, choose to split or offset it against a Reconciliation. View the running total and full expense history in Cards > Reconciliation. At the end of your budget periods, your Savings Account will keep a running total. This feature is designed to help offset future expenses with any surplus savings."
+                    description: "Accounts is now your place for Cards, Reconciliations, and workspace-scoped Offshore Savings! You can now split expenses and track reconciliations. When adding or editing an expense, choose to split or offset it against a Reconciliation. View the running total and full expense history in Cards > Reconciliation. At the end of your budget periods, your Offshore Savings will keep a running total. This feature is designed to help offset future expenses with any surplus savings."
                 ),
                 ReleaseItem(
                     systemImage: "square.2.layers.3d.top.filled",

@@ -145,8 +145,8 @@ struct CardsView: View {
                 ),
                 PostBoardingTipItem(
                     systemImage: "banknote.fill",
-                    title: "Savings",
-                    detail: "Use Savings to monitor your actual savings at the close of every budget period."
+                    title: "Offshore Savings",
+                    detail: "Use Offshore Savings to track money left over at the end of each budgeting period."
                 )
             ]
         )

@@ -28,7 +28,7 @@ enum WorkspaceTransferSection: String, Codable, CaseIterable, Identifiable, Hash
         case .expenseHistory: "Expense History"
         case .incomes: "Income"
         case .reconciliations: "Reconciliations"
-        case .savings: "Savings"
+        case .savings: "Offshore Savings"
         case .importRules: "Expense Import Rules"
         case .marinaAliases: "Marina Aliases"
         }

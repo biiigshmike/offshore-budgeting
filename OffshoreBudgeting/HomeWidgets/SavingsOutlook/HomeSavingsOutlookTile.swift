@@ -71,7 +71,7 @@ struct HomeSavingsOutlookTile: View {
             )
         } label: {
             HomeTileContainer(
-                title: String(localized: "homeWidget.savingsOutlook", defaultValue: "Savings Outlook", comment: "Pinned home widget title for savings outlook."),
+                title: String(localized: "homeWidget.savingsOutlook", defaultValue: "Savings Outlook", comment: "Pinned home widget title for Offshore Savings outlook."),
                 subtitle: dateRangeSubtitle,
                 accent: accentColor,
                 showsChevron: true
@@ -105,7 +105,7 @@ struct HomeSavingsOutlookTile: View {
             }
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(String(localized: "homeWidget.savingsOutlook", defaultValue: "Savings Outlook", comment: "Pinned home widget title for savings outlook."))
+        .accessibilityLabel(String(localized: "homeWidget.savingsOutlook", defaultValue: "Savings Outlook", comment: "Pinned home widget title for Offshore Savings outlook."))
         .accessibilityHint(String(localized: "homeSavingsOutlook.openHint", defaultValue: "Opens savings metrics", comment: "Accessibility hint for opening savings outlook metrics."))
     }
 

@@ -327,7 +327,7 @@ enum GeneratedHelpContent {
                 textSection(
                     id: "introduction-building-blocks-1",
                     header: "What This Includes",
-                    body: "Offshore is organized into core functions that work together instead of competing for your attention. Accounts includes Cards, Reconciliations, and a dedicated workspace Savings Account. Income is split into planned and actual inflows, while Budgets gives you the lens that compares what you expected against what really happened.\n\nEach area has one clear job so you always know where to go, where money is being spent, what income is expected, what income has landed, and what your savings direction looks like in the current period. Settings supports all of this with defaults and tools like Categories, Presets, and workspace-level behavior. Once these building blocks click, every other screen feels much more natural."
+                    body: "Offshore is organized into core functions that work together instead of competing for your attention. Accounts includes Cards, Reconciliations, and Offshore Savings for each workspace. Income is split into planned and actual inflows, while Budgets gives you the lens that compares what you expected against what really happened.\n\nEach area has one clear job so you always know where to go, where money is being spent, what income is expected, what income has landed, and what your savings direction looks like in the current period. Settings supports all of this with defaults and tools like Categories, Presets, and workspace-level behavior. Once these building blocks click, every other screen feels much more natural."
                 ),
                 textSection(
                     id: "introduction-building-blocks-2",
@@ -689,8 +689,8 @@ enum GeneratedHelpContent {
                             id: "home-widgets-savings-outlook",
                             assetName: "Help/CoreScreens/Home/Widgets/savings-outlook",
                             displayTitle: "Savings Outlook",
-                            bodyText: "Savings Outlook projects where the period may end based on current entries and assumptions. Review it after adding meaningful expenses or income updates so direction changes are visible immediately. Use this signal to decide whether you need to slow discretionary spending. Frequent checks keep surprises smaller at period close.",
-                            fullscreenCaptionText: "Use Savings Outlook to forecast direction and course-correct before period close."
+                            bodyText: "Offshore Savings Outlook projects where the period may end based on current entries and assumptions. Review it after adding meaningful expenses or income updates so direction changes are visible immediately. Use this signal to decide whether you need to slow discretionary spending. Frequent checks keep surprises smaller at period close.",
+                            fullscreenCaptionText: "Use Offshore Savings Outlook to forecast direction and course-correct before period close."
                         ),
                         mediaItem(
                             id: "home-widgets-spend-trends",
@@ -910,13 +910,13 @@ enum GeneratedHelpContent {
                 mediaSection(
                     id: "accounts-overview-1",
                     header: "Accounts Overview",
-                    body: "Accounts is the hub for card activity, shared-balance reconciliation, and savings tracking. It helps you separate normal spending workflows from settlement and reserve workflows so your data stays organized.\n\nUse the three colored toggle buttons at the top to move between Cards, Reconciliations, and Savings quickly. Think of them as fast container switches so you can jump directly to the area that owns the task.\n\nA quick review pass in Accounts each cycle keeps card-level accuracy strong and improves related reports across the app.",
+                    body: "Accounts is the hub for card activity, shared-balance reconciliation, and savings tracking. It helps you separate normal spending workflows from settlement and reserve workflows so your data stays organized.\n\nUse the Section menu in the toolbar to switch between Cards, Reconciliations, and Offshore Savings. Choose the area that owns the task before adding or editing entries.\n\nA quick review pass in Accounts each cycle keeps card-level accuracy strong and improves related reports across the app.",
                     media: [
                         mediaItem(
                             id: "accounts-overview-1-image-1",
                             assetName: "Help/CoreScreens/Accounts/Overview/overview",
-                            bodyText: "Accounts is the launch point for Cards, Reconciliations, and Savings workflows. Use the card, person, and cash toggle buttons to switch containers and start in the right place for the job. Container-first navigation keeps edits easier to validate and reduces accidental cross-workflow changes.",
-                            fullscreenCaptionText: "Use the top toggles to switch between Cards, Reconciliations, and Savings."
+                            bodyText: "Accounts is the launch point for Cards, Reconciliations, and Offshore Savings workflows. Use the Section menu in the toolbar to choose the right area for the job. Container-first navigation keeps edits easier to validate and reduces accidental cross-workflow changes.",
+                            fullscreenCaptionText: "Use the Section menu to switch between Cards, Reconciliations, and Offshore Savings."
                         )
                     ]
                 )
@@ -1056,20 +1056,25 @@ enum GeneratedHelpContent {
         GeneratedHelpLeafTopic(
             id: "accounts-savings-account",
             destinationID: "accounts",
-            title: "Savings Account",
+            title: "Offshore Savings",
             sections: [
                 mediaSection(
                     id: "accounts-savings-account-overview",
-                    header: "Savings Account",
-                    body: "Savings Account provides a dedicated ledger and trend view for money set aside outside normal card spending. It is especially useful when you want saved funds to offset future purchases without losing expense ownership on the card that made the purchase.\n\nA practical pattern is: save money during one period, keep a later purchase on the correct card, then use Savings activity to offset the balance impact intentionally. This keeps card history accurate while showing how savings supported the purchase.\n\nAfter each savings update, verify both ledgers moved as expected. This keeps your reserve history trustworthy and your card math clean.",
+                    header: "Offshore Savings",
+                    body: "Offshore Savings keeps a workspace-specific ledger of money left over at the end of each budgeting period. Running Total includes all dates in the ledger, while Current Period shows activity for the selected date range.\n\nLeave this balance available for future spending, add manual adjustments, or use it to offset an expense. An offset keeps the purchase on its original card while reducing the amount covered by the current budget.",
                     media: [
                         mediaItem(
                             id: "accounts-savings-account-overview-image-1",
                             assetName: "Help/CoreScreens/Accounts/Savings Account/overview",
-                            bodyText: "The Savings Account ledger shows contributions, withdrawals, and trend context in one view. Use it when you are offsetting a future card purchase with saved funds so the card still owns the expense while savings absorbs part of the impact. After posting, verify the card and savings records both reflect your intent.",
-                            fullscreenCaptionText: "Use Savings to offset future card purchases while keeping expense ownership on the card."
+                            bodyText: "The Offshore Savings ledger shows period-close amounts, manual adjustments, and expense offsets. Use Running Total for the full ledger balance or Current Period to review activity in the selected date range.",
+                            fullscreenCaptionText: "Review your available Offshore Savings balance and its ledger history."
                         )
                     ]
+                ),
+                textSection(
+                    id: "accounts-savings-account-set-aside",
+                    header: "Set Aside as Savings",
+                    body: "In Accounts > Offshore Savings, add a savings entry, enter the amount, and enable Set Aside as Savings. Saving the entry subtracts that amount from Offshore Savings so the remaining balance reflects money available for future spending.\n\nThis records money you have set aside elsewhere. It does not transfer money between bank accounts or create a separate savings balance in the app. The entry is saved as a negative manual adjustment; existing ledger history is preserved."
                 )
             ]
         ),

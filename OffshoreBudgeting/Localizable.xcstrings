@@ -1735,140 +1735,122 @@
         }
       }
     },
-    "Accounts is now your place for Cards, Reconciliations, and a workspace-scoped Savings Account! You can now split expenses and track reconciliations. When adding or editing an expense, choose to split or offset it against a Reconciliation. View the running total and full expense history in Cards > Reconciliation. At the end of your budget periods, your Savings Account will keep a running total. This feature is designed to help offset future expenses with any surplus savings." : {
+    "Accounts is now your place for Cards, Reconciliations, and workspace-scoped Offshore Savings! You can now split expenses and track reconciliations. When adding or editing an expense, choose to split or offset it against a Reconciliation. View the running total and full expense history in Cards > Reconciliation. At the end of your budget periods, your Offshore Savings will keep a running total. This feature is designed to help offset future expenses with any surplus savings." : {
       "localizations" : {
         "ar" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "أصبحت الحسابات الآن مكانك المناسب للحصول على البطاقات والتسويات وحساب التوفير الخاص بمساحة العمل! يمكنك الآن تقسيم النفقات وتتبع التسويات. عند إضافة مصروف أو تحريره، اختر تقسيمه أو معادلته مقابل التسوية. اعرض سجل النفقات الإجمالي والكامل الجاري في البطاقات > التسوية. في نهاية فترات ميزانيتك، سيحتفظ حساب التوفير الخاص بك بإجمالي المبلغ الجاري. تم تصميم هذه الميزة للمساعدة في تعويض النفقات المستقبلية مع أي مدخرات فائضة."
+            "value" : "أصبحت الحسابات الآن مكانك المناسب للحصول على البطاقات والتسويات وOffshore Savings الخاص بمساحة العمل! يمكنك الآن تقسيم النفقات وتتبع التسويات. عند إضافة مصروف أو تحريره، اختر تقسيمه أو معادلته مقابل التسوية. اعرض سجل النفقات الإجمالي والكامل الجاري في البطاقات > التسوية. في نهاية فترات ميزانيتك، سيحتفظ Offshore Savings بإجمالي المبلغ الجاري. تم تصميم هذه الميزة للمساعدة في تعويض النفقات المستقبلية مع أي مدخرات فائضة."
           }
         },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "„Konten“ ist jetzt Ihr Ort für Karten, Abstimmungen und ein arbeitsbereichsbezogenes Sparkonto!"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Accounts is now your place for Cards, Reconciliations, and a workspace-scoped Savings Account! You can now split expenses and track reconciliations. When adding or editing an expense, choose to split or offset it against a Reconciliation. View the running total and full expense history in Cards > Reconciliation. At the end of your budget periods, your Savings Account will keep a running total. This feature is designed to help offset future expenses with any surplus savings."
+            "value" : "„Konten“ ist jetzt Ihr Ort für Karten, Abstimmungen und Offshore Savings pro Arbeitsbereich!"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Cuentas ahora es tu espacio para Tarjetas, Conciliaciones y una Cuenta de ahorros por espacio de trabajo. Ahora puedes dividir gastos y llevar el seguimiento de conciliaciones. Al agregar o editar un gasto, elige dividirlo o compensarlo contra una Conciliación. Consulta el total acumulado y el historial completo de gastos en Tarjetas > Conciliación. Al final de tus periodos de presupuesto, tu Cuenta de ahorros mantendrá un total acumulado. Esta función está diseñada para ayudar a compensar gastos futuros con cualquier ahorro sobrante."
+            "value" : "Cuentas ahora es tu espacio para Tarjetas, Conciliaciones y Offshore Savings por espacio de trabajo. Ahora puedes dividir gastos y llevar el seguimiento de conciliaciones. Al agregar o editar un gasto, elige dividirlo o compensarlo contra una Conciliación. Consulta el total acumulado y el historial completo de gastos en Tarjetas > Conciliación. Al final de tus periodos de presupuesto, tu Offshore Savings mantendrá un total acumulado. Esta función está diseñada para ayudar a compensar gastos futuros con cualquier ahorro sobrante."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Comptes regroupe désormais Cartes, Rapprochements et un Compte d’épargne propre à l’espace de travail. Vous pouvez maintenant fractionner les dépenses et suivre les rapprochements. Lors de l’ajout ou de la modification d’une dépense, choisissez de la fractionner ou de la compenser avec un Rapprochement. Consultez le total cumulé et l’historique complet des dépenses dans Cartes > Rapprochement. À la fin de vos périodes budgétaires, votre Compte d’épargne conservera un total cumulé. Cette fonction est conçue pour aider à compenser de futures dépenses avec l’épargne excédentaire."
+            "value" : "Comptes regroupe désormais Cartes, Rapprochements et Offshore Savings pour chaque espace de travail. Vous pouvez maintenant fractionner les dépenses et suivre les rapprochements. Lors de l’ajout ou de la modification d’une dépense, choisissez de la fractionner ou de la compenser avec un Rapprochement. Consultez le total cumulé et l’historique complet des dépenses dans Cartes > Rapprochement. À la fin de vos périodes budgétaires, votre Offshore Savings conservera un total cumulé. Cette fonction est conçue pour aider à compenser de futures dépenses avec l’épargne excédentaire."
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Contas agora é o seu lugar para cartões, reconciliações e uma conta poupança no escopo do espaço de trabalho! Agora você pode dividir despesas e acompanhar reconciliações. Ao adicionar ou editar uma despesa, opte por dividi-la ou compensá-la em uma Reconciliação. Visualize o histórico total e completo de despesas em Cartões > Reconciliação. No final dos períodos do seu orçamento, a sua Conta Poupança manterá um total corrente. Este recurso foi projetado para ajudar a compensar despesas futuras com quaisquer economias excedentes."
+            "value" : "Contas agora é o seu lugar para cartões, reconciliações e Offshore Savings no escopo do espaço de trabalho! Agora você pode dividir despesas e acompanhar reconciliações. Ao adicionar ou editar uma despesa, opte por dividi-la ou compensá-la em uma Reconciliação. Visualize o histórico total e completo de despesas em Cartões > Reconciliação. No final dos períodos do seu orçamento, seu Offshore Savings manterá um total corrente. Este recurso foi projetado para ajudar a compensar despesas futuras com quaisquer economias excedentes."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "帐户现在是您放置卡片、对账和工作区范围的储蓄帐户的地方！您现在可以分摊费用并跟踪对账。添加或编辑费用时，选择将其拆分或抵销对帐。在“卡”>“对账”中查看运行总计和完整费用历史记录。在您的预算期结束时，您的储蓄账户将保持运行总额。此功能旨在帮助通过任何盈余节省来抵消未来的费用。"
+            "value" : "帐户现在是您放置卡片、对账和工作区范围的 Offshore Savings的地方！您现在可以分摊费用并跟踪对账。添加或编辑费用时，选择将其拆分或抵销对帐。在“卡”>“对账”中查看运行总计和完整费用历史记录。在您的预算期结束时，您的 Offshore Savings将保持运行总额。此功能旨在帮助通过任何盈余节省来抵消未来的费用。"
           }
         }
       }
     },
-    "Accounts is the hub for card activity, shared-balance reconciliation, and savings tracking. It helps you separate normal spending workflows from settlement and reserve workflows so your data stays organized.\n\nUse the three colored toggle buttons at the top to move between Cards, Reconciliations, and Savings quickly. Think of them as fast container switches so you can jump directly to the area that owns the task.\n\nA quick review pass in Accounts each cycle keeps card-level accuracy strong and improves related reports across the app." : {
+    "Accounts is the hub for card activity, shared-balance reconciliation, and savings tracking. It helps you separate normal spending workflows from settlement and reserve workflows so your data stays organized.\n\nUse the Section menu in the toolbar to switch between Cards, Reconciliations, and Offshore Savings. Choose the area that owns the task before adding or editing entries.\n\nA quick review pass in Accounts each cycle keeps card-level accuracy strong and improves related reports across the app." : {
       "localizations" : {
         "ar" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "الحسابات هي مركز نشاط البطاقة وتسوية الرصيد المشترك وتتبع المدخرات. فهو يساعدك على فصل سير عمل الإنفاق العادي عن سير عمل التسوية والحجز حتى تظل بياناتك منظمة.\n\nاستخدم أزرار التبديل الملونة الثلاثة في الأعلى للتنقل بين البطاقات والتسويات والمدخرات بسرعة. فكر فيها كمفاتيح سريعة للحاويات حتى تتمكن من الانتقال مباشرة إلى المنطقة التي تمتلك المهمة.\n\nيؤدي تمرير المراجعة السريعة في الحسابات في كل دورة إلى الحفاظ على قوة الدقة على مستوى البطاقة وتحسين التقارير ذات الصلة عبر التطبيق."
+            "value" : "الحسابات هي مركز نشاط البطاقة وتسوية الرصيد المشترك وتتبع المدخرات. فهو يساعدك على فصل سير عمل الإنفاق العادي عن سير عمل التسوية والحجز حتى تظل بياناتك منظمة.\n\nاستخدم قائمة قسم في شريط الأدوات للتبديل بين البطاقات والتسويات وOffshore Savings. اختر المجال المسؤول عن المهمة قبل إضافة القيود أو تعديلها.\n\nيؤدي تمرير المراجعة السريعة في الحسابات في كل دورة إلى الحفاظ على قوة الدقة على مستوى البطاقة وتحسين التقارير ذات الصلة عبر التطبيق."
           }
         },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Konten sind die Drehscheibe für Kartenaktivitäten, den Abgleich gemeinsamer Guthaben und die Nachverfolgung von Ersparnissen."
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Accounts is the hub for card activity, shared-balance reconciliation, and savings tracking. It helps you separate normal spending workflows from settlement and reserve workflows so your data stays organized.\n\nUse the three colored toggle buttons at the top to move between Cards, Reconciliations, and Savings quickly. Think of them as fast container switches so you can jump directly to the area that owns the task.\n\nA quick review pass in Accounts each cycle keeps card-level accuracy strong and improves related reports across the app."
+            "value" : "Konten sind die Drehscheibe für Kartenaktivitäten, den Abgleich gemeinsamer Guthaben und die Nachverfolgung von Ersparnissen.\n\nVerwenden Sie das Menü Abschnitt in der Symbolleiste, um zwischen Karten, Abstimmungen und Offshore Savings zu wechseln. Wählen Sie den für die Aufgabe zuständigen Bereich, bevor Sie Einträge hinzufügen oder bearbeiten.\n\nEine kurze Prüfung in Konten in jeder Periode erhält die Genauigkeit auf Kartenebene und verbessert die zugehörigen Berichte in der gesamten App."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Cuentas es el centro de actividad de tarjetas, conciliación de saldos compartidos y seguimiento de ahorros. Te ayuda a separar los flujos normales de gasto de los flujos de liquidación y reserva para que tus datos se mantengan organizados.\n\nUsa los tres botones de alternancia de colores en la parte superior para moverte rápidamente entre Tarjetas, Conciliaciones y Ahorros. Piensa en ellos como cambios rápidos de contenedor para saltar directamente al área que posee la tarea.\n\nUna revisión rápida en Cuentas durante cada ciclo mantiene sólida la precisión a nivel de tarjeta y mejora los informes relacionados en toda la app."
+            "value" : "Cuentas es el centro de actividad de tarjetas, conciliación de saldos compartidos y seguimiento de ahorros. Te ayuda a separar los flujos normales de gasto de los flujos de liquidación y reserva para que tus datos se mantengan organizados.\n\nUsa el menú Sección de la barra de herramientas para cambiar entre Tarjetas, Conciliaciones y Offshore Savings. Elige el área correspondiente a la tarea antes de agregar o editar movimientos.\n\nUna revisión rápida en Cuentas durante cada ciclo mantiene sólida la precisión a nivel de tarjeta y mejora los informes relacionados en toda la app."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Comptes est le point central pour l’activité des cartes, le rapprochement des soldes partagés et le suivi de l’épargne. Il vous aide à séparer les flux de dépense normaux des flux de règlement et de réserve afin que vos données restent organisées.\n\nUtilisez les trois boutons colorés en haut pour passer rapidement entre Cartes, Rapprochements et Épargne. Considérez-les comme des changements de conteneur rapides pour aller directement à la zone qui possède la tâche.\n\nUne revue rapide dans Comptes à chaque cycle maintient une forte précision au niveau des cartes et améliore les rapports associés dans toute l’app."
+            "value" : "Comptes est le point central pour l’activité des cartes, le rapprochement des soldes partagés et le suivi de l’épargne. Il vous aide à séparer les flux de dépense normaux des flux de règlement et de réserve afin que vos données restent organisées.\n\nUtilisez le menu Section de la barre d’outils pour passer entre Cartes, Rapprochements et Offshore Savings. Choisissez la zone correspondant à votre tâche avant d’ajouter ou de modifier des écritures.\n\nUne revue rapide dans Comptes à chaque cycle maintient une forte précision au niveau des cartes et améliore les rapports associés dans toute l’app."
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Contas é o centro para atividades de cartão, reconciliação de saldo compartilhado e rastreamento de poupança. Ele ajuda a separar os fluxos de trabalho de gastos normais dos fluxos de trabalho de liquidação e reserva para que seus dados permaneçam organizados.\n\nUse os três botões de alternância coloridos na parte superior para alternar rapidamente entre Cartões, Reconciliações e Poupanças. Pense neles como trocas rápidas de contêineres para que você possa ir diretamente para a área que possui a tarefa.\n\nUma rápida revisão nas Contas em cada ciclo mantém forte a precisão no nível do cartão e melhora os relatórios relacionados em todo o aplicativo."
+            "value" : "Contas é o centro para atividades de cartão, reconciliação de saldo compartilhado e rastreamento de poupança. Ele ajuda a separar os fluxos de trabalho de gastos normais dos fluxos de trabalho de liquidação e reserva para que seus dados permaneçam organizados.\n\nUse o menu Seção na barra de ferramentas para alternar entre Cartões, Reconciliações e Offshore Savings. Escolha a área responsável pela tarefa antes de adicionar ou editar lançamentos.\n\nUma rápida revisão nas Contas em cada ciclo mantém forte a precisão no nível do cartão e melhora os relatórios relacionados em todo o aplicativo."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "账户是卡活动、共享余额对账和储蓄跟踪的中心。它可以帮助您将正常支出工作流程与结算和储备工作流程分开，以便您的数据保持井井有条。\n\n使用顶部的三个彩色切换按钮可在卡、对账和储蓄之间快速切换。将它们视为快速容器开关，这样您就可以直接跳转到拥有该任务的区域。\n\n每个周期在帐户中进行快速审核可保持卡级准确性，并改进整个应用程序的相关报告。"
+            "value" : "账户是卡活动、共享余额对账和储蓄跟踪的中心。它可以帮助您将正常支出工作流程与结算和储备工作流程分开，以便您的数据保持井井有条。\n\n使用工具栏中的“部分”菜单在卡、对账和 Offshore Savings 之间切换。添加或编辑记录前，请先选择负责该任务的区域。\n\n每个周期在帐户中进行快速审核可保持卡级准确性，并改进整个应用程序的相关报告。"
           }
         }
       }
     },
-    "Accounts is the launch point for Cards, Reconciliations, and Savings workflows. Use the card, person, and cash toggle buttons to switch containers and start in the right place for the job. Container-first navigation keeps edits easier to validate and reduces accidental cross-workflow changes." : {
+    "Accounts is the launch point for Cards, Reconciliations, and Offshore Savings workflows. Use the Section menu in the toolbar to choose the right area for the job. Container-first navigation keeps edits easier to validate and reduces accidental cross-workflow changes." : {
       "localizations" : {
         "ar" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "الحسابات هي نقطة الانطلاق لسير عمل البطاقات والتسويات والادخار. استخدم أزرار تبديل البطاقة والشخص والنقود لتبديل الحاويات والبدء في المكان المناسب للمهمة. التنقل في الحاوية أولاً يجعل من السهل التحقق من صحة التعديلات ويقلل من التغييرات العرضية في سير العمل."
+            "value" : "الحسابات هي نقطة الانطلاق لسير عمل البطاقات والتسويات وOffshore Savings. استخدم قائمة قسم في شريط الأدوات لاختيار المجال المناسب للمهمة. يسهّل البدء بالمجال المناسب التحقق من التعديلات ويقلل التغييرات العرضية بين مسارات العمل."
           }
         },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "„Konten“ ist der Startpunkt für Karten-, Abstimmungs- und Spar-Workflows."
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Accounts is the launch point for Cards, Reconciliations, and Savings workflows. Use the card, person, and cash toggle buttons to switch containers and start in the right place for the job. Container-first navigation keeps edits easier to validate and reduces accidental cross-workflow changes."
+            "value" : "Konten ist der Startpunkt für Karten-, Abstimmungs- und Offshore Savings-Workflows. Wählen Sie über das Menü Abschnitt in der Symbolleiste den passenden Bereich für Ihre Aufgabe. Die Navigation über diese Bereiche erleichtert das Prüfen von Änderungen und verringert versehentliche Änderungen in anderen Workflows."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Cuentas es el punto de partida para los flujos de Tarjetas, Conciliaciones y Ahorros. Usa los botones de alternancia de tarjeta, persona y efectivo para cambiar de contenedor y empezar en el lugar correcto para la tarea. Una navegación que prioriza el contenedor hace más fácil validar las ediciones y reduce cambios accidentales entre flujos."
+            "value" : "Cuentas es el punto de partida para los flujos de Tarjetas, Conciliaciones y Offshore Savings. Usa el menú Sección de la barra de herramientas para elegir el área adecuada para la tarea. Una navegación que prioriza el contenedor hace más fácil validar las ediciones y reduce cambios accidentales entre flujos."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Comptes est le point de départ des flux Cartes, Rapprochements et Épargne. Utilisez les boutons carte, personne et espèces pour changer de conteneur et commencer au bon endroit pour la tâche. Une navigation qui privilégie d’abord le conteneur rend les modifications plus faciles à valider et réduit les changements accidentels entre flux."
+            "value" : "Comptes est le point de départ des flux Cartes, Rapprochements et Offshore Savings. Utilisez le menu Section de la barre d’outils pour choisir la zone adaptée à votre tâche. Une navigation qui privilégie d’abord le conteneur rend les modifications plus faciles à valider et réduit les changements accidentels entre flux."
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Contas é o ponto de lançamento para fluxos de trabalho de Cartões, Reconciliações e Poupança. Use os botões de alternância de cartão, pessoa e dinheiro para trocar de contêiner e começar no lugar certo para o trabalho. A navegação que prioriza o contêiner facilita a validação das edições e reduz alterações acidentais entre fluxos de trabalho."
+            "value" : "Contas é o ponto de partida para fluxos de trabalho de Cartões, Reconciliações e Offshore Savings. Use o menu Seção na barra de ferramentas para escolher a área certa para a tarefa. A navegação que prioriza o contêiner facilita a validação das edições e reduz alterações acidentais entre fluxos de trabalho."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "帐户是卡、对账和储蓄工作流程的启动点。使用卡、人员和现金切换按钮来切换容器并从正确的位置开始工作。容器优先导航使编辑更容易验证，并减少意外的跨工作流程更改。"
+            "value" : "账户是卡、对账和 Offshore Savings 工作流程的起点。使用工具栏中的“部分”菜单，为当前任务选择合适的区域。先选择相应区域再操作，更容易核对编辑结果，也能减少意外修改其他工作流程中的数据。"
           }
         }
       }
@@ -2160,49 +2142,49 @@
       }
     },
     "accounts.segment.savings" : {
-      "comment" : "Accounts section segment for savings.",
+      "comment" : "Accounts section segment for Offshore Savings.",
       "extractionState" : "extracted_with_value",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "الادخار"
+            "value" : "Offshore Savings"
           }
         },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Einsparungen"
+            "value" : "Offshore Savings"
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "new",
-            "value" : "Savings"
+            "value" : "Offshore Savings"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ahorros"
+            "value" : "Offshore Savings"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Épargne"
+            "value" : "Offshore Savings"
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Poupança"
+            "value" : "Offshore Savings"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "储蓄"
+            "value" : "Offshore Savings"
           }
         }
       }
@@ -16273,6 +16255,10 @@
         }
       }
     },
+    "Date Ranges" : {
+      "comment" : "A label that displays a menu of quick date ranges.",
+      "isCommentAutoGenerated" : true
+    },
     "dateRange.short.end" : {
       "comment" : "Short title for the end date picker pill.",
       "extractionState" : "manual",
@@ -18994,48 +18980,42 @@
         }
       }
     },
-    "Enhancements to Savings Account" : {
+    "Enhancements to Offshore Savings" : {
       "localizations" : {
         "ar" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "تحسينات على حساب التوفير"
+            "value" : "تحسينات على Offshore Savings"
           }
         },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Verbesserungen beim Sparkonto"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Enhancements to Savings Account"
+            "value" : "Verbesserungen an Offshore Savings"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Mejoras en la Cuenta de ahorros"
+            "value" : "Mejoras en Offshore Savings"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Améliorations du compte d’épargne"
+            "value" : "Améliorations d’Offshore Savings"
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Melhorias na conta poupança"
+            "value" : "Melhorias no Offshore Savings"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "储蓄账户的增强功能"
+            "value" : "Offshore Savings 功能增强"
           }
         }
       }
@@ -21126,48 +21106,42 @@
         }
       }
     },
-    "Fixed an issue where split transactions counted toward savings. Amounts split to a Reconciliation now affect only that balance and no longer impact Savings Outlook." : {
+    "Fixed an issue where split transactions counted toward savings. Amounts split to a Reconciliation now affect only that balance and no longer impact Offshore Savings Outlook." : {
       "localizations" : {
         "ar" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "تم إصلاح مشكلة كانت تؤدي إلى احتساب المعاملات المقسمة ضمن الادخار. المبالغ المقسمة إلى تسوية تؤثر الآن فقط في ذلك الرصيد ولم تعد تؤثر في توقعات الادخار."
+            "value" : "تم إصلاح مشكلة كانت تؤدي إلى احتساب المعاملات المقسمة ضمن الادخار. المبالغ المقسمة إلى تسوية تؤثر الآن فقط في ذلك الرصيد ولم تعد تؤثر في توقعات Offshore Savings."
           }
         },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Es wurde ein Problem behoben, durch das aufgeteilte Buchungen als Ersparnisse mitgezaehlt wurden. Betraege, die einer Abstimmung zugeordnet werden, wirken sich jetzt nur noch auf diesen Saldo aus und beeinflussen den Sparausblick nicht mehr."
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Fixed an issue where split transactions counted toward savings. Amounts split to a Reconciliation now affect only that balance and no longer impact Savings Outlook."
+            "value" : "Es wurde ein Problem behoben, durch das aufgeteilte Buchungen als Ersparnisse mitgezaehlt wurden. Betraege, die einer Abstimmung zugeordnet werden, wirken sich jetzt nur noch auf diesen Saldo aus und beeinflussen den Offshore Savings-Ausblick nicht mehr."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Se corrigio un problema por el que las transacciones divididas se contabilizaban en el ahorro. Los importes divididos en una conciliacion ahora afectan solo a ese saldo y ya no influyen en Perspectiva de ahorro."
+            "value" : "Se corrigio un problema por el que las transacciones divididas se contabilizaban en el ahorro. Los importes divididos en una conciliacion ahora afectan solo a ese saldo y ya no influyen en Perspectiva de Offshore Savings."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Correction d’un probleme ou les transactions fractionnees etaient comptabilisees dans l’epargne. Les montants repartis dans un rapprochement n’affectent desormais que ce solde et n’ont plus d’impact sur la perspective d’epargne."
+            "value" : "Correction d’un probleme ou les transactions fractionnees etaient comptabilisees dans l’epargne. Les montants repartis dans un rapprochement n’affectent desormais que ce solde et n’ont plus d’impact sur les Perspectives Offshore Savings."
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Foi corrigido um problema em que transacoes divididas eram contabilizadas na poupanca. Valores divididos para uma reconciliacao agora afetam apenas esse saldo e nao impactam mais a Perspectiva de poupanca."
+            "value" : "Foi corrigido um problema em que transacoes divididas eram contabilizadas na poupanca. Valores divididos para uma reconciliacao agora afetam apenas esse saldo e nao impactam mais a Projeção do Offshore Savings."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "修复了拆分交易会计入储蓄的问题。拆分到对账中的金额现在只会影响该余额，不再影响储蓄前景。"
+            "value" : "修复了拆分交易会计入储蓄的问题。拆分到对账中的金额现在只会影响该余额，不再影响Offshore Savings 展望。"
           }
         }
       }
@@ -21219,48 +21193,42 @@
         }
       }
     },
-    "Fixes an issue where post‑dated budgets didn’t always update the Savings Account running total.\n\nNote: If the graph or running total doesn’t update right away, edit and save a budget that includes post‑dated entries (for example, adjust an expense), then return and undo the change. This should trigger the update and reflect accurate totals." : {
+    "Fixes an issue where post‑dated budgets didn’t always update the Offshore Savings running total.\n\nNote: If the graph or running total doesn’t update right away, edit and save a budget that includes post‑dated entries (for example, adjust an expense), then return and undo the change. This should trigger the update and reflect accurate totals." : {
       "localizations" : {
         "ar" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "يصلح مشكلة كانت تؤدي إلى عدم تحديث الإجمالي التراكمي لحساب الادخار دائمًا عند وجود ميزانيات مؤرخة لاحقًا.\n\nملاحظة: إذا لم يتم تحديث الرسم البياني أو الإجمالي التراكمي فورًا، فحرر ميزانية تتضمن إدخالات مؤرخة لاحقًا واحفظها (على سبيل المثال، عدل مصروفًا)، ثم ارجع وتراجع عن التغيير. من المفترض أن يؤدي ذلك إلى تشغيل التحديث وعرض الإجماليات الدقيقة."
+            "value" : "يصلح مشكلة كانت تؤدي إلى عدم تحديث الإجمالي التراكمي لـOffshore Savings دائمًا عند وجود ميزانيات مؤرخة لاحقًا.\n\nملاحظة: إذا لم يتم تحديث الرسم البياني أو الإجمالي التراكمي فورًا، فحرر ميزانية تتضمن إدخالات مؤرخة لاحقًا واحفظها (على سبيل المثال، عدل مصروفًا)، ثم ارجع وتراجع عن التغيير. من المفترض أن يؤدي ذلك إلى تشغيل التحديث وعرض الإجماليات الدقيقة."
           }
         },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Behebt ein Problem, bei dem nachdatierte Budgets die laufende Gesamtsumme des Sparkontos nicht immer aktualisiert haben.\n\nHinweis: Wenn das Diagramm oder die laufende Gesamtsumme nicht sofort aktualisiert wird, bearbeiten und speichern Sie ein Budget mit nachdatierten Einträgen (z. B. passen Sie eine Ausgabe an), kehren Sie dann zurück und machen Sie die Änderung rückgängig. Dadurch sollte die Aktualisierung ausgelöst und korrekte Summen angezeigt werden."
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Fixes an issue where post‑dated budgets didn’t always update the Savings Account running total.\n\nNote: If the graph or running total doesn’t update right away, edit and save a budget that includes post‑dated entries (for example, adjust an expense), then return and undo the change. This should trigger the update and reflect accurate totals."
+            "value" : "Behebt ein Problem, bei dem nachdatierte Budgets die laufende Gesamtsumme von Offshore Savings nicht immer aktualisiert haben.\n\nHinweis: Wenn das Diagramm oder die laufende Gesamtsumme nicht sofort aktualisiert wird, bearbeiten und speichern Sie ein Budget mit nachdatierten Einträgen (z. B. passen Sie eine Ausgabe an), kehren Sie dann zurück und machen Sie die Änderung rückgängig. Dadurch sollte die Aktualisierung ausgelöst und korrekte Summen angezeigt werden."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Corrige un problema por el que los presupuestos con fecha futura no siempre actualizaban el total acumulado de la Cuenta de Ahorros.\n\nNota: Si el gráfico o el total acumulado no se actualizan de inmediato, edita y guarda un presupuesto que incluya entradas con fecha futura (por ejemplo, ajusta un gasto), luego vuelve y deshaz el cambio. Esto debería activar la actualización y reflejar totales correctos."
+            "value" : "Corrige un problema por el que los presupuestos con fecha futura no siempre actualizaban el total acumulado de Offshore Savings.\n\nNota: Si el gráfico o el total acumulado no se actualizan de inmediato, edita y guarda un presupuesto que incluya entradas con fecha futura (por ejemplo, ajusta un gasto), luego vuelve y deshaz el cambio. Esto debería activar la actualización y reflejar totales correctos."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Corrige un problème où les budgets postdatés ne mettaient pas toujours à jour le total cumulé du compte d’épargne.\n\nRemarque : si le graphique ou le total cumulé ne se met pas à jour immédiatement, modifiez et enregistrez un budget qui inclut des écritures postdatées (par exemple, ajustez une dépense), puis revenez en arrière et annulez la modification. Cela devrait déclencher la mise à jour et refléter des totaux exacts."
+            "value" : "Corrige un problème où les budgets postdatés ne mettaient pas toujours à jour le total cumulé d’Offshore Savings.\n\nRemarque : si le graphique ou le total cumulé ne se met pas à jour immédiatement, modifiez et enregistrez un budget qui inclut des écritures postdatées (par exemple, ajustez une dépense), puis revenez en arrière et annulez la modification. Cela devrait déclencher la mise à jour et refléter des totaux exacts."
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Corrige um problema em que orcamentos com data futura nem sempre atualizavam o total acumulado da Conta de Poupanca.\n\nObservacao: se o grafico ou o total acumulado nao atualizar imediatamente, edite e salve um orcamento que inclua lancamentos com data futura (por exemplo, ajuste uma despesa), depois volte e desfaça a alteracao. Isso deve acionar a atualizacao e refletir totais corretos."
+            "value" : "Corrige um problema em que orcamentos com data futura nem sempre atualizavam o total acumulado do Offshore Savings.\n\nObservacao: se o grafico ou o total acumulado nao atualizar imediatamente, edite e salve um orcamento que inclua lancamentos com data futura (por exemplo, ajuste uma despesa), depois volte e desfaça a alteracao. Isso deve acionar a atualizacao e refletir totais corretos."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "修复了一个问题：带有未来日期的预算有时不会更新储蓄账户的累计总额。\n\n注意：如果图表或累计总额没有立即更新，请编辑并保存一个包含未来日期条目的预算（例如，调整一笔支出），然后返回并撤销该更改。这应会触发更新并反映准确的总额。"
+            "value" : "修复了一个问题：带有未来日期的预算有时不会更新Offshore Savings的累计总额。\n\n注意：如果图表或累计总额没有立即更新，请编辑并保存一个包含未来日期条目的预算（例如，调整一笔支出），然后返回并撤销该更改。这应会触发更新并反映准确的总额。"
           }
         }
       }
@@ -22741,43 +22709,43 @@
       "localizations" : {
         "ar" : {
           "stringUnit" : {
-            "state" : "translated",
+            "state" : "needs_review",
             "value" : "إجراءات المنزل"
           }
         },
         "de" : {
           "stringUnit" : {
-            "state" : "translated",
+            "state" : "needs_review",
             "value" : "Home-Aktionen"
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "new",
-            "value" : "Home Actions"
+            "value" : "Expense Display"
           }
         },
         "es" : {
           "stringUnit" : {
-            "state" : "translated",
+            "state" : "needs_review",
             "value" : "Acciones de panel"
           }
         },
         "fr" : {
           "stringUnit" : {
-            "state" : "translated",
+            "state" : "needs_review",
             "value" : "Accueil Actions"
           }
         },
         "pt-BR" : {
           "stringUnit" : {
-            "state" : "translated",
+            "state" : "needs_review",
             "value" : "Ações iniciais"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
-            "state" : "translated",
+            "state" : "needs_review",
             "value" : "主页 行动"
           }
         }
@@ -23879,49 +23847,49 @@
       }
     },
     "homeSavingsOutlook.openSavingsAccount" : {
-      "comment" : "Button title to open savings account screen.",
+      "comment" : "Button title to open Offshore Savings.",
       "extractionState" : "extracted_with_value",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "افتح حساب التوفير"
+            "value" : "فتح Offshore Savings"
           }
         },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Sparkonto eröffnen"
+            "value" : "Offshore Savings öffnen"
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "new",
-            "value" : "Open Savings Account"
+            "value" : "Open Offshore Savings"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Abrir cuenta de ahorros"
+            "value" : "Abrir Offshore Savings"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Open Épargne Account"
+            "value" : "Ouvrir Offshore Savings"
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Abrir conta poupança"
+            "value" : "Abrir Offshore Savings"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "开设储蓄账户"
+            "value" : "打开 Offshore Savings"
           }
         }
       }
@@ -25904,48 +25872,49 @@
       }
     },
     "homeWidget.savingsOutlook" : {
-      "comment" : "Pinned home widget title for savings outlook.",
+      "comment" : "Pinned home widget title for Offshore Savings outlook.",
+      "extractionState" : "extracted_with_value",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
-            "state" : "translated",
-            "value" : "توقعات الادخار"
+            "state" : "needs_review",
+            "value" : "توقعات Offshore Savings"
           }
         },
         "de" : {
           "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sparausblick"
+            "state" : "needs_review",
+            "value" : "Offshore Savings-Ausblick"
           }
         },
         "en" : {
           "stringUnit" : {
-            "state" : "translated",
+            "state" : "new",
             "value" : "Savings Outlook"
           }
         },
         "es" : {
           "stringUnit" : {
-            "state" : "translated",
-            "value" : "Pronostico de Ahorro"
+            "state" : "needs_review",
+            "value" : "Perspectiva de Offshore Savings"
           }
         },
         "fr" : {
           "stringUnit" : {
-            "state" : "translated",
-            "value" : "Épargne Outlook"
+            "state" : "needs_review",
+            "value" : "Perspectives Offshore Savings"
           }
         },
         "pt-BR" : {
           "stringUnit" : {
-            "state" : "translated",
-            "value" : "Perspectiva de poupança"
+            "state" : "needs_review",
+            "value" : "Projeção do Offshore Savings"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
-            "state" : "translated",
-            "value" : "储蓄前景"
+            "state" : "needs_review",
+            "value" : "Offshore Savings 展望"
           }
         }
       }
@@ -28701,6 +28670,46 @@
         }
       }
     },
+    "In Accounts > Offshore Savings, add a savings entry, enter the amount, and enable Set Aside as Savings. Saving the entry subtracts that amount from Offshore Savings so the remaining balance reflects money available for future spending.\n\nThis records money you have set aside elsewhere. It does not transfer money between bank accounts or create a separate savings balance in the app. The entry is saved as a negative manual adjustment; existing ledger history is preserved." : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "في الحسابات > Offshore Savings، أضف قيدًا للادخار، وأدخل المبلغ، وفعّل تخصيص مبلغ للادخار. يؤدي حفظ القيد إلى طرح هذا المبلغ من Offshore Savings ليعكس الرصيد المتبقي الأموال المتاحة للنفقات المستقبلية.\n\nيسجّل ذلك الأموال التي خصصتها للادخار في مكان آخر. ولا يحوّل الأموال بين الحسابات المصرفية أو ينشئ رصيد ادخار منفصلًا في التطبيق. يُحفظ القيد كتعديل يدوي سالب، مع الحفاظ على سجل القيود الحالي."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fügen Sie unter Konten > Offshore Savings einen Spareintrag hinzu, geben Sie den Betrag ein und aktivieren Sie Als Ersparnis zurücklegen. Beim Speichern wird dieser Betrag von Offshore Savings abgezogen, sodass der verbleibende Saldo das für zukünftige Ausgaben verfügbare Geld widerspiegelt.\n\nDamit erfassen Sie Geld, das Sie anderweitig zurückgelegt haben. Es wird weder Geld zwischen Bankkonten übertragen noch ein separater Sparsaldo in der App angelegt. Der Eintrag wird als negative manuelle Anpassung gespeichert; der bestehende Buchungsverlauf bleibt erhalten."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En Cuentas > Offshore Savings, agrega un movimiento de ahorro, introduce el importe y activa Reservar como ahorro. Al guardar el movimiento, ese importe se resta de Offshore Savings para que el saldo restante refleje el dinero disponible para gastos futuros.\n\nEsto registra el dinero que has reservado en otro lugar. No transfiere dinero entre cuentas bancarias ni crea un saldo de ahorro separado en la app. El movimiento se guarda como un ajuste manual negativo; se conserva el historial existente del registro."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dans Comptes > Offshore Savings, ajoutez une écriture d’épargne, saisissez le montant et activez Mettre de côté comme épargne. L’enregistrement de l’écriture soustrait ce montant d’Offshore Savings afin que le solde restant reflète l’argent disponible pour de futures dépenses.\n\nCela enregistre l’argent que vous avez mis de côté ailleurs. Aucun argent n’est transféré entre comptes bancaires et aucun solde d’épargne distinct n’est créé dans l’app. L’écriture est enregistrée comme un ajustement manuel négatif ; l’historique existant du registre est conservé."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Em Contas > Offshore Savings, adicione um lançamento de poupança, informe o valor e ative Separar como poupança. Ao salvar o lançamento, esse valor é subtraído do Offshore Savings para que o saldo restante reflita o dinheiro disponível para gastos futuros.\n\nIsso registra o dinheiro que você separou em outro lugar. Não transfere dinheiro entre contas bancárias nem cria um saldo de poupança separado no app. O lançamento é salvo como um ajuste manual negativo; o histórico existente do registro é preservado."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在“账户 > Offshore Savings”中添加储蓄记录，输入金额，并启用“留作储蓄”。保存记录后，该金额会从 Offshore Savings 中扣除，让剩余余额反映可用于未来支出的资金。\n\n这会记录你已在其他地方留作储蓄的资金，不会在银行账户之间转账，也不会在应用内创建单独的储蓄余额。该记录会保存为负数手动调整；现有账本历史会保留。"
+          }
+        }
+      }
+    },
     "In Settings > General > Expense Display, it is now possible to hide future expenses from view, as well as excluding future expenses from being calculated. To toggle this temporarily, look for the eye button on Budget Details and Card Details." : {
       "localizations" : {
         "ar" : {
@@ -31018,46 +31027,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Offshore 中的大多数总计都是按期间、记录类型和视图上下文筛选的分组总和。这意味着数字可以根据范围而变化，即使基础记录没有变化。\n\n计划值支持预测，而实际值代表实际发生的情况。在正确的上下文中阅读两者可以防止大多数解释错误。"
-          }
-        }
-      }
-    },
-    "Move to True Savings" : {
-      "localizations" : {
-        "ar" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "الانتقال إلى الادخار الحقيقي"
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Wechseln Sie zu echten Einsparungen"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Mover a ahorros reales"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Move to True Épargne"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Mude para a verdadeira economia"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "转向真正的节省"
           }
         }
       }
@@ -34209,48 +34178,42 @@
         }
       }
     },
-    "Offshore is organized into core functions that work together instead of competing for your attention. Accounts includes Cards, Reconciliations, and a dedicated workspace Savings Account. Income is split into planned and actual inflows, while Budgets gives you the lens that compares what you expected against what really happened.\n\nEach area has one clear job so you always know where to go, where money is being spent, what income is expected, what income has landed, and what your savings direction looks like in the current period. Settings supports all of this with defaults and tools like Categories, Presets, and workspace-level behavior. Once these building blocks click, every other screen feels much more natural." : {
+    "Offshore is organized into core functions that work together instead of competing for your attention. Accounts includes Cards, Reconciliations, and Offshore Savings for each workspace. Income is split into planned and actual inflows, while Budgets gives you the lens that compares what you expected against what really happened.\n\nEach area has one clear job so you always know where to go, where money is being spent, what income is expected, what income has landed, and what your savings direction looks like in the current period. Settings supports all of this with defaults and tools like Categories, Presets, and workspace-level behavior. Once these building blocks click, every other screen feels much more natural." : {
       "localizations" : {
         "ar" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "تم تنظيم Offshore في وظائف أساسية تعمل معًا بدلاً من التنافس على جذب انتباهك. تشتمل الحسابات على البطاقات والتسويات وحساب التوفير المخصص لمساحة العمل. يتم تقسيم الدخل إلى تدفقات مخططة وتدفقات فعلية، بينما تمنحك الميزانيات العدسة التي تقارن ما توقعته بما حدث بالفعل.\n\nتحتوي كل منطقة على وظيفة واحدة واضحة حتى تعرف دائمًا إلى أين تذهب، وأين يتم إنفاق الأموال، وما هو الدخل المتوقع، وما هو الدخل الذي وصل إليه، وكيف يبدو اتجاه مدخراتك في الفترة الحالية. تدعم الإعدادات كل هذا من خلال الإعدادات الافتراضية والأدوات مثل الفئات والإعدادات المسبقة والسلوك على مستوى مساحة العمل. بمجرد النقر على هذه العناصر الأساسية، تبدو كل شاشة أخرى أكثر طبيعية."
+            "value" : "تم تنظيم Offshore في وظائف أساسية تعمل معًا بدلاً من التنافس على جذب انتباهك. تشتمل الحسابات على البطاقات والتسويات وOffshore Savings لكل مساحة عمل. يتم تقسيم الدخل إلى تدفقات مخططة وتدفقات فعلية، بينما تمنحك الميزانيات العدسة التي تقارن ما توقعته بما حدث بالفعل.\n\nتحتوي كل منطقة على وظيفة واحدة واضحة حتى تعرف دائمًا إلى أين تذهب، وأين يتم إنفاق الأموال، وما هو الدخل المتوقع، وما هو الدخل الذي وصل إليه، وكيف يبدو اتجاه مدخراتك في الفترة الحالية. تدعم الإعدادات كل هذا من خلال الإعدادات الافتراضية والأدوات مثل الفئات والإعدادات المسبقة والسلوك على مستوى مساحة العمل. بمجرد النقر على هذه العناصر الأساسية، تبدو كل شاشة أخرى أكثر طبيعية."
           }
         },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Offshore ist in Kernfunktionen organisiert, die zusammenarbeiten, anstatt um Ihre Aufmerksamkeit zu konkurrieren."
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Offshore is organized into core functions that work together instead of competing for your attention. Accounts includes Cards, Reconciliations, and a dedicated workspace Savings Account. Income is split into planned and actual inflows, while Budgets gives you the lens that compares what you expected against what really happened.\n\nEach area has one clear job so you always know where to go, where money is being spent, what income is expected, what income has landed, and what your savings direction looks like in the current period. Settings supports all of this with defaults and tools like Categories, Presets, and workspace-level behavior. Once these building blocks click, every other screen feels much more natural."
+            "value" : "Offshore ist in Kernfunktionen organisiert, die zusammenarbeiten, anstatt um Ihre Aufmerksamkeit zu konkurrieren. Konten umfasst Karten, Abstimmungen und Offshore Savings für jeden Arbeitsbereich."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Offshore está organizado en funciones principales que trabajan juntas en lugar de competir por tu atención. Cuentas incluye Tarjetas, Conciliaciones y una Cuenta de ahorros dedicada por espacio de trabajo. Ingresos se divide en entradas planificadas y reales, mientras que Presupuestos te da la vista que compara lo que esperabas con lo que realmente ocurrió.\n\nCada área tiene una tarea clara, así siempre sabes a dónde ir, dónde se está gastando el dinero, qué ingresos se esperan, qué ingresos ya llegaron y cómo va tu dirección de ahorro en el periodo actual. Ajustes respalda todo esto con valores predeterminados y herramientas como Categorías, Plantillas y comportamiento a nivel de espacio de trabajo. Cuando estos componentes básicos hacen clic, cada otra pantalla se siente mucho más natural."
+            "value" : "Offshore está organizado en funciones principales que trabajan juntas en lugar de competir por tu atención. Cuentas incluye Tarjetas, Conciliaciones y Offshore Savings para cada espacio de trabajo. Ingresos se divide en entradas planificadas y reales, mientras que Presupuestos te da la vista que compara lo que esperabas con lo que realmente ocurrió.\n\nCada área tiene una tarea clara, así siempre sabes a dónde ir, dónde se está gastando el dinero, qué ingresos se esperan, qué ingresos ya llegaron y cómo va tu dirección de ahorro en el periodo actual. Ajustes respalda todo esto con valores predeterminados y herramientas como Categorías, Plantillas y comportamiento a nivel de espacio de trabajo. Cuando estos componentes básicos hacen clic, cada otra pantalla se siente mucho más natural."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Offshore est organisé en fonctions principales qui travaillent ensemble au lieu de se disputer votre attention. Comptes comprend Cartes, Rapprochements et un Compte d’épargne dédié par espace de travail. Revenu se divise entre entrées prévues et réelles, tandis que Budgets vous donne la vue qui compare ce que vous attendiez à ce qui s’est réellement passé.\n\nChaque zone a un rôle clair, pour que vous sachiez toujours où aller, où l’argent est dépensé, quel revenu est attendu, quel revenu est bien arrivé et quelle est la direction de votre épargne dans la période en cours. Réglages soutient tout cela avec des valeurs par défaut et des outils comme Catégories, Préréglages et le comportement au niveau de l’espace de travail. Une fois ces éléments de base assimilés, chaque autre écran devient beaucoup plus naturel."
+            "value" : "Offshore est organisé en fonctions principales qui travaillent ensemble au lieu de se disputer votre attention. Comptes comprend Cartes, Rapprochements et Offshore Savings pour chaque espace de travail. Revenu se divise entre entrées prévues et réelles, tandis que Budgets vous donne la vue qui compare ce que vous attendiez à ce qui s’est réellement passé.\n\nChaque zone a un rôle clair, pour que vous sachiez toujours où aller, où l’argent est dépensé, quel revenu est attendu, quel revenu est bien arrivé et quelle est la direction de votre épargne dans la période en cours. Réglages soutient tout cela avec des valeurs par défaut et des outils comme Catégories, Préréglages et le comportement au niveau de l’espace de travail. Une fois ces éléments de base assimilés, chaque autre écran devient beaucoup plus naturel."
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Offshore é organizado em funções principais que funcionam juntas em vez de competir pela sua atenção. As contas incluem cartões, reconciliações e uma conta poupança de espaço de trabalho dedicado. A receita é dividida em entradas planejadas e reais, enquanto o Orçamento oferece uma visão que compara o que você esperava com o que realmente aconteceu.\n\nCada área tem uma função clara para que você sempre saiba para onde ir, onde o dinheiro está sendo gasto, que renda é esperada, que renda foi recebida e qual é a direção de sua poupança no período atual. As configurações oferecem suporte a tudo isso com padrões e ferramentas como categorias, predefinições e comportamento no nível do espaço de trabalho. Depois que esses blocos de construção são clicados, todas as outras telas parecem muito mais naturais."
+            "value" : "Offshore é organizado em funções principais que funcionam juntas em vez de competir pela sua atenção. As contas incluem cartões, reconciliações e Offshore Savings para cada espaço de trabalho. A receita é dividida em entradas planejadas e reais, enquanto o Orçamento oferece uma visão que compara o que você esperava com o que realmente aconteceu.\n\nCada área tem uma função clara para que você sempre saiba para onde ir, onde o dinheiro está sendo gasto, que renda é esperada, que renda foi recebida e qual é a direção de sua poupança no período atual. As configurações oferecem suporte a tudo isso com padrões e ferramentas como categorias, predefinições e comportamento no nível do espaço de trabalho. Depois que esses blocos de construção são clicados, todas as outras telas parecem muito mais naturais."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Offshore 被组织成多个核心功能，这些功能可以协同工作，而不是争夺您的注意力。账户包括卡、对账和专用工作区储蓄账户。收入分为计划流入和实际流入，而预算为您提供了将预期与实际发生的情况进行比较的镜头。\n\n每个区域都有明确的工作，因此您始终知道该去哪里、钱花在哪里、预期收入是多少、收入已到达什么以及您当前时期的储蓄方向是什么。设置通过默认值和工具（例如类别、预设和工作区级行为）支持所有这些。一旦这些构建块点击，其他所有屏幕都会感觉更加自然。"
+            "value" : "Offshore 被组织成多个核心功能，这些功能可以协同工作，而不是争夺您的注意力。账户包括卡、对账和各工作区专属的 Offshore Savings。收入分为计划流入和实际流入，而预算为您提供了将预期与实际发生的情况进行比较的镜头。\n\n每个区域都有明确的工作，因此您始终知道该去哪里、钱花在哪里、预期收入是多少、收入已到达什么以及您当前时期的储蓄方向是什么。设置通过默认值和工具（例如类别、预设和工作区级行为）支持所有这些。一旦这些构建块点击，其他所有屏幕都会感觉更加自然。"
           }
         }
       }
@@ -34425,6 +34388,247 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Offshore 向公众发布"
+          }
+        }
+      }
+    },
+    "Offshore Savings" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Offshore Savings"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Offshore Savings"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Offshore Savings"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Offshore Savings"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Offshore Savings"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Offshore Savings"
+          }
+        }
+      }
+    },
+    "Offshore Savings keeps a workspace-specific ledger of money left over at the end of each budgeting period. Running Total includes all dates in the ledger, while Current Period shows activity for the selected date range.\n\nLeave this balance available for future spending, add manual adjustments, or use it to offset an expense. An offset keeps the purchase on its original card while reducing the amount covered by the current budget." : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "يحتفظ Offshore Savings بسجل خاص بكل مساحة عمل للأموال المتبقية في نهاية كل فترة ميزانية. يشمل الإجمالي التراكمي جميع التواريخ في السجل، بينما تعرض الفترة الحالية النشاط ضمن نطاق التواريخ المحدد.\n\nاترك هذا الرصيد متاحًا للنفقات المستقبلية، أو أضف تعديلات يدوية، أو استخدمه لتعويض مصروف. يُبقي التعويض عملية الشراء على بطاقتها الأصلية مع تقليل المبلغ الذي تغطيه الميزانية الحالية."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Offshore Savings führt für jeden Arbeitsbereich ein Buch über das Geld, das am Ende jeder Budgetperiode übrig bleibt. Die laufende Gesamtsumme umfasst alle Daten im Buch, während Aktuelle Periode die Aktivität für den ausgewählten Datumsbereich zeigt.\n\nLassen Sie diesen Saldo für zukünftige Ausgaben verfügbar, fügen Sie manuelle Anpassungen hinzu oder gleichen Sie damit eine Ausgabe aus. Ein Ausgleich belässt den Kauf auf seiner ursprünglichen Karte und verringert zugleich den Betrag, der vom aktuellen Budget getragen wird."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Offshore Savings mantiene un registro por espacio de trabajo del dinero que sobra al final de cada periodo de presupuesto. Total acumulado incluye todas las fechas del registro, mientras que Periodo actual muestra la actividad del intervalo de fechas seleccionado.\n\nDeja este saldo disponible para gastos futuros, agrega ajustes manuales o úsalo para compensar un gasto. Una compensación mantiene la compra en su tarjeta original y reduce el importe cubierto por el presupuesto actual."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Offshore Savings tient, pour chaque espace de travail, un registre de l’argent restant à la fin de chaque période budgétaire. Total cumulé comprend toutes les dates du registre, tandis que Période en cours affiche l’activité pour la plage de dates sélectionnée.\n\nLaissez ce solde disponible pour de futures dépenses, ajoutez des ajustements manuels ou utilisez-le pour compenser une dépense. Une compensation conserve l’achat sur sa carte d’origine tout en réduisant le montant couvert par le budget actuel."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O Offshore Savings mantém, para cada espaço de trabalho, um registro do dinheiro que sobra ao final de cada período orçamentário. Total acumulado inclui todas as datas do registro, enquanto Período atual mostra a atividade no intervalo de datas selecionado.\n\nDeixe esse saldo disponível para gastos futuros, adicione ajustes manuais ou use-o para compensar uma despesa. Uma compensação mantém a compra no cartão original e reduz o valor coberto pelo orçamento atual."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Offshore Savings 为每个工作区单独记录每个预算期结束时剩余的资金。“累计总额”包含账本中所有日期的记录，而“当前期间”显示所选日期范围内的活动。\n\n你可以将此余额留作未来支出、添加手动调整，或用它抵扣某笔支出。抵扣操作会将购买记录保留在原卡上，同时减少由当前预算承担的金额。"
+          }
+        }
+      }
+    },
+    "Offshore Savings Outlook" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "توقعات Offshore Savings"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Offshore Savings-Ausblick"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Perspectiva de Offshore Savings"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Perspectives Offshore Savings"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Projeção do Offshore Savings"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Offshore Savings 展望"
+          }
+        }
+      }
+    },
+    "Offshore Savings Outlook projects where the period may end based on current entries and assumptions. Review it after adding meaningful expenses or income updates so direction changes are visible immediately. Use this signal to decide whether you need to slow discretionary spending. Frequent checks keep surprises smaller at period close." : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تُقدّر توقعات Offshore Savings النتيجة المحتملة للفترة بناءً على القيود والافتراضات الحالية. راجعها بعد إضافة نفقات مهمة أو تحديثات للدخل حتى تظهر تغييرات الاتجاه فورًا. استخدم هذه الإشارة لتحديد ما إذا كنت بحاجة إلى تقليل الإنفاق الاختياري. تقلل المراجعات المتكررة المفاجآت عند إغلاق الفترة."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Der Offshore Savings-Ausblick schätzt anhand der aktuellen Einträge und Annahmen, wie die Periode enden könnte. Prüfen Sie ihn nach größeren Ausgaben oder Einkommensänderungen, damit Richtungsänderungen sofort sichtbar werden. Entscheiden Sie anhand dieses Signals, ob Sie frei verfügbare Ausgaben einschränken sollten. Häufige Kontrollen verringern Überraschungen beim Periodenabschluss."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Perspectiva de Offshore Savings proyecta dónde puede terminar el periodo en función de las entradas y supuestos actuales. Revísala después de agregar gastos importantes o actualizaciones de ingresos para que los cambios de dirección sean visibles de inmediato. Usa esta señal para decidir si necesitas frenar el gasto discrecional. Las revisiones frecuentes reducen las sorpresas al cierre del periodo."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Perspectives Offshore Savings projette la manière dont la période peut se terminer à partir des entrées et hypothèses actuelles. Passez-la en revue après avoir ajouté des dépenses significatives ou des mises à jour de revenu afin que les changements de direction soient visibles immédiatement. Utilisez ce signal pour décider si vous devez ralentir les dépenses discrétionnaires. Des vérifications fréquentes réduisent les surprises à la clôture de la période."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A Projeção do Offshore Savings projeta onde o período pode terminar com base nas entradas e suposições atuais. Revise-o depois de adicionar despesas significativas ou atualizações de receitas para que as mudanças de direção sejam visíveis imediatamente. Use este sinal para decidir se você precisa desacelerar os gastos discricionários. Verificações frequentes mantêm as surpresas menores no encerramento do período."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Offshore Savings 展望根据当前条目和假设预测该期间可能结束的时间。添加有意义的支出或收入更新后进行审查，以便立即看到方向变化。使用此信号来决定是否需要放慢可自由支配支出。频繁的检查可以减少期末意外的发生。"
+          }
+        }
+      }
+    },
+    "Offshore Savings Refinement" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تحسين Offshore Savings"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Optimierung von Offshore Savings"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mejoras de Offshore Savings"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Amélioration d’Offshore Savings"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Refinamento do Offshore Savings"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Offshore Savings 优化"
+          }
+        }
+      }
+    },
+    "Offshore Savings tracks money left over at the end of each budgeting period. Your running total includes all dates in your savings ledger." : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "يتتبع Offshore Savings الأموال المتبقية في نهاية كل فترة ميزانية. يشمل الإجمالي التراكمي جميع التواريخ في سجل مدخراتك."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Offshore Savings erfasst das Geld, das am Ende jeder Budgetperiode übrig bleibt. Ihre laufende Gesamtsumme umfasst alle Daten in Ihrem Sparbuch."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Offshore Savings registra el dinero que sobra al final de cada periodo de presupuesto. Tu total acumulado incluye todas las fechas del registro de ahorros."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Offshore Savings suit l’argent restant à la fin de chaque période budgétaire. Votre total cumulé comprend toutes les dates de votre registre d’épargne."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O Offshore Savings acompanha o dinheiro que sobra ao final de cada período orçamentário. Seu total acumulado inclui todas as datas do registro de poupança."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Offshore Savings 记录每个预算期结束时剩余的资金。累计总额包含储蓄账本中所有日期的记录。"
           }
         }
       }
@@ -35161,6 +35365,47 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "打开Offshore直接进入快速添加费用表。"
+          }
+        }
+      }
+    },
+    "Open Offshore Savings" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "فتح Offshore Savings"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Offshore Savings öffnen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abrir Offshore Savings"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvrir Offshore Savings"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abrir Offshore Savings"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开 Offshore Savings"
           }
         }
       }
@@ -39443,6 +39688,46 @@
         }
       }
     },
+    "Record money you've set aside by subtracting this amount from Offshore Savings. The remaining balance is available for future spending. This does not transfer money between bank accounts." : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "سجّل الأموال التي خصصتها للادخار بطرح هذا المبلغ من Offshore Savings. يبقى الرصيد المتبقي متاحًا للنفقات المستقبلية. لا يؤدي ذلك إلى تحويل الأموال بين الحسابات المصرفية."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Erfassen Sie zurückgelegtes Geld, indem Sie diesen Betrag von Offshore Savings abziehen. Der verbleibende Saldo steht für zukünftige Ausgaben zur Verfügung. Dabei wird kein Geld zwischen Bankkonten übertragen."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Registra el dinero que has reservado restando este importe de Offshore Savings. El saldo restante queda disponible para gastos futuros. Esto no transfiere dinero entre cuentas bancarias."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enregistrez l’argent que vous avez mis de côté en soustrayant ce montant d’Offshore Savings. Le solde restant est disponible pour de futures dépenses. Cela ne transfère pas d’argent entre comptes bancaires."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Registre o dinheiro que você separou subtraindo este valor do Offshore Savings. O saldo restante fica disponível para gastos futuros. Isso não transfere dinheiro entre contas bancárias."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "从 Offshore Savings 中扣除此金额，以记录你已留作储蓄的资金。剩余余额可用于未来支出。此操作不会在银行账户之间转账。"
+          }
+        }
+      }
+    },
     "Record variable expenses in the active budget context so entries land in the correct period and comparisons stay meaningful. Keeping the right context from the start prevents avoidable cleanup work.\n\nAssign category, amount, date, and account details with care. Clean entry data now directly improves every filter, report, and trend you rely on later." : {
       "localizations" : {
         "ar" : {
@@ -41165,6 +41450,46 @@
       "comment" : "A toggle that lets users decide whether to be prompted to review their uncategorized expenses when they open the app.",
       "isCommentAutoGenerated" : true
     },
+    "Review your available Offshore Savings balance and its ledger history." : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "راجع رصيد Offshore Savings المتاح وسجل قيوده."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prüfen Sie Ihren verfügbaren Offshore Savings-Saldo und den Buchungsverlauf."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Revisa tu saldo disponible de Offshore Savings y el historial de su registro."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Consultez votre solde Offshore Savings disponible et l’historique de son registre."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Revise seu saldo disponível no Offshore Savings e o histórico do registro."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "查看可用的 Offshore Savings 余额及其账本历史。"
+          }
+        }
+      }
+    },
     "Route to Expense Import" : {
       "localizations" : {
         "ar" : {
@@ -41334,46 +41659,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "运行总计"
-          }
-        }
-      }
-    },
-    "Running Total includes all dates in your savings ledger." : {
-      "localizations" : {
-        "ar" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "يتضمن تشغيل الإجمالي جميع التواريخ الموجودة في دفتر أستاذ التوفير الخاص بك."
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Die laufende Summe umfasst alle Daten in Ihrem Sparbuch."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "El saldo acumulado incluye todas las fechas de tu libro de ahorros."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Le total cumulé inclut toutes les dates de votre registre d’épargne."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "O Running Total inclui todas as datas em seu livro de poupança."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "运行总计包括您的储蓄分类帐中的所有日期。"
           }
         }
       }
@@ -41625,144 +41910,6 @@
         }
       }
     },
-    "Savings Account" : {
-      "localizations" : {
-        "ar" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "حساب التوفير"
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sparkonto"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Savings Account"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Cuenta de ahorros"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Compte d’épargne"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Conta Poupança"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "储蓄账户"
-          }
-        }
-      }
-    },
-    "Savings Account provides a dedicated ledger and trend view for money set aside outside normal card spending. It is especially useful when you want saved funds to offset future purchases without losing expense ownership on the card that made the purchase.\n\nA practical pattern is: save money during one period, keep a later purchase on the correct card, then use Savings activity to offset the balance impact intentionally. This keeps card history accurate while showing how savings supported the purchase.\n\nAfter each savings update, verify both ledgers moved as expected. This keeps your reserve history trustworthy and your card math clean." : {
-      "localizations" : {
-        "ar" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "يوفر حساب التوفير دفترًا مخصصًا وعرضًا لاتجاهات الأموال التي يتم تخصيصها خارج نطاق الإنفاق العادي للبطاقة. يكون ذلك مفيدًا بشكل خاص عندما تريد الأموال المحفوظة لتعويض عمليات الشراء المستقبلية دون فقدان ملكية النفقات على البطاقة التي قامت بعملية الشراء.\n\nالنمط العملي هو: توفير المال خلال فترة واحدة، والاحتفاظ بعملية شراء لاحقة على البطاقة الصحيحة، ثم استخدام نشاط التوفير لتعويض تأثير الرصيد عن عمد. يؤدي هذا إلى الحفاظ على دقة سجل البطاقة مع إظهار مدى دعم المدخرات لعملية الشراء.\n\nبعد كل تحديث للادخار، تحقق من نقل كلا الدفترين كما هو متوقع. يؤدي هذا إلى إبقاء سجل الاحتياطي الخاص بك جديرًا بالثقة وحسابات بطاقتك نظيفة."
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Das Sparkonto bietet ein spezielles Hauptbuch und eine Trendansicht für Geld, das außerhalb der normalen Kartenausgaben beiseite gelegt wird."
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Savings Account provides a dedicated ledger and trend view for money set aside outside normal card spending. It is especially useful when you want saved funds to offset future purchases without losing expense ownership on the card that made the purchase.\n\nA practical pattern is: save money during one period, keep a later purchase on the correct card, then use Savings activity to offset the balance impact intentionally. This keeps card history accurate while showing how savings supported the purchase.\n\nAfter each savings update, verify both ledgers moved as expected. This keeps your reserve history trustworthy and your card math clean."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Cuenta de ahorros ofrece un libro dedicado y una vista de tendencia para dinero apartado fuera del gasto normal de tarjeta. Es especialmente útil cuando quieres que fondos ahorrados compensen compras futuras sin perder la propiedad del gasto en la tarjeta que hizo la compra.\n\nUn patrón práctico es: ahorrar dinero durante un periodo, mantener una compra posterior en la tarjeta correcta y luego usar actividad de Ahorros para compensar intencionalmente el impacto en el saldo. Esto mantiene preciso el historial de la tarjeta mientras muestra cómo los ahorros respaldaron la compra.\n\nDespués de cada actualización de ahorros, verifica que ambos libros se movieron como esperabas. Esto mantiene confiable tu historial de reserva y limpias las cuentas de la tarjeta."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Compte d’épargne fournit un registre dédié et une vue de tendance pour l’argent mis de côté en dehors des dépenses normales de carte. Il est particulièrement utile lorsque vous voulez que des fonds épargnés compensent de futurs achats sans perdre la propriété de la dépense sur la carte qui a effectué l’achat.\n\nUn schéma pratique est le suivant : épargner de l’argent pendant une période, garder un achat ultérieur sur la bonne carte, puis utiliser l’activité d’Épargne pour compenser intentionnellement l’impact sur le solde. Cela garde l’historique de la carte précis tout en montrant comment l’épargne a soutenu l’achat.\n\nAprès chaque mise à jour de l’épargne, vérifiez que les deux registres ont bougé comme prévu. Cela garde votre historique de réserve fiable et les calculs de votre carte propres."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "A Conta Poupança fornece um livro-razão dedicado e uma visão de tendências para o dinheiro reservado fora dos gastos normais do cartão. É especialmente útil quando você deseja que os fundos economizados possam compensar compras futuras sem perder a propriedade das despesas do cartão que fez a compra.\n\nUm padrão prático é: economizar dinheiro durante um período, manter uma compra posterior no cartão correto e, em seguida, usar a atividade de Poupança para compensar intencionalmente o impacto no saldo. Isso mantém o histórico do cartão preciso e mostra como as economias apoiaram a compra.\n\nApós cada atualização de poupança, verifique se ambos os livros foram movidos conforme esperado. Isso mantém seu histórico de reservas confiável e a matemática do seu cartão limpa."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "储蓄账户为正常卡支出之外预留的资金提供专用分类账和趋势视图。当您希望节省的资金抵消未来的购买而不失去购买卡上的费用所有权时，它特别有用。\n\n一种实用的模式是：在一段时间内省钱，将以后的购买保留在正确的卡上，然后使用储蓄活动有意抵消余额影响。这可以保持卡历史记录的准确性，同时显示储蓄如何支持购买。\n\n每次储蓄更新后，验证两个分类帐是否按预期移动。这使您的储备历史记录值得信赖，并且您的卡数学清晰。"
-          }
-        }
-      }
-    },
-    "Savings Account Refinement" : {
-      "localizations" : {
-        "ar" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "تحسين حساب الادخار"
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Optimierung des Sparkontos"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Savings Account Refinement"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Perfeccionamiento de la cuenta de ahorros"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Amélioration du compte d’épargne"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Refinamento da conta de poupança"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "储蓄账户优化"
-          }
-        }
-      }
-    },
     "Savings Amount" : {
       "localizations" : {
         "ar" : {
@@ -41938,96 +42085,7 @@
       }
     },
     "Savings Outlook" : {
-      "localizations" : {
-        "ar" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "توقعات الادخار"
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sparausblick"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Savings Outlook"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Perspectiva de ahorro"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Perspective d’épargne"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Perspectiva de poupança"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "储蓄前景"
-          }
-        }
-      }
-    },
-    "Savings Outlook projects where the period may end based on current entries and assumptions. Review it after adding meaningful expenses or income updates so direction changes are visible immediately. Use this signal to decide whether you need to slow discretionary spending. Frequent checks keep surprises smaller at period close." : {
-      "localizations" : {
-        "ar" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "مشاريع التوفير في Outlook حيث قد تنتهي الفترة بناءً على الإدخالات والافتراضات الحالية. قم بمراجعته بعد إضافة نفقات ذات معنى أو تحديثات للدخل حتى تظهر تغييرات الاتجاه على الفور. استخدم هذه الإشارة لتقرر ما إذا كنت بحاجة إلى إبطاء الإنفاق التقديري. الشيكات المتكررة تجعل المفاجآت أصغر عند إغلاق الفترة."
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Einsparungen bei Outlook-Projekten, bei denen der Zeitraum aufgrund aktueller Einträge und Annahmen enden kann."
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Savings Outlook projects where the period may end based on current entries and assumptions. Review it after adding meaningful expenses or income updates so direction changes are visible immediately. Use this signal to decide whether you need to slow discretionary spending. Frequent checks keep surprises smaller at period close."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Perspectiva de ahorro proyecta dónde puede terminar el periodo en función de las entradas y supuestos actuales. Revísala después de agregar gastos importantes o actualizaciones de ingresos para que los cambios de dirección sean visibles de inmediato. Usa esta señal para decidir si necesitas frenar el gasto discrecional. Las revisiones frecuentes reducen las sorpresas al cierre del periodo."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Perspective d’épargne projette la manière dont la période peut se terminer à partir des entrées et hypothèses actuelles. Passez-la en revue après avoir ajouté des dépenses significatives ou des mises à jour de revenu afin que les changements de direction soient visibles immédiatement. Utilisez ce signal pour décider si vous devez ralentir les dépenses discrétionnaires. Des vérifications fréquentes réduisent les surprises à la clôture de la période."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "O Savings Outlook projeta onde o período pode terminar com base nas entradas e suposições atuais. Revise-o depois de adicionar despesas significativas ou atualizações de receitas para que as mudanças de direção sejam visíveis imediatamente. Use este sinal para decidir se você precisa desacelerar os gastos discricionários. Verificações frequentes mantêm as surpresas menores no encerramento do período."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "储蓄展望根据当前条目和假设预测该期间可能结束的时间。添加有意义的支出或收入更新后进行审查，以便立即看到方向变化。使用此信号来决定是否需要放慢可自由支配支出。频繁的检查可以减少期末意外的发生。"
-          }
-        }
-      }
+
     },
     "Savings Trend" : {
       "comment" : "Section title for the savings trend chart.",
@@ -42891,6 +42949,46 @@
     },
     "Series" : {
 
+    },
+    "Set Aside as Savings" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تخصيص مبلغ للادخار"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Als Ersparnis zurücklegen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reservar como ahorro"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mettre de côté comme épargne"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Separar como poupança"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "留作储蓄"
+          }
+        }
+      }
     },
     "Set category limits to surface budget pressure before it compounds." : {
       "localizations" : {
@@ -47415,48 +47513,42 @@
         }
       }
     },
-    "The in-app, workspace-scoped Savings Account now supports adding negative manual entries to transfer any amount of the running balance 'out' of the savings account to reflect when funds are moved to your actual bank's savings account." : {
+    "The in-app, workspace-scoped Offshore Savings now supports adding negative manual entries to transfer any amount of the running balance 'out' of Offshore Savings to reflect when funds are moved to your actual bank's savings account." : {
       "localizations" : {
         "ar" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "يدعم الآن حساب التوفير على نطاق مساحة العمل داخل التطبيق إضافة إدخالات يدوية سلبية لتحويل أي مبلغ من الرصيد الجاري \"خارج\" حساب التوفير ليعكس متى يتم نقل الأموال إلى حساب التوفير الفعلي الخاص بالبنك."
+            "value" : "يدعم الآن Offshore Savings على نطاق مساحة العمل داخل التطبيق إضافة إدخالات يدوية سلبية لتحويل أي مبلغ من الرصيد الجاري \"خارج\" Offshore Savings ليعكس متى يتم نقل الأموال إلى حساب التوفير الفعلي الخاص بالبنك."
           }
         },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Das arbeitsbereichsbezogene In-App-Sparkonto unterstützt jetzt das Hinzufügen negativer manueller Einträge, um einen beliebigen Betrag des laufenden Saldos „aus“ dem Sparkonto zu übertragen, um anzuzeigen, wann Gelder auf das Sparkonto Ihrer tatsächlichen Bank übertragen werden."
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "The in-app, workspace-scoped Savings Account now supports adding negative manual entries to transfer any amount of the running balance 'out' of the savings account to reflect when funds are moved to your actual bank's savings account."
+            "value" : "Offshore Savings innerhalb der App und des Arbeitsbereichs unterstützt jetzt das Hinzufügen negativer manueller Einträge, um einen beliebigen Betrag des laufenden Saldos „aus“ Offshore Savings zu übertragen, um anzuzeigen, wann Gelder auf das Sparkonto Ihrer tatsächlichen Bank übertragen werden."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "La Cuenta de ahorros integrada en la app y limitada al espacio de trabajo ahora permite agregar movimientos manuales negativos para sacar cualquier monto del saldo acumulado y reflejar cuando los fondos se mueven a la cuenta de ahorros real de tu banco."
+            "value" : "Offshore Savings integrada en la app y limitada al espacio de trabajo ahora permite agregar movimientos manuales negativos para sacar cualquier monto del saldo acumulado y reflejar cuando los fondos se mueven a la cuenta de ahorros real de tu banco."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Le compte d’épargne intégré à l’app et propre à l’espace de travail permet maintenant d’ajouter des entrées manuelles négatives pour sortir n’importe quel montant du solde cumulé et refléter le moment où des fonds sont transférés vers le compte d’épargne réel de votre banque."
+            "value" : "Offshore Savings intégré à l’app et propre à l’espace de travail permet maintenant d’ajouter des entrées manuelles négatives pour sortir n’importe quel montant du solde cumulé et refléter le moment où des fonds sont transférés vers le compte d’épargne réel de votre banque."
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "A Conta Poupança no aplicativo, com escopo de espaço de trabalho, agora suporta a adição de entradas manuais negativas para transferir qualquer valor do saldo corrente da conta poupança para refletir quando os fundos são transferidos para a conta poupança real do seu banco."
+            "value" : "O Offshore Savings no aplicativo, com escopo de espaço de trabalho, agora suporta a adição de entradas manuais negativas para transferir qualquer valor do saldo corrente do Offshore Savings para refletir quando os fundos são transferidos para a conta poupança real do seu banco."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "应用程序内、工作区范围的储蓄账户现在支持添加负手动条目，以将任何金额的运行余额“转出”储蓄账户，以反映资金何时转移到实际银行的储蓄账户。"
+            "value" : "应用程序内、工作区范围的 Offshore Savings现在支持添加负手动条目，以将任何金额的运行余额“转出”Offshore Savings，以反映资金何时转移到实际银行的储蓄账户。"
           }
         }
       }
@@ -47687,6 +47779,86 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "最常见的问题是混合概念，尤其是对待计划价值（如已转移的资金）。计划值仍然代表意图，因此请在阅读节省指标时牢记这一背景。\n\n另一个常见问题是类别重叠或命名不明确。保持名称一致，将每个屏幕用于其预期目的，并尽早保持工作区结构简单。随着你的历史的增长，一个小小的结构现在会发挥很大的作用。"
+          }
+        }
+      }
+    },
+    "The Offshore Savings graph now offers two views: Running Total and Current Period." : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "يقدم الرسم البياني لـOffshore Savings الآن طريقتي عرض: إجمالي التشغيل والفترة الحالية."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Das Offshore Savings-Diagramm bietet jetzt zwei Ansichten: laufende Summe und aktuelle Periode."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La gráfica de Offshore Savings ahora ofrece dos vistas: total acumulado y periodo actual."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le graphique d’Offshore Savings propose maintenant deux vues : total cumulé et période en cours."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O gráfico do Offshore Savings agora oferece duas visualizações: Total em execução e Período atual."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Offshore Savings 图表现在提供两种视图：运行总计和当前期间。"
+          }
+        }
+      }
+    },
+    "The Offshore Savings ledger shows period-close amounts, manual adjustments, and expense offsets. Use Running Total for the full ledger balance or Current Period to review activity in the selected date range." : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "يعرض سجل Offshore Savings مبالغ إغلاق الفترات والتعديلات اليدوية وتعويضات النفقات. استخدم الإجمالي التراكمي لعرض رصيد السجل الكامل، أو الفترة الحالية لمراجعة النشاط ضمن نطاق التواريخ المحدد."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Das Offshore Savings-Buch zeigt Periodenabschlussbeträge, manuelle Anpassungen und Ausgabenausgleiche. Verwenden Sie die laufende Gesamtsumme für den vollständigen Buchsaldo oder Aktuelle Periode, um die Aktivität im ausgewählten Datumsbereich zu prüfen."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El registro de Offshore Savings muestra importes de cierre de periodo, ajustes manuales y compensaciones de gastos. Usa Total acumulado para ver el saldo completo del registro o Periodo actual para revisar la actividad del intervalo de fechas seleccionado."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le registre Offshore Savings affiche les montants de clôture de période, les ajustements manuels et les compensations de dépenses. Utilisez Total cumulé pour consulter le solde complet du registre ou Période en cours pour examiner l’activité de la plage de dates sélectionnée."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O registro do Offshore Savings mostra valores de fechamento de período, ajustes manuais e compensações de despesas. Use Total acumulado para ver o saldo completo do registro ou Período atual para revisar a atividade no intervalo de datas selecionado."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Offshore Savings 账本显示期末结算金额、手动调整和支出抵扣。使用“累计总额”查看完整账本余额，或使用“当前期间”查看所选日期范围内的活动。"
           }
         }
       }
@@ -47963,98 +48135,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "调节列表管理共享余额。使用它来创建和监控特定于个人或特定于上下文的分类账，而无需将其与卡费用混合。保持名称明确，以便在审核期间轻松识别余额。单独的账本使结算进度更容易沟通。"
-          }
-        }
-      }
-    },
-    "The Savings Account graph now offers two views: Running Total and Current Period." : {
-      "localizations" : {
-        "ar" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "يقدم الرسم البياني لحساب التوفير الآن طريقتي عرض: إجمالي التشغيل والفترة الحالية."
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Das Sparkontodiagramm bietet jetzt zwei Ansichten: laufende Summe und aktuelle Periode."
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "The Savings Account graph now offers two views: Running Total and Current Period."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "La gráfica de la Cuenta de ahorros ahora ofrece dos vistas: total acumulado y periodo actual."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Le graphique du compte d’épargne propose maintenant deux vues : total cumulé et période en cours."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "O gráfico da Conta Poupança agora oferece duas visualizações: Total em execução e Período atual."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "储蓄账户图表现在提供两种视图：运行总计和当前期间。"
-          }
-        }
-      }
-    },
-    "The Savings Account ledger shows contributions, withdrawals, and trend context in one view. Use it when you are offsetting a future card purchase with saved funds so the card still owns the expense while savings absorbs part of the impact. After posting, verify the card and savings records both reflect your intent." : {
-      "localizations" : {
-        "ar" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "يعرض دفتر أستاذ حساب التوفير المساهمات والسحوبات وسياق الاتجاه في عرض واحد. استخدمها عندما تقوم بتعويض عملية شراء بطاقة مستقبلية بالأموال المحفوظة بحيث تظل البطاقة تمتلك النفقات بينما تمتص المدخرات جزءًا من التأثير. بعد النشر، تأكد من أن البطاقة وسجلات التوفير تعكسان نيتك."
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Das Hauptbuch des Sparkontos zeigt Einzahlungen, Abhebungen und den Trendkontext in einer Ansicht."
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "The Savings Account ledger shows contributions, withdrawals, and trend context in one view. Use it when you are offsetting a future card purchase with saved funds so the card still owns the expense while savings absorbs part of the impact. After posting, verify the card and savings records both reflect your intent."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "El libro de Cuenta de ahorros muestra aportaciones, retiros y contexto de tendencia en una sola vista. Úsalo cuando estés compensando una compra futura de tarjeta con fondos ahorrados para que la tarjeta siga siendo la dueña del gasto mientras los ahorros absorben parte del impacto. Después de registrar, verifica que tanto la tarjeta como los registros de ahorros reflejen tu intención."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Le registre du Compte d’épargne montre les contributions, retraits et le contexte de tendance dans une seule vue. Utilisez-le lorsque vous compensez un futur achat par carte avec des fonds épargnés afin que la carte conserve la propriété de la dépense pendant que l’épargne absorbe une partie de l’impact. Après l’enregistrement, vérifiez que les enregistrements de la carte et de l’épargne reflètent tous deux votre intention."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "O livro-razão da Conta Poupança mostra contribuições, retiradas e contexto de tendências em uma única visualização. Use-o quando estiver compensando uma compra futura com cartão com fundos economizados, para que o cartão ainda seja o proprietário da despesa enquanto a economia absorve parte do impacto. Após a postagem, verifique se os registros do cartão e da poupança refletem sua intenção."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "储蓄账户分类账在一个视图中显示供款、提款和趋势背景。当您用节省的资金抵消未来的卡购买时，请使用它，这样卡仍然拥有费用，同时储蓄吸收部分影响。发布后，验证卡和储蓄记录是否都反映了您的意图。"
           }
         }
       }
@@ -49072,46 +49152,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "一旦链接了卡，此预设就会应用。"
-          }
-        }
-      }
-    },
-    "This saves a negative manual adjustment so your running total reflects spendable savings." : {
-      "localizations" : {
-        "ar" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "يؤدي هذا إلى حفظ تعديل يدوي سلبي بحيث يعكس إجمالي التشغيل المدخرات القابلة للإنفاق."
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Dadurch wird eine negative manuelle Anpassung eingespart, sodass Ihre laufende Summe die auszugebenden Einsparungen widerspiegelt."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Esto guarda un ajuste manual negativo para que tu saldo acumulado refleje los ahorros disponibles para gastar."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Cela enregistre un ajustement manuel négatif afin que votre total cumulé reflète l’épargne disponible à dépenser."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Isso economiza um ajuste manual negativo para que seu total em execução reflita as economias que podem ser gastas."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "这样可以节省负的手动调整，因此您的运行总额反映了可支出的节省。"
           }
         }
       }
@@ -51889,6 +51929,86 @@
         }
       }
     },
+    "Use Offshore Savings Outlook to forecast direction and course-correct before period close." : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "استخدم توقعات Offshore Savings لاستشراف الاتجاه وتصحيح المسار قبل إغلاق الفترة."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verwenden Sie den Offshore Savings-Ausblick, um die Entwicklung abzuschätzen und vor Periodenende gegenzusteuern."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Usa la Perspectiva de Offshore Savings para prever la dirección y corregir el rumbo antes del cierre del periodo."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Utilisez les Perspectives Offshore Savings pour anticiper la tendance et ajuster le cap avant la clôture de la période."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Use a Projeção do Offshore Savings para prever a direção e corrigir o rumo antes do encerramento do período."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用 Offshore Savings 展望预测趋势，并在期末前及时调整。"
+          }
+        }
+      }
+    },
+    "Use Offshore Savings to track money left over at the end of each budgeting period." : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "استخدم Offshore Savings لتتبع الأموال المتبقية في نهاية كل فترة ميزانية."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verwenden Sie Offshore Savings, um das Geld zu verfolgen, das am Ende jeder Budgetperiode übrig bleibt."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Usa Offshore Savings para registrar el dinero que sobra al final de cada periodo de presupuesto."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Utilisez Offshore Savings pour suivre l’argent restant à la fin de chaque période budgétaire."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Use o Offshore Savings para acompanhar o dinheiro que sobra ao final de cada período orçamentário."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用 Offshore Savings 记录每个预算期结束时剩余的资金。"
+          }
+        }
+      }
+    },
     "Use Presets management to keep recurring templates accurate and ready." : {
       "localizations" : {
         "ar" : {
@@ -51977,98 +52097,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "使用对账来跟踪与正常卡支出分开的共享余额。"
-          }
-        }
-      }
-    },
-    "Use Savings Outlook to forecast direction and course-correct before period close." : {
-      "localizations" : {
-        "ar" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "استخدم Savings Outlook للتنبؤ بالاتجاه وتصحيح المسار قبل إغلاق الفترة."
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Verwenden Sie den Savings Outlook, um die Richtung vorherzusagen und den Kurs vor Periodenende zu korrigieren."
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Use Savings Outlook to forecast direction and course-correct before period close."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Usa Perspectiva de ahorro para prever la dirección y corregir el rumbo antes del cierre del periodo."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Utilisez Perspective d’épargne pour anticiper la direction et corriger la trajectoire avant la clôture de la période."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Use o Savings Outlook para prever a direção e corrigir o curso antes do encerramento do período."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "使用 Savings Outlook 在期末结束前预测方向并纠正路线。"
-          }
-        }
-      }
-    },
-    "Use Savings to offset future card purchases while keeping expense ownership on the card." : {
-      "localizations" : {
-        "ar" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "استخدم المدخرات لتعويض مشتريات البطاقة المستقبلية مع الاحتفاظ بملكية النفقات على البطاقة."
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Nutzen Sie die Ersparnisse, um künftige Kartenkäufe auszugleichen und gleichzeitig die Kostenbeteiligung auf der Karte zu behalten."
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Use Savings to offset future card purchases while keeping expense ownership on the card."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Usa Ahorros para compensar futuras compras con tarjeta manteniendo la propiedad del gasto en la tarjeta."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Utilisez Épargne pour compenser de futurs achats par carte tout en gardant la propriété de la dépense sur la carte."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Use a Poupança para compensar compras futuras com cartão, mantendo a propriedade das despesas no cartão."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "使用储蓄来抵消未来的卡购买，同时保留卡上的费用所有权。"
           }
         }
       }
@@ -52165,48 +52193,42 @@
         }
       }
     },
-    "Use the top toggles to switch between Cards, Reconciliations, and Savings." : {
+    "Use the Section menu to switch between Cards, Reconciliations, and Offshore Savings." : {
       "localizations" : {
         "ar" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "استخدم مفاتيح التبديل العلوية للتبديل بين البطاقات والتسويات والمدخرات."
+            "value" : "استخدم قائمة قسم للتبديل بين البطاقات والتسويات وOffshore Savings."
           }
         },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Verwenden Sie die oberen Schalter, um zwischen Karten, Abgleichen und Ersparnissen zu wechseln."
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Use the top toggles to switch between Cards, Reconciliations, and Savings."
+            "value" : "Verwenden Sie das Menü Abschnitt, um zwischen Karten, Abstimmungen und Offshore Savings zu wechseln."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Usa los botones superiores para cambiar entre Tarjetas, Conciliaciones y Ahorros."
+            "value" : "Usa el menú Sección para cambiar entre Tarjetas, Conciliaciones y Offshore Savings."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Utilisez les bascules du haut pour passer entre Cartes, Rapprochements et Épargne."
+            "value" : "Utilisez le menu Section pour passer entre Cartes, Rapprochements et Offshore Savings."
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Use os botões superiores para alternar entre Cartões, Reconciliações e Poupanças."
+            "value" : "Use o menu Seção para alternar entre Cartões, Reconciliações e Offshore Savings."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "使用顶部切换按钮可在卡、对账和储蓄之间切换。"
+            "value" : "使用“部分”菜单在卡、对账和 Offshore Savings 之间切换。"
           }
         }
       }

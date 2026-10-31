@@ -17,7 +17,7 @@ struct AccountsView: View {
             case .sharedBalances:
                 return String(localized: "accounts.segment.reconciliations", defaultValue: "Reconciliations", comment: "Accounts section segment for reconciliations.")
             case .savings:
-                return String(localized: "accounts.segment.savings", defaultValue: "Savings", comment: "Accounts section segment for savings.")
+                return String(localized: "accounts.segment.savings", defaultValue: "Offshore Savings", comment: "Accounts section segment for Offshore Savings.")
             }
         }
 

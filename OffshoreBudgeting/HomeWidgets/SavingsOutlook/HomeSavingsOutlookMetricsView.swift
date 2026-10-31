@@ -120,7 +120,7 @@ struct HomeSavingsOutlookMetricsView: View {
         .toolbar {
             ToolbarItem(placement: .principal) {
                 VStack(spacing: 2) {
-                    Text(String(localized: "homeWidget.savingsOutlook", defaultValue: "Savings Outlook", comment: "Pinned home widget title for savings outlook."))
+                    Text(String(localized: "homeWidget.savingsOutlook", defaultValue: "Savings Outlook", comment: "Pinned home widget title for Offshore Savings outlook."))
                         .font(.headline.weight(.semibold))
                         .foregroundStyle(.primary)
 
@@ -168,7 +168,7 @@ struct HomeSavingsOutlookMetricsView: View {
 
     private var openSavingsAccountLabel: some View {
         HStack {
-            Text(String(localized: "homeSavingsOutlook.openSavingsAccount", defaultValue: "Open Savings Account", comment: "Button title to open savings account screen."))
+            Text(String(localized: "homeSavingsOutlook.openSavingsAccount", defaultValue: "Open Offshore Savings", comment: "Button title to open Offshore Savings."))
         }
         .frame(maxWidth: .infinity, minHeight: 44)
     }
