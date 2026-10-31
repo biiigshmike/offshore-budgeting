@@ -102,11 +102,27 @@ struct OnboardingStartGateView: View {
     private var dataSourceScreen: some View {
         List {
             Section {
-                ContentUnavailableView(
-                    "Where should Offshore save your data?",
-                    systemImage: "externaldrive",
-                    description: Text("Keep your data on this device, or sync it with iCloud. You can switch later from Manage Workspaces.")
-                )
+                VStack(spacing: 12) {
+                    Image(systemName: "externaldrive")
+                        .font(.largeTitle)
+                        .imageScale(.large)
+                        .foregroundStyle(.secondary)
+                        .accessibilityHidden(true)
+
+                    Text("Where should Offshore save your data?")
+                        .font(.title2.bold())
+                        .lineLimit(nil)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityAddTraits(.isHeader)
+                        .accessibilityIdentifier("onboarding.storageHeading")
+
+                    Text("Keep your data on this device, or sync it with iCloud. You can switch later from Manage Workspaces.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .multilineTextAlignment(.center)
+                .padding(.vertical, 24)
                 .frame(maxWidth: .infinity, alignment: .center)
                 .listRowBackground(Color.clear)
             }

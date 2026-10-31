@@ -626,21 +626,6 @@ private struct OnboardingWorkspaceStep: View {
             )
 
             List {
-                if workspaces.isEmpty && usesICloud == false {
-                    Section {
-                        Button("Start with Personal") {
-                            onCreate("Personal", "#3B82F6")
-                        }
-                        Button("Start with Work") {
-                            onCreate("Work", "#10B981")
-                        }
-                    } header: {
-                        Text("Choose a Starting Workspace")
-                    } footer: {
-                        Text("Choose one to begin, or create your own below. You can add more workspaces later.")
-                    }
-                }
-
                 Section("Workspaces") {
                     WorkspaceListRows(
                         workspaces: workspaces,
@@ -705,6 +690,7 @@ private struct OnboardingWorkspaceStep: View {
             Spacer(minLength: 0)
         }
         .onAppear {
+            seedStartingWorkspacesIfNeeded()
             ensureInitialSelection()
         }
         .onChange(of: workspaces.count) { _, _ in
@@ -762,6 +748,23 @@ private struct OnboardingWorkspaceStep: View {
         if willDeleteSelected {
             selectedWorkspaceID = fallbackWorkspaceID
         }
+    }
+
+    private func seedStartingWorkspacesIfNeeded() {
+        // Cloud discovery may still deliver existing workspaces. Only an empty
+        // On Device store can safely receive automatic defaults here.
+        guard !usesICloud,
+              let count = try? modelContext.fetchCount(FetchDescriptor<Workspace>()),
+              count == 0 else { return }
+
+        let personal = Workspace(name: "Personal", hexColor: "#3B82F6")
+        let work = Workspace(name: "Work", hexColor: "#10B981")
+        modelContext.insert(personal)
+        modelContext.insert(work)
+        // Flush both inserts together so the parent query refreshes before
+        // the user proceeds through onboarding.
+        try? modelContext.save()
+        selectedWorkspaceID = personal.id.uuidString
     }
 
     private func ensureInitialSelection() {

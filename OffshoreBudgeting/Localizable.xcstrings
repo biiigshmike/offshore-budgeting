@@ -12340,6 +12340,7 @@
       }
     },
     "Choose a Starting Workspace" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -12741,6 +12742,7 @@
       }
     },
     "Choose one to begin, or create your own below. You can add more workspaces later." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -51775,6 +51777,7 @@
       }
     },
     "Start with Personal" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -51815,6 +51818,7 @@
       }
     },
     "Start with Work" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {

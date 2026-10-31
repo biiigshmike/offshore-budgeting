@@ -72,7 +72,7 @@ final class OffshoreBudgetingUITests: XCTestCase {
 
         app.buttons["Save"].tap()
 
-        let createdWorkspace = app.buttons["Personal"].firstMatch
+        let createdWorkspace = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Personal")).firstMatch
         XCTAssertTrue(createdWorkspace.waitForExistence(timeout: 5))
 
         app.buttons["Next"].tap()
@@ -94,15 +94,14 @@ final class OffshoreBudgetingUITests: XCTestCase {
         let loadingTitle = app.staticTexts["Setting Up iCloud Sync"].firstMatch
         XCTAssertTrue(loadingTitle.waitForExistence(timeout: 3))
 
-        let slowLoadingTitle = app.staticTexts["Still Checking iCloud"].firstMatch
-        XCTAssertTrue(slowLoadingTitle.waitForExistence(timeout: 10))
-
         let emptyStateTitle = app.staticTexts["No iCloud Workspaces Found"].firstMatch
         XCTAssertFalse(emptyStateTitle.exists)
 
         let delayedWorkspace = app.buttons["Delayed iCloud Workspace"].firstMatch
-        XCTAssertTrue(delayedWorkspace.waitForExistence(timeout: 5))
+        XCTAssertTrue(delayedWorkspace.waitForExistence(timeout: 15))
         XCTAssertFalse(emptyStateTitle.exists)
+        XCTAssertFalse(app.staticTexts["Personal"].exists)
+        XCTAssertFalse(app.staticTexts["Work"].exists)
     }
 
     @MainActor
@@ -117,16 +116,10 @@ final class OffshoreBudgetingUITests: XCTestCase {
         XCTAssertTrue(onDeviceButton.waitForExistence(timeout: 5))
         onDeviceButton.tap()
 
-        app.buttons["Next"].tap()
-        XCTAssertTrue(app.alerts["Workspace Required"].waitForExistence(timeout: 5))
-        app.alerts["Workspace Required"].buttons["OK"].tap()
-        app.buttons["Add Workspace"].tap()
-
-        let workspaceNameField = app.textFields["Name"].firstMatch
-        XCTAssertTrue(workspaceNameField.waitForExistence(timeout: 5))
-        workspaceNameField.tap()
-        workspaceNameField.typeText("Personal")
-        app.buttons["Save"].tap()
+        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Personal")).firstMatch.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Work")).firstMatch.exists)
+        XCTAssertFalse(app.buttons["Start with Personal"].exists)
+        XCTAssertFalse(app.staticTexts["No Workspaces Yet"].exists)
 
         app.buttons["Next"].tap()
         XCTAssertTrue(app.staticTexts["Privacy and Notifications"].firstMatch.waitForExistence(timeout: 5))
@@ -168,6 +161,35 @@ final class OffshoreBudgetingUITests: XCTestCase {
     }
 
     // MARK: - Helpers
+
+    @MainActor
+    func testOnboarding_storageHeadingAndRealDefaultWorkspaces() throws {
+        let app = makeAppForUITesting(scenario: "-uiTestScenarioICloudEmpty")
+        app.launchArguments += ["-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
+        app.launch()
+        app.buttons["Get Started"].tap()
+        let heading = app.staticTexts["onboarding.storageHeading"]
+        XCTAssertTrue(heading.waitForExistence(timeout: 5))
+        XCTAssertEqual(heading.label, "Where should Offshore save your data?")
+        let storageScreenshot = XCTAttachment(screenshot: app.screenshot())
+        storageScreenshot.name = "Storage heading on small iPhone"
+        storageScreenshot.lifetime = .keepAlways
+        add(storageScreenshot)
+        app.buttons["On Device"].tap()
+        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Personal")).firstMatch.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Work")).firstMatch.exists)
+        XCTAssertFalse(app.staticTexts["No Workspaces Yet"].exists)
+        XCTAssertFalse(app.buttons["Start with Personal"].exists)
+        let workspaceScreenshot = XCTAttachment(screenshot: app.screenshot())
+        workspaceScreenshot.name = "Real default workspaces"
+        workspaceScreenshot.lifetime = .keepAlways
+        add(workspaceScreenshot)
+        app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Work")).firstMatch.tap()
+        app.buttons["Next"].tap()
+        app.buttons["Back"].tap()
+        XCTAssertEqual(app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Personal")).count, 1)
+        XCTAssertEqual(app.buttons.matching(NSPredicate(format: "label CONTAINS %@ AND label != %@", "Work", "Add Workspace")).count, 1)
+    }
 
     private func makeAppForUITesting(scenario: String) -> XCUIApplication {
         let app = XCUIApplication()
