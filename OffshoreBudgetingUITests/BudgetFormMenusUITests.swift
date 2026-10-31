@@ -72,9 +72,13 @@ final class BudgetFormMenusUITests: XCTestCase {
         exerciseMenus(app, formTitle: "Add Budget")
         app.buttons["budget.categoryGoals"].tap()
         XCTAssertTrue(app.navigationBars["Category Goals"].waitForExistence(timeout: 5))
+        let autoConfigure = app.switches["categoryGoals.autoConfigure"]
+        XCTAssertTrue(autoConfigure.waitForExistence(timeout: 5))
+        autoConfigure.coordinate(withNormalizedOffset: CGVector(dx: 0.93, dy: 0.5)).tap()
         app.staticTexts["Bills"].firstMatch.tap()
         XCTAssertTrue(app.navigationBars["Bills"].waitForExistence(timeout: 5))
-        app.buttons["categoryGoals.usePlannedMinimum"].tap()
+        XCTAssertFalse(app.buttons["categoryGoals.usePlannedMinimum"].exists)
+        XCTAssertFalse(app.buttons["categoryGoals.clearPlannedMinimum"].exists)
         XCTAssertEqual(app.textFields["Minimum"].value as? String, "860.00")
         let goals = XCTAttachment(screenshot: app.screenshot())
         goals.name = "Preset-based minimum during budget creation"

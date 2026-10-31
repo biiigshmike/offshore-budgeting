@@ -1,6 +1,100 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Sets category minimums from attached presets within the budget dates. Only presets assigned to selected cards are included. You can still edit each category’s Min and Max. Turning this off restores previous minimums unless you edited them." : {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sets category minimums from attached presets within the budget dates. Only presets assigned to selected cards are included. You can still edit each category’s Min and Max. Turning this off restores previous minimums unless you edited them."
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "يضبط الحدود الدنيا للفئات من القوالب المرفقة ضمن تواريخ الميزانية. تُدرج فقط القوالب المرتبطة بالبطاقات المحددة. يمكنك تعديل الحدين الأدنى والأقصى لكل فئة. يؤدي إيقاف هذا الخيار إلى استعادة الحدود الدنيا السابقة ما لم تعدّلها."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Legt Kategorie-Mindestwerte anhand verknüpfter Vorlagen innerhalb des Budgetzeitraums fest. Nur Vorlagen ausgewählter Karten werden berücksichtigt. Min und Max jeder Kategorie bleiben bearbeitbar. Beim Ausschalten werden vorherige Mindestwerte wiederhergestellt, sofern du sie nicht bearbeitet hast."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Establece los mínimos por categoría a partir de los preajustes asociados dentro de las fechas del presupuesto. Solo incluye preajustes de las tarjetas seleccionadas. Puedes editar el mínimo y máximo de cada categoría. Al desactivarlo, se restauran los mínimos anteriores salvo que los hayas editado."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Définit les minimums par catégorie à partir des modèles associés pendant la période du budget. Seuls les modèles des cartes sélectionnées sont inclus. Vous pouvez modifier le minimum et le maximum de chaque catégorie. La désactivation rétablit les minimums précédents, sauf si vous les avez modifiés."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Define os mínimos por categoria com base nos modelos vinculados dentro das datas do orçamento. Inclui apenas modelos dos cartões selecionados. Você ainda pode editar o mínimo e o máximo de cada categoria. Ao desativar, os mínimos anteriores são restaurados, exceto os que você editou."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "根据预算日期范围内关联的预设设置各类别的最低金额。仅包含分配给所选卡片的预设。您仍可编辑各类别的最低和最高金额。关闭后将恢复原来的最低金额，但您手动编辑过的值会保留。"
+          }
+        }
+      }
+    },
+    "Auto-Configure" : {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Auto-Configure"
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "تهيئة تلقائية"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Automatisch konfigurieren"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Configurar automáticamente"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Configuration automatique"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Configurar automaticamente"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "自动配置"
+          }
+        }
+      }
+    },
     "" : {
       "localizations" : {
         "ar" : {
@@ -58561,102 +58655,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "使用“用储蓄支付”，以此余额支付部分或全部支出。完整交易保留在卡片历史中，只有剩余金额影响当前周期预算。"
-          }
-        }
-      }
-    },
-    "Use Planned Amount" : {
-      "comment" : "Button to fill a category minimum goal from selected recurring planned expenses.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "ar" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "استخدام المبلغ المخطط"
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Geplanten Betrag verwenden"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Use Planned Amount"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Usar monto planificado"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Utiliser le montant prévu"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Usar valor planejado"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "使用计划金额"
-          }
-        }
-      }
-    },
-    "Use Planned Amount fills Minimum with this category’s selected presets, repeated within the budget dates. Only presets assigned to selected cards are included. You can edit the amount afterward." : {
-      "comment" : "Explains the optional category-minimum calculation during budget creation.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "ar" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "يملأ «استخدام المبلغ المخطط» الحد الأدنى بإجمالي الإعدادات المسبقة المحددة لهذه الفئة، بما يشمل تكراراتها ضمن تواريخ الميزانية. تُضمَّن فقط الإعدادات المسبقة المرتبطة بالبطاقات المحددة. يمكنك تعديل المبلغ بعد ذلك."
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "„Geplanten Betrag verwenden“ trägt für „Mindestens“ die Summe der ausgewählten Voreinstellungen dieser Kategorie ein, einschließlich aller Wiederholungen innerhalb des Budgetzeitraums. Es werden nur Voreinstellungen berücksichtigt, die ausgewählten Karten zugeordnet sind. Du kannst den Betrag anschließend ändern."
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Use Planned Amount fills Minimum with this category’s selected presets, repeated within the budget dates. Only presets assigned to selected cards are included. You can edit the amount afterward."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Usar monto planificado completa Mínimo con el total de las plantillas seleccionadas de esta categoría, incluidas sus repeticiones dentro de las fechas del presupuesto. Solo se incluyen las plantillas asignadas a las tarjetas seleccionadas. Puedes editar el monto después."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Utiliser le montant prévu renseigne le minimum avec le total des préréglages sélectionnés de cette catégorie, répétés sur la période du budget. Seuls les préréglages associés aux cartes sélectionnées sont inclus. Vous pouvez ensuite modifier le montant."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Usar valor planejado preenche Mínimo com o total das predefinições selecionadas desta categoria, incluindo as repetições dentro do período do orçamento. Apenas predefinições atribuídas aos cartões selecionados são incluídas. Você pode editar o valor depois."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "“使用计划金额”会将此类别中所选预设在预算日期范围内重复发生的金额总和填入“最低限度”。仅包含分配给所选卡片的预设。之后仍可编辑该金额。"
           }
         }
       }

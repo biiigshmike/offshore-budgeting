@@ -27,7 +27,6 @@ struct CategoryLimitFormView: View {
     @Binding var maxText: String
 
     let validationMessage: String?
-    var minimumSuggestion: Double? = nil
 
     var body: some View {
         Form {
@@ -47,14 +46,6 @@ struct CategoryLimitFormView: View {
                 TextField("Minimum", text: $minText)
                     .keyboardType(.decimalPad)
 
-                if let minimumSuggestion {
-                    Button("Use Planned Amount") {
-                        minText = CurrencyFormatter.editingString(from: minimumSuggestion)
-                    }
-                    .disabled(minimumSuggestion <= 0)
-                    .accessibilityIdentifier("categoryGoals.usePlannedMinimum")
-                }
-
                 TextField("Maximum", text: $maxText)
                     .keyboardType(.decimalPad)
 
@@ -66,12 +57,7 @@ struct CategoryLimitFormView: View {
             } header: {
                 Text("Category Goals")
             } footer: {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Goals apply only to this budget. Leave either amount blank if you don't want that goal.")
-                    if minimumSuggestion != nil {
-                        Text("Use Planned Amount fills Minimum with this category’s selected presets, repeated within the budget dates. Only presets assigned to selected cards are included. You can edit the amount afterward.")
-                    }
-                }
+                Text("Goals apply only to this budget. Leave either amount blank if you don't want that goal.")
             }
         }
     }

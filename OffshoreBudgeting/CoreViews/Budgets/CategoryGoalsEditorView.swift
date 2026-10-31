@@ -10,6 +10,9 @@ struct CategoryGoalsEditorView: View {
     let onSave: ([UUID: CategoryGoalDraft]) -> Void
 
     @Environment(\.dismiss) private var dismiss
+    @State private var autoConfigure = false
+    @State private var previousMinimums: [UUID: String] = [:]
+    @State private var generatedMinimums: [UUID: String] = [:]
     @State private var drafts: [UUID: CategoryGoalDraft]
 
     init(
@@ -31,6 +34,17 @@ struct CategoryGoalsEditorView: View {
     var body: some View {
         NavigationStack {
             List {
+                if allowsPlannedMinimum {
+                    Section {
+                        Toggle("Auto-Configure", isOn: $autoConfigure)
+                            .accessibilityIdentifier("categoryGoals.autoConfigure")
+                            .onChange(of: autoConfigure) { _, enabled in
+                                configureMinimums(enabled: enabled)
+                            }
+                    } footer: {
+                        Text("Sets category minimums from attached presets within the budget dates. Only presets assigned to selected cards are included. You can still edit each category’s Min and Max. Turning this off restores previous minimums unless you edited them.")
+                    }
+                }
                 Section {
                     ForEach(categories) { category in
                         NavigationLink {
@@ -38,8 +52,7 @@ struct CategoryGoalsEditorView: View {
                                 category: category,
                                 draft: draftBinding(for: category.id),
                                 plannedContribution: plannedContributions[category.id] ?? 0,
-                                variableContribution: variableContributions[category.id] ?? 0,
-                                allowsPlannedMinimum: allowsPlannedMinimum
+                                variableContribution: variableContributions[category.id] ?? 0
                             )
                         } label: {
                             VStack(alignment: .leading, spacing: 6) {
@@ -104,6 +117,29 @@ struct CategoryGoalsEditorView: View {
             .foregroundStyle(.secondary)
         } else {
             Text("No goals set").font(.footnote).foregroundStyle(.secondary)
+        }
+    }
+
+    private func configureMinimums(enabled: Bool) {
+        if enabled {
+            previousMinimums = [:]
+            generatedMinimums = [:]
+            for category in categories {
+                guard let amount = plannedContributions[category.id], amount > 0 else { continue }
+                var draft = drafts[category.id] ?? CategoryGoalDraft()
+                previousMinimums[category.id] = draft.minimumText
+                draft.minimumText = CurrencyFormatter.editingString(from: amount)
+                generatedMinimums[category.id] = draft.minimumText
+                drafts[category.id] = draft
+            }
+        } else {
+            for (categoryID, generated) in generatedMinimums {
+                guard var draft = drafts[categoryID], draft.minimumText == generated else { continue }
+                draft.minimumText = previousMinimums[categoryID] ?? ""
+                drafts[categoryID] = draft
+            }
+            previousMinimums = [:]
+            generatedMinimums = [:]
         }
     }
 
