@@ -32,16 +32,6 @@ struct AccountsView: View {
             }
         }
 
-        var tint: Color {
-            switch self {
-            case .cards:
-                return .blue
-            case .sharedBalances:
-                return .orange
-            case .savings:
-                return .green
-            }
-        }
     }
 
     let workspace: Workspace
@@ -49,10 +39,8 @@ struct AccountsView: View {
     @State private var selectedSegment: Segment = .cards
     @State private var mountedSegments: Set<Segment> = []
     @State private var stagingSegments: Set<Segment> = []
-    @State private var isSegmentControlExpanded: Bool = false
     @State private var showingAddCardFromAccounts: Bool = false
     @State private var showingAddAllocationAccountFromAccounts: Bool = false
-    @Namespace private var glassNamespace
 
     @AppStorage("sort.cards.mode") private var cardsSortModeRaw: String = "az"
     @AppStorage("sort.sharedBalances.mode") private var sharedBalancesSortModeRaw: String = "az"
@@ -110,9 +98,6 @@ struct AccountsView: View {
             consumePendingAccountsSegmentIfNeeded()
         }
         .onChange(of: selectedSegment) { _, _ in
-            if isSegmentControlExpanded {
-                isSegmentControlExpanded = false
-            }
             requestPrepareSelectedSegment(reason: "segmentChanged")
             scheduleSavingsGraphWarmIfNeeded(reason: "segmentChanged")
             updateCommandSurface()
@@ -145,15 +130,7 @@ struct AccountsView: View {
     private var accountsToolbar: some ToolbarContent {
         if #available(iOS 26.0, macCatalyst 26.0, *) {
             ToolbarItemGroup(placement: .primaryAction) {
-                #if targetEnvironment(macCatalyst)
                 segmentMenuPicker
-                #else
-                AccountsGlassSegmentControl(
-                    selectedSegment: $selectedSegment,
-                    isExpanded: $isSegmentControlExpanded,
-                    namespace: glassNamespace
-                )
-                #endif
             }
 
             ToolbarSpacer(.fixed, placement: .primaryAction)
@@ -369,7 +346,7 @@ struct AccountsView: View {
                 commandHub.dispatch(AppCommandID.Savings.newEntry)
             }
         } label: {
-            Image(systemName: "plus")
+            Label(addButtonAccessibilityLabel, systemImage: "plus")
         }
         .accessibilityLabel(addButtonAccessibilityLabel)
     }
@@ -390,7 +367,7 @@ struct AccountsView: View {
                     commandID: AppCommandID.Cards.sortZA
                 )
             } label: {
-                Image(systemName: "arrow.up.arrow.down")
+                Label(String(localized: "common.sort", defaultValue: "Sort", comment: "Accessibility label for sort actions."), systemImage: "arrow.up.arrow.down")
             }
             .accessibilityLabel(String(localized: "common.sort", defaultValue: "Sort", comment: "Accessibility label for sort actions."))
         case .sharedBalances:
@@ -416,7 +393,7 @@ struct AccountsView: View {
                     commandID: AppCommandID.SharedBalances.sortAmountDesc
                 )
             } label: {
-                Image(systemName: "arrow.up.arrow.down")
+                Label(String(localized: "common.sort", defaultValue: "Sort", comment: "Accessibility label for sort actions."), systemImage: "arrow.up.arrow.down")
             }
             .accessibilityLabel(String(localized: "common.sort", defaultValue: "Sort", comment: "Accessibility label for sort actions."))
         case .savings:
@@ -452,7 +429,7 @@ struct AccountsView: View {
                     commandID: AppCommandID.Savings.sortDateDesc
                 )
             } label: {
-                Image(systemName: "arrow.up.arrow.down")
+                Label(String(localized: "common.sort", defaultValue: "Sort", comment: "Accessibility label for sort actions."), systemImage: "arrow.up.arrow.down")
             }
             .accessibilityLabel(String(localized: "common.sort", defaultValue: "Sort", comment: "Accessibility label for sort actions."))
         }
@@ -465,7 +442,7 @@ struct AccountsView: View {
                     selectedSegment = segment
                 } label: {
                     HStack {
-                        Text(segment.title)
+                        Label(segment.title, systemImage: segment.symbolName)
                         if selectedSegment == segment {
                             Spacer()
                             Image(systemName: "checkmark")
@@ -603,64 +580,5 @@ extension AccountsView.Segment {
         default:
             return nil
         }
-    }
-}
-
-// MARK: - Glass Segment Control
-
-@available(iOS 26.0, macCatalyst 26.0, *)
-private struct AccountsGlassSegmentControl: View {
-    @Binding var selectedSegment: AccountsView.Segment
-    @Binding var isExpanded: Bool
-
-    let namespace: Namespace.ID
-
-    var body: some View {
-        GlassEffectContainer {
-            HStack(spacing: 8) {
-                if isExpanded {
-                    ForEach(orderedSegments) { segment in
-                        segmentButton(for: segment)
-                    }
-                } else {
-                    segmentButton(for: selectedSegment)
-                }
-            }
-            .animation(.smooth, value: isExpanded)
-        }
-    }
-
-    private var orderedSegments: [AccountsView.Segment] {
-        AccountsView.Segment.allCases
-    }
-
-    private func segmentButton(for segment: AccountsView.Segment) -> some View {
-        Button {
-            if isExpanded {
-                withAnimation(.spring(response: 0.32, dampingFraction: 0.84)) {
-                    isExpanded = false
-                }
-
-                var transaction = Transaction(animation: nil)
-                transaction.disablesAnimations = true
-                withTransaction(transaction) {
-                    selectedSegment = segment
-                }
-            } else {
-                withAnimation(.spring(response: 0.32, dampingFraction: 0.84)) {
-                    isExpanded = true
-                }
-            }
-        } label: {
-            Image(systemName: segment.symbolName)
-                .font(.headline.weight(.semibold))
-                .foregroundStyle(segment.tint)
-                .padding(.horizontal, 11)
-                .padding(.vertical, 8)
-                .contentShape(.capsule)
-        }
-        .glassEffectID(segment.id, in: namespace)
-        .glassEffectTransition(.matchedGeometry)
-        .accessibilityLabel(segment.title)
     }
 }

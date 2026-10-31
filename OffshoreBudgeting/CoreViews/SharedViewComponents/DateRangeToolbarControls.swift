@@ -14,7 +14,7 @@ struct DateRangeToolbarControls: View {
         let editorButton = Button {
             editorDraft = DateRangeEditorDraft(startDate: startDate, endDate: endDate)
         } label: {
-            Image(systemName: "calendar.badge.clock")
+            Label("Date Range", systemImage: "calendar.badge.clock")
         }
         .accessibilityLabel("Date Range")
         .accessibilityValue("\(AppDateFormat.abbreviatedDate(startDate)) – \(AppDateFormat.abbreviatedDate(endDate))")
@@ -42,7 +42,7 @@ struct DateRangeToolbarControls: View {
         Menu {
             CalendarQuickRangeMenuItems(onSelect: onSelectQuickRange)
         } label: {
-            Image(systemName: "calendar")
+            Label("Date Ranges", systemImage: "calendar")
         }
         .accessibilityLabel("Quick Date Ranges")
         .accessibilityIdentifier("dateRange.quickRanges")

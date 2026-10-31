@@ -336,10 +336,11 @@ struct HomePinnedStoresTests {
         #expect(seed.end == storedEnd)
     }
 
-    @Test func layoutCapabilities_phoneNeverSupportsMultiColumn() throws {
+    @Test func layoutCapabilities_compactPhoneNeverSupportsMultiColumn() throws {
         let supports = HomeLayoutCapabilities.supportsMultiColumnLayout(
             usableWidth: 900,
             isPhone: true,
+            horizontalSizeClass: .compact,
             voiceOverEnabled: false,
             dynamicTypeSize: .large,
             gridSpacing: 12
@@ -352,6 +353,7 @@ struct HomePinnedStoresTests {
         let supports = HomeLayoutCapabilities.supportsMultiColumnLayout(
             usableWidth: 700,
             isPhone: false,
+            horizontalSizeClass: .regular,
             voiceOverEnabled: false,
             dynamicTypeSize: .large,
             gridSpacing: 12
@@ -364,6 +366,7 @@ struct HomePinnedStoresTests {
         let supports = HomeLayoutCapabilities.supportsMultiColumnLayout(
             usableWidth: 500,
             isPhone: false,
+            horizontalSizeClass: .regular,
             voiceOverEnabled: false,
             dynamicTypeSize: .large,
             gridSpacing: 12
@@ -372,23 +375,105 @@ struct HomePinnedStoresTests {
         #expect(supports == false)
     }
 
-    @Test func layoutCapabilities_accessibilityAndVoiceOverDisableControls() throws {
-        let accessibilityType = HomeLayoutCapabilities.supportsTileSizeControl(
-            usableWidth: 900,
-            isPhone: false,
-            voiceOverEnabled: false,
-            dynamicTypeSize: .accessibility2,
+    @Test(arguments: [611.0, 612.0, 923.0, 924.0, 2000.0])
+    func layoutCapabilities_regularPhoneUsesCompactTiles(usableWidth: Double) {
+        let expectedColumns = usableWidth < 612 ? 1 : (usableWidth < 924 ? 2 : 3)
+        let columns = HomeLayoutCapabilities.masonryColumnCount(
+            usableWidth: usableWidth,
+            isPhone: true,
+            horizontalSizeClass: .regular,
+            dynamicTypeSize: .large,
             gridSpacing: 12
         )
-        let voiceOver = HomeLayoutCapabilities.supportsTileSizeControl(
-            usableWidth: 900,
-            isPhone: false,
-            voiceOverEnabled: true,
+        let supports = HomeLayoutCapabilities.supportsMultiColumnLayout(
+            usableWidth: usableWidth,
+            isPhone: true,
+            horizontalSizeClass: .regular,
+            voiceOverEnabled: false,
+            dynamicTypeSize: .large,
+            gridSpacing: 12
+        )
+        let showsControls = HomeLayoutCapabilities.supportsTileSizeControl(
+            usableWidth: usableWidth,
+            isPhone: true,
+            horizontalSizeClass: .regular,
+            voiceOverEnabled: false,
             dynamicTypeSize: .large,
             gridSpacing: 12
         )
 
-        #expect(accessibilityType == false)
-        #expect(voiceOver == false)
+        #expect(columns == expectedColumns)
+        #expect(supports == (expectedColumns >= 2))
+        #expect(showsControls == supports)
+    }
+
+    @Test func layoutCapabilities_unknownPhoneSizeClassStaysStacked() {
+        #expect(HomeLayoutCapabilities.masonryColumnCount(
+            usableWidth: 1200,
+            isPhone: true,
+            horizontalSizeClass: nil,
+            dynamicTypeSize: .large,
+            gridSpacing: 12
+        ) == 1)
+        #expect(HomeLayoutCapabilities.supportsTileSizeControl(
+            usableWidth: 1200,
+            isPhone: true,
+            horizontalSizeClass: nil,
+            voiceOverEnabled: false,
+            dynamicTypeSize: .large,
+            gridSpacing: 12
+        ) == false)
+    }
+
+    @Test(arguments: [false, true])
+    func layoutCapabilities_preservesLargeTextThreshold(isPhone: Bool) {
+        for textSize in [DynamicTypeSize.xxLarge, .xxxLarge] {
+            for width in [851.0, 852.0] {
+                #expect(HomeLayoutCapabilities.supportsMultiColumnLayout(
+                    usableWidth: width,
+                    isPhone: isPhone,
+                    horizontalSizeClass: .regular,
+                    voiceOverEnabled: false,
+                    dynamicTypeSize: textSize,
+                    gridSpacing: 12
+                ) == (width >= 852))
+            }
+        }
+    }
+
+    @Test(arguments: [671.0, 672.0, 1013.0, 1014.0, 2000.0])
+    func layoutCapabilities_preservesNonPhoneColumnWidths(usableWidth: Double) {
+        let expectedColumns = usableWidth < 672 ? 1 : (usableWidth < 1014 ? 2 : 3)
+        #expect(HomeLayoutCapabilities.masonryColumnCount(
+            usableWidth: usableWidth,
+            isPhone: false,
+            horizontalSizeClass: .compact,
+            dynamicTypeSize: .large,
+            gridSpacing: 12
+        ) == expectedColumns)
+    }
+
+    @Test(arguments: [false, true])
+    func layoutCapabilities_accessibilityAndVoiceOverDisableControls(isPhone: Bool) {
+        for (voiceOver, textSize) in [(false, DynamicTypeSize.accessibility2), (true, .large)] {
+            let supports = HomeLayoutCapabilities.supportsMultiColumnLayout(
+                usableWidth: 1200,
+                isPhone: isPhone,
+                horizontalSizeClass: .regular,
+                voiceOverEnabled: voiceOver,
+                dynamicTypeSize: textSize,
+                gridSpacing: 12
+            )
+            let showsControls = HomeLayoutCapabilities.supportsTileSizeControl(
+                usableWidth: 1200,
+                isPhone: isPhone,
+                horizontalSizeClass: .regular,
+                voiceOverEnabled: voiceOver,
+                dynamicTypeSize: textSize,
+                gridSpacing: 12
+            )
+            #expect(supports == false)
+            #expect(showsControls == false)
+        }
     }
 }

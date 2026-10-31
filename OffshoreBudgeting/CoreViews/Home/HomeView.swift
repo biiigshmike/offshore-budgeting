@@ -150,6 +150,7 @@ struct HomeView: View {
     // MARK: - A11y + Layout Environment
 
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.accessibilityVoiceOverEnabled) private var voiceOverEnabled
     @Environment(\.appTabActivationContext) private var tabActivationContext
     @Environment(\.appCommandHub) private var commandHub
@@ -824,6 +825,8 @@ struct HomeView: View {
     private func masonryColumnCount(for usableWidth: CGFloat) -> Int {
         HomeLayoutCapabilities.masonryColumnCount(
             usableWidth: usableWidth,
+            isPhone: isPhone,
+            horizontalSizeClass: horizontalSizeClass,
             dynamicTypeSize: dynamicTypeSize,
             gridSpacing: gridSpacing
         )
@@ -833,6 +836,7 @@ struct HomeView: View {
         HomeLayoutCapabilities.supportsMultiColumnLayout(
             usableWidth: usableWidth,
             isPhone: isPhone,
+            horizontalSizeClass: horizontalSizeClass,
             voiceOverEnabled: voiceOverEnabled,
             dynamicTypeSize: dynamicTypeSize,
             gridSpacing: gridSpacing
@@ -843,6 +847,7 @@ struct HomeView: View {
         HomeLayoutCapabilities.supportsTileSizeControl(
             usableWidth: lastMeasuredUsableWidth,
             isPhone: isPhone,
+            horizontalSizeClass: horizontalSizeClass,
             voiceOverEnabled: voiceOverEnabled,
             dynamicTypeSize: dynamicTypeSize,
             gridSpacing: gridSpacing
@@ -1291,7 +1296,7 @@ struct HomeView: View {
                 Label(String(localized: "expenseDisplay.variable.title", defaultValue: "Variable Expense Display", comment: "Menu label for variable expense display options."), systemImage: "chart.xyaxis.line")
             }
         } label: {
-            Image(systemName: "eye")
+            Label(String(localized: "home.actions", defaultValue: "Expense Display", comment: "Accessibility label for home actions menu."), systemImage: "eye")
         }
         .accessibilityLabel(String(localized: "home.actions", defaultValue: "Home Actions", comment: "Accessibility label for home actions menu."))
     }
@@ -1483,10 +1488,14 @@ enum HomeLayoutCapabilities {
 
     static func masonryColumnCount(
         usableWidth: CGFloat,
+        isPhone: Bool,
+        horizontalSizeClass: UserInterfaceSizeClass?,
         dynamicTypeSize: DynamicTypeSize,
         gridSpacing: CGFloat
     ) -> Int {
-        let minTileWidth: CGFloat = (dynamicTypeSize >= .xxLarge) ? 420 : 330
+        guard isPhone == false || horizontalSizeClass == .regular else { return 1 }
+        let standardTileWidth: CGFloat = isPhone ? 300 : 330
+        let minTileWidth: CGFloat = (dynamicTypeSize >= .xxLarge) ? 420 : standardTileWidth
         let fit = Int((usableWidth + gridSpacing) / (minTileWidth + gridSpacing))
         return max(1, min(fit, 3))
     }
@@ -1494,15 +1503,18 @@ enum HomeLayoutCapabilities {
     static func supportsMultiColumnLayout(
         usableWidth: CGFloat,
         isPhone: Bool,
+        horizontalSizeClass: UserInterfaceSizeClass?,
         voiceOverEnabled: Bool,
         dynamicTypeSize: DynamicTypeSize,
         gridSpacing: CGFloat
     ) -> Bool {
-        guard isPhone == false else { return false }
+        guard isPhone == false || horizontalSizeClass == .regular else { return false }
         guard voiceOverEnabled == false else { return false }
         guard dynamicTypeSize.isAccessibilitySize == false else { return false }
         return masonryColumnCount(
             usableWidth: usableWidth,
+            isPhone: isPhone,
+            horizontalSizeClass: horizontalSizeClass,
             dynamicTypeSize: dynamicTypeSize,
             gridSpacing: gridSpacing
         ) >= 2
@@ -1511,6 +1523,7 @@ enum HomeLayoutCapabilities {
     static func supportsTileSizeControl(
         usableWidth: CGFloat,
         isPhone: Bool,
+        horizontalSizeClass: UserInterfaceSizeClass?,
         voiceOverEnabled: Bool,
         dynamicTypeSize: DynamicTypeSize,
         gridSpacing: CGFloat
@@ -1518,6 +1531,7 @@ enum HomeLayoutCapabilities {
         supportsMultiColumnLayout(
             usableWidth: usableWidth,
             isPhone: isPhone,
+            horizontalSizeClass: horizontalSizeClass,
             voiceOverEnabled: voiceOverEnabled,
             dynamicTypeSize: dynamicTypeSize,
             gridSpacing: gridSpacing

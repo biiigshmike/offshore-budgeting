@@ -999,7 +999,7 @@ struct BudgetDetailView: View {
         Button {
             activeModal = .addExpense
         } label: {
-            Image(systemName: "plus")
+            Label(String(localized: "expense.add", defaultValue: "Add Expense", comment: "Accessibility label for adding an expense."), systemImage: "plus")
         }
         .accessibilityLabel(String(localized: "expense.add", defaultValue: "Add Expense", comment: "Accessibility label for adding an expense."))
         .disabled(linkedCards.isEmpty)
@@ -1035,7 +1035,7 @@ struct BudgetDetailView: View {
             }
             .tint(Color("OffshoreDepth"))
         } label: {
-            Image(systemName: "ellipsis")
+            Label(String(localized: "budgetDetail.actions", defaultValue: "Budget Actions", comment: "Accessibility label for budget actions menu."), systemImage: "ellipsis")
         }
         .accessibilityLabel(String(localized: "budgetDetail.actions", defaultValue: "Budget Actions", comment: "Accessibility label for budget actions menu."))
     }
@@ -1067,7 +1067,7 @@ struct BudgetDetailView: View {
                 Label(String(localized: "expenseDisplay.variable.title", defaultValue: "Variable Expense Display", comment: "Menu label for variable expense display options."), systemImage: "chart.xyaxis.line")
             }
         } label: {
-            Image(systemName: "eye")
+            Label(String(localized: "expense.display", defaultValue: "Expense Display", comment: "Accessibility label for expense display menu."), systemImage: "eye")
         }
         .accessibilityLabel(String(localized: "expense.display", defaultValue: "Expense Display", comment: "Accessibility label for expense display menu."))
     }
