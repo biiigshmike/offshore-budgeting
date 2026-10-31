@@ -635,13 +635,20 @@ struct CardDetailView: View {
             )
             .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
 
-            Button("How is this calculated?", systemImage: "info.circle") {
-                activeModal = .calculationHelp
-            }
         } header: {
             Text("Total Spent")
         } footer: {
-            Text("Total Spent shows planned expenses and debit purchases for the selected view. Credits and adjustments remain in card history and do not contribute to this gross spending total.")
+            VStack(alignment: .leading, spacing: 8) {
+                Button("How is this calculated?", systemImage: "info.circle") {
+                    activeModal = .calculationHelp
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.tint)
+                .font(.subheadline)
+                .padding(.vertical, 4)
+
+                Text("Total Spent shows planned expenses and debit purchases for the selected view. Credits and adjustments remain in card history and do not contribute to this gross spending total.")
+            }
         }
     }
 
