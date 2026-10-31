@@ -3,7 +3,7 @@
 //  OffshoreBudgeting
 //
 //  Centralized currency formatting using:
-//  - User-selected currency code (Settings > General)
+//  - Previously selected currency code, or the device's regional currency
 //  - User locale (comma vs dot separators, symbol placement, spacing, etc.)
 //  - Currency minor units (JPY = 0, USD/EUR = 2, etc.)
 //
@@ -19,24 +19,24 @@ nonisolated enum CurrencyFormatter {
     private static let systemCurrencyTag: String = "SYSTEM"
     private static let fallbackCurrencyCode: String = "USD"
 
-    static var defaultFallbackCurrencyCode: String {
-        fallbackCurrencyCode
-    }
-
     // MARK: - Public: Currency Code
 
     static var currencyCode: String {
-        let stored = UserDefaults.standard.string(forKey: currencyCodeKey)
+        resolveCurrencyCode(
+            storedCode: UserDefaults.standard.string(forKey: currencyCodeKey),
+            regionalCurrencyCode: Locale.autoupdatingCurrent.currency?.identifier
+        )
+    }
 
-        // Settings can store a sentinel value meaning "use system currency".
-        if stored == systemCurrencyTag {
-            return Locale.autoupdatingCurrent.currency?.identifier ?? fallbackCurrencyCode
+    /// Preserve saved choices while defaulting new users to their regional currency.
+    static func resolveCurrencyCode(storedCode: String?, regionalCurrencyCode: String?) -> String {
+        if let storedCode, !storedCode.isEmpty, storedCode != systemCurrencyTag {
+            return storedCode
         }
 
-        if let stored, !stored.isEmpty {
-            return stored
+        if let regionalCurrencyCode, !regionalCurrencyCode.isEmpty {
+            return regionalCurrencyCode
         }
-
         return fallbackCurrencyCode
     }
 

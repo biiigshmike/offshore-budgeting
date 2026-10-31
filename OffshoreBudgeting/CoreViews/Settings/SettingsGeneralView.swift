@@ -10,9 +10,6 @@ import SwiftData
 
 struct SettingsGeneralView: View {
 
-    // Store "SYSTEM" when user wants the device default currency.
-    @AppStorage("general_currencyCode") private var currencyCode: String = CurrencyPickerConstants.systemTag
-
     @AppStorage("general_confirmBeforeDeleting") private var confirmBeforeDeleting: Bool = true
 
     @AppStorage("general_defaultBudgetingPeriod")
@@ -46,46 +43,11 @@ struct SettingsGeneralView: View {
     @AppStorage("app_rootResetToken") private var rootResetToken: String = UUID().uuidString
     @State private var showingRestartRequired: Bool = false
 
-    @State private var searchText: String = ""
-
     @Environment(\.modelContext) private var modelContext
     @Environment(PostBoardingTipsStore.self) private var postBoardingTipsStore
 
     var body: some View {
         List {
-            Section {
-                NavigationLink {
-                    CurrencyPickerView(
-                        selectedCode: $currencyCode,
-                        searchText: $searchText
-                    )
-                } label: {
-                    LabeledContent("Currency") {
-                        Text(selectedCurrencyLabel)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-
-                LabeledContent("Date Format") {
-                    Text(systemDateFormatLabel)
-                        .foregroundStyle(.secondary)
-                }
-
-                LabeledContent("System First Weekday") {
-                    Text(systemFirstWeekdayLabel)
-                        .foregroundStyle(.secondary)
-                }
-
-                LabeledContent("Number Format") {
-                    Text(systemNumberFormatLabel)
-                        .foregroundStyle(.secondary)
-                }
-            } header: {
-                Text("Formatting")
-            } footer: {
-                Text("How to Manage: Settings app > General > Language & Region")
-            }
-
             Section("Behavior") {
                 Toggle("Confirm Before Deleting", isOn: $confirmBeforeDeleting
                 )
@@ -196,29 +158,6 @@ struct SettingsGeneralView: View {
         }
     }
 
-    private var selectedCurrencyLabel: String {
-        if currencyCode == CurrencyPickerConstants.systemTag {
-            let systemCode = CurrencyPickerConstants.systemCurrencyCode
-            let systemName = CurrencyPickerConstants.localizedCurrencyName(for: systemCode)
-            return "System Default (\(systemName) • \(systemCode))"
-        } else {
-            let name = CurrencyPickerConstants.localizedCurrencyName(for: currencyCode)
-            return "\(name) • \(currencyCode)"
-        }
-    }
-
-    private var systemFirstWeekdayLabel: String {
-        AppCalendarFormat.firstWeekdayName()
-    }
-
-    private var systemDateFormatLabel: String {
-        AppDateFormat.numericDate(.now)
-    }
-
-    private var systemNumberFormatLabel: String {
-        AppNumberFormat.decimal(1_234.56, minimumFractionDigits: 2, maximumFractionDigits: 2)
-    }
-
     private var defaultBudgetingPeriodBinding: Binding<BudgetingPeriod> {
         Binding(
             get: { BudgetingPeriod(rawValue: defaultBudgetingPeriodRaw) ?? .monthly },
@@ -292,11 +231,6 @@ private struct SettingsMaintenanceView: View {
     let onRepeatOnboarding: () -> Void
     let onEraseContent: () -> Void
     @State private var activeMaintenanceAlert: MaintenanceAlert? = nil
-    #if DEBUG
-    @AppStorage("debug_tabFlickerDiagnosticsEnabled") private var tabFlickerDiagnosticsEnabled: Bool = false
-    @AppStorage("debug_tabFlickerVerboseEventsEnabled") private var tabFlickerVerboseEventsEnabled: Bool = false
-    @AppStorage("debug_resumeTraceEnabled") private var resumeTraceEnabled: Bool = false
-    #endif
 
     var body: some View {
         List {
@@ -322,24 +256,6 @@ private struct SettingsMaintenanceView: View {
                 )
                 .listRowSeparator(.hidden)
             }
-
-            #if DEBUG
-            Section {
-                Toggle("Tab Flicker Diagnostics", isOn: $tabFlickerDiagnosticsEnabled)
-                    .tint(Color("AccentColor"))
-
-                Toggle("Verbose Flicker Events", isOn: $tabFlickerVerboseEventsEnabled)
-                    .tint(Color("AccentColor"))
-
-                Toggle("Resume Trace", isOn: $resumeTraceEnabled)
-                    .tint(Color("AccentColor"))
-
-            } header: {
-                Text("Debug Diagnostics")
-            } footer: {
-                Text("Debug-only diagnostics and internal QA toggles.")
-            }
-            #endif
         }
         .listStyle(.insetGrouped)
         .navigationTitle("Maintenance")
@@ -454,128 +370,6 @@ private struct SettingsExpenseDisplayView: View {
         }
         .listStyle(.insetGrouped)
         .navigationTitle("Expense Display")
-    }
-}
-
-// MARK: - Currency Picker
-
-private struct CurrencyPickerView: View {
-
-    @Binding var selectedCode: String
-    @Binding var searchText: String
-
-    @Environment(\.dismiss) private var dismiss
-
-    private var filteredCurrencies: [String] {
-        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !query.isEmpty else { return CurrencyPickerConstants.allCurrencyCodes }
-
-        let lower = query.lowercased()
-
-        return CurrencyPickerConstants.allCurrencyCodes.filter { code in
-            if code.lowercased().contains(lower) { return true }
-
-            let name = CurrencyPickerConstants.localizedCurrencyName(for: code)
-            if name.lowercased().contains(lower) { return true }
-
-            let symbol = CurrencyPickerConstants.currencySymbol(for: code)
-            if !symbol.isEmpty, symbol.lowercased().contains(lower) { return true }
-
-            return false
-        }
-    }
-
-    var body: some View {
-        List {
-            Section {
-                Button {
-                    selectedCode = CurrencyPickerConstants.systemTag
-                    dismiss()
-                } label: {
-                    HStack {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("System Default")
-                            Text("\(CurrencyPickerConstants.localizedCurrencyName(for: CurrencyPickerConstants.systemCurrencyCode)) • \(CurrencyPickerConstants.systemCurrencyCode)")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-
-                        Spacer()
-
-                        if selectedCode == CurrencyPickerConstants.systemTag {
-                            Image(systemName: "checkmark")
-                                .foregroundStyle(.tint)
-                        }
-                    }
-                }
-                .buttonStyle(.plain)
-            }
-
-            Section("Currencies") {
-                ForEach(filteredCurrencies, id: \.self) { code in
-                    Button {
-                        selectedCode = code
-                        dismiss()
-                    } label: {
-                        HStack {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(CurrencyPickerConstants.localizedCurrencyName(for: code))
-                                Text("\(CurrencyPickerConstants.currencySymbol(for: code)) • \(code)")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-
-                            Spacer()
-
-                            if selectedCode == code {
-                                Image(systemName: "checkmark")
-                                    .foregroundStyle(.tint)
-                            }
-                        }
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-        }
-        .navigationTitle("Currency")
-        .searchable(
-            text: $searchText,
-            placement: .navigationBarDrawer(displayMode: .always),
-            prompt: "Search currency or code"
-        )
-    }
-}
-
-// MARK: - Helpers
-
-private enum CurrencyPickerConstants {
-    static let systemTag: String = "SYSTEM"
-
-    static var systemCurrencyCode: String {
-        if let id = Locale.autoupdatingCurrent.currency?.identifier, !id.isEmpty {
-            return id
-        }
-        return CurrencyFormatter.defaultFallbackCurrencyCode
-    }
-
-    static var allCurrencyCodes: [String] = {
-        let all = Set(Locale.Currency.isoCurrencies.map(\.identifier))
-        let common = Set(Locale.commonISOCurrencyCodes)
-
-        let uncommonSorted = all.subtracting(common).sorted()
-        return Locale.commonISOCurrencyCodes + uncommonSorted
-    }()
-
-    static func localizedCurrencyName(for code: String) -> String {
-        Locale.autoupdatingCurrent.localizedString(forCurrencyCode: code) ?? code
-    }
-
-    static func currencySymbol(for code: String) -> String {
-        let formatter = NumberFormatter()
-        formatter.numberStyle = .currency
-        formatter.locale = .autoupdatingCurrent
-        formatter.currencyCode = code
-        return formatter.currencySymbol ?? ""
     }
 }
 

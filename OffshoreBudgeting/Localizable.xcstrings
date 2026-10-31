@@ -17293,6 +17293,7 @@
       }
     },
     "Currencies" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -17333,6 +17334,7 @@
       }
     },
     "Currency" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -18022,6 +18024,7 @@
       }
     },
     "Date Format" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -23768,6 +23771,7 @@
       }
     },
     "Formatting" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -29786,6 +29790,7 @@
       }
     },
     "How to Manage: Settings app > General > Language & Region" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -37195,6 +37200,7 @@
       }
     },
     "Number Format" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -47453,6 +47459,7 @@
       }
     },
     "Search currency or code" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -52532,6 +52539,7 @@
       }
     },
     "System Default" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -52572,6 +52580,7 @@
       }
     },
     "System First Weekday" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
