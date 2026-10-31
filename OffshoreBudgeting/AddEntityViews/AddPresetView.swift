@@ -63,11 +63,6 @@ struct AddPresetView: View {
         }
     }
 
-    private func selectInitialCardIfNeeded() {
-        guard selectedCardID == nil else { return }
-        selectedCardID = sortedCards.first?.id
-    }
-
     private var trimmedTitle: String {
         PresetFormView.trimmedTitle(title)
     }
@@ -135,11 +130,7 @@ struct AddPresetView: View {
         } message: {
             Text("Choose a default card for this preset.")
         }
-        .onChange(of: cards.map(\.id)) { _, _ in
-            selectInitialCardIfNeeded()
-        }
         .onAppear {
-            defer { selectInitialCardIfNeeded() }
             guard DebugScreenshotFormDefaults.isEnabled else { return }
 
             if trimmedTitle.isEmpty {

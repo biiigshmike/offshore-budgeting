@@ -61,14 +61,8 @@ struct PresetFormView: View {
                     Text("No cards yet. Create a card first to set a default.")
                         .foregroundStyle(.secondary)
                 } else {
-                    EntityMenuPicker(title: "Default Card", items: cards, selection: $selectedCardID, allowsEmptySelection: false, showsTitle: false) { card in
+                    EntityMenuPicker(title: "Card", items: cards, selection: $selectedCardID, allowsEmptySelection: false, showsTitle: false) { card in
                         CardMenuLabel(card: card)
-                    }
-
-                    if selectedCardID == nil {
-                        Text("Select a default card to continue.")
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
                     }
                 }
 
