@@ -35,6 +35,27 @@ struct AccountsOverviewView: View {
             }
         }
         .listStyle(.insetGrouped)
+        .postBoardingTip(
+            key: "tip.cards.v1",
+            title: "Accounts",
+            items: [
+                PostBoardingTipItem(
+                    systemImage: "creditcard.fill",
+                    title: "Cards",
+                    detail: "Manage credit cards, checking accounts, or cash. Open a card to track spending, add expenses, and review its activity."
+                ),
+                PostBoardingTipItem(
+                    systemImage: "person.2.fill",
+                    title: "Reconciliations",
+                    detail: "Use Reconciliations to track shared balances, split amounts, and settle up clearly."
+                ),
+                PostBoardingTipItem(
+                    systemImage: "banknote.fill",
+                    title: "Offshore Savings",
+                    detail: "Use Offshore Savings to track money left over at the end of each budgeting period."
+                )
+            ]
+        )
     }
 }
 
