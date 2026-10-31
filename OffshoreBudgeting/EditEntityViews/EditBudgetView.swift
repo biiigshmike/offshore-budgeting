@@ -18,6 +18,7 @@ struct EditBudgetView: View {
 
     @Query private var cards: [Card]
     @Query private var presets: [Preset]
+    @Query private var categories: [Category]
 
     // MARK: - Form State
 
@@ -29,6 +30,8 @@ struct EditBudgetView: View {
 
     @State private var selectedCardIDs: Set<UUID> = []
     @State private var selectedPresetIDs: Set<UUID> = []
+    @State private var categoryGoalDrafts: [UUID: CategoryGoalDraft] = [:]
+    @State private var didSeedForm: Bool = false
 
     // MARK: - Alerts
 
@@ -49,6 +52,11 @@ struct EditBudgetView: View {
             filter: #Predicate<Preset> { $0.workspace?.id == workspaceID },
             sort: [SortDescriptor(\Preset.title, order: .forward)]
         )
+
+        _categories = Query(
+            filter: #Predicate<Category> { $0.workspace?.id == workspaceID },
+            sort: [SortDescriptor(\Category.name, order: .forward)]
+        )
     }
 
     private var trimmedName: String {
@@ -57,7 +65,7 @@ struct EditBudgetView: View {
 
     private var canSave: Bool {
         guard !trimmedName.isEmpty else { return false }
-        return startDate <= endDate
+        return startDate <= endDate && categoryGoalDrafts.values.allSatisfy(\.isValid)
     }
 
     private var linkedPresetIDs: Set<UUID> {
@@ -71,11 +79,17 @@ struct EditBudgetView: View {
         }
     }
 
+    private var goalCategories: [Category] {
+        let existingCategoryIDs = Set((budget.categoryLimits ?? []).compactMap { $0.category?.id })
+        return categories.filter { !$0.isArchived || existingCategoryIDs.contains($0.id) }
+    }
+
     var body: some View {
         BudgetFormView(
             modeTitle: "Edit Budget",
             cards: cards,
             presets: visiblePresets,
+            categories: goalCategories,
             scheduleString: scheduleString(for:),
             name: $name,
             userEditedName: $userEditedName,
@@ -83,6 +97,7 @@ struct EditBudgetView: View {
             endDate: $endDate,
             selectedCardIDs: $selectedCardIDs,
             selectedPresetIDs: $selectedPresetIDs,
+            categoryGoalDrafts: $categoryGoalDrafts,
             onToggleAllCards: toggleAllCards,
             onToggleAllPresets: toggleAllPresets,
             onStartDateChanged: handleStartDateChanged(_:),
@@ -116,6 +131,8 @@ struct EditBudgetView: View {
             Text("Start date must be on or before the end date.")
         }
         .onAppear {
+            guard !didSeedForm else { return }
+            didSeedForm = true
             seedFromBudget()
             applyScreenshotPrefillIfNeeded()
         }
@@ -134,6 +151,7 @@ struct EditBudgetView: View {
 
         selectedCardIDs = Set((budget.cardLinks ?? []).compactMap { $0.card?.id })
         selectedPresetIDs = Set((budget.presetLinks ?? []).compactMap { $0.preset?.id })
+        categoryGoalDrafts = BudgetCategoryGoalStore.drafts(for: budget)
     }
 
     private func applyScreenshotPrefillIfNeeded() {
@@ -199,6 +217,7 @@ struct EditBudgetView: View {
     // MARK: - Save
 
     private func save() {
+        guard budget.workspace?.id == workspace.id, categoryGoalDrafts.values.allSatisfy(\.isValid) else { return }
         guard startDate <= endDate else {
             showingInvalidDatesAlert = true
             return
@@ -207,6 +226,13 @@ struct EditBudgetView: View {
         budget.name = trimmedName
         budget.startDate = startDate
         budget.endDate = endDate
+        BudgetCategoryGoalStore.apply(
+            categoryGoalDrafts,
+            categories: categories,
+            budget: budget,
+            workspaceID: workspace.id,
+            modelContext: modelContext
+        )
 
         // Update Card Links
         let currentCardIDs = Set((budget.cardLinks ?? []).compactMap { $0.card?.id })

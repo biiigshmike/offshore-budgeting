@@ -119,6 +119,18 @@ struct CategorySpotlightDetailView: View {
             .listRowSeparator(.hidden)
 
             Section {
+                Text("Category spending uses planned and variable expense budget impact for these dates. Shared splits and Pay From Savings reduce purchase impact; refunds reduce spending, and adjustments have no budget impact.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+
+                Text("The chart lists categories with positive totals. Refunds can reduce the overall Total Spent even when their category is not shown.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+
+                HelpTopicLink(topicID: "home-widgets", title: "How spending is calculated")
+            }
+
+            Section {
                 showAllCategoriesButton
                     .listRowBackground(Color.clear)
             }

@@ -41,6 +41,7 @@ struct HomeIncomeMetricsView: View {
     let initialPeriod: Period
 
     @State private var selectedPeriod: Period
+    @State private var showingCalculationHelp: Bool = false
 
     init(
         workspace: Workspace,
@@ -77,6 +78,14 @@ struct HomeIncomeMetricsView: View {
                     percentText: percentText
                 )
 
+                Text("Actual income is money received. Planned income is money expected. These are compared separately, rather than added together.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+
+                Button("How is this calculated?", systemImage: "info.circle") {
+                    showingCalculationHelp = true
+                }
+
                 periodPicker
 
                 chartCard(
@@ -104,6 +113,41 @@ struct HomeIncomeMetricsView: View {
                 }
                 .accessibilityElement(children: .combine)
             }
+        }
+        .appSheet(isPresented: $showingCalculationHelp) {
+            FinancialCalculationHelpView(
+                sections: incomeCalculationSections(from: resolved.start, to: resolved.end),
+                dateRange: "\(formattedDate(resolved.start)) – \(formattedDate(resolved.end))",
+                helpTopicID: "income-calculations"
+            )
+        }
+    }
+
+    private func incomeCalculationSections(from start: Date, to end: Date) -> [FinancialCalculationSection] {
+        [false, true].map { isPlanned in
+            let included = incomes.filter {
+                $0.isPlanned == isPlanned && $0.date >= start && $0.date <= end
+            }
+            let grouped = Dictionary(grouping: included, by: \.source)
+            let sourceRows = grouped.keys.sorted().map { source in
+                FinancialCalculationRow(
+                    id: "source-\(source)",
+                    title: source,
+                    amount: (grouped[source] ?? []).reduce(0) { $0 + $1.amount },
+                    titleIsVerbatim: true
+                )
+            }
+            let title = isPlanned ? "Planned Income" : "Actual Income"
+            return FinancialCalculationSection(
+                id: isPlanned ? "planned" : "actual", title: title,
+                explanation: isPlanned
+                    ? "Expected income entries dated within the selected range, grouped by source."
+                    : "Received income entries dated within the selected range, grouped by source.",
+                rows: sourceRows + [.init(id: "total", title: title, amount: sum(isPlanned: isPlanned, from: start, to: end), isTotal: true)],
+                notes: isPlanned
+                    ? ["Progress compares Actual Income with Planned Income. A percentage is shown when Planned Income is greater than zero."]
+                    : ["Actual and Planned Income are separate groups. They are not added into a combined income total."]
+            )
         }
     }
 

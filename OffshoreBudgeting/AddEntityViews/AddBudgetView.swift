@@ -17,6 +17,7 @@ struct AddBudgetView: View {
 
     @Query private var cards: [Card]
     @Query private var presets: [Preset]
+    @Query private var categories: [Category]
 
     // MARK: - Form State
 
@@ -31,6 +32,8 @@ struct AddBudgetView: View {
 
     @State private var selectedCardIDs: Set<UUID> = []
     @State private var selectedPresetIDs: Set<UUID> = []
+    @State private var categoryGoalDrafts: [UUID: CategoryGoalDraft] = [:]
+    @State private var didSeedForm: Bool = false
 
     // MARK: - Alerts
 
@@ -51,6 +54,11 @@ struct AddBudgetView: View {
             filter: #Predicate<Preset> { $0.workspace?.id == workspaceID && $0.isArchived == false },
             sort: [SortDescriptor(\Preset.title, order: .forward)]
         )
+
+        _categories = Query(
+            filter: #Predicate<Category> { $0.workspace?.id == workspaceID },
+            sort: [SortDescriptor(\Category.name, order: .forward)]
+        )
     }
 
     private var trimmedName: String {
@@ -59,7 +67,7 @@ struct AddBudgetView: View {
 
     private var canCreate: Bool {
         guard !trimmedName.isEmpty else { return false }
-        return startDate <= endDate
+        return startDate <= endDate && categoryGoalDrafts.values.allSatisfy(\.isValid)
     }
 
     var body: some View {
@@ -67,6 +75,7 @@ struct AddBudgetView: View {
             modeTitle: "Add Budget",
             cards: cards,
             presets: presets,
+            categories: CategoryArchivePolicy.activeCategories(from: categories),
             scheduleString: scheduleString(for:),
             name: $name,
             userEditedName: $userEditedName,
@@ -74,6 +83,7 @@ struct AddBudgetView: View {
             endDate: $endDate,
             selectedCardIDs: $selectedCardIDs,
             selectedPresetIDs: $selectedPresetIDs,
+            categoryGoalDrafts: $categoryGoalDrafts,
             onToggleAllCards: toggleAllCards,
             onToggleAllPresets: toggleAllPresets,
             onStartDateChanged: handleStartDateChanged(_:),
@@ -102,6 +112,8 @@ struct AddBudgetView: View {
             }
         }
         .onAppear {
+            guard !didSeedForm else { return }
+            didSeedForm = true
             seedInitialDatesAndName()
             applyScreenshotPrefillIfNeeded()
         }
@@ -200,6 +212,7 @@ struct AddBudgetView: View {
     // MARK: - Create
 
     private func createBudget() {
+        guard categoryGoalDrafts.values.allSatisfy(\.isValid) else { return }
         guard startDate <= endDate else {
             showingInvalidDatesAlert = true
             return
@@ -213,6 +226,13 @@ struct AddBudgetView: View {
         )
 
         modelContext.insert(budget)
+        BudgetCategoryGoalStore.apply(
+            categoryGoalDrafts,
+            categories: categories,
+            budget: budget,
+            workspaceID: workspace.id,
+            modelContext: modelContext
+        )
 
         // Link selected cards
         for card in cards where selectedCardIDs.contains(card.id) {
@@ -228,7 +248,7 @@ struct AddBudgetView: View {
         }
 
         // Materialize: presets -> planned expenses (inside this budget window)
-        materializePlannedExpenses(
+        let createdPlannedExpenses = materializePlannedExpenses(
             for: budget,
             selectedPresets: selectedPresets,
             selectedCardIDs: selectedCardIDs
@@ -237,6 +257,13 @@ struct AddBudgetView: View {
         do {
             try modelContext.save()
         } catch {
+            // Discard only this failed creation attempt. A context-wide rollback
+            // could discard unrelated changes made elsewhere in the app.
+            BudgetCreationAttemptCleanup.discard(
+                budget: budget,
+                createdPlannedExpenses: createdPlannedExpenses,
+                modelContext: modelContext
+            )
             budgetSaveErrorMessage = error.localizedDescription
             showingBudgetSaveError = true
             return
@@ -256,7 +283,8 @@ struct AddBudgetView: View {
         for budget: Budget,
         selectedPresets: [Preset],
         selectedCardIDs: Set<UUID>
-    ) {
+    ) -> [PlannedExpense] {
+        var created: [PlannedExpense] = []
         // Budget-anchored recurrence
         for preset in selectedPresets {
             let dates = PresetScheduleEngine.occurrences(for: preset, in: budget)
@@ -285,8 +313,10 @@ struct AddBudgetView: View {
                 )
 
                 modelContext.insert(planned)
+                created.append(planned)
             }
         }
+        return created
     }
 
     private func plannedExpenseExists(budgetID: UUID, presetID: UUID, date: Date) -> Bool {

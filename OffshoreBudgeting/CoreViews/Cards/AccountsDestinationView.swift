@@ -1,0 +1,456 @@
+import SwiftUI
+import SwiftData
+
+/// Shares the existing account screens between native stack pushes and direct
+/// sidebar/shortcut selection. Pushed screens leave back navigation to SwiftUI.
+struct AccountsDestinationView: View {
+    typealias Segment = AccountsView.Segment
+
+    let workspace: Workspace
+    private let directSelection: Binding<Segment?>?
+    @State private var localSegment: Segment
+
+    init(workspace: Workspace, initialSegment: Segment, directSelection: Binding<Segment?>? = nil) {
+        self.workspace = workspace
+        self.directSelection = directSelection
+        _localSegment = State(initialValue: initialSegment)
+    }
+
+    private var selectedSegment: Segment { directSelection?.wrappedValue ?? localSegment }
+    @State private var mountedSegments: Set<Segment> = []
+    @State private var stagingSegments: Set<Segment> = []
+    @State private var showingAddCardFromAccounts: Bool = false
+    @State private var showingAddAllocationAccountFromAccounts: Bool = false
+
+    @AppStorage("sort.cards.mode") private var cardsSortModeRaw: String = "az"
+    @AppStorage("sort.sharedBalances.mode") private var sharedBalancesSortModeRaw: String = "az"
+    @AppStorage("sort.savings.mode") private var savingsSortModeRaw: String = SavingsLedgerSortMode.dateDesc.rawValue
+
+    @Environment(\.appTabActivationContext) private var tabActivationContext
+    @Environment(\.appCommandHub) private var commandHub
+    @Environment(\.modelContext) private var modelContext
+    @Environment(DetailViewSnapshotCache.self) private var detailSnapshotCache
+
+    @State private var savingsGraphWarmTask: Task<Void, Never>? = nil
+
+    private var isPhone: Bool {
+        #if canImport(UIKit)
+        UIDevice.current.userInterfaceIdiom == .phone
+        #else
+        false
+        #endif
+    }
+
+    private var shouldSyncCommandSurface: Bool {
+        isPhone == false
+    }
+
+    // MARK: - View
+
+    var body: some View {
+        stagedSegmentContent
+        .navigationTitle(navigationTitleText)
+        .toolbar {
+            if selectedSegment != .savings {
+                accountsToolbar
+            }
+        }
+        .appSheet(isPresented: $showingAddCardFromAccounts) {
+            NavigationStack {
+                AddCardView(workspace: workspace)
+            }
+        }
+        .appSheet(isPresented: $showingAddAllocationAccountFromAccounts) {
+            NavigationStack {
+                AddAllocationAccountView(workspace: workspace)
+            }
+        }
+        .onAppear {
+            localSegment = selectedSegment
+            requestPrepareSelectedSegment(reason: "onAppear")
+            scheduleSavingsGraphWarmIfNeeded(reason: "onAppear")
+            updateCommandSurface()
+        }
+        .onChange(of: selectedSegment) { _, destination in
+            localSegment = destination
+            requestPrepareSelectedSegment(reason: "destinationChanged")
+            scheduleSavingsGraphWarmIfNeeded(reason: "destinationChanged")
+            updateCommandSurface()
+        }
+        .onChange(of: tabActivationContext) { _, newValue in
+            guard newValue.sectionRawValue == AppSection.cards.rawValue else { return }
+            if newValue.isVisible {
+                requestPrepareSelectedSegment(reason: "tabPhaseChanged")
+                scheduleSavingsGraphWarmIfNeeded(reason: "tabPhaseChanged")
+            } else {
+                cancelSavingsGraphWarm(reason: "tabPhaseChanged")
+            }
+        }
+        .onDisappear {
+            cancelSavingsGraphWarm(reason: "onDisappear")
+            if shouldSyncCommandSurface {
+                switch selectedSegment.commandConfiguration.surface {
+                case .cards:
+                    commandHub.deactivate(.cards)
+                case .savings:
+                    commandHub.deactivate(.savings)
+                default:
+                    break
+                }
+            }
+        }
+    }
+
+    @ToolbarContentBuilder
+    private var accountsToolbar: some ToolbarContent {
+        if let directSelection {
+            ToolbarItem(placement: .topBarLeading) {
+                Button {
+                    directSelection.wrappedValue = nil
+                } label: {
+                    Label(String(localized: "app.section.cards", defaultValue: "Accounts", comment: "Main tab title for the Accounts section."), systemImage: "chevron.backward")
+                }
+                .accessibilityIdentifier("accounts.overview.return")
+            }
+        }
+        if #available(iOS 26.0, macCatalyst 26.0, *) {
+            ToolbarItemGroup(placement: .primaryAction) {
+                sortToolbarButton
+            }
+
+            ToolbarSpacer(.flexible, placement: .primaryAction)
+
+            ToolbarItemGroup(placement: .primaryAction) {
+                addToolbarButton
+            }
+        } else {
+            ToolbarItemGroup(placement: .topBarTrailing) {
+                sortToolbarButton
+                addToolbarButton
+            }
+        }
+    }
+
+    // MARK: - Commands
+
+    @ViewBuilder
+    private var stagedSegmentContent: some View {
+        // Mount Savings immediately so its complete, ordered toolbar is part
+        // of the initial destination rather than a later staged update.
+        if selectedSegment == .savings || mountedSegments.contains(selectedSegment) {
+            switch selectedSegment {
+            case .cards:
+                CardsView(workspace: workspace)
+            case .sharedBalances:
+                AllocationAccountView(workspace: workspace)
+            case .savings:
+                SavingsAccountView(workspace: workspace) {
+                    accountsToolbar
+                }
+            }
+        } else {
+            Color.clear
+                .accessibilityHidden(true)
+        }
+    }
+
+    private func updateCommandSurface() {
+        guard shouldSyncCommandSurface else { return }
+
+        let configuration = selectedSegment.commandConfiguration
+
+        commandHub.activate(configuration.surface)
+
+        if let cardsSortContext = configuration.cardsSortContext {
+            commandHub.setCardsSortContext(cardsSortContext)
+        }
+    }
+
+    private func requestPrepareSelectedSegment(reason: String) {
+        guard selectedSegment != .savings else { return }
+        requestPrepareSegment(selectedSegment, reason: reason)
+    }
+
+    private func requestPrepareSegment(_ segment: Segment, reason: String) {
+        guard segment == selectedSegment else {
+            TabFlickerDiagnostics.markEvent(
+                "accountsSegmentWarmPrevented",
+                metadata: [
+                    "segment": segment.rawValue,
+                    "reason": "nonSelected:\(reason)"
+                ]
+            )
+            return
+        }
+
+        if tabActivationContext.sectionRawValue == AppSection.cards.rawValue,
+           tabActivationContext.phase == .inactive {
+            TabFlickerDiagnostics.markEvent(
+                "accountsSegmentWarmPrevented",
+                metadata: [
+                    "segment": segment.rawValue,
+                    "reason": "inactiveTab:\(reason)"
+                ]
+            )
+            return
+        }
+
+        prepareSegment(segment)
+    }
+
+    private func prepareSegment(_ segment: Segment) {
+        guard mountedSegments.contains(segment) == false else { return }
+        guard stagingSegments.contains(segment) == false else { return }
+
+        stagingSegments.insert(segment)
+        TabFlickerDiagnostics.markEvent(
+            "accountsSegmentMountScheduled",
+            metadata: ["segment": segment.rawValue]
+        )
+        DispatchQueue.main.async {
+            mountedSegments.insert(segment)
+            stagingSegments.remove(segment)
+            TabFlickerDiagnostics.markEvent(
+                "accountsSegmentMountActivated",
+                metadata: ["segment": segment.rawValue]
+            )
+        }
+    }
+
+    private func scheduleSavingsGraphWarmIfNeeded(reason: String) {
+        guard tabActivationContext.sectionRawValue == AppSection.cards.rawValue else { return }
+        guard tabActivationContext.phase == .active else { return }
+        guard selectedSegment != .savings else {
+            cancelSavingsGraphWarm(reason: "savingsVisible")
+            return
+        }
+
+        cancelSavingsGraphWarm(reason: "reschedule")
+        let activationToken = tabActivationContext.token
+        let defaultRange = SavingsGraphSnapshotService.defaultRange(
+            defaultBudgetingPeriodRaw: UserDefaults.standard.string(forKey: "general_defaultBudgetingPeriod")
+                ?? BudgetingPeriod.monthly.rawValue
+        )
+
+        TabFlickerDiagnostics.markEvent(
+            "savingsGraphWarmScheduled",
+            metadata: [
+                "reason": reason,
+                "token": String(activationToken)
+            ]
+        )
+
+        savingsGraphWarmTask = Task {
+            try? await Task.sleep(nanoseconds: 320_000_000)
+            guard Task.isCancelled == false else { return }
+
+            await MainActor.run {
+                guard tabActivationContext.sectionRawValue == AppSection.cards.rawValue,
+                      tabActivationContext.phase == .active,
+                      tabActivationContext.token == activationToken,
+                      selectedSegment != .savings else {
+                    TabFlickerDiagnostics.markEvent(
+                        "savingsGraphWarmCancelled",
+                        metadata: [
+                            "reason": reason,
+                            "cancel": "activationChanged"
+                        ]
+                    )
+                    return
+                }
+
+                let cacheKey = SavingsGraphSnapshotService.cacheKey(
+                    workspaceID: workspace.id,
+                    rangeStart: defaultRange.start,
+                    rangeEnd: defaultRange.end
+                )
+                let existing: SavingsGraphSnapshot? = detailSnapshotCache.snapshot(for: cacheKey)
+                let signature = SavingsGraphSnapshotService.signature(
+                    for: workspace,
+                    rangeStart: defaultRange.start,
+                    rangeEnd: defaultRange.end,
+                    modelContext: modelContext
+                )
+
+                guard existing?.signature != signature else { return }
+
+                let snapshot = SavingsGraphSnapshotService.buildSnapshot(
+                    for: workspace,
+                    rangeStart: defaultRange.start,
+                    rangeEnd: defaultRange.end,
+                    modelContext: modelContext
+                )
+                detailSnapshotCache.store(snapshot, for: cacheKey)
+                TabFlickerDiagnostics.markEvent("savingsGraphWarmFinished")
+            }
+        }
+    }
+
+    private func cancelSavingsGraphWarm(reason: String) {
+        guard savingsGraphWarmTask != nil else { return }
+        savingsGraphWarmTask?.cancel()
+        savingsGraphWarmTask = nil
+        TabFlickerDiagnostics.markEvent(
+            "savingsGraphWarmCancelled",
+            metadata: ["reason": reason]
+        )
+    }
+
+    @ViewBuilder
+    private var addToolbarButton: some View {
+        Button {
+            switch selectedSegment {
+            case .cards:
+                if isPhone {
+                    showingAddCardFromAccounts = true
+                } else {
+                    commandHub.dispatch(AppCommandID.Cards.newCard)
+                }
+            case .sharedBalances:
+                if isPhone {
+                    showingAddAllocationAccountFromAccounts = true
+                } else {
+                    commandHub.dispatch(AppCommandID.Cards.newCard)
+                }
+            case .savings:
+                commandHub.dispatch(AppCommandID.Savings.newEntry)
+            }
+        } label: {
+            Label(addButtonAccessibilityLabel, systemImage: "plus")
+        }
+        .accessibilityLabel(addButtonAccessibilityLabel)
+    }
+
+    @ViewBuilder
+    private var sortToolbarButton: some View {
+        switch selectedSegment {
+        case .cards:
+            Menu {
+                sortMenuButton(
+                    title: "A–Z",
+                    isSelected: cardsSortModeRaw == "az",
+                    commandID: AppCommandID.Cards.sortAZ
+                )
+                sortMenuButton(
+                    title: "Z–A",
+                    isSelected: cardsSortModeRaw == "za",
+                    commandID: AppCommandID.Cards.sortZA
+                )
+            } label: {
+                Label(String(localized: "common.sort", defaultValue: "Sort", comment: "Accessibility label for sort actions."), systemImage: "arrow.up.arrow.down")
+            }
+            .accessibilityLabel(String(localized: "common.sort", defaultValue: "Sort", comment: "Accessibility label for sort actions."))
+        case .sharedBalances:
+            Menu {
+                sortMenuButton(
+                    title: "A–Z",
+                    isSelected: sharedBalancesSortModeRaw == "az",
+                    commandID: AppCommandID.SharedBalances.sortAZ
+                )
+                sortMenuButton(
+                    title: "Z–A",
+                    isSelected: sharedBalancesSortModeRaw == "za",
+                    commandID: AppCommandID.SharedBalances.sortZA
+                )
+                sortMenuButton(
+                    title: "$↑",
+                    isSelected: sharedBalancesSortModeRaw == "amountAsc",
+                    commandID: AppCommandID.SharedBalances.sortAmountAsc
+                )
+                sortMenuButton(
+                    title: "$↓",
+                    isSelected: sharedBalancesSortModeRaw == "amountDesc",
+                    commandID: AppCommandID.SharedBalances.sortAmountDesc
+                )
+            } label: {
+                Label(String(localized: "common.sort", defaultValue: "Sort", comment: "Accessibility label for sort actions."), systemImage: "arrow.up.arrow.down")
+            }
+            .accessibilityLabel(String(localized: "common.sort", defaultValue: "Sort", comment: "Accessibility label for sort actions."))
+        case .savings:
+            Menu {
+                sortMenuButton(
+                    title: "A–Z",
+                    isSelected: savingsSortModeRaw == SavingsLedgerSortMode.az.rawValue,
+                    commandID: AppCommandID.Savings.sortAZ
+                )
+                sortMenuButton(
+                    title: "Z–A",
+                    isSelected: savingsSortModeRaw == SavingsLedgerSortMode.za.rawValue,
+                    commandID: AppCommandID.Savings.sortZA
+                )
+                sortMenuButton(
+                    title: "\(CurrencyFormatter.currencySymbol)↑",
+                    isSelected: savingsSortModeRaw == SavingsLedgerSortMode.amountAsc.rawValue,
+                    commandID: AppCommandID.Savings.sortAmountAsc
+                )
+                sortMenuButton(
+                    title: "\(CurrencyFormatter.currencySymbol)↓",
+                    isSelected: savingsSortModeRaw == SavingsLedgerSortMode.amountDesc.rawValue,
+                    commandID: AppCommandID.Savings.sortAmountDesc
+                )
+                sortMenuButton(
+                    title: String(localized: "Date ↑", defaultValue: "Date ↑", comment: "Ascending date sort label."),
+                    isSelected: savingsSortModeRaw == SavingsLedgerSortMode.dateAsc.rawValue,
+                    commandID: AppCommandID.Savings.sortDateAsc
+                )
+                sortMenuButton(
+                    title: String(localized: "Date ↓", defaultValue: "Date ↓", comment: "Descending date sort label."),
+                    isSelected: savingsSortModeRaw == SavingsLedgerSortMode.dateDesc.rawValue,
+                    commandID: AppCommandID.Savings.sortDateDesc
+                )
+            } label: {
+                Label(String(localized: "common.sort", defaultValue: "Sort", comment: "Accessibility label for sort actions."), systemImage: "arrow.up.arrow.down")
+            }
+            .accessibilityLabel(String(localized: "common.sort", defaultValue: "Sort", comment: "Accessibility label for sort actions."))
+        }
+    }
+
+    private func sortMenuButton(title: String, isSelected: Bool, commandID: String) -> some View {
+        Button {
+            handleSortSelection(commandID)
+        } label: {
+            HStack {
+                Text(title)
+                if isSelected {
+                    Spacer()
+                    Image(systemName: "checkmark")
+                }
+            }
+        }
+    }
+
+    private func handleSortSelection(_ commandID: String) {
+        if isPhone, let phoneSortTarget = AccountsPhoneSortTarget.target(for: commandID) {
+            applyPhoneSort(phoneSortTarget)
+            return
+        }
+
+        commandHub.dispatch(commandID)
+    }
+
+    private func applyPhoneSort(_ target: AccountsPhoneSortTarget) {
+        switch target {
+        case .cards(let mode):
+            cardsSortModeRaw = mode
+        case .sharedBalances(let mode):
+            sharedBalancesSortModeRaw = mode
+        case .savings(let mode):
+            savingsSortModeRaw = mode
+        }
+    }
+
+    private var addButtonAccessibilityLabel: String {
+        switch selectedSegment {
+        case .cards:
+            return String(localized: "accounts.addCard", defaultValue: "Add Card", comment: "Accessibility label for add card action.")
+        case .sharedBalances:
+            return String(localized: "accounts.addReconciliation", defaultValue: "Add Reconciliation", comment: "Accessibility label for add reconciliation action.")
+        case .savings:
+            return String(localized: "accounts.addSavingsEntry", defaultValue: "Add Savings Entry", comment: "Accessibility label for add savings entry action.")
+        }
+    }
+
+    private var navigationTitleText: String {
+        selectedSegment.title
+    }
+}

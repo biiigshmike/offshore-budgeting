@@ -33,8 +33,12 @@ struct CardFormView: View {
                 .padding(.vertical, 6)
             }
 
-            Section("Name") {
-                TextField("Apple Card", text: $name)
+            Section {
+                TextField("Credit Card, Checking, or Cash", text: $name)
+            } header: {
+                Text("Name")
+            } footer: {
+                Text("A card can represent a credit card, checking account, or cash. Name it whatever makes sense to you. No bank connection is needed.")
             }
 
             Section("Effect") {

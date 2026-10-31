@@ -52,7 +52,9 @@ struct ExpenseFormView: View {
     let availableSavingsBalance: Double
 
     let onSharedBalanceChanged: (() -> Void)?
+    var onOptionalActionsValidationChanged: ((Bool) -> Void)? = nil
     @State private var draftSharedBalanceMode: SharedBalanceMode? = nil
+    @State private var wantsReconciliation = false
     @State private var splitPercentage: Double = 0.5
     @State private var shouldApplyInitialSplitDefault: Bool = false
     @State private var hasAppliedInitialSplitDefault: Bool = false
@@ -167,9 +169,8 @@ struct ExpenseFormView: View {
 
     var body: some View {
         List {
-            cardSection
-            transactionSection
-            categorySection
+            expenseDetailsSection
+            transactionTypeSection
             sharedBalanceSection
             savingsOffsetSection
         }
@@ -180,6 +181,10 @@ struct ExpenseFormView: View {
             if activeSharedBalanceMode == .split {
                 applyPercentageFromSplitAmountText()
             }
+            onOptionalActionsValidationChanged?(areOptionalActionsValid)
+        }
+        .onChange(of: areOptionalActionsValid) { _, isValid in
+            onOptionalActionsValidationChanged?(isValid)
         }
         .onChange(of: amountText) { _, _ in
             handleExpenseAmountChangedForSplit()
@@ -189,146 +194,162 @@ struct ExpenseFormView: View {
         }
     }
 
-    private var cardSection: some View {
-        Section("Card") {
+    private var expenseDetailsSection: some View {
+        Section {
             if cards.isEmpty {
                 Text("No cards yet. Create a card first to add expenses.")
                     .foregroundStyle(.secondary)
             } else {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 12) {
-                        ForEach(cards) { card in
-                            CardTile(
-                                title: card.name,
-                                themeRaw: card.theme,
-                                effectRaw: card.effect,
-                                isSelected: selectedCardID == card.id
-                            ) {
-                                selectedCardID = card.id
-                            }
-                            .accessibilityLabel(selectedCardID == card.id ? "\(card.name), selected" : "\(card.name)")
-                            .accessibilityHint("Double tap to set as the expense card.")
-                        }
-                    }
-                    .padding(.vertical, 6)
-                    .padding(.horizontal, 2)
-                }
-
-                if selectedCardID == nil {
-                    Text("Select a card to continue.")
-                        .foregroundStyle(.secondary)
+                EntityMenuPicker(title: "Card", items: cards, selection: $selectedCardID, allowsEmptySelection: false) { card in
+                    CardMenuLabel(card: card)
                 }
             }
-        }
-    }
 
-    private var transactionSection: some View {
-        Section("Expense") {
             TextField("Description", text: $descriptionText)
-
             TextField("Amount", text: $amountText)
                 .keyboardType(.decimalPad)
-
-            Picker("Type", selection: $transactionKind) {
-                ForEach(VariableExpenseKind.allCases) { kind in
-                    Text(kind.displayTitle).tag(kind)
-                }
-            }
-            .pickerStyle(.segmented)
 
             HStack {
                 Text("Date")
                 Spacer()
                 PillDatePickerField(title: "Date", date: $transactionDate)
             }
-        }
-    }
 
-    private var categorySection: some View {
-        Section {
-            Picker("Category", selection: $selectedCategoryID) {
-                Text("None").tag(UUID?.none)
-
-                ForEach(categories) { category in
-                    Text(category.name).tag(Optional(category.id))
-                }
+            EntityMenuPicker(title: "Category", items: categories, selection: $selectedCategoryID) { category in
+                CategoryMenuLabel(category: category)
             }
         } header: {
-            Text("Category")
-        } footer: {
-            Text("If no category is set, it will default to Uncategorized.")
+            Text("Expense")
         }
     }
 
-    private var sharedBalanceSection: some View {
-        Section("Reconciliation") {
-            Picker("Action", selection: sharedBalanceModeBinding) {
-                Text("None").tag(SharedBalanceMode?.none)
-                ForEach(SharedBalanceMode.allCases) { mode in
-                    Text(mode.title).tag(Optional(mode))
+    private var transactionTypeSection: some View {
+        Section {
+            Picker("Transaction Type", selection: $transactionKind) {
+                ForEach(VariableExpenseKind.allCases) { kind in
+                    Text(kind.displayTitle).tag(kind)
                 }
             }
             .pickerStyle(.segmented)
-
-            if isLegacyDualConfiguration {
-                Text("Legacy setup detected. Choose Split or Offset to keep one action type.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            }
-
-            if let mode = activeSharedBalanceMode {
-                Picker("Reconciliation", selection: accountBinding(for: mode)) {
-                    Text("None").tag(UUID?.none)
-                    ForEach(allocationAccounts) { account in
-                        Text(account.name).tag(Optional(account.id))
-                    }
-                }
-
-                TextField("Amount", text: amountBinding(for: mode))
-                    .keyboardType(.decimalPad)
-
-                if mode == .split {
-                    splitPercentageControl
-                }
-
-                if let account = selectedAccount(for: mode) {
-                    HStack {
-                        Text("Available Balance")
-                            .foregroundStyle(.secondary)
-                        Spacer()
-                        Text(
-                            CurrencyFormatter.normalizedCurrencyDisplayValue(AllocationLedgerService.balance(for: account)),
-                            format: CurrencyFormatter.currencyStyle()
-                        )
-                            .fontWeight(.semibold)
-                    }
-                }
-            }
-
-            if let validationMessage = sharedBalanceValidationMessage {
-                Text(validationMessage)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            }
-
-            if hasAnySharedBalanceAction || isLegacyDualConfiguration {
-                Button("Clear Reconciliation Action", role: .destructive) {
-                    draftSharedBalanceMode = nil
-                    selectedAllocationAccountID = nil
-                    allocationAmountText = ""
-                    selectedOffsetAccountID = nil
-                    offsetAmountText = ""
-                    onSharedBalanceChanged?()
-                }
-            }
-
-            if let sharedBalanceSummary, !isLegacyDualConfiguration {
-                Text(sharedBalanceSummary)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+        } header: {
+            Text("Transaction Type")
+        } footer: {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(ExpenseEntryGuidance.transactionExplanation(for: transactionKind))
+                HelpTopicLink(topicID: "accounts-transaction-types", title: "Purchases, refunds, and adjustments")
             }
         }
-        .disabled(applySavingsOffset)
+    }
+
+    private var reconciliationEnabled: Binding<Bool> {
+        Binding(
+            get: { wantsReconciliation || activeSharedBalanceMode != nil || isLegacyDualConfiguration },
+            set: { isEnabled in
+                guard !isEnabled || !applySavingsOffset else { return }
+                wantsReconciliation = isEnabled
+                if !isEnabled {
+                    sharedBalanceModeBinding.wrappedValue = nil
+                } else if activeSharedBalanceMode == nil && !isLegacyDualConfiguration {
+                    sharedBalanceModeBinding.wrappedValue = .split
+                }
+            }
+        )
+    }
+
+    private var sharedBalanceSection: some View {
+        Section {
+            Picker("Reconciliation", selection: reconciliationEnabled) {
+                Text("None").tag(false)
+                Text("Choose").tag(true)
+            }
+            .pickerStyle(.segmented)
+            .disabled(applySavingsOffset && !reconciliationEnabled.wrappedValue)
+
+            if reconciliationEnabled.wrappedValue {
+                Group {
+                    if let mode = activeSharedBalanceMode {
+                        Picker("Reconciliation Account", selection: accountBinding(for: mode)) {
+                            Text("Choose a Reconciliation").tag(UUID?.none)
+                            ForEach(allocationAccounts) { account in
+                                Text(account.name).tag(Optional(account.id))
+                            }
+                        }
+                        .pickerStyle(.menu)
+                    }
+
+                    Picker("Reconciliation Action", selection: sharedBalanceModeBinding) {
+                        if isLegacyDualConfiguration {
+                            Text("Choose Action").tag(SharedBalanceMode?.none)
+                        }
+                        ForEach(SharedBalanceMode.allCases) { mode in
+                            Text(mode.title).tag(Optional(mode))
+                        }
+                    }
+                    .pickerStyle(.segmented)
+
+                    if isLegacyDualConfiguration {
+                        Text("Legacy setup detected. Choose Split or Offset to keep one action type.")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    if let mode = activeSharedBalanceMode {
+                        TextField("Amount", text: amountBinding(for: mode))
+                            .keyboardType(.decimalPad)
+
+                        if mode == .split {
+                            splitPercentageControl
+                        }
+
+                        if let account = selectedAccount(for: mode) {
+                            HStack {
+                                Text("Available Balance")
+                                    .foregroundStyle(.secondary)
+                                Spacer()
+                                Text(
+                                    CurrencyFormatter.normalizedCurrencyDisplayValue(AllocationLedgerService.balance(for: account)),
+                                    format: CurrencyFormatter.currencyStyle()
+                                )
+                                    .fontWeight(.semibold)
+                            }
+                        }
+                    }
+
+                    if let validationMessage = sharedBalanceValidationMessage {
+                        Text(validationMessage)
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    if hasAnySharedBalanceAction || isLegacyDualConfiguration {
+                        Button("Clear Reconciliation Action", role: .destructive) {
+                            reconciliationEnabled.wrappedValue = false
+                        }
+                    }
+
+                    if let sharedBalanceSummary, !isLegacyDualConfiguration {
+                        Text(sharedBalanceSummary)
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .disabled(applySavingsOffset)
+            }
+        } header: {
+            Text("Reconciliation")
+        } footer: {
+            VStack(alignment: .leading, spacing: 4) {
+                switch activeSharedBalanceMode {
+                case .split:
+                    Text(ExpenseEntryGuidance.splitExplanation)
+                case .offset:
+                    Text(ExpenseEntryGuidance.offsetExplanation)
+                case nil:
+                    Text(ExpenseEntryGuidance.reconciliationOverview)
+                }
+                HelpTopicLink(topicID: "accounts-reconciliations", title: "Reconciliation guide")
+            }
+        }
         .onChange(of: activeSharedBalanceMode?.rawValue) { _, newValue in
             if newValue != nil && applySavingsOffset {
                 applySavingsOffset = false
@@ -374,34 +395,52 @@ struct ExpenseFormView: View {
 
     private var savingsOffsetSection: some View {
         Section {
-            Toggle("Pay From Savings", isOn: $applySavingsOffset)
-
-            if applySavingsOffset {
-                TextField("Savings Amount", text: $savingsOffsetAmountText)
-                    .keyboardType(.decimalPad)
-
-                HStack {
-                    Text("Available Savings")
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                    Text(availableSavingsBalance, format: CurrencyFormatter.currencyStyle())
-                        .fontWeight(.semibold)
+            Group {
+                Picker("Pay From Savings", selection: $applySavingsOffset) {
+                    Text("Off").tag(false)
+                    Text("Use Savings").tag(true)
                 }
+                .pickerStyle(.segmented)
+                .disabled(reconciliationEnabled.wrappedValue && !applySavingsOffset)
 
-                if let message = savingsValidationMessage {
-                    Text(message)
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
+                if applySavingsOffset {
+                    LabeledContent {
+                        TextField("Savings Amount", text: $savingsOffsetAmountText)
+                            .keyboardType(.decimalPad)
+                            .multilineTextAlignment(.trailing)
+                    } label: {
+                        Label("Savings Amount", systemImage: "checkmark.square.fill")
+                    }
+                    .disabled(reconciliationEnabled.wrappedValue)
+
+                    HStack {
+                        Text("Available Savings")
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        Text(availableSavingsBalance, format: CurrencyFormatter.currencyStyle())
+                            .fontWeight(.semibold)
+                    }
+
+                    if let message = savingsValidationMessage {
+                        Text(message)
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
                 }
             }
         } header: {
-            Text("Savings Offset")
+            Text("Pay From Savings")
         } footer: {
-            if hasAnySharedBalanceAction {
-                Text("Clear Reconciliation actions to use Savings Offset.")
+            if transactionKind == .debit {
+                Text(ExpenseEntryGuidance.payFromSavingsExplanation)
+            } else {
+                Text(ExpenseEntryGuidance.nonPurchaseSavingsExplanation)
             }
+            if reconciliationEnabled.wrappedValue {
+                Text("Clear Reconciliation actions to use Pay From Savings.")
+            }
+            HelpTopicLink(topicID: "accounts-savings-account", title: "Savings guide")
         }
-        .disabled(hasAnySharedBalanceAction)
         .onChange(of: applySavingsOffset) { _, isOn in
             if isOn && hasAnySharedBalanceAction {
                 applySavingsOffset = false
@@ -420,7 +459,7 @@ struct ExpenseFormView: View {
         }
 
         let trimmed = savingsOffsetAmountText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return nil }
+        guard !trimmed.isEmpty else { return "Enter an amount." }
 
         guard let parsed = CurrencyFormatter.parseAmount(trimmed) else {
             return "Enter a valid amount."
@@ -452,7 +491,7 @@ struct ExpenseFormView: View {
         }
 
         let trimmedAmount = rawAmountText.trimmingCharacters(in: .whitespacesAndNewlines)
-        if trimmedAmount.isEmpty { return nil }
+        if trimmedAmount.isEmpty { return "Enter an amount." }
 
         guard let parsedAmount = CurrencyFormatter.parseAmount(trimmedAmount) else {
             return "Enter a valid amount."
@@ -467,6 +506,26 @@ struct ExpenseFormView: View {
         }
 
         return nil
+    }
+
+    private var areOptionalActionsValid: Bool {
+        guard isReconciliationValid else { return false }
+        guard applySavingsOffset else { return true }
+        guard !reconciliationEnabled.wrappedValue,
+              let amount = CurrencyFormatter.parseAmount(savingsOffsetAmountText),
+              amount > 0, amount <= enteredAmount else { return false }
+        return true
+    }
+
+    private var isReconciliationValid: Bool {
+        guard reconciliationEnabled.wrappedValue else { return true }
+        guard let mode = activeSharedBalanceMode, !applySavingsOffset else { return false }
+        let accountID = mode == .split ? selectedAllocationAccountID : selectedOffsetAccountID
+        let rawAmount = mode == .split ? allocationAmountText : offsetAmountText
+        guard allocationAccounts.contains(where: { $0.id == accountID }),
+              let amount = CurrencyFormatter.parseAmount(rawAmount),
+              amount > 0, amount <= enteredAmount else { return false }
+        return true
     }
 
     private func accountBinding(for mode: SharedBalanceMode) -> Binding<UUID?> {
@@ -614,55 +673,5 @@ struct ExpenseFormView: View {
 
         guard let accountID else { return nil }
         return allocationAccounts.first(where: { $0.id == accountID })
-    }
-}
-
-// MARK: - Card tile ( uses CardVisualView)
-
-private struct CardTile: View {
-    let title: String
-    let themeRaw: String
-    let effectRaw: String
-    let isSelected: Bool
-    let onTap: () -> Void
-
-    private let tileWidth: CGFloat = 160
-
-    var body: some View {
-        Button(action: onTap) {
-            CardVisualView(
-                title: title,
-                theme: themeOption(from: themeRaw),
-                effect: effectOption(from: effectRaw),
-                minHeight: nil,
-                showsShadow: false,
-                titleFont: .headline,
-                titlePadding: 12,
-                titleOpacity: 0.82
-            )
-            .frame(width: tileWidth)
-            .overlay {
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .stroke(isSelected ? Color.primary.opacity(0.35) : Color.clear, lineWidth: 2)
-            }
-            .overlay(alignment: .topTrailing) {
-                if isSelected {
-                    Image(systemName: "checkmark.circle.fill")
-                        .font(.headline)
-                        .foregroundStyle(.white.opacity(0.92))
-                        .padding(10)
-                }
-            }
-            .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-        }
-        .buttonStyle(.plain)
-    }
-
-    private func themeOption(from raw: String) -> CardThemeOption {
-        CardThemeOption(rawValue: raw) ?? .charcoal
-    }
-
-    private func effectOption(from raw: String) -> CardEffectOption {
-        CardEffectOption(rawValue: raw) ?? .plastic
     }
 }

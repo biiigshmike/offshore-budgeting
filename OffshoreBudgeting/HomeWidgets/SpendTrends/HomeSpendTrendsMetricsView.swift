@@ -68,6 +68,12 @@ struct HomeSpendTrendsMetricsView: View {
                     selectedCard: selectedCard
                 )
 
+                Text("Spending here uses budget impact for the selected dates and card. Shared splits and Pay From Savings reduce purchase impact; refunds reduce spending, and adjustments have no budget impact.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+
+                HelpTopicLink(topicID: "home-widgets", title: "How spending is calculated")
+
                 periodPicker
 
                 cardCarousel

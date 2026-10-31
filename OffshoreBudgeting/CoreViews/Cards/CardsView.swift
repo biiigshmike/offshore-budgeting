@@ -136,7 +136,7 @@ struct CardsView: View {
                 PostBoardingTipItem(
                     systemImage: "creditcard.fill",
                     title: "Cards",
-                    detail: "Manage your credit and debit cards. Open a card to track spending, add expenses, and review card activity."
+                    detail: "Manage credit cards, checking accounts, or cash. Open a card to track spending, add expenses, and review its activity."
                 ),
                 PostBoardingTipItem(
                     systemImage: "person.2.fill",

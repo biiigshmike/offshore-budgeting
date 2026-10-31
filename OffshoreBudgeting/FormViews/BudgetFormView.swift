@@ -15,6 +15,7 @@ struct BudgetFormView: View {
     
     let cards: [Card]
     let presets: [Preset]
+    let categories: [Category]
     
     let scheduleString: (Preset) -> String
     
@@ -28,6 +29,8 @@ struct BudgetFormView: View {
     
     @Binding var selectedCardIDs: Set<UUID>
     @Binding var selectedPresetIDs: Set<UUID>
+    @Binding var categoryGoalDrafts: [UUID: CategoryGoalDraft]
+    @State private var showingCategoryGoals: Bool = false
     
     // MARK: - Actions
     
@@ -75,7 +78,7 @@ struct BudgetFormView: View {
                     Button {
                         onToggleAllCards()
                     } label: {
-                        Text(selectedCardIDs.count == cards.count && !cards.isEmpty ? "Clear All" : "Toggle All")
+                        Text(selectedCardIDs.count == cards.count && !cards.isEmpty ? "Clear All" : "Select All")
                             .frame(maxWidth: .infinity, minHeight: 44, alignment: .center)
                     }
                     .listRowSeparator(.hidden)
@@ -88,7 +91,7 @@ struct BudgetFormView: View {
                     Button {
                         onToggleAllCards()
                     } label: {
-                        Text(selectedCardIDs.count == cards.count && !cards.isEmpty ? "Clear All" : "Toggle All")
+                        Text(selectedCardIDs.count == cards.count && !cards.isEmpty ? "Clear All" : "Select All")
                             .frame(maxWidth: .infinity, minHeight: 44, alignment: .center)
                     }
                     .listRowSeparator(.hidden)
@@ -109,12 +112,12 @@ struct BudgetFormView: View {
                 }
             }
             
-            Section("Preset Planned Expenses") {
+            Section {
                 if #available(iOS 26.0, *) {
                     Button {
                         onToggleAllPresets()
                     } label: {
-                        Text(selectedPresetIDs.count == presets.count && !presets.isEmpty ? "Clear All" : "Toggle All")
+                        Text(selectedPresetIDs.count == presets.count && !presets.isEmpty ? "Clear All" : "Select All")
                             .frame(maxWidth: .infinity, minHeight: 44, alignment: .center)
                     }
                     .listRowSeparator(.hidden)
@@ -127,7 +130,7 @@ struct BudgetFormView: View {
                     Button {
                         onToggleAllPresets()
                     } label: {
-                        Text(selectedPresetIDs.count == presets.count && !presets.isEmpty ? "Clear All" : "Toggle All")
+                        Text(selectedPresetIDs.count == presets.count && !presets.isEmpty ? "Clear All" : "Select All")
                             .frame(maxWidth: .infinity, minHeight: 44, alignment: .center)
                     }
                     .listRowSeparator(.hidden)
@@ -161,12 +164,42 @@ struct BudgetFormView: View {
                 }
                 
                 if presets.isEmpty {
-                    Text("No presets yet. Create a preset first.")
+                    Text("No presets yet. You can add them later.")
                         .foregroundStyle(.secondary)
                 }
+            } header: {
+                Text("Presets")
+            } footer: {
+                Text("Choose which presets to include. Offshore creates their planned expenses within this budget’s dates.")
+            }
+
+            Section {
+                Button {
+                    showingCategoryGoals = true
+                } label: {
+                    HStack {
+                        Text("Category Goals")
+                        Spacer()
+                        if categoryGoalDrafts.values.contains(where: \.hasValues) {
+                            Text("Edit").foregroundStyle(.secondary)
+                        } else {
+                            Text("Optional").foregroundStyle(.secondary)
+                        }
+                        Image(systemName: "chevron.right")
+                            .foregroundStyle(.secondary)
+                            .accessibilityHidden(true)
+                    }
+                }
+            } footer: {
+                Text("Set optional minimum and maximum spending goals for this budget. You can change them later.")
             }
         }
         .navigationTitle(modeTitle)
+        .appSheet(isPresented: $showingCategoryGoals) {
+            CategoryGoalsEditorView(categories: categories, drafts: categoryGoalDrafts) { updatedDrafts in
+                categoryGoalDrafts = updatedDrafts
+            }
+        }
     }
     
     // MARK: - Bindings

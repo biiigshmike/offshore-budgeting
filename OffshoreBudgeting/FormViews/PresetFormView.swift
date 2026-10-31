@@ -88,12 +88,8 @@ struct PresetFormView: View {
             }
             
             Section("Category") {
-                Picker("Default Category", selection: $selectedCategoryID) {
-                    Text("None").tag(UUID?.none)
-                    
-                    ForEach(categories) { category in
-                        Text(category.name).tag(Optional(category.id))
-                    }
+                EntityMenuPicker(title: "Default Category", items: categories, selection: $selectedCategoryID) { category in
+                    CategoryMenuLabel(category: category)
                 }
             }
             

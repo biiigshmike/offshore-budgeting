@@ -622,10 +622,25 @@ private struct OnboardingWorkspaceStep: View {
 
             header(
                 title: "Workspaces",
-                subtitle: "A Workspace is where your all of your budgeting data lives. You can create multiple workspaces for different budgeting purposes."
+                subtitle: "A workspace keeps a complete set of finances separate. Use Personal for everyday budgeting or Work for business expenses."
             )
 
             List {
+                if workspaces.isEmpty && usesICloud == false {
+                    Section {
+                        Button("Start with Personal") {
+                            onCreate("Personal", "#3B82F6")
+                        }
+                        Button("Start with Work") {
+                            onCreate("Work", "#10B981")
+                        }
+                    } header: {
+                        Text("Choose a Starting Workspace")
+                    } footer: {
+                        Text("Choose one to begin, or create your own below. You can add more workspaces later.")
+                    }
+                }
+
                 Section("Workspaces") {
                     WorkspaceListRows(
                         workspaces: workspaces,
@@ -804,8 +819,8 @@ private struct OnboardingPrivacySyncStep: View {
                     ? "Privacy, iCloud, and Notifications"
                     : "Privacy and Notifications",
                 subtitle: shouldShowICloudSyncSection
-                    ? "Enable App Lock, iCloud sync, and setup Notifications."
-                    : "Enable App Lock and setup Notifications."
+                    ? "Enable App Lock, iCloud sync, and set up notifications."
+                    : "Enable App Lock and set up notifications."
             )
             
             Form {
@@ -1140,7 +1155,7 @@ private struct OnboardingCardsStep: View {
 
             header(
                 title: "Cards",
-                subtitle: "Cards are where debits and credits are tracked for any account you wish to add."
+                subtitle: "A card can represent a credit card, checking account, or cash. Name it whatever makes sense to you. No bank connection is needed."
             )
 
             cardsGrid
@@ -1349,7 +1364,7 @@ private struct OnboardingPresetsStep: View {
             
             header(
                 title: "Presets",
-                subtitle: "Presets are reusable templates for recurring expenses, like rent, subscriptions, etc."
+                subtitle: "Presets are reusable expense templates, such as rent or subscriptions. Include them in a budget to create its dated planned expenses."
             )
             
             List {

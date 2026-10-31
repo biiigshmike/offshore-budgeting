@@ -7,6 +7,7 @@
 
 import SwiftUI
 import SwiftData
+import StoreKit
 
 struct AddExpenseView: View {
 
@@ -26,6 +27,7 @@ struct AddExpenseView: View {
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.requestReview) private var requestReview
 
     @Query private var cardsInWorkspace: [Card]
     @Query private var categories: [Category]
@@ -46,6 +48,7 @@ struct AddExpenseView: View {
     @State private var offsetAmountText: String = ""
     @State private var applySavingsOffset: Bool = false
     @State private var savingsOffsetAmountText: String = ""
+    @State private var areOptionalActionsValid = true
 
     // MARK: - Alerts
 
@@ -101,7 +104,7 @@ struct AddExpenseView: View {
     }
 
     private var canSave: Bool {
-        ExpenseFormView.canSave(
+        areOptionalActionsValid && ExpenseFormView.canSave(
             descriptionText: descriptionText,
             amountText: amountText,
             selectedCardID: selectedCardID,
@@ -132,7 +135,8 @@ struct AddExpenseView: View {
             applySavingsOffset: $applySavingsOffset,
             savingsOffsetAmountText: $savingsOffsetAmountText,
             availableSavingsBalance: availableSavingsBalance,
-            onSharedBalanceChanged: nil
+            onSharedBalanceChanged: nil,
+            onOptionalActionsValidationChanged: { areOptionalActionsValid = $0 }
         )
         .navigationTitle("Add Expense")
         .toolbar {
@@ -181,10 +185,10 @@ struct AddExpenseView: View {
             Text("Offset amount must be 0 or greater and cannot exceed the expense amount.")
         }
         .blocksAutomaticExpenseReview(while: showingInvalidSavingsOffsetAlert)
-        .alert("Invalid Savings Offset", isPresented: $showingInvalidSavingsOffsetAlert) {
+        .alert("Invalid Savings Amount", isPresented: $showingInvalidSavingsOffsetAlert) {
             Button("OK", role: .cancel) { }
         } message: {
-            Text("Savings offset must be 0 or greater and cannot exceed the expense amount.")
+            Text("The amount paid from savings must be 0 or greater and cannot exceed the expense amount.")
         }
         .onAppear {
             if descriptionText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
@@ -342,7 +346,15 @@ struct AddExpenseView: View {
             SavingsAccountService.removeSavingsOffset(for: expense, modelContext: modelContext)
         }
 
+        let shouldRequestReview = AppReviewRequestPolicy.recordExpenseAdded()
         dismiss()
+        if shouldRequestReview {
+            Task { @MainActor in
+                try? await Task.sleep(for: .seconds(2))
+                guard !Task.isCancelled else { return }
+                requestReview()
+            }
+        }
     }
 
     private func offsetNote(for description: String) -> String {

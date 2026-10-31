@@ -5,6 +5,22 @@ import Testing
 @MainActor
 struct HelpFAQEngineTests {
 
+    @Test func refundAndAdjustmentQuestion_findsTransactionGuide() {
+        let matches = HelpFAQEngine().rankedTopicMatches(
+            for: "Purchases refunds adjustments",
+            topics: GeneratedHelpContent.allLeafTopics
+        )
+        #expect(matches.first?.topicID == "accounts-transaction-types")
+    }
+
+    @Test func categoryGoalsQuestion_findsGoalsGuide() {
+        let matches = HelpFAQEngine().rankedTopicMatches(
+            for: "Category Goals minimum maximum",
+            topics: GeneratedHelpContent.allLeafTopics
+        )
+        #expect(matches.first?.topicID == "budgets-category-goals")
+    }
+
     // MARK: - Answering
 
     @Test func answer_exactTopicQuestion_returnsHomeTopic() {

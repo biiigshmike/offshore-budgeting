@@ -164,6 +164,11 @@ struct BudgetDetailView: View {
             detail: "Tap one or more categories to filter expenses. Tap a selected category again to clear just that selection."
         ),
         PostBoardingTipItem(
+            systemImage: "target",
+            title: "Goals",
+            detail: "Set optional minimum and maximum spending goals for each category. Tap Goals to edit them, or press and hold a category."
+        ),
+        PostBoardingTipItem(
             systemImage: "ellipsis",
             title: "Budget Management",
             detail: "Press the three dots and manage your budget easily. Assign cards and presets to track them for your budget period."
@@ -249,6 +254,8 @@ struct BudgetDetailView: View {
         case editPlannedExpense(PlannedExpense)
         case editPreset(Preset)
         case editCategoryLimit(CategoryLimitEditorInput)
+        case categoryGoals
+        case calculations
         case reviewRecordedPlannedExpenses
 
         var id: String {
@@ -269,6 +276,10 @@ struct BudgetDetailView: View {
                 return "edit-preset-\(preset.id.uuidString)"
             case .editCategoryLimit(let input):
                 return "edit-category-limit-\(input.category.id.uuidString)"
+            case .categoryGoals:
+                return "category-goals"
+            case .calculations:
+                return "calculations"
             case .reviewRecordedPlannedExpenses:
                 return "review-recorded-planned-expenses"
             }
@@ -307,7 +318,9 @@ struct BudgetDetailView: View {
         for category in CategoryArchivePolicy.activeCategories(from: workspaceCategories) {
             categoriesByID[category.id] = category
         }
-        for category in (plannedExpensesInBudget.compactMap { $0.category } + variableExpensesInBudget.compactMap { $0.category }) {
+        for category in (plannedExpensesInBudget.compactMap { $0.category }
+            + variableExpensesInBudget.compactMap { $0.category }
+            + budgetCategoryLimits.compactMap { $0.category }) where category.workspace?.id == workspace.id {
             categoriesByID[category.id] = category
         }
         let categoriesInBudget = categoriesByID.values
@@ -722,6 +735,31 @@ struct BudgetDetailView: View {
                     plannedContribution: input.plannedContribution,
                     variableContribution: input.variableContribution
                 )
+            case .categoryGoals:
+                CategoryGoalsEditorView(
+                    categories: derived.categoriesInBudget,
+                    drafts: BudgetCategoryGoalStore.drafts(for: budget),
+                    plannedContributions: Dictionary(uniqueKeysWithValues: derived.categoriesInBudget.map {
+                        ($0.id, plannedContribution(for: $0, derived: derived))
+                    }),
+                    variableContributions: Dictionary(uniqueKeysWithValues: derived.categoriesInBudget.map {
+                        ($0.id, variableContribution(for: $0, derived: derived))
+                    })
+                ) { drafts in
+                    BudgetCategoryGoalStore.apply(
+                        drafts,
+                        categories: derived.categoriesInBudget,
+                        budget: budget,
+                        workspaceID: workspace.id,
+                        modelContext: modelContext
+                    )
+                }
+            case .calculations:
+                FinancialCalculationHelpView(
+                    sections: calculationSections(derived),
+                    dateRange: budgetDateRangeLabel,
+                    helpTopicID: "accounts-savings-account"
+                )
             case .reviewRecordedPlannedExpenses:
                 NavigationStack {
                     BudgetRecordedPlannedExpensesReviewView(
@@ -785,7 +823,7 @@ struct BudgetDetailView: View {
                 )
 
                 BudgetSummaryBucketCard(
-                    title: String(localized: "accounts.segment.savings", defaultValue: "Offshore Savings", comment: "Accounts section segment for Offshore Savings."),
+                    title: String(localized: "accounts.segment.savings", defaultValue: "Savings Outlook", comment: "Accounts section segment for Offshore Savings."),
                     titleColor: .green,
                     rows: [
                         .init(label: String(localized: "budgetDetail.summary.maxSavings", defaultValue: "Max Savings", comment: "Budget detail summary row for max savings."), value: derived.maxSavings),
@@ -795,6 +833,9 @@ struct BudgetDetailView: View {
                 )
             }
             .padding(.vertical, 4)
+            Button("How is this calculated?", systemImage: "info.circle") {
+                activeModal = .calculations
+            }
         } header: {
             Text(String(format: String(localized: "budgetDetail.overviewHeader", defaultValue: "Overview • %@", comment: "Budget detail overview section header with date range."), locale: Locale.current, budgetDateRangeLabel))
         } footer: {
@@ -804,10 +845,63 @@ struct BudgetDetailView: View {
         }
     }
 
-    @ViewBuilder
+    private func calculationSections(_ derived: BudgetDetailDerivedState) -> [FinancialCalculationSection] {
+        let adjustments = SavingsMathService.actualSavingsAdjustmentTotal(
+            from: workspaceSavingsEntries,
+            startDate: budget.startDate,
+            endDate: budget.endDate
+        )
+        var notes = [
+            "Expense totals follow the current search and category filters. Income and savings adjustments use the full budget date range.",
+            "Expenses must be on cards tracked by this budget. Planned expenses must also belong to this budget.",
+            "Planned expenses use their recorded actual amount when greater than zero; otherwise, their planned amount is reserved."
+        ]
+        if excludeFuturePlannedExpensesFromCalculationsInView {
+            notes.append("Future planned expenses are excluded from these totals.")
+        }
+        if excludeFutureVariableExpensesFromCalculationsInView {
+            notes.append("Future variable expenses are excluded from these totals.")
+        }
+        return [
+            FinancialCalculationSection(
+                id: "max-savings",
+                title: "Max Savings",
+                explanation: "Planned income minus planned expenses at their current budget impact, before variable expenses.",
+                rows: [
+                    .init(id: "income", title: "Planned Income", amount: derived.plannedIncomeTotal),
+                    .init(id: "planned", title: "Planned Expense Budget Impact", amount: -derived.plannedExpensesEffectiveTotal),
+                    .init(id: "total", title: "Max Savings", amount: derived.maxSavings, isTotal: true)
+                ]
+            ),
+            FinancialCalculationSection(
+                id: "projected-savings",
+                title: "Projected Savings",
+                explanation: "Planned income minus the original planned expense amounts, after shared splits. Variable expenses are not included.",
+                rows: [
+                    .init(id: "income", title: "Planned Income", amount: derived.plannedIncomeTotal),
+                    .init(id: "planned", title: "Planned Expenses After Splits", amount: -derived.plannedExpensesPlannedTotal),
+                    .init(id: "total", title: "Projected Savings", amount: derived.projectedSavings, isTotal: true)
+                ]
+            ),
+            FinancialCalculationSection(
+                id: "actual-savings",
+                title: "Actual Savings",
+                explanation: "Received income minus planned and variable expense budget impacts, plus manual savings adjustments.",
+                rows: [
+                    .init(id: "income", title: "Actual Income", amount: derived.actualIncomeTotal),
+                    .init(id: "planned", title: "Planned Expense Budget Impact", amount: -derived.plannedExpensesEffectiveTotal),
+                    .init(id: "variable", title: "Variable Expense Budget Impact", amount: -derived.variableExpensesTotal),
+                    .init(id: "adjustments", title: "Manual Savings Adjustments", amount: adjustments),
+                    .init(id: "total", title: "Actual Savings", amount: derived.actualSavings, isTotal: true)
+                ],
+                notes: notes
+            )
+        ]
+    }
+
     private func categorySection(_ derived: BudgetDetailDerivedState) -> some View {
-        if !derived.categoriesInBudget.isEmpty {
-            Section {
+        Section {
+            if !derived.categoriesInBudget.isEmpty {
                 BudgetCategoryChipsRow(
                     categories: derived.categoriesInBudget,
                     selectedIDs: $selectedCategoryIDs,
@@ -820,20 +914,28 @@ struct BudgetDetailView: View {
                         activeModal = .editCategoryLimit(input)
                     }
                 )
-            } header: {
-                HStack {
-                    Text(String(localized: "categories.title", defaultValue: "Categories", comment: "Title for categories section."))
-                    Spacer()
-                    if !selectedCategoryIDs.isEmpty {
-                        Button(String(localized: "common.clear", defaultValue: "Clear", comment: "Action to clear a selection.")) {
-                            selectedCategoryIDs.removeAll()
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-            } footer: {
-                Text(String(localized: "budgetDetail.categories.footer", defaultValue: "Single-press categories to filter expenses; tap selected chips to clear one. Long-press to edit category limits.", comment: "Footer guidance for budget detail category chips."))
+            } else {
+                Text("Create a category in Settings to set spending goals.")
+                    .foregroundStyle(.secondary)
             }
+        } header: {
+            HStack {
+                Text(String(localized: "categories.title", defaultValue: "Categories", comment: "Title for categories section."))
+                Spacer()
+                if !selectedCategoryIDs.isEmpty {
+                    Button(String(localized: "common.clear", defaultValue: "Clear", comment: "Action to clear a selection.")) {
+                        selectedCategoryIDs.removeAll()
+                    }
+                    .buttonStyle(.plain)
+                }
+                Button("Goals", systemImage: "target") {
+                    activeModal = .categoryGoals
+                }
+                .buttonStyle(.borderless)
+                .textCase(nil)
+            }
+        } footer: {
+            Text("Set optional minimum and maximum spending goals for each category. Tap Goals to edit them, or press and hold a category.")
         }
     }
 
@@ -841,7 +943,7 @@ struct BudgetDetailView: View {
         Section {
             Picker(String(localized: "common.type", defaultValue: "Type", comment: "Label for type picker."), selection: $expenseScope) {
                 Text(String(localized: "expenseScope.planned", defaultValue: "Planned", comment: "Expense scope option for planned expenses.")).tag(ExpenseScope.planned)
-                Text(String(localized: "expenseScope.unified", defaultValue: "Unified", comment: "Expense scope option for unified expenses.")).tag(ExpenseScope.unified)
+                Text(String(localized: "expenseScope.unified", defaultValue: "Combined", comment: "Expense scope option for combined expenses.")).tag(ExpenseScope.unified)
                 Text(String(localized: "expenseScope.variable", defaultValue: "Variable", comment: "Expense scope option for variable expenses.")).tag(ExpenseScope.variable)
             }
             .pickerStyle(.segmented)
@@ -1092,7 +1194,7 @@ struct BudgetDetailView: View {
             return [
                 .init(label: String(localized: "budgetDetail.total.planned", defaultValue: "Planned Total", comment: "Summary row label for planned total."), value: derived.plannedExpensesEffectiveTotal),
                 .init(label: String(localized: "budgetDetail.total.variable", defaultValue: "Variable Total", comment: "Summary row label for variable total."), value: derived.variableExpensesTotal),
-                .init(label: String(localized: "budgetDetail.total.unified", defaultValue: "Unified Total", comment: "Summary row label for unified total."), value: unifiedTotal)
+                .init(label: String(localized: "budgetDetail.total.unified", defaultValue: "Combined Total", comment: "Summary row label for combined total."), value: unifiedTotal)
             ]
         }
     }

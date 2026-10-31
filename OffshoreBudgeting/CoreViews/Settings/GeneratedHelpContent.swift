@@ -265,6 +265,7 @@ enum GeneratedHelpContent {
             leafTopicIDs: [
                 "budgets-overview",
                 "budgets-budget-details",
+                "budgets-category-goals",
                 "budgets-calculations"
             ]
         ),
@@ -289,6 +290,7 @@ enum GeneratedHelpContent {
             leafTopicIDs: [
                 "accounts-overview",
                 "accounts-card-details",
+                "accounts-transaction-types",
                 "accounts-calculations",
                 "accounts-reconciliations",
                 "accounts-savings-account"
@@ -326,8 +328,8 @@ enum GeneratedHelpContent {
             sections: [
                 textSection(
                     id: "introduction-building-blocks-1",
-                    header: "What This Includes",
-                    body: "Offshore is organized into core functions that work together instead of competing for your attention. Accounts includes Cards, Reconciliations, and Offshore Savings for each workspace. Income is split into planned and actual inflows, while Budgets gives you the lens that compares what you expected against what really happened.\n\nEach area has one clear job so you always know where to go, where money is being spent, what income is expected, what income has landed, and what your savings direction looks like in the current period. Settings supports all of this with defaults and tools like Categories, Presets, and workspace-level behavior. Once these building blocks click, every other screen feels much more natural."
+                    header: "Budget Your Way",
+                    body: "Budget your way. Choose any date range and the cards you want to include. Add presets for predictable expenses, record variable expenses as they happen, and set category goals wherever they help. You can start small and add more later.\n\nA workspace keeps a complete set of finances separate, such as Personal and Work. Within a workspace, a budget gives you a date range for reviewing income and selected cards. You can budget daily, weekly, by payday, monthly, or for custom dates.\n\nA preset is a reusable expense template. Including it in a budget creates its dated planned expenses. Variable expenses record individual transactions. Categories organize both kinds of expense; category goals are optional and belong to each budget."
                 ),
                 textSection(
                     id: "introduction-building-blocks-2",
@@ -368,8 +370,8 @@ enum GeneratedHelpContent {
                 ),
                 textSection(
                     id: "introduction-planned-expenses-3",
-                    header: "How To Use Them Day To Day",
-                    body: "Add planned expenses early in the period so your numbers start from a realistic baseline. As real charges happen, compare those charges to the plan and keep records updated.\n\nIf the final amount changes, record the actual outcome and let planned-versus-actual do its job. That keeps your budget alive and useful instead of turning into a static list that no longer reflects reality."
+                    header: "Recording a Paid Bill",
+                    body: "When this bill is paid, enter its actual amount on the existing planned expense. Leave Actual Amount blank to use the planned amount. You do not need to add a separate expense for this payment.\n\nFor example, a planned electricity bill of $80 counts as $80 while its actual amount is blank. If you record an actual amount of $72, the same planned expense counts as $72. Adding another $72 variable expense for that payment would count the bill twice.\n\nAn actual amount of zero currently also uses the planned amount; it does not mark a bill as free or canceled."
                 ),
                 textSection(
                     id: "introduction-planned-expenses-4",
@@ -767,7 +769,7 @@ enum GeneratedHelpContent {
                 mediaSection(
                     id: "budgets-details-add-expense",
                     header: "Add Expense",
-                    body: "Budget Details is where period execution happens day by day. This is where you add, edit, and monitor expenses while keeping planned and variable behavior in sync.\n\nWhen adding an expense, you can also use split and offset controls when one purchase needs more than one treatment. Split helps you break a single charge into multiple tracked parts, while offset helps you intentionally reduce the balance impact when another source is covering all or part of that cost.\n\nAfter each meaningful change, scan summary signals to confirm direction. Small, consistent updates make budget control much easier than large delayed corrections.",
+                    body: "Use Add Expense for a separate variable transaction. If a bill already has a planned expense, open that existing row and record its actual amount instead of creating a second expense.\n\nChoose Debit for a purchase, Credit for a refund, or Adjustment for a positive ledger correction. The help article Purchases, Refunds, and Adjustments explains why gross spending, signed ledger totals, and budget impact can differ.\n\nSplit assigns part of a purchase to a reconciliation balance. Offset records a settlement against that balance. Pay From Savings uses available leftover money to reduce a purchase’s budget impact. Choose the action that matches what happened; reconciliation actions and Pay From Savings cannot be combined on one expense.",
                     media: [
                         mediaItem(
                             id: "budgets-details-add-expense-1",
@@ -778,7 +780,7 @@ enum GeneratedHelpContent {
                         mediaItem(
                             id: "budgets-details-add-expense-2",
                             assetName: "Help/CoreScreens/Budgets/Budget Details/add-expense-2",
-                            bodyText: "This step completes amount, date, card, and category, and it is where split and offset are applied when needed. Use split when one transaction should be tracked across multiple purposes, and use offset when another source should reduce part of the balance impact. Verify totals right after save so you can confirm the split or offset behaved the way you expected.",
+                            bodyText: "Complete the amount, date, card, and category. Split assigns a share of a purchase to a reconciliation balance. Offset reduces that shared balance through a settlement; Pay From Savings covers a purchase from available Offshore Savings. Check the explanation under the selected action before saving.",
                             fullscreenCaptionText: "Complete fields, apply split or offset if needed, then verify totals after save."
                         )
                     ]
@@ -798,16 +800,33 @@ enum GeneratedHelpContent {
                 ),
                 mediaSection(
                     id: "budgets-details-spending-limits",
-                    header: "Spending Limits",
-                    body: "Spending limits create practical guardrails for categories that tend to drift beyond comfort. They are not just constraints, they are early alerts that help you respond before overspending compounds. Use limits on high-variance categories first for the biggest impact.\n\nReview limit status alongside trend and category views so decisions stay contextual. Limits work best when adjusted as behavior patterns change rather than left static forever. Recalibrating periodically keeps them realistic and useful.\n\nIf a limit is repeatedly exceeded, investigate root causes before simply raising it. Sometimes the better fix is reclassification or behavior adjustment. Thoughtful limit usage improves long-term control.",
+                    header: "Category Goals",
+                    body: "Set optional minimum and maximum spending goals for each category. Tap Goals beside Categories to edit them, or press and hold a category. A minimum is a target you want to reach; a maximum is a ceiling. Goals guide your review without blocking expense entry.\n\nCategory Goals belong to this budget. You can set them while creating a budget or edit them later. The Goals list includes categories with no spending yet, so you can plan ahead. Leave either amount blank when you do not need that goal.",
                     media: [
                         mediaItem(
                             id: "budgets-details-spending-limits-1",
                             assetName: "Help/CoreScreens/Budgets/Budget Details/spending-limits",
-                            bodyText: "This step shows setting or adjusting category spending limits inside Budget Details. Use limits to keep high-variance categories visible and actionable throughout the cycle. When alerts or pressure appear, review recent entries before changing the threshold. This keeps limits tied to real behavior rather than guesswork.",
-                            fullscreenCaptionText: "Set category limits to surface budget pressure before it compounds."
+                            bodyText: "Open Goals beside Categories, or press and hold a category, to set its minimum and maximum spending goals for this budget. Review recent spending before changing a goal. Minimums are targets; maximums are ceilings; either can be left blank.",
+                            fullscreenCaptionText: "Set category goals to surface budget pressure before it compounds."
                         )
                     ]
+                )
+            ]
+        ),
+        GeneratedHelpLeafTopic(
+            id: "budgets-category-goals",
+            destinationID: "budgets",
+            title: "Category Goals",
+            sections: [
+                textSection(
+                    id: "budgets-category-goals-editing",
+                    header: "Set Minimum and Maximum Goals",
+                    body: "Set optional minimum and maximum spending goals for each category. Tap Goals to edit them, or press and hold a category. A minimum is a spending target you want to reach; a maximum is a ceiling you want to stay within. Either can be left blank.\n\nGoals belong to one budget, so Groceries can have a different maximum in a weekly budget and a monthly budget. They guide your review without preventing you from recording expenses. All categories in the workspace are available, including ones with no spending yet."
+                ),
+                textSection(
+                    id: "budgets-category-goals-creation",
+                    header: "Goals During Budget Creation",
+                    body: "Open the optional Category Goals section while creating a budget. Enter only the goals you need. These values remain a draft until you save the budget; canceling budget creation discards them.\n\nChoose which presets to include. Offshore creates their planned expenses within this budget’s dates. Select the cards you want this budget to track so their expenses can contribute to its totals."
                 )
             ]
         ),
@@ -910,7 +929,7 @@ enum GeneratedHelpContent {
                 mediaSection(
                     id: "accounts-overview-1",
                     header: "Accounts Overview",
-                    body: "Accounts is the hub for card activity, shared-balance reconciliation, and savings tracking. It helps you separate normal spending workflows from settlement and reserve workflows so your data stays organized.\n\nUse the Section menu in the toolbar to switch between Cards, Reconciliations, and Offshore Savings. Choose the area that owns the task before adding or editing entries.\n\nA quick review pass in Accounts each cycle keeps card-level accuracy strong and improves related reports across the app.",
+                    body: "Accounts is the hub for card activity, shared-balance reconciliation, and savings tracking. It helps you separate normal spending workflows from settlement and reserve workflows so your data stays organized.\n\nOpen Accounts to see Cards, Reconciliations, and Offshore Savings together. Choose a destination row to open it. On iPad and Mac, you can also choose its child destination in the sidebar. Use Accounts in the destination toolbar to return to the overview, or the Section menu to switch directly.\n\nA quick review pass in Accounts each cycle keeps card-level accuracy strong and improves related reports across the app.",
                     media: [
                         mediaItem(
                             id: "accounts-overview-1-image-1",
@@ -982,6 +1001,33 @@ enum GeneratedHelpContent {
             ]
         ),
         GeneratedHelpLeafTopic(
+            id: "accounts-transaction-types",
+            destinationID: "accounts",
+            title: "Purchases, Refunds, and Adjustments",
+            sections: [
+                textSection(
+                    id: "accounts-transaction-types-debit",
+                    header: "Debit: Purchases and Charges",
+                    body: "Choose Debit for a purchase or charge, including a purchase paid with a credit card. Debit describes the transaction’s effect, not the type of card.\n\nA $40 debit adds $40 to the signed card ledger and gross spending totals. It normally adds $40 of budget impact too. A reconciliation split or Pay From Savings can reduce your budget impact while the full purchase remains in card history."
+                ),
+                textSection(
+                    id: "accounts-transaction-types-credit",
+                    header: "Credit: Refunds and Credits",
+                    body: "Choose Credit for a refund or credit. Enter a positive amount; Offshore applies its negative ledger sign.\n\nA $10 credit subtracts $10 from the signed card ledger and budget impact. If your earlier purchase was $40, the net ledger amount is $30. Gross spending totals, including the card’s Total Spent, still show the $40 debit purchase before refunds."
+                ),
+                textSection(
+                    id: "accounts-transaction-types-adjustment",
+                    header: "Adjustment: Positive Ledger Corrections",
+                    body: "Choose Adjustment for a positive correction to the card ledger that should not count as a purchase.\n\nA $5 adjustment adds $5 to the signed card ledger. It contributes zero to gross spending totals and has zero budget impact in savings calculations. To record money returned from a purchase, use Credit instead."
+                ),
+                textSection(
+                    id: "accounts-transaction-types-totals",
+                    header: "Why Totals Can Differ",
+                    body: "Card history keeps every recorded transaction. The signed ledger treats debits and adjustments as positive and credits as negative. Gross spending counts debit purchases, before refunds, splits, or payments from savings. Budget impact accounts for credits, your share after splits, and Pay From Savings; adjustments have no budget impact.\n\nPlanned expenses are separate expected bills. Their effective amount is the actual amount when greater than zero, otherwise the planned amount. Record a paid planned bill on its existing planned expense instead of adding a second variable expense.\n\nDate ranges, category and search filters, and future-expense calculation settings also affect totals. Hiding a future row is separate from excluding it from calculations."
+                )
+            ]
+        ),
+        GeneratedHelpLeafTopic(
             id: "accounts-calculations",
             destinationID: "accounts",
             title: "Calculations",
@@ -1006,6 +1052,11 @@ enum GeneratedHelpContent {
             destinationID: "accounts",
             title: "Reconciliations",
             sections: [
+                textSection(
+                    id: "accounts-reconciliations-actions",
+                    header: "Split and Offset",
+                    body: "Split assigns part of a purchase to a reconciliation balance. For example, a $100 purchase with a $40 split keeps the full $100 in card history, adds $40 to that reconciliation balance, and leaves $60 as your budget impact.\n\nOffset records a negative settlement against the chosen reconciliation balance. A $40 offset reduces that shared balance by $40. It does not use Offshore Savings or reduce the expense’s budget impact.\n\nTo cover an expense with leftover money from earlier periods, choose Pay From Savings instead. A reconciliation action and Pay From Savings cannot be applied to the same expense. For credits and adjustments, splits and payments from savings do not change their normal budget impact: credits retain their full negative amount and adjustments contribute zero."
+                ),
                 mediaSection(
                     id: "accounts-reconciliations-overview",
                     header: "Reconciliations Overview",
@@ -1058,10 +1109,15 @@ enum GeneratedHelpContent {
             destinationID: "accounts",
             title: "Offshore Savings",
             sections: [
+                textSection(
+                    id: "accounts-savings-account-calculations",
+                    header: "Outlook Versus Available Balance",
+                    body: "Projected Savings is planned income minus planned expenses at their original planned amounts, after splits. Max Savings is planned income minus the effective budget impact of planned expenses. Neither includes variable transactions.\n\nActual Savings starts with actual income, subtracts effective planned-expense and variable-expense budget impacts, then includes manual savings adjustments in the selected dates. A planned expense uses its actual amount when greater than zero, otherwise its planned amount. Actual Savings therefore still allows for bills you have not recorded as paid.\n\nThe available Offshore Savings running total is the sum of period closes, manual adjustments, and payments from savings across all dates. It is different from Actual Savings for a selected period. Legacy reconciliation mirrors are excluded. Tap How is this calculated? to inspect the amounts used by the current screen."
+                ),
                 mediaSection(
                     id: "accounts-savings-account-overview",
-                    header: "Offshore Savings",
-                    body: "Offshore Savings keeps a workspace-specific ledger of money left over at the end of each budgeting period. Running Total includes all dates in the ledger, while Current Period shows activity for the selected date range.\n\nLeave this balance available for future spending, add manual adjustments, or use it to offset an expense. An offset keeps the purchase on its original card while reducing the amount covered by the current budget.",
+                    header: "Money Available for Future Expenses",
+                    body: "Offshore Savings tracks money left over from completed default budgeting periods that remains available for future expenses. Running Total includes your full savings ledger across all dates. Current Period shows ledger activity for the selected date range.\n\nAutomatic period closes follow your Default Budgeting Period and its calendar boundaries. They do not make a separate deposit whenever a custom budget ends. Daily, weekly, monthly, and other custom Budget records are views of your finances, not separate savings accounts.\n\nPay From Savings reduces an expense’s budget impact while keeping the full transaction in card history. Set Aside as Savings removes money from this available balance when you reserve it elsewhere. Offshore records these changes; it does not move money between bank accounts.",
                     media: [
                         mediaItem(
                             id: "accounts-savings-account-overview-image-1",
@@ -1074,7 +1130,7 @@ enum GeneratedHelpContent {
                 textSection(
                     id: "accounts-savings-account-set-aside",
                     header: "Set Aside as Savings",
-                    body: "In Accounts > Offshore Savings, add a savings entry, enter the amount, and enable Set Aside as Savings. Saving the entry subtracts that amount from Offshore Savings so the remaining balance reflects money available for future spending.\n\nThis records money you have set aside elsewhere. It does not transfer money between bank accounts or create a separate savings balance in the app. The entry is saved as a negative manual adjustment; existing ledger history is preserved."
+                    body: "In Accounts > Offshore Savings, add a savings entry, enter the amount, and enable Set Aside as Savings. Record money you have moved into savings and no longer want available for future expenses. This subtracts it from Offshore Savings; Offshore does not transfer money between bank accounts or create a second savings balance.\n\nFor example, with $500 available, covering $40 of a $100 purchase leaves $460 available and gives that purchase a $60 budget impact. Setting aside another $200 leaves $260 available. The full $100 purchase remains in card history and gross spending totals.\n\nSet Aside is a negative manual adjustment. It reduces the available running total and the Actual Savings metric for the adjustment’s date range. The ledger keeps a record of the change."
                 )
             ]
         ),

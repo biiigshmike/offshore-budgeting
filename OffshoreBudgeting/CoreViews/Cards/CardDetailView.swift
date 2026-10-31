@@ -177,6 +177,7 @@ struct CardDetailView: View {
         case editExpense(VariableExpense)
         case editPlannedExpense(PlannedExpense)
         case editPreset(Preset)
+        case calculationHelp
 
         var id: String {
             switch self {
@@ -192,6 +193,8 @@ struct CardDetailView: View {
                 return "edit-planned-expense-\(expense.id.uuidString)"
             case .editPreset(let preset):
                 return "edit-preset-\(preset.id.uuidString)"
+            case .calculationHelp:
+                return "calculation-help"
             }
         }
     }
@@ -556,6 +559,12 @@ struct CardDetailView: View {
                     NavigationStack {
                         EditPresetView(workspace: workspace, preset: preset)
                     }
+                case .calculationHelp:
+                    FinancialCalculationHelpView(
+                        sections: cardCalculationSections(derivedState),
+                        dateRange: "\(AppDateFormat.abbreviatedDate(appliedStartDate)) – \(AppDateFormat.abbreviatedDate(appliedEndDate))",
+                        helpTopicID: "accounts-calculations"
+                    )
                 }
             }
             .onAppear {
@@ -625,9 +634,50 @@ struct CardDetailView: View {
                 heatMapStops: derived.heatMapStops
             )
             .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
+
+            Button("How is this calculated?", systemImage: "info.circle") {
+                activeModal = .calculationHelp
+            }
         } header: {
             Text("Total Spent")
+        } footer: {
+            Text("Total Spent shows planned expenses and debit purchases for the selected view. Credits and adjustments remain in card history and do not contribute to this gross spending total.")
         }
+    }
+
+    private func cardCalculationSections(_ derived: CardDetailDerivedState) -> [FinancialCalculationSection] {
+        let currentScopeExplanation: String
+        switch expenseScope {
+        case .planned:
+            currentScopeExplanation = "Total Spent currently shows Planned expenses only."
+        case .variable:
+            currentScopeExplanation = "Total Spent currently shows Variable debit purchases only."
+        case .unified:
+            currentScopeExplanation = "Total Spent currently shows Planned and Variable spending combined."
+        }
+
+        return [
+            FinancialCalculationSection(
+                id: "combined", title: "Combined Spending",
+                explanation: "Planned expenses plus variable debit purchases, using the current date range, search, category filters, and calculation settings.",
+                rows: [
+                    .init(id: "planned", title: "Planned", amount: derived.plannedTotal),
+                    .init(id: "variable", title: "Variable", amount: derived.variableTotal),
+                    .init(id: "total", title: "Combined Total", amount: derived.unifiedTotal, isTotal: true)
+                ],
+                notes: [
+                    "Planned expenses use their actual amount when greater than zero; otherwise, they use the planned amount.",
+                    "Credits and adjustments stay in card history and do not contribute to this gross spending total.",
+                    "Shared splits and Pay From Savings affect budget impact elsewhere; they do not reduce this card’s gross spending total.",
+                    "Hiding future expenses changes the list. Excluding future expenses from totals changes this calculation."
+                ]
+            ),
+            FinancialCalculationSection(
+                id: "current", title: "Current View",
+                explanation: currentScopeExplanation,
+                rows: [.init(id: "displayed", title: "Total Spent", amount: derived.displayTotal, isTotal: true)]
+            )
+        ]
     }
 
     private func categorySection(_ derived: CardDetailDerivedState) -> some View {
@@ -660,7 +710,7 @@ struct CardDetailView: View {
         Section {
             Picker("Scope", selection: $expenseScope) {
                 Text("Planned").tag(ExpenseScope.planned)
-                Text("Unified").tag(ExpenseScope.unified)
+                Text("Combined").tag(ExpenseScope.unified)
                 Text("Variable").tag(ExpenseScope.variable)
             }
             .pickerStyle(.segmented)

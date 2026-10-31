@@ -151,6 +151,11 @@ extension EnvironmentValues {
 
 struct AppRootView: View {
 
+    private enum SidebarSelection: Hashable {
+        case section(AppSection)
+        case account(AccountsView.Segment)
+    }
+
     let workspace: Workspace
     @Binding var selectedWorkspaceID: String
     let initialSectionOverride: AppSection?
@@ -169,11 +174,15 @@ struct AppRootView: View {
     }
 
     @AppStorage(AppShortcutNavigationStore.pendingSectionKey) private var pendingShortcutSectionRaw: String = ""
+    @AppStorage(AppShortcutNavigationStore.pendingAccountsSegmentKey) private var pendingAccountsSegmentRaw: String = ""
+    @AppStorage(AppShortcutNavigationStore.pendingActionKey) private var pendingShortcutActionRaw: String = ""
 
     @SceneStorage("AppRootView.selectedSection")
     private var persistedSelectedSectionRaw: String = AppSection.home.rawValue
 
     @State private var selectedSectionRaw: String = AppSection.home.rawValue
+    @State private var selectedAccountsDestination: AccountsView.Segment? = nil
+    @State private var queuedAccountsDestination: AccountsView.Segment? = nil
 
     @State private var homePath = NavigationPath()
     @State private var budgetsPath = NavigationPath()
@@ -240,12 +249,28 @@ struct AppRootView: View {
         )
     }
 
-    private var selectedSectionForSidebar: Binding<AppSection?> {
+    private var selectedSectionForSidebar: Binding<SidebarSelection?> {
         Binding(
-            get: { selectedSection },
+            get: {
+                if selectedSection == .cards, let selectedAccountsDestination {
+                    return .account(selectedAccountsDestination)
+                }
+                return .section(selectedSection)
+            },
             set: { newValue in
                 guard let newValue else { return }
-                selectedSectionRaw = newValue.rawValue
+                switch newValue {
+                case .section(let section):
+                    if section == .cards {
+                        cardsPath = NavigationPath()
+                        selectedAccountsDestination = nil
+                    }
+                    selectedSectionRaw = section.rawValue
+                case .account(let destination):
+                    cardsPath = NavigationPath()
+                    selectedAccountsDestination = destination
+                    selectedSectionRaw = AppSection.cards.rawValue
+                }
             }
         )
     }
@@ -264,6 +289,10 @@ struct AppRootView: View {
             guard didApplyInitialSection == false else { return }
             didApplyInitialSection = true
             let resolvedSection = resolveInitialSection()
+            if resolvedSection == .cards,
+               (!pendingShortcutSectionRaw.isEmpty || !pendingAccountsSegmentRaw.isEmpty || AccountsView.Segment(pendingActionRaw: pendingShortcutActionRaw) != nil) {
+                applyPendingAccountsDestination()
+            }
             selectedSectionRaw = resolvedSection.rawValue
             persistedSelectedSectionRaw = resolvedSection.rawValue
             preparePhoneSection(resolvedSection, preferImmediateMount: true)
@@ -295,6 +324,15 @@ struct AppRootView: View {
         }
         .onChange(of: pendingShortcutSectionRaw) { _, _ in
             consumePendingShortcutSectionIfNeeded()
+        }
+        .onChange(of: pendingAccountsSegmentRaw) { _, _ in
+            consumePendingAccountsDestinationIfNeeded()
+        }
+        .onChange(of: pendingShortcutActionRaw) { _, action in
+            guard selectedSection == .cards,
+                  let destination = AccountsView.Segment(pendingActionRaw: action) else { return }
+            cardsPath = NavigationPath()
+            selectedAccountsDestination = destination
         }
         .onReceive(commandHub.$sequence) { _ in
             handleCommand(commandHub.latestCommandID)
@@ -392,7 +430,7 @@ struct AppRootView: View {
 
             NavigationStack(path: $cardsPath) {
                 phoneSectionContent(.cards) {
-                    AccountsView(workspace: workspace)
+                    AccountsView(workspace: workspace, selectedDestination: $selectedAccountsDestination)
                 }
             }
             .tabItem { Label(AppSection.cards.title, systemImage: AppSection.cards.systemImage) }
@@ -420,7 +458,17 @@ struct AppRootView: View {
             List(selection: selectedSectionForSidebar) {
                 ForEach(AppSection.allCases) { section in
                     Label(section.title, systemImage: section.systemImage)
-                        .tag(section)
+                        .tag(SidebarSelection.section(section))
+
+                    if section == .cards {
+                        ForEach(AccountsView.Segment.allCases) { destination in
+                            Label(destination.title, systemImage: destination.symbolName)
+                                .font(.subheadline)
+                                .padding(.leading, 18)
+                                .tag(SidebarSelection.account(destination))
+                                .accessibilityIdentifier("accounts.sidebar.\(destination.rawValue)")
+                        }
+                    }
                 }
 
                 Section(
@@ -662,6 +710,9 @@ struct AppRootView: View {
         guard !pending.isEmpty else { return }
 
         if let section = AppSection.fromStorageRaw(pending) {
+            if section == .cards {
+                applyPendingAccountsDestination()
+            }
             selectedSectionRaw = section.rawValue
             preparePhoneSection(section)
             preparePhoneSectionActivation(section)
@@ -669,6 +720,30 @@ struct AppRootView: View {
         }
 
         clearPendingShortcutSection()
+    }
+
+    /// Segment requests can arrive just before their section request. Keep that
+    /// destination queued until the section is consumed, even after clearing the store key.
+    private func consumePendingAccountsDestinationIfNeeded() {
+        let raw = pendingAccountsSegmentRaw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !raw.isEmpty else { return }
+        if let destination = AccountsView.Segment(pendingSegmentRaw: raw) {
+            queuedAccountsDestination = destination
+            selectedAccountsDestination = destination
+            cardsPath = NavigationPath()
+        }
+        pendingAccountsSegmentRaw = ""
+    }
+
+    private func applyPendingAccountsDestination() {
+        selectedAccountsDestination = AccountsNavigationResolver.destination(
+            pendingSegmentRaw: pendingAccountsSegmentRaw,
+            queuedDestination: queuedAccountsDestination,
+            pendingActionRaw: pendingShortcutActionRaw
+        )
+        queuedAccountsDestination = nil
+        pendingAccountsSegmentRaw = ""
+        cardsPath = NavigationPath()
     }
 
     private func clearPendingShortcutSection() {
@@ -697,7 +772,7 @@ struct AppRootView: View {
         case .income:
             IncomeWorkspaceView(workspace: workspace)
         case .cards:
-            AccountsView(workspace: workspace)
+            AccountsView(workspace: workspace, selectedDestination: $selectedAccountsDestination)
         case .settings:
             SettingsView(workspace: workspace, selectedWorkspaceID: $selectedWorkspaceID)
         }

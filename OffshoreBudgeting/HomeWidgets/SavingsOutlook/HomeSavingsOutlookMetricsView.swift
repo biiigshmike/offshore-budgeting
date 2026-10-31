@@ -44,6 +44,7 @@ struct HomeSavingsOutlookMetricsView: View {
     let initialPeriod: Period
 
     @State private var selectedPeriod: Period
+    @State private var showingCalculationHelp: Bool = false
 
     init(
         workspace: Workspace,
@@ -83,6 +84,14 @@ struct HomeSavingsOutlookMetricsView: View {
                     actualTotal: actualTotal,
                     progressLine: progressInfo.lineText
                 )
+
+                Text("Actual Savings still allows for planned expenses whose actual amount has not been recorded. Offshore Savings is the separate running balance available for future expenses.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+
+                Button("How is this calculated?", systemImage: "info.circle") {
+                    showingCalculationHelp = true
+                }
 
                 periodPicker
 
@@ -130,6 +139,20 @@ struct HomeSavingsOutlookMetricsView: View {
                 }
                 .accessibilityElement(children: .combine)
             }
+        }
+        .appSheet(isPresented: $showingCalculationHelp) {
+            FinancialCalculationHelpView(
+                sections: SavingsCalculationExplanation.outlook(
+                    incomes: incomes,
+                    plannedExpenses: plannedExpenses,
+                    variableExpenses: variableExpenses,
+                    savingsEntries: savingsEntries,
+                    startDate: resolved.start,
+                    endDate: resolved.end
+                ),
+                dateRange: "\(formattedDate(resolved.start)) – \(formattedDate(resolved.end))",
+                helpTopicID: "accounts-savings-account"
+            )
         }
     }
 

@@ -31,10 +31,18 @@ struct CategoryLimitFormView: View {
     var body: some View {
         Form {
             Section {
+                HStack(spacing: 8) {
+                    Circle()
+                        .fill(tint)
+                        .frame(width: 12, height: 12)
+                        .accessibilityHidden(true)
+                    Text(categoryName)
+                        .font(.headline)
+                }
                 summaryGaugeCard
             }
 
-            Section("Set Spending Limits") {
+            Section {
                 TextField("Minimum", text: $minText)
                     .keyboardType(.decimalPad)
 
@@ -46,6 +54,10 @@ struct CategoryLimitFormView: View {
                         .font(.footnote)
                         .foregroundStyle(.red)
                 }
+            } header: {
+                Text("Category Goals")
+            } footer: {
+                Text("Goals apply only to this budget. Leave either amount blank if you don't want that goal.")
             }
         }
     }
@@ -58,7 +70,7 @@ struct CategoryLimitFormView: View {
                 .font(.headline.weight(.semibold))
 
             if let gaugeMax, gaugeMax > gaugeMin {
-                Gauge(value: min(totalAmount, gaugeMax), in: gaugeMin...gaugeMax) {
+                Gauge(value: min(max(totalAmount, gaugeMin), gaugeMax), in: gaugeMin...gaugeMax) {
                     EmptyView()
                 } currentValueLabel: {
                     Text(totalAmount, format: CurrencyFormatter.currencyStyle())

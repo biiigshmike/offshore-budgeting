@@ -15,6 +15,7 @@ struct EditExpenseView: View {
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
+    @State private var didSeedFields = false
 
     @Query private var cards: [Card]
     @Query private var categories: [Category]
@@ -35,6 +36,7 @@ struct EditExpenseView: View {
     @State private var offsetAmountText: String = ""
     @State private var applySavingsOffset: Bool = false
     @State private var savingsOffsetAmountText: String = ""
+    @State private var areOptionalActionsValid = true
     @State private var sharedBalanceWasEdited: Bool = false
 
     // MARK: - Alerts
@@ -62,7 +64,7 @@ struct EditExpenseView: View {
 
         _allocationAccounts = Query(
             filter: #Predicate<AllocationAccount> {
-                $0.workspace?.id == workspaceID && $0.isArchived == false
+                $0.workspace?.id == workspaceID
             },
             sort: [SortDescriptor(\AllocationAccount.name, order: .forward)]
         )
@@ -74,7 +76,7 @@ struct EditExpenseView: View {
     }
 
     private var canSave: Bool {
-        ExpenseFormView.canSave(
+        areOptionalActionsValid && ExpenseFormView.canSave(
             descriptionText: descriptionText,
             amountText: amountText,
             selectedCardID: selectedCardID,
@@ -92,12 +94,20 @@ struct EditExpenseView: View {
         CategoryArchivePolicy.selectableCategories(from: categories, selectedCategoryID: selectedCategoryID)
     }
 
+    private var selectableAllocationAccounts: [AllocationAccount] {
+        AllocationAccountSelectionPolicy.selectableAccounts(
+            from: allocationAccounts,
+            workspaceID: workspace.id,
+            linkedAccountIDs: Set([expense.allocation?.account?.id, expense.offsetSettlement?.account?.id].compactMap { $0 })
+        )
+    }
+
     var body: some View {
         ExpenseFormView(
             workspace: workspace,
             cards: cards,
             categories: selectableCategories,
-            allocationAccounts: allocationAccounts,
+            allocationAccounts: selectableAllocationAccounts,
             descriptionText: $descriptionText,
             amountText: $amountText,
             transactionDate: $transactionDate,
@@ -113,7 +123,8 @@ struct EditExpenseView: View {
             availableSavingsBalance: availableSavingsBalance,
             onSharedBalanceChanged: {
                 sharedBalanceWasEdited = true
-            }
+            },
+            onOptionalActionsValidationChanged: { areOptionalActionsValid = $0 }
         )
         .navigationTitle("Edit Expense")
         .toolbar {
@@ -162,12 +173,14 @@ struct EditExpenseView: View {
             Text("Offset amount must be 0 or greater and cannot exceed the expense amount.")
         }
         .blocksAutomaticExpenseReview(while: showingInvalidSavingsOffsetAlert)
-        .alert("Invalid Savings Offset", isPresented: $showingInvalidSavingsOffsetAlert) {
+        .alert("Invalid Savings Amount", isPresented: $showingInvalidSavingsOffsetAlert) {
             Button("OK", role: .cancel) { }
         } message: {
-            Text("Savings offset must be 0 or greater and cannot exceed the expense amount.")
+            Text("The amount paid from savings must be 0 or greater and cannot exceed the expense amount.")
         }
         .onAppear {
+            guard !didSeedFields else { return }
+            didSeedFields = true
             // Seed fields once.
             descriptionText = expense.descriptionText
             let existingOffset = max(0, -(expense.offsetSettlement?.amount ?? 0))

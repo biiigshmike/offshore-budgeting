@@ -43,6 +43,9 @@ struct OffshoreBudgetingApp: App {
 
     @State private var modelContainer: ModelContainer = {
         #if DEBUG
+        if Self.isUnitTestHost {
+            return Self.makeModelContainer(useICloud: false, inMemoryOnly: true)
+        }
         UITestSupport.applyResetIfNeeded()
         #endif
 
@@ -84,34 +87,38 @@ struct OffshoreBudgetingApp: App {
 
     var body: some Scene {
         WindowGroup(for: AppWindowContext.self) { windowContext in
-            WindowSceneRootView(
-                modelContainer: $modelContainer,
-                postBoardingTipsStore: postBoardingTipsStore,
-                initialSectionOverride: initialSection(from: windowContext.wrappedValue)
-            )
-                .id(rootResetToken)
-                .onAppear {
-                    consumePendingWidgetActionIfNeeded()
-                    refreshShoppingModeForForeground(reason: "sceneOnAppear")
-                }
-                .task {
-                    #if DEBUG
-                    if Self.isScreenshotModeEnabled {
-                        DebugSeeder.runIfNeeded(
-                            container: modelContainer,
-                            forceReset: Self.isSeedResetRequested
-                        )
+            if Self.isUnitTestHost {
+                Color.clear
+            } else {
+                WindowSceneRootView(
+                    modelContainer: $modelContainer,
+                    postBoardingTipsStore: postBoardingTipsStore,
+                    initialSectionOverride: initialSection(from: windowContext.wrappedValue)
+                )
+                    .id(rootResetToken)
+                    .onAppear {
+                        consumePendingWidgetActionIfNeeded()
+                        refreshShoppingModeForForeground(reason: "sceneOnAppear")
                     }
-                    #endif
-                }
-                .onChange(of: scenePhase) { _, newValue in
-                    guard newValue == .active else { return }
-                    consumePendingWidgetActionIfNeeded()
-                    refreshShoppingModeForForeground(reason: "sceneBecameActive")
-                }
-                .onOpenURL { url in
-                    _ = OffshoreDeepLinkHandler.handle(url)
-                }
+                    .task {
+                        #if DEBUG
+                        if Self.isScreenshotModeEnabled {
+                            DebugSeeder.runIfNeeded(
+                                container: modelContainer,
+                                forceReset: Self.isSeedResetRequested
+                            )
+                        }
+                        #endif
+                    }
+                    .onChange(of: scenePhase) { _, newValue in
+                        guard newValue == .active else { return }
+                        consumePendingWidgetActionIfNeeded()
+                        refreshShoppingModeForForeground(reason: "sceneBecameActive")
+                    }
+                    .onOpenURL { url in
+                        _ = OffshoreDeepLinkHandler.handle(url)
+                    }
+            }
         }
         .modelContainer(modelContainer)
         .commands {
@@ -210,9 +217,18 @@ struct OffshoreBudgetingApp: App {
 
     // MARK: - Container Factory
 
+    /// Opt-in isolation for a hosted unit-test run. Never opens Local or iCloud data.
+    private static var isUnitTestHost: Bool {
+        #if DEBUG
+        ProcessInfo.processInfo.environment["OFFSHORE_UNIT_TEST_HOST"] == "1"
+        #else
+        false
+        #endif
+    }
+
     private static let cloudKitContainerIdentifier: String = "iCloud.com.mb.offshore-budgeting"
 
-    static func makeModelContainer(useICloud: Bool, debugStoreOverride: String? = nil) -> ModelContainer {
+    static func makeModelContainer(useICloud: Bool, debugStoreOverride: String? = nil, inMemoryOnly: Bool = false) -> ModelContainer {
         do {
             let schema = Schema([
                 Workspace.self,
@@ -236,6 +252,18 @@ struct OffshoreBudgetingApp: App {
                 IncomeSeries.self,
                 Income.self
             ])
+
+            #if DEBUG
+            if inMemoryOnly {
+                let configuration = ModelConfiguration(
+                    "UnitTests",
+                    schema: schema,
+                    isStoredInMemoryOnly: true,
+                    cloudKitDatabase: .none
+                )
+                return try ModelContainer(for: schema, configurations: [configuration])
+            }
+            #endif
 
             let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
             try FileManager.default.createDirectory(at: appSupport, withIntermediateDirectories: true)

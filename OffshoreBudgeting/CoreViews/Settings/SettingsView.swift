@@ -81,6 +81,8 @@ struct SettingsView: View {
                     EmptyView()
                 }
             }
+
+            SettingsSupportFeedbackSection()
         }
         .navigationTitle(String(localized: "app.section.settings", defaultValue: "Settings", comment: "Main tab title for the Settings section."))
         .toolbar {

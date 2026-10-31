@@ -31,6 +31,7 @@ struct EditPlannedExpenseView: View {
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
+    @State private var didSeedFields = false
 
     @Query private var cards: [Card]
     @Query private var categories: [Category]
@@ -47,6 +48,7 @@ struct EditPlannedExpenseView: View {
     @State private var selectedCategoryID: UUID? = nil
 
     @State private var draftSharedBalanceMode: SharedBalanceMode? = nil
+    @State private var wantsReconciliation = false
     @State private var selectedAllocationAccountID: UUID? = nil
     @State private var allocationAmountText: String = ""
     @State private var selectedOffsetAccountID: UUID? = nil
@@ -81,7 +83,7 @@ struct EditPlannedExpenseView: View {
 
         _allocationAccounts = Query(
             filter: #Predicate<AllocationAccount> {
-                $0.workspace?.id == workspaceID && $0.isArchived == false
+                $0.workspace?.id == workspaceID
             },
             sort: [SortDescriptor(\AllocationAccount.name, order: .forward)]
         )
@@ -127,6 +129,14 @@ struct EditPlannedExpenseView: View {
         CategoryArchivePolicy.selectableCategories(from: categories, selectedCategoryID: selectedCategoryID)
     }
 
+    private var selectableAllocationAccounts: [AllocationAccount] {
+        AllocationAccountSelectionPolicy.selectableAccounts(
+            from: allocationAccounts,
+            workspaceID: workspace.id,
+            linkedAccountIDs: Set([plannedExpense.allocation?.account?.id, plannedExpense.offsetSettlement?.account?.id].compactMap { $0 })
+        )
+    }
+
     private var canSave: Bool {
         let trimmedTitle = PresetFormView.trimmedTitle(title)
         guard !trimmedTitle.isEmpty else { return false }
@@ -148,17 +158,8 @@ struct EditPlannedExpenseView: View {
 
             guard selectedAccountID != nil else { return false }
 
-            let trimmedSharedAmount = rawAmountText.trimmingCharacters(in: .whitespacesAndNewlines)
-            if !trimmedSharedAmount.isEmpty {
-                guard let parsedSharedAmount = CurrencyFormatter.parseAmount(trimmedSharedAmount), parsedSharedAmount >= 0 else {
-                    return false
-                }
-
-                guard parsedSharedAmount <= plannedAmount else {
-                    return false
-                }
-
-            }
+            guard let parsedSharedAmount = CurrencyFormatter.parseAmount(rawAmountText),
+                  parsedSharedAmount > 0, parsedSharedAmount <= plannedAmount else { return false }
         }
 
         if applySavingsOffset {
@@ -166,17 +167,8 @@ struct EditPlannedExpenseView: View {
                 return false
             }
 
-            let trimmedSavings = savingsOffsetAmountText.trimmingCharacters(in: .whitespacesAndNewlines)
-            if !trimmedSavings.isEmpty {
-                guard let parsed = CurrencyFormatter.parseAmount(trimmedSavings), parsed >= 0 else {
-                    return false
-                }
-
-                guard parsed <= plannedAmount else {
-                    return false
-                }
-
-            }
+            guard let parsed = CurrencyFormatter.parseAmount(savingsOffsetAmountText),
+                  parsed > 0, parsed <= plannedAmount else { return false }
         }
 
         guard selectedCardID != nil else { return false }
@@ -194,6 +186,10 @@ struct EditPlannedExpenseView: View {
                 TextField("Actual Amount (optional)", text: $actualAmountText)
                     .keyboardType(.decimalPad)
 
+                Text(ExpenseEntryGuidance.plannedActualExplanation)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+
                 HStack {
                     Text("Date")
                     Spacer()
@@ -202,20 +198,14 @@ struct EditPlannedExpenseView: View {
             }
 
             Section("Card") {
-                Picker("Card", selection: $selectedCardID) {
-                    Text("Select").tag(UUID?.none)
-                    ForEach(cards) { card in
-                        Text(card.name).tag(UUID?.some(card.id))
-                    }
+                EntityMenuPicker(title: "Card", items: cards, selection: $selectedCardID, allowsEmptySelection: false) { card in
+                    CardMenuLabel(card: card)
                 }
             }
 
             Section("Category") {
-                Picker("Category", selection: $selectedCategoryID) {
-                    Text("None").tag(UUID?.none)
-                    ForEach(selectableCategories) { category in
-                        Text(category.name).tag(UUID?.some(category.id))
-                    }
+                EntityMenuPicker(title: "Category", items: selectableCategories, selection: $selectedCategoryID) { category in
+                    CategoryMenuLabel(category: category)
                 }
             }
 
@@ -272,12 +262,14 @@ struct EditPlannedExpenseView: View {
             Text("Offset amount must be 0 or greater and cannot exceed the planned amount.")
         }
         .blocksAutomaticExpenseReview(while: showingInvalidSavingsOffsetAmountAlert)
-        .alert("Invalid Savings Offset Amount", isPresented: $showingInvalidSavingsOffsetAmountAlert) {
+        .alert("Invalid Savings Amount", isPresented: $showingInvalidSavingsOffsetAmountAlert) {
             Button("OK", role: .cancel) { }
         } message: {
-            Text("Savings offset amount must be 0 or greater and cannot exceed the planned amount.")
+            Text("The amount paid from savings must be 0 or greater and cannot exceed the planned amount.")
         }
         .onAppear {
+            guard !didSeedFields else { return }
+            didSeedFields = true
             title = plannedExpense.title
             plannedAmountText = CurrencyFormatter.editingString(from: plannedExpense.plannedAmount)
             let grossRecordedActual = SavingsMathService.grossRecordedActualAmount(for: plannedExpense)
@@ -378,86 +370,145 @@ struct EditPlannedExpenseView: View {
         }
     }
 
-    private var sharedBalanceSection: some View {
-        Section("Reconciliation") {
-            Picker("Action", selection: sharedBalanceModeBinding) {
-                Text("None").tag(SharedBalanceMode?.none)
-                ForEach(SharedBalanceMode.allCases) { mode in
-                    Text(mode.title).tag(Optional(mode))
+    private var reconciliationEnabled: Binding<Bool> {
+        Binding(
+            get: { wantsReconciliation || activeSharedBalanceMode != nil || isLegacyDualConfiguration },
+            set: { isEnabled in
+                guard !isEnabled || !applySavingsOffset else { return }
+                wantsReconciliation = isEnabled
+                if !isEnabled {
+                    sharedBalanceModeBinding.wrappedValue = nil
+                } else if activeSharedBalanceMode == nil && !isLegacyDualConfiguration {
+                    sharedBalanceModeBinding.wrappedValue = .split
                 }
+            }
+        )
+    }
+
+    private var sharedBalanceSection: some View {
+        Section {
+            Picker("Reconciliation", selection: reconciliationEnabled) {
+                Text("None").tag(false)
+                Text("Choose").tag(true)
             }
             .pickerStyle(.segmented)
+            .disabled(applySavingsOffset && !reconciliationEnabled.wrappedValue)
 
-            if isLegacyDualConfiguration {
-                Text("Legacy setup detected. Choose Split or Offset to keep one action type.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            }
-
-            if let mode = activeSharedBalanceMode {
-                Picker("Reconciliation", selection: accountBinding(for: mode)) {
-                    Text("None").tag(UUID?.none)
-                    ForEach(allocationAccounts) { account in
-                        Text(account.name).tag(UUID?.some(account.id))
+            if reconciliationEnabled.wrappedValue {
+                Group {
+                    if let mode = activeSharedBalanceMode {
+                        Picker("Reconciliation Account", selection: accountBinding(for: mode)) {
+                            Text("Choose a Reconciliation").tag(UUID?.none)
+                            ForEach(selectableAllocationAccounts) { account in
+                                Text(account.name).tag(UUID?.some(account.id))
+                            }
+                        }
+                        .pickerStyle(.menu)
                     }
-                }
 
-                TextField("Amount", text: amountBinding(for: mode))
-                    .keyboardType(.decimalPad)
+                    Picker("Reconciliation Action", selection: sharedBalanceModeBinding) {
+                        if isLegacyDualConfiguration {
+                            Text("Choose Action").tag(SharedBalanceMode?.none)
+                        }
+                        ForEach(SharedBalanceMode.allCases) { mode in
+                            Text(mode.title).tag(Optional(mode))
+                        }
+                    }
+                    .pickerStyle(.segmented)
 
-                if let account = selectedAccount(for: mode) {
-                    HStack {
-                        Text("Available Balance")
+                    if isLegacyDualConfiguration {
+                        Text("Legacy setup detected. Choose Split or Offset to keep one action type.")
+                            .font(.footnote)
                             .foregroundStyle(.secondary)
-                        Spacer()
-                        Text(
-                            CurrencyFormatter.normalizedCurrencyDisplayValue(AllocationLedgerService.balance(for: account)),
-                            format: CurrencyFormatter.currencyStyle()
-                        )
-                            .fontWeight(.semibold)
+                    }
+
+                    if let mode = activeSharedBalanceMode {
+                        TextField("Amount", text: amountBinding(for: mode))
+                            .keyboardType(.decimalPad)
+
+                        if let account = selectedAccount(for: mode) {
+                            HStack {
+                                Text("Available Balance")
+                                    .foregroundStyle(.secondary)
+                                Spacer()
+                                Text(
+                                    CurrencyFormatter.normalizedCurrencyDisplayValue(AllocationLedgerService.balance(for: account)),
+                                    format: CurrencyFormatter.currencyStyle()
+                                )
+                                    .fontWeight(.semibold)
+                            }
+                        }
+                    }
+
+                    if let validationMessage = sharedBalanceValidationMessage {
+                        Text(validationMessage)
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    if hasAllocationConfigured || hasOffsetConfigured || isLegacyDualConfiguration {
+                        Button("Clear Reconciliation Action", role: .destructive) {
+                            clearSharedBalanceAction()
+                        }
                     }
                 }
+                .disabled(applySavingsOffset)
             }
-
-            if let validationMessage = sharedBalanceValidationMessage {
-                Text(validationMessage)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            }
-
-            if hasAllocationConfigured || hasOffsetConfigured || isLegacyDualConfiguration {
-                Button("Clear Reconciliation Action", role: .destructive) {
-                    clearSharedBalanceAction()
+        } header: {
+            Text("Reconciliation")
+        } footer: {
+            VStack(alignment: .leading, spacing: 4) {
+                switch activeSharedBalanceMode {
+                case .split:
+                    Text(ExpenseEntryGuidance.splitExplanation)
+                case .offset:
+                    Text(ExpenseEntryGuidance.offsetExplanation)
+                case nil:
+                    Text(ExpenseEntryGuidance.reconciliationOverview)
                 }
+                HelpTopicLink(topicID: "accounts-reconciliations", title: "Reconciliation guide")
             }
         }
-        .disabled(applySavingsOffset)
     }
 
     private var savingsOffsetSection: some View {
         Section {
-            Toggle("Pay From Savings", isOn: $applySavingsOffset)
+            Group {
+                Picker("Pay From Savings", selection: $applySavingsOffset) {
+                    Text("Off").tag(false)
+                    Text("Use Savings").tag(true)
+                }
+                .pickerStyle(.segmented)
+                .disabled(reconciliationEnabled.wrappedValue && !applySavingsOffset)
 
-            if applySavingsOffset {
-                TextField("Savings Amount", text: $savingsOffsetAmountText)
-                    .keyboardType(.decimalPad)
+                if applySavingsOffset {
+                    LabeledContent {
+                        TextField("Savings Amount", text: $savingsOffsetAmountText)
+                            .keyboardType(.decimalPad)
+                            .multilineTextAlignment(.trailing)
+                    } label: {
+                        Label("Savings Amount", systemImage: "checkmark.square.fill")
+                    }
+                    .disabled(reconciliationEnabled.wrappedValue)
 
-                HStack {
-                    Text("Available Savings")
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                    Text(normalizedAvailableSavingsBalance, format: CurrencyFormatter.currencyStyle())
-                        .fontWeight(.semibold)
+                    HStack {
+                        Text("Available Savings")
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        Text(normalizedAvailableSavingsBalance, format: CurrencyFormatter.currencyStyle())
+                            .fontWeight(.semibold)
+                    }
                 }
             }
         } header: {
-            Text("Savings Offset")
+            Text("Pay From Savings")
         } footer: {
-            if activeSharedBalanceMode != nil {
-                Text("Clear Reconciliation actions to use Savings Offset.")
+            Text(ExpenseEntryGuidance.payFromSavingsExplanation)
+            if reconciliationEnabled.wrappedValue {
+                Text("Clear Reconciliation actions to use Pay From Savings.")
             }
+            HelpTopicLink(topicID: "accounts-savings-account", title: "Savings guide")
         }
-        .disabled(activeSharedBalanceMode != nil)
     }
 
     private var normalizedAvailableSavingsBalance: Double {
@@ -513,7 +564,7 @@ struct EditPlannedExpenseView: View {
         }
 
         let trimmedAmount = rawAmountText.trimmingCharacters(in: .whitespacesAndNewlines)
-        if trimmedAmount.isEmpty { return nil }
+        if trimmedAmount.isEmpty { return "Enter an amount." }
 
         guard let parsedAmount = CurrencyFormatter.parseAmount(trimmedAmount) else {
             return "Enter a valid amount."
@@ -582,6 +633,7 @@ struct EditPlannedExpenseView: View {
     }
 
     private func clearSharedBalanceAction() {
+        wantsReconciliation = false
         draftSharedBalanceMode = nil
         selectedAllocationAccountID = nil
         allocationAmountText = ""

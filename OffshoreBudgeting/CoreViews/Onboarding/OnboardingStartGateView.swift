@@ -103,15 +103,15 @@ struct OnboardingStartGateView: View {
         List {
             Section {
                 ContentUnavailableView(
-                    "Choose Data Source",
+                    "Where should Offshore save your data?",
                     systemImage: "externaldrive",
-                    description: Text("Pick where your data is stored. You can switch later from Manage Workspaces.")
+                    description: Text("Keep your data on this device, or sync it with iCloud. You can switch later from Manage Workspaces.")
                 )
                 .frame(maxWidth: .infinity, alignment: .center)
                 .listRowBackground(Color.clear)
             }
 
-            Section("Data Source") {
+            Section("Storage") {
                 Button {
                     onChooseDataSource(false)
                 } label: {

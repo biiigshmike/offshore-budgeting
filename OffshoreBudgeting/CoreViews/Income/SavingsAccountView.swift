@@ -115,6 +115,7 @@ struct SavingsAccountView<TrailingToolbar: ToolbarContent>: View {
     @State private var isApplyingQuickRange: Bool = false
 
     @State private var showingEntrySheet: Bool = false
+    @State private var showingCalculationHelp: Bool = false
     @State private var editingEntry: SavingsLedgerEntry? = nil
 
     @State private var showingDeleteConfirm: Bool = false
@@ -354,9 +355,19 @@ struct SavingsAccountView<TrailingToolbar: ToolbarContent>: View {
                         .foregroundStyle(runningTotal >= 0 ? .green : .red)
                 }
 
-                Text("Offshore Savings tracks money left over at the end of each budgeting period. Your running total includes all dates in your savings ledger.")
+                Text("Offshore Savings tracks money left over from completed default budgeting periods that remains available for future expenses. Your running total includes all dates in your savings ledger.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
+
+                Text("Use Pay From Savings to cover part or all of an expense from this balance. The full transaction stays in your card history; only the remaining amount affects the current period’s budget.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+
+                Button("How is this calculated?", systemImage: "info.circle") {
+                    showingCalculationHelp = true
+                }
+
+                HelpTopicLink(topicID: "accounts-savings-account", title: "Savings guide")
 
                 Button {
                     runManualSync()
@@ -501,6 +512,12 @@ struct SavingsAccountView<TrailingToolbar: ToolbarContent>: View {
                     }
                 )
             }
+        }
+        .appSheet(isPresented: $showingCalculationHelp) {
+            FinancialCalculationHelpView(
+                sections: SavingsCalculationExplanation.runningTotal(entries: accountScopedEntries),
+                helpTopicID: "accounts-savings-account"
+            )
         }
     }
 
@@ -936,9 +953,11 @@ private struct SavingsLedgerEntryFormView: View {
                         normalizeAmountTextForTransfer()
                     }
 
-                Text("Record money you've set aside by subtracting this amount from Offshore Savings. The remaining balance is available for future spending. This does not transfer money between bank accounts.")
+                Text("Record money you have moved into savings and no longer want available for future expenses. This subtracts it from Offshore Savings and reduces Actual Savings for this entry’s date. Offshore records the change; it does not transfer money between bank accounts.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
+
+                HelpTopicLink(topicID: "accounts-savings-account", title: "Savings guide")
 
                 HStack {
                     Text("Type")
