@@ -64,7 +64,6 @@
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "4CAD3C3B2F28AF7C001E3F5B"
             BuildableName = "OffshoreBudgetingWidgetsExtension.appex"
-            BlueprintName = "OffshoreBudgetingWidgetsExtension"
             ReferencedContainer = "container:OffshoreBudgeting.xcodeproj">
          </BuildableReference>
       </RemoteRunnable>

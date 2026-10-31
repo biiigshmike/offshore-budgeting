@@ -82,6 +82,11 @@ struct SettingsReleaseLogsView: View {
             build: "22",
             items: [
                 ReleaseItem(
+                    systemImage: "figure.wave",
+                    title: "A Farewell to Marina, For Now",
+                    description: "Marina has been removed in this update as I refocus on what makes Offshore special: private, intentional, manual-first budgeting. While building the experience Marina deserves requires more resources and a growing community, I hope to welcome her back someday."
+                ),
+                ReleaseItem(
                     systemImage: "widget.extralarge",
                     title: "Layout Adjustments for Extra Large Income and Next Planned Expense Widgets",
                     description: "Fixed truncation of text in the Extra Large Income and Next Planned Expense widgets. This update also delivers a more effective way of keeping all of the iOS and macOS widgets up-to-date without the app needing to be opened."
