@@ -19,6 +19,121 @@ struct BudgetFormView: View {
     
     let scheduleString: (Preset) -> String
     
+    // MARK: - Multiple-selection menus
+
+    private var cardsMenu: some View {
+        Menu {
+            Button(selectedCardIDs.count == cards.count ? "Clear All" : "Select All", action: onToggleAllCards)
+                .menuActionDismissBehavior(.disabled)
+            Divider()
+            ForEach(cards) { card in
+                Toggle(isOn: bindingForCard(card)) {
+                    Label {
+                        Text(card.name)
+                    } icon: {
+                        if let image = EntityMenuImageCache.card(
+                            themeRaw: card.theme,
+                            effectRaw: card.effect,
+                            colorScheme: colorScheme,
+                            scale: displayScale
+                        ) {
+                            Image(uiImage: image).renderingMode(.original)
+                        } else {
+                            Image(systemName: "creditcard")
+                        }
+                    }
+                }
+                .menuActionDismissBehavior(.disabled)
+            }
+        } label: {
+            selectionMenuLabel("Cards") {
+                if cards.isEmpty {
+                    Text("No cards available")
+                } else if selectedCardIDs.count == 1,
+                          let card = cards.first(where: { selectedCardIDs.contains($0.id) }) {
+                    CardMenuLabel(card: card)
+                } else if selectedCardIDs.isEmpty {
+                    Text("None selected")
+                } else {
+                    Text("\(selectedCardIDs.count) selected")
+                }
+            }
+        }
+        .buttonStyle(.borderless)
+        .menuIndicator(.hidden)
+        .menuActionDismissBehavior(.disabled)
+        .disabled(cards.isEmpty)
+        .accessibilityIdentifier("budget.cards")
+    }
+
+    private var presetsMenu: some View {
+        Menu {
+            Button(selectedPresetIDs.count == presets.count ? "Clear All" : "Select All", action: onToggleAllPresets)
+                .menuActionDismissBehavior(.disabled)
+            Divider()
+            ForEach(presets) { preset in
+                Toggle(isOn: bindingForPreset(preset)) {
+                    Text(verbatim: presetMenuTitle(preset))
+                }
+                .menuActionDismissBehavior(.disabled)
+            }
+        } label: {
+            selectionMenuLabel("Presets") {
+                if presets.isEmpty {
+                    Text("No presets available")
+                } else if selectedPresetIDs.count == 1,
+                          let preset = presets.first(where: { selectedPresetIDs.contains($0.id) }) {
+                    Text(preset.title)
+                } else if selectedPresetIDs.isEmpty {
+                    Text("None selected")
+                } else {
+                    Text("\(selectedPresetIDs.count) selected")
+                }
+            }
+        }
+        .buttonStyle(.borderless)
+        .menuIndicator(.hidden)
+        .menuActionDismissBehavior(.disabled)
+        .disabled(presets.isEmpty)
+        .accessibilityIdentifier("budget.presets")
+    }
+
+    private func presetMenuTitle(_ preset: Preset) -> String {
+        let title = preset.isArchived
+            ? "\(preset.title) (\(String(localized: "Archived")))"
+            : preset.title
+        return "\(title) • \(CurrencyFormatter.string(from: preset.plannedAmount)) • \(scheduleString(preset))"
+    }
+
+    private func selectionMenuLabel<Summary: View>(
+        _ title: LocalizedStringKey,
+        @ViewBuilder summary: () -> Summary
+    ) -> some View {
+        let value = HStack(spacing: 8) {
+            summary()
+                .labelStyle(.titleAndIcon)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+            Image(systemName: "chevron.up.chevron.down")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .accessibilityHidden(true)
+        }
+        return ViewThatFits(in: .horizontal) {
+            HStack(spacing: 12) {
+                Text(title).foregroundStyle(.primary).fixedSize(horizontal: true, vertical: false)
+                Spacer(minLength: 0)
+                value
+            }
+            VStack(alignment: .leading, spacing: 8) {
+                Text(title).foregroundStyle(.primary)
+                value
+            }
+        }
+        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+        .contentShape(Rectangle())
+    }
+
     // MARK: - Bindings
     
     @Binding var name: String
@@ -31,6 +146,8 @@ struct BudgetFormView: View {
     @Binding var selectedPresetIDs: Set<UUID>
     @Binding var categoryGoalDrafts: [UUID: CategoryGoalDraft]
     @State private var showingCategoryGoals: Bool = false
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.displayScale) private var displayScale
     
     // MARK: - Actions
     
@@ -43,145 +160,45 @@ struct BudgetFormView: View {
     
     var body: some View {
         Form {
-            
-            Section("Name") {
-                TextField(
-                    "January 2026",
-                    text: $name,
-                    onEditingChanged: { isEditing in
-                        if isEditing {
-                            userEditedName = true
+            Section {
+                LabeledContent("Name") {
+                    TextField(
+                        "January 2026",
+                        text: $name,
+                        onEditingChanged: { isEditing in
+                            if isEditing { userEditedName = true }
                         }
-                    }
-                )
-            }
-            
-            Section("Dates") {
-                HStack(spacing: 12) {
-                    Spacer(minLength: 0)
-                    
+                    )
+                    .multilineTextAlignment(.trailing)
+                    .accessibilityIdentifier("budget.name")
+                }
+
+                LabeledContent("Start Date") {
                     PillDatePickerField(title: "Start Date", date: $startDate)
-                    PillDatePickerField(title: "End Date", date: $endDate)
-                    
-                    Spacer(minLength: 0)
                 }
                 .onChange(of: startDate) { _, newValue in
                     onStartDateChanged(newValue)
                 }
+
+                LabeledContent("End Date") {
+                    PillDatePickerField(title: "End Date", date: $endDate)
+                }
                 .onChange(of: endDate) { _, newValue in
                     onEndDateChanged(newValue)
                 }
-            }
-            
-            Section("Cards to Track") {
-                if #available(iOS 26.0, *) {
-                    Button {
-                        onToggleAllCards()
-                    } label: {
-                        Text(selectedCardIDs.count == cards.count && !cards.isEmpty ? "Clear All" : "Select All")
-                            .frame(maxWidth: .infinity, minHeight: 44, alignment: .center)
-                    }
-                    .listRowSeparator(.hidden)
-                    .glassProminentButtonStyleCompat()
-                    #if targetEnvironment(macCatalyst)
-                    .padding(.vertical, 8)
-                    #endif
-                    .disabled(cards.isEmpty)
-                } else {
-                    Button {
-                        onToggleAllCards()
-                    } label: {
-                        Text(selectedCardIDs.count == cards.count && !cards.isEmpty ? "Clear All" : "Select All")
-                            .frame(maxWidth: .infinity, minHeight: 44, alignment: .center)
-                    }
-                    .listRowSeparator(.hidden)
-                    .buttonStyle(.borderedProminent)
-                    .disabled(cards.isEmpty)
-                }
-                
-                ForEach(cards) { card in
-                    Toggle(isOn: bindingForCard(card)) {
-                        Text(card.name)
-                    }
-                    .tint(Color("AccentColor"))
-                }
-                
-                if cards.isEmpty {
-                    Text("No cards yet. Create a card first.")
-                        .foregroundStyle(.secondary)
-                }
-            }
-            
-            Section {
-                if #available(iOS 26.0, *) {
-                    Button {
-                        onToggleAllPresets()
-                    } label: {
-                        Text(selectedPresetIDs.count == presets.count && !presets.isEmpty ? "Clear All" : "Select All")
-                            .frame(maxWidth: .infinity, minHeight: 44, alignment: .center)
-                    }
-                    .listRowSeparator(.hidden)
-                    .glassProminentButtonStyleCompat()
-                    #if targetEnvironment(macCatalyst)
-                    .padding(.vertical, 8)
-                    #endif
-                    .disabled(presets.isEmpty)
-                } else {
-                    Button {
-                        onToggleAllPresets()
-                    } label: {
-                        Text(selectedPresetIDs.count == presets.count && !presets.isEmpty ? "Clear All" : "Select All")
-                            .frame(maxWidth: .infinity, minHeight: 44, alignment: .center)
-                    }
-                    .listRowSeparator(.hidden)
-                    .buttonStyle(.borderedProminent)
-                    .disabled(presets.isEmpty)
-                }
-                
-                ForEach(presets) { preset in
-                    Toggle(isOn: bindingForPreset(preset)) {
-                            VStack(alignment: .leading, spacing: 4) {
-                                HStack(spacing: 8) {
-                                    Text(preset.title)
 
-                                    if preset.isArchived {
-                                        Text("Archived")
-                                            .font(.caption.weight(.semibold))
-                                            .foregroundStyle(.secondary)
-                                    }
-                                }
-                                
-                                HStack(spacing: 8) {
-                                    Text(preset.plannedAmount, format: CurrencyFormatter.currencyStyle())
-                                    Text("•")
-                                    Text(scheduleString(preset))
-                                }
-                                .font(.footnote)
-                                .foregroundStyle(.secondary)
-                            }
-                        }
-                    .tint(Color("AccentColor"))
-                }
-                
-                if presets.isEmpty {
-                    Text("No presets yet. You can add them later.")
-                        .foregroundStyle(.secondary)
-                }
-            } header: {
-                Text("Presets")
-            } footer: {
-                Text("Choose which presets to include. Offshore creates their planned expenses within this budget’s dates.")
-            }
+                cardsMenu
+                presetsMenu
 
-            Section {
                 Button {
                     showingCategoryGoals = true
                 } label: {
                     HStack {
-                        Text("Category Goals")
+                        Text("Category Goals").foregroundStyle(.primary)
                         Spacer()
-                        if categoryGoalDrafts.values.contains(where: \.hasValues) {
-                            Text("Edit").foregroundStyle(.secondary)
+                        let count = categoryGoalDrafts.values.filter(\.hasValues).count
+                        if count > 0 {
+                            Text("\(count) configured").foregroundStyle(.secondary)
                         } else {
                             Text("Optional").foregroundStyle(.secondary)
                         }
@@ -190,8 +207,20 @@ struct BudgetFormView: View {
                             .accessibilityHidden(true)
                     }
                 }
+                .accessibilityIdentifier("budget.categoryGoals")
+            } header: {
+                Text("Budget")
             } footer: {
-                Text("Set optional minimum and maximum spending goals for this budget. You can change them later.")
+                VStack(alignment: .leading, spacing: 8) {
+                    if cards.isEmpty {
+                        Text("No cards yet. Create a card first.")
+                    }
+                    if presets.isEmpty {
+                        Text("No presets yet. You can add them later.")
+                    }
+                    Text("Choose which presets to include. Offshore creates their planned expenses within this budget’s dates.")
+                    Text("Set optional minimum and maximum spending goals for this budget. You can change them later.")
+                }
             }
         }
         .navigationTitle(modeTitle)

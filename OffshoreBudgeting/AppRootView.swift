@@ -433,6 +433,10 @@ struct AppRootView: View {
                     AccountsView(workspace: workspace, selectedDestination: $selectedAccountsDestination)
                 }
             }
+            // Pushed destinations must inherit the same activation context as
+            // the root; placing it only inside the stack leaves them inactive.
+            .environment(\.appTabActivationContext, activationContext(for: .cards))
+            .environment(\.postBoardingTipPresenterIsActive, selectedSection == .cards)
             .tabItem { Label(AppSection.cards.title, systemImage: AppSection.cards.systemImage) }
             .tag(AppSection.cards)
 

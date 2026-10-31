@@ -653,11 +653,15 @@ private struct OnboardingWorkspaceStep: View {
                         }
                     }
                     .pickerStyle(.menu)
-
-                    Toggle("Confirm Before Deleting", isOn: $confirmBeforeDeleting)
-                    .tint(Color("AccentColor"))
                 } header: {
                     Text("Workspace Behaviors")
+                } footer: {
+                    Text("Sets the default date range for Home, account views, and widgets, and the starting dates for new budgets. Monthly, for example, starts with the current month. This period also determines when completed periods are recorded in Offshore Savings. You can choose other date ranges when needed.")
+                }
+
+                Section {
+                    Toggle("Confirm Before Deleting", isOn: $confirmBeforeDeleting)
+                        .tint(Color("AccentColor"))
                 } footer: {
                     Text("You can change these later in Settings.")
                 }

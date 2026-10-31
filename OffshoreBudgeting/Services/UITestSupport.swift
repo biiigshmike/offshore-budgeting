@@ -27,6 +27,7 @@ enum UITestSupport {
         case iCloudEmpty
         case iCloudDelayedWorkspace
         case uncategorizedReview
+        case budgetMenus
     }
 
     static var scenario: Scenario? {
@@ -35,6 +36,7 @@ enum UITestSupport {
         if args.contains("-uiTestScenarioICloudEmpty") { return .iCloudEmpty }
         if args.contains("-uiTestScenarioICloudDelayedWorkspace") { return .iCloudDelayedWorkspace }
         if args.contains("-uiTestScenarioUncategorizedReview") { return .uncategorizedReview }
+        if args.contains("-uiTestScenarioBudgetMenus") { return .budgetMenus }
         return nil
     }
 
@@ -83,6 +85,34 @@ enum UITestSupport {
 
         case .iCloudDelayedWorkspace:
             scheduleDelayedWorkspaceInsert(using: container)
+
+        case .budgetMenus:
+            let workspace = Workspace(name: "Budget Menu Workspace", hexColor: "#3B82F6")
+            let cardA = Card(name: "Ruby Card", theme: "ruby", effect: "plastic", workspace: workspace)
+            let cardB = Card(name: "Ocean Card", theme: "aqua", effect: "plastic", workspace: workspace)
+            let presetA = Preset(title: "Internet", plannedAmount: 60, workspace: workspace, defaultCard: cardA)
+            let presetB = Preset(title: "Rent", plannedAmount: 800, workspace: workspace, defaultCard: cardB)
+            let range = Calendar.current.dateInterval(of: .month, for: .now)!
+            let budget = Budget(name: "Existing Menu Budget", startDate: range.start,
+                endDate: Calendar.current.date(byAdding: .day, value: -1, to: range.end)!, workspace: workspace)
+            context.insert(workspace)
+            context.insert(cardA)
+            context.insert(cardB)
+            context.insert(presetA)
+            context.insert(presetB)
+            context.insert(budget)
+            context.insert(BudgetCardLink(budget: budget, card: cardA))
+            context.insert(BudgetPresetLink(budget: budget, preset: presetA))
+            let defaults = UserDefaults.standard
+            defaults.set(true, forKey: "didCompleteOnboarding")
+            defaults.set(true, forKey: "onboarding_didChooseDataSource")
+            defaults.set(true, forKey: "didSeedDefaultWorkspaces")
+            defaults.set(workspace.id.uuidString, forKey: "selectedWorkspaceID")
+            defaults.set(false, forKey: "privacy_requireBiometrics")
+            defaults.set(false, forKey: "general_reviewUncategorizedExpensesOnOpen")
+            if let release = SettingsReleaseLogsView.currentReleaseSection {
+                defaults.set(release.id, forKey: "releaseLogs_seenReleaseIDs")
+            }
 
         case .uncategorizedReview:
             let workspace = Workspace(name: "Review Workspace", hexColor: "#3B82F6")

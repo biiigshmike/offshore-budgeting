@@ -56,50 +56,31 @@ struct PresetFormView: View {
     var body: some View {
         Form {
             
-            Section("Card") {
+            Section("Details") {
                 if cards.isEmpty {
                     Text("No cards yet. Create a card first to set a default.")
                         .foregroundStyle(.secondary)
                 } else {
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 12) {
-                            ForEach(cards) { card in
-                                CardTile(
-                                    title: card.name,
-                                    themeRaw: card.theme,
-                                    effectRaw: card.effect,
-                                    isSelected: selectedCardID == card.id
-                                ) {
-                                    selectedCardID = card.id
-                                }
-                                .accessibilityLabel(selectedCardID == card.id ? "\(card.name), selected" : "\(card.name)")
-                                .accessibilityHint("Double tap to set as default card.")
-                            }
-                        }
-                        .padding(.vertical, 6)
-                        .padding(.horizontal, 2)
+                    EntityMenuPicker(title: "Default Card", items: cards, selection: $selectedCardID, allowsEmptySelection: false) { card in
+                        CardMenuLabel(card: card)
                     }
-                    
+
                     if selectedCardID == nil {
                         Text("Select a default card to continue.")
+                            .font(.footnote)
                             .foregroundStyle(.secondary)
                     }
                 }
-            }
-            
-            Section("Category") {
+
+                TextField("Expense Name", text: $title)
+                TextField("Planned Amount", text: $plannedAmountText)
+                    .keyboardType(.decimalPad)
+
                 EntityMenuPicker(title: "Default Category", items: categories, selection: $selectedCategoryID) { category in
                     CategoryMenuLabel(category: category)
                 }
             }
-            
-            Section("Details") {
-                TextField("Expense Name", text: $title)
-                
-                TextField("Planned Amount", text: $plannedAmountText)
-                    .keyboardType(.decimalPad)
-            }
-            
+
             Section("Schedule") {
                 
                 Picker("Frequency", selection: $frequency) {
@@ -232,56 +213,5 @@ struct PresetFormView: View {
 
     private func localizedInt(_ value: Int) -> String {
         AppNumberFormat.integer(value)
-    }
-}
-
-// MARK: - Reused tile (uses CardVisualView)
-
-private struct CardTile: View {
-    
-    let title: String
-    let themeRaw: String
-    let effectRaw: String
-    let isSelected: Bool
-    let onTap: () -> Void
-    
-    private let tileWidth: CGFloat = 160
-    
-    var body: some View {
-        Button(action: onTap) {
-            CardVisualView(
-                title: title,
-                theme: themeOption(from: themeRaw),
-                effect: effectOption(from: effectRaw),
-                minHeight: nil,
-                showsShadow: false,
-                titleFont: .headline,
-                titlePadding: 12,
-                titleOpacity: 0.82
-            )
-            .frame(width: tileWidth)
-            .overlay {
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .stroke(isSelected ? Color.primary.opacity(0.35) : Color.clear, lineWidth: 2)
-            }
-            .overlay(alignment: .topTrailing) {
-                if isSelected {
-                    Image(systemName: "checkmark.circle.fill")
-                        .font(.headline)
-                        .foregroundStyle(.white.opacity(0.92))
-                        .padding(10)
-                }
-            }
-            .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-        }
-        .buttonStyle(.plain)
-    }
-    
-    private func themeOption(from raw: String) -> CardThemeOption {
-        CardThemeOption(rawValue: raw) ?? .charcoal
-    }
-    
-    private func effectOption(from raw: String) -> CardEffectOption {
-        CardEffectOption(rawValue: raw) ?? .plastic
     }
 }

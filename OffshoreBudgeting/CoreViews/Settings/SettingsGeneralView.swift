@@ -77,7 +77,7 @@ struct SettingsGeneralView: View {
                 }
             }
 
-            Section("Budgets") {
+            Section {
                 Picker("Default Budgeting Period", selection: defaultBudgetingPeriodBinding) {
                     ForEach(BudgetingPeriod.allCases) { period in
                         Text(period.displayTitle)
@@ -85,6 +85,10 @@ struct SettingsGeneralView: View {
                     }
                 }
                 .pickerStyle(.menu)
+            } header: {
+                Text("Budgets")
+            } footer: {
+                Text("Sets the default date range for Home, account views, and widgets, and the starting dates for new budgets. Monthly, for example, starts with the current month. This period also determines when completed periods are recorded in Offshore Savings. You can choose other date ranges when needed.")
             }
 
             Section("Maintenance") {

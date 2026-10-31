@@ -224,7 +224,9 @@ struct SavingsAccountView<TrailingToolbar: ToolbarContent>: View {
     }
 
     private var runningTotal: Double {
-        graphSnapshot?.runningTotal ?? account?.total ?? 0
+        // The ledger is the live source of truth. The chart cache must never
+        // hold the displayed balance back after a recorded savings change.
+        accountScopedEntries.reduce(0) { $0 + $1.amount }
     }
 
     private var manualSyncStatus: SavingsAccountService.ManualSavingsSyncStatus {
@@ -351,6 +353,7 @@ struct SavingsAccountView<TrailingToolbar: ToolbarContent>: View {
                     Text(String(localized: "Running Total", defaultValue: "Running Total", comment: "Label for the running total savings value."))
                     Spacer()
                     Text(runningTotal, format: CurrencyFormatter.currencyStyle())
+                        .accessibilityIdentifier("savings.runningTotal")
                         .font(.headline)
                         .foregroundStyle(runningTotal >= 0 ? .green : .red)
                 }
@@ -374,7 +377,6 @@ struct SavingsAccountView<TrailingToolbar: ToolbarContent>: View {
                 } label: {
                     Label("Refresh Savings", systemImage: "arrow.clockwise")
                 }
-                .disabled(!manualSyncStatus.canSync)
 
                 Text(manualSyncStatus.reason.message)
                     .font(.footnote)
@@ -460,7 +462,8 @@ struct SavingsAccountView<TrailingToolbar: ToolbarContent>: View {
         .onChange(of: defaultBudgetingPeriodRaw) { _, _ in
             applyDefaultPeriodRange()
         }
-        .onChange(of: graphSignature) { _, _ in
+        .onChange(of: graphSignature) { _, signature in
+            guard graphSnapshot?.signature != signature else { return }
             if tabActivationContext.phase == .active {
                 scheduleGraphSnapshotRefresh(reason: "inputsChanged")
             } else {
@@ -623,6 +626,7 @@ struct SavingsAccountView<TrailingToolbar: ToolbarContent>: View {
     }
 
     private func rebuildGraphSnapshot(reason: String) {
+        cancelGraphSnapshotRefresh(reason: "rebuild:\(reason)")
         let start = DispatchTime.now().uptimeNanoseconds
         graphSnapshot = SavingsGraphSnapshotService.buildSnapshot(
             for: workspace,
@@ -765,6 +769,7 @@ struct SavingsAccountView<TrailingToolbar: ToolbarContent>: View {
 
         SavingsAccountService.recalculateAccountTotal(account)
         try? modelContext.save()
+        rebuildGraphSnapshot(reason: "entrySaved")
     }
 
     private func requestDelete(_ entry: SavingsLedgerEntry) {
@@ -778,10 +783,11 @@ struct SavingsAccountView<TrailingToolbar: ToolbarContent>: View {
 
     private func deleteEntry(_ entry: SavingsLedgerEntry) {
         SavingsAccountService.deleteEntry(entry, modelContext: modelContext)
+        rebuildGraphSnapshot(reason: "entryDeleted")
     }
 
     private func runManualSync() {
-        let result = SavingsAccountService.runManualSyncIfNeeded(
+        _ = SavingsAccountService.runManualSyncIfNeeded(
             for: workspace,
             defaultBudgetingPeriodRaw: defaultBudgetingPeriodRaw,
             incomes: incomes,
@@ -790,7 +796,8 @@ struct SavingsAccountView<TrailingToolbar: ToolbarContent>: View {
             modelContext: modelContext
         )
 
-        guard result.didApplyChanges else { return }
+        // Ledger synchronization can be current while the displayed cache is
+        // stale. Refresh the display regardless of whether repairs were needed.
         rebuildGraphSnapshot(reason: "manualSavingsSync")
     }
 
