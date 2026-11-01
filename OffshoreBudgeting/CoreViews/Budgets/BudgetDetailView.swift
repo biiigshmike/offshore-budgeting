@@ -164,7 +164,7 @@ struct BudgetDetailView: View {
             detail: "Tap one or more categories to filter expenses. Tap a selected category again to clear just that selection."
         ),
         PostBoardingTipItem(
-            systemImage: "target",
+            systemImage: "pencil.and.list.clipboard",
             title: "Goals",
             detail: "Set optional minimum and maximum spending goals for each category. Tap Goals to edit them, or press and hold a category."
         ),
@@ -928,7 +928,7 @@ struct BudgetDetailView: View {
                     }
                     .buttonStyle(.plain)
                 }
-                Button("Goals", systemImage: "target") {
+                Button("Goals", systemImage: "pencil.and.list.clipboard") {
                     activeModal = .categoryGoals
                 }
                 .buttonStyle(.borderless)
