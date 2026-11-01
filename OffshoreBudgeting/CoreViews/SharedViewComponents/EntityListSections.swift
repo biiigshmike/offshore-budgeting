@@ -115,13 +115,14 @@ struct WorkspaceListRows: View {
 
 // MARK: - Category Rows
 
-struct CategoryListRows: View {
+struct CategoryListRows<Destination: View>: View {
 
     let categories: [Category]
     let onEdit: (Category) -> Void
     let onArchive: ((Category) -> Void)?
     let onUnarchive: ((Category) -> Void)?
     let onDelete: (Category) -> Void
+    private let destination: ((Category) -> Destination)?
 
     init(
         categories: [Category],
@@ -129,12 +130,29 @@ struct CategoryListRows: View {
         onArchive: ((Category) -> Void)? = nil,
         onUnarchive: ((Category) -> Void)? = nil,
         onDelete: @escaping (Category) -> Void
+    ) where Destination == EmptyView {
+        self.categories = categories
+        self.onEdit = onEdit
+        self.onArchive = onArchive
+        self.onUnarchive = onUnarchive
+        self.onDelete = onDelete
+        self.destination = nil
+    }
+
+    init(
+        categories: [Category],
+        onEdit: @escaping (Category) -> Void,
+        onArchive: ((Category) -> Void)? = nil,
+        onUnarchive: ((Category) -> Void)? = nil,
+        onDelete: @escaping (Category) -> Void,
+        @ViewBuilder destination: @escaping (Category) -> Destination
     ) {
         self.categories = categories
         self.onEdit = onEdit
         self.onArchive = onArchive
         self.onUnarchive = onUnarchive
         self.onDelete = onDelete
+        self.destination = destination
     }
 
     var body: some View {
@@ -146,14 +164,18 @@ struct CategoryListRows: View {
             )
         } else {
             ForEach(categories) { category in
-                HStack(spacing: 12) {
-                    Circle()
-                        .fill(Color(hex: category.hexColor) ?? .secondary)
-                        .frame(width: 10, height: 10)
-
-                    Text(category.name)
+                Group {
+                    if let destination {
+                        NavigationLink {
+                            destination(category)
+                        } label: {
+                            categoryLabel(category)
+                        }
+                        .accessibilityIdentifier("categories.row.\(category.id.uuidString)")
+                    } else {
+                        categoryLabel(category)
+                    }
                 }
-                .padding(.vertical, 6)
                 .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                     Button(role: .destructive) {
                         onDelete(category)
@@ -190,5 +212,18 @@ struct CategoryListRows: View {
                 }
             }
         }
+    }
+
+    private func categoryLabel(_ category: Category) -> some View {
+        HStack(spacing: 12) {
+            Circle()
+                .fill(Color(hex: category.hexColor) ?? .secondary)
+                .frame(width: 10, height: 10)
+                .accessibilityHidden(true)
+            Text(category.name)
+        }
+        .frame(minHeight: 32)
+        .padding(.vertical, 6)
+        .contentShape(Rectangle())
     }
 }

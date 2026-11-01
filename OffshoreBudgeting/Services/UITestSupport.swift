@@ -131,6 +131,10 @@ enum UITestSupport {
                                                   workspace: workspace, card: cardA, category: category))
                 }
             }
+            if ProcessInfo.processInfo.arguments.contains("-uiTestCategoryDetailHistory") {
+                seedCategoryDetailHistory(context: context, workspace: workspace, cardA: cardA, cardB: cardB,
+                                          monthStart: range.start)
+            }
             let defaults = UserDefaults.standard
             defaults.set(true, forKey: "didCompleteOnboarding")
             defaults.set(true, forKey: "onboarding_didChooseDataSource")
@@ -267,6 +271,40 @@ enum UITestSupport {
         } catch {
             assertionFailure("UITestSupport failed to save seed data: \(error)")
         }
+    }
+
+    private static func seedCategoryDetailHistory(
+        context: ModelContext, workspace: Workspace, cardA: Card, cardB: Card, monthStart: Date
+    ) {
+        let dining = Category(id: UUID(uuidString: "C1000000-0000-0000-0000-000000000001")!,
+                              name: "Detail Dining", hexColor: "#F97316", workspace: workspace)
+        let archived = Category(id: UUID(uuidString: "C1000000-0000-0000-0000-000000000002")!,
+                                name: "Archived Dining", hexColor: "#64748B", workspace: workspace,
+                                isArchived: true, archivedAt: .now)
+        let other = Category(id: UUID(uuidString: "C1000000-0000-0000-0000-000000000003")!,
+                             name: "Other Detail Category", hexColor: "#10B981", workspace: workspace)
+        context.insert(dining)
+        context.insert(archived)
+        context.insert(other)
+        let date = Calendar.current.date(byAdding: .hour, value: 12, to: monthStart)!
+        context.insert(VariableExpense(id: UUID(uuidString: "D1000000-0000-0000-0000-000000000001")!,
+            descriptionText: "Lunch Ruby", amount: 25, transactionDate: date,
+            workspace: workspace, card: cardA, category: dining))
+        context.insert(VariableExpense(id: UUID(uuidString: "D1000000-0000-0000-0000-000000000002")!,
+            descriptionText: "Coffee Ocean", amount: 5, transactionDate: date,
+            workspace: workspace, card: cardB, category: dining))
+        context.insert(PlannedExpense(id: UUID(uuidString: "E1000000-0000-0000-0000-000000000001")!,
+            title: "Planned Dinner", plannedAmount: 40, expenseDate: date,
+            workspace: workspace, card: cardB, category: dining))
+        context.insert(VariableExpense(id: UUID(uuidString: "D1000000-0000-0000-0000-000000000003")!,
+            descriptionText: "Archived Supper", amount: 15,
+            transactionDate: date, workspace: workspace, card: cardA, category: archived))
+        context.insert(VariableExpense(descriptionText: "Other Category Purchase", amount: 99,
+            transactionDate: date, workspace: workspace, card: cardA, category: other))
+        let previousMonth = Calendar.current.date(byAdding: .month, value: -1, to: date)!
+        context.insert(VariableExpense(id: UUID(uuidString: "D1000000-0000-0000-0000-000000000004")!,
+            descriptionText: "Previous Month Dining", amount: 12,
+            transactionDate: previousMonth, workspace: workspace, card: cardA, category: dining))
     }
 
     private static func wipeAllData(context: ModelContext) {

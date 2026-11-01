@@ -77,6 +77,10 @@ struct ManageCategoriesView: View {
                             },
                             onDelete: { category in
                                 deleteCategoryWithOptionalConfirm(category)
+                            },
+                            destination: { category in
+                                CategoryDetailView(workspace: workspace, category: category)
+                                    .equatable()
                             }
                         )
                     }
@@ -94,6 +98,10 @@ struct ManageCategoriesView: View {
                             },
                             onDelete: { category in
                                 deleteCategoryWithOptionalConfirm(category)
+                            },
+                            destination: { category in
+                                CategoryDetailView(workspace: workspace, category: category)
+                                    .equatable()
                             }
                         )
                     }
@@ -107,7 +115,7 @@ struct ManageCategoriesView: View {
                 PostBoardingTipItem(
                     systemImage: "tag",
                     title: "Categories",
-                    detail: "Add categories to track and visualize spending. Swipe a row to the right to edit or archive; swipe left to delete."
+                    detail: "Tap a category to explore its expenses across cards and dates. Swipe a row to the right to edit or archive; swipe left to delete."
                 )
             ]
         )

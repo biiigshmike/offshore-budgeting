@@ -87,14 +87,19 @@ struct SettingsReleaseLogsView: View {
                     description: "Marina has been removed in this update as I refocus on what makes Offshore special: private, intentional, manual-first budgeting. While building the experience Marina deserves requires more resources and a growing community, I hope to welcome her back someday."
                 ),
                 ReleaseItem(
-                    systemImage: "pencil.and.list.clipboard",
-                    title: "Auto-Configure Category Minimums & Maximums",
+                    systemImage: "slider.horizontal.3",
+                    title: "Auto-Configure Category Goals",
                     description: "Less typing, more smooth sailing! Auto-Configure fills category minimums from attached presets and suggests maximums from past budgets. Choose how far back to look, add a little cushion, and make every amount your own.\n\nTry it: Create a budget > Category Goals > Auto-Configure\nCustomize defaults: Settings > Manage Categories > Auto-Configure Goals"
                 ),
                 ReleaseItem(
-                    systemImage: "tag.fill",
+                    systemImage: "pencil.and.list.clipboard",
                     title: "Uncategorized Expenses",
                     description: "When enabled, review uncategorized expenses when you next open the app or return it to the foreground.\n\nHow to enable: Settings > General > Behavior"
+                ),
+                ReleaseItem(
+                    systemImage: "tag.fill",
+                    title: "A Closer Look at Your Categories",
+                    description: "See the full picture of your category spending! Tap any category to explore expenses across all your cards, search your history, and review totals for any date range—all with the familiar controls you already know.\n\nTry it: Settings > Manage Categories > Tap a category"
                 ),
                 ReleaseItem(
                     systemImage: "square.and.arrow.down",
