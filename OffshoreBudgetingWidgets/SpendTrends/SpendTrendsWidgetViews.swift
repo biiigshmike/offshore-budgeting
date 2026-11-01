@@ -94,7 +94,7 @@ private struct SpendTrendsBarChartView: View {
                 GeometryReader { geo in
                     let maxTotal = max(1.0, visibleBuckets.map(\.total).max() ?? 1.0)
                     let slotWidth = geo.size.width / CGFloat(max(1, visibleBuckets.count))
-                    let barWidth = min(24, slotWidth * 0.66)
+                    let barWidth = SpendTrendsBarStyle.compactWidth(slotWidth: slotWidth)
 
                     HStack(alignment: .bottom, spacing: 0) {
                         ForEach(visibleBuckets) { bucket in
@@ -182,30 +182,22 @@ private struct SpendTrendsBarView: View {
     let availableHeight: CGFloat
 
     var body: some View {
-        let ratio = min(1.0, max(0.0, bucket.total / max(0.000_1, maxTotal)))
-        let barHeight = max(2, availableHeight * CGFloat(ratio))
+        let barHeight = SpendTrendsBarStyle.barHeight(
+            total: bucket.total, maximum: maxTotal, availableHeight: availableHeight
+        )
 
         VStack(spacing: 0) {
             Spacer(minLength: 0)
-
             if bucket.total > 0 {
-                VStack(spacing: 0) {
-                    ForEach(bucket.slices) { slice in
-                        let segment = max(1, barHeight * CGFloat(slice.amount / max(0.000_1, bucket.total)))
-                        Rectangle()
-                            .fill(spendTrendsColor(fromHex: slice.hexColor))
-                            .frame(width: barWidth, height: segment)
-                    }
-                }
-                .frame(width: barWidth, height: barHeight, alignment: .bottom)
-                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .stroke(.white.opacity(0.14), lineWidth: 1)
-                }
+                SpendTrendsSatinBar(
+                    segments: bucket.slices.map {
+                        SpendTrendsBarSegment(amount: $0.amount, color: spendTrendsColor(fromHex: $0.hexColor))
+                    },
+                    width: barWidth,
+                    height: barHeight
+                )
             } else {
-                Color.clear
-                    .frame(width: barWidth, height: 2)
+                Color.clear.frame(width: barWidth, height: 2)
             }
         }
     }

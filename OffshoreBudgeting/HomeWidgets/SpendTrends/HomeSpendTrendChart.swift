@@ -1,7 +1,7 @@
 import SwiftUI
 import Charts
 
-/// Home's feathered category bars rendered from immutable display values.
+/// Home's satin category bars rendered from immutable display values.
 struct HomeSpendTrendChart: View {
     let buckets: [HomeSpendTrendBucket]
     var showsValues = false
@@ -84,7 +84,7 @@ struct HomeSpendTrendChart: View {
             GeometryReader { geo in
                 let maxTotal = max(1.0, buckets.map(\.total).max() ?? 1.0)
                 let slotWidth = geo.size.width / CGFloat(max(1, buckets.count))
-                let barWidth = min(26, slotWidth * 0.70)
+                let barWidth = SpendTrendsBarStyle.compactWidth(slotWidth: slotWidth)
                 let height = geo.size.height
 
                 HStack(alignment: .bottom, spacing: 0) {

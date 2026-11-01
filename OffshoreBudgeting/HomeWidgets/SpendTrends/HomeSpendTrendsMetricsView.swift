@@ -23,7 +23,7 @@ struct HomeSpendTrendsMetricsView: View {
     @State private var selectedCardID: UUID? = nil
     @State private var selectedBucketID: HomeSpendTrendsAggregator.Bucket.ID? = nil
 
-    private let selectableBucketEpsilon: Double = 1.00
+    private let selectableBucketEpsilon: Double = 0
 
     init(
         workspace: Workspace,
@@ -299,7 +299,7 @@ struct HomeSpendTrendsMetricsView: View {
                             let plotFrame = geo[plotAnchor]
                             let barSlotWidth = plotFrame.width / CGFloat(max(5, result.buckets.count))
                             let hitSlotWidth = plotFrame.width / CGFloat(max(1, result.buckets.count))
-                            let barWidth = min(84, barSlotWidth * 0.78)
+                            let barWidth = SpendTrendsBarStyle.detailWidth(slotWidth: barSlotWidth)
                             let hitWidth = max(44, min(96, hitSlotWidth))
 
                             ZStack(alignment: .topLeading) {
@@ -308,7 +308,6 @@ struct HomeSpendTrendsMetricsView: View {
                                         bucket: bucket,
                                         proxy: proxy,
                                         plotFrame: plotFrame,
-                                        height: plotFrame.height,
                                         barWidth: barWidth,
                                         isSelected: bucket.id == selectedBucketID,
                                         colorForSlice: color(for:)
@@ -587,7 +586,7 @@ private struct HeatMapBucketSelectionButton: View {
     let isSelected: Bool
     let onTap: () -> Void
 
-    private let displayEpsilon: Double = 1.00
+    private let displayEpsilon: Double = 0
 
     var body: some View {
         guard bucket.total > displayEpsilon else {
@@ -652,127 +651,30 @@ private struct HeatMapBucketSelectionButton: View {
     }
 }
 
-// MARK: - Overlay Bar (HeatMap-style)
+// MARK: - Overlay Bar
 
 private struct HeatMapBucketBar: View {
-
     let bucket: HomeSpendTrendsAggregator.Bucket
     let proxy: ChartProxy
     let plotFrame: CGRect
-    let height: CGFloat
     let barWidth: CGFloat
     let isSelected: Bool
     let colorForSlice: (HomeSpendTrendsAggregator.Slice) -> Color
-    private let displayEpsilon: Double = 1.00
-
 
     var body: some View {
-        guard bucket.total > displayEpsilon else {
-            return AnyView(EmptyView())
+        if bucket.total > 0,
+           let x = proxy.position(forX: bucket.label),
+           let yTop = proxy.position(forY: bucket.total) {
+            let barHeight = max(2, plotFrame.height - yTop)
+            SpendTrendsSatinBar(
+                segments: bucket.slices.map {
+                    SpendTrendsBarSegment(amount: $0.amount, color: colorForSlice($0))
+                },
+                width: barWidth,
+                height: barHeight,
+                isSelected: isSelected
+            )
+            .position(x: x, y: plotFrame.height - barHeight / 2)
         }
-
-        // X position for the bucket (centered on the category)
-        guard let x = proxy.position(forX: bucket.label) else {
-            return AnyView(EmptyView())
-        }
-
-        // Y position for the bucket total
-        guard let yTop = proxy.position(forY: bucket.total) else {
-            return AnyView(EmptyView())
-        }
-
-        let barHeight = max(2, plotFrame.height - yTop)
-
-        let gradient = bucketMeltGradient(bucket: bucket)
-
-        let shape = RoundedRectangle(cornerRadius: 10, style: .continuous)
-        let barSize = CGSize(width: barWidth, height: barHeight)
-
-        return AnyView(
-            ZStack {
-                shape
-                    .fill(gradient)
-
-                if isSelected {
-                    shape
-                        .strokeBorder(Color.primary.opacity(0.35), lineWidth: 2)
-                }
-            }
-                .frame(width: barSize.width, height: barSize.height)
-                .position(x: x, y: yTop + (barHeight / 2))
-                .compositingGroup()
-        )
-    }
-
-    /// - Full-opacity stops (no transparency)
-    /// - Close paired stops around boundaries for soft transitions after blur
-    private func bucketMeltGradient(bucket: HomeSpendTrendsAggregator.Bucket) -> LinearGradient {
-        let slices = bucket.slices
-            .filter { $0.amount > 0 }
-            .sorted { $0.amount > $1.amount }
-
-        let total = max(bucket.total, 0.000_1)
-
-        func clamp(_ x: Double) -> Double { min(1, max(0, x)) }
-
-        // This is the one knob that controls “blendiness”.
-        // Smaller = crisper boundaries, bigger = more melt.
-        let feather: Double = 0.045
-
-        // Colors in order
-        let colors = slices.map { colorForSlice($0) }
-        guard let firstColor = colors.first else {
-            return LinearGradient(colors: [.secondary], startPoint: .bottom, endPoint: .top)
-        }
-
-        // Boundary positions (end of each slice, except the last)
-        var boundaries: [Double] = []
-        var running: Double = 0
-        for s in slices.dropLast() {
-            running += s.amount
-            boundaries.append(running / total)
-        }
-
-        var stops: [Gradient.Stop] = []
-        stops.reserveCapacity(2 + boundaries.count * 2)
-
-        // Start
-        stops.append(.init(color: firstColor, location: 0))
-
-        // For each boundary, create a “feather zone” where it transitions to the next color.
-        for (i, pRaw) in boundaries.enumerated() {
-            let p = clamp(pRaw)
-            let left = clamp(p - feather)
-            let right = clamp(p + feather)
-
-            let a = colors[i]
-            let b = colors[i + 1]
-
-            stops.append(.init(color: a, location: left))
-            stops.append(.init(color: b, location: right))
-        }
-
-        // End
-        stops.append(.init(color: colors.last ?? firstColor, location: 1))
-
-        // Ensure stops are ordered by location (monotonic non-decreasing)
-        var ordered = stops.sorted { $0.location < $1.location }
-        let epsilon: Double = 1e-6
-        if !ordered.isEmpty {
-            var last = ordered[0].location
-            for i in 1..<ordered.count {
-                var loc = ordered[i].location
-                if loc < last { loc = last }
-                if abs(loc - last) < epsilon { loc = last + epsilon }
-                ordered[i].location = loc
-                last = loc
-            }
-        }
-
-        return LinearGradient(
-            gradient: Gradient(stops: ordered),
-            startPoint: .bottom,
-            endPoint: .top
-        )
     }
 }
