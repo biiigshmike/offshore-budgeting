@@ -363,7 +363,13 @@ struct WorkspaceImportService {
                 SavingsAccountService.recalculateAccountTotal(account)
             }
 
-            try modelContext.save()
+            let importedSteps = try WorkspaceProgressService.inferredSteps(in: importedWorkspace, modelContext: modelContext)
+            let historicalSteps = Set((archive.workspace.completedSetupSteps ?? []).filter {
+                archive.selectedSections.contains($0.archiveSection)
+            })
+            try WorkspaceProgressService.saveCompleting(importedSteps.union(historicalSteps), in: importedWorkspace) {
+                try modelContext.save()
+            }
             return importedWorkspace
         } catch {
             modelContext.delete(importedWorkspace)

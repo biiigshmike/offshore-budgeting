@@ -12,6 +12,16 @@ struct SettingsView: View {
 
     let workspace: Workspace
     @Binding var selectedWorkspaceID: String
+    @AppStorage private var hideWorkspaceProgress: Bool
+
+    init(workspace: Workspace, selectedWorkspaceID: Binding<String>) {
+        self.workspace = workspace
+        _selectedWorkspaceID = selectedWorkspaceID
+        _hideWorkspaceProgress = AppStorage(
+            wrappedValue: false,
+            WorkspaceProgressPreferences.hiddenKey(workspaceID: workspace.id)
+        )
+    }
 
     @Query(sort: \Workspace.name, order: .forward)
     private var workspaces: [Workspace]
@@ -25,6 +35,7 @@ struct SettingsView: View {
 
     private enum SettingsDestination: Hashable {
         case about
+        case workspaceProgress
         case help
         case general
         case privacy
@@ -73,7 +84,9 @@ struct SettingsView: View {
             ForEach(displayedSectionModels) { section in
                 Section {
                     ForEach(section.rows) { row in
-                        settingsRow(for: row)
+                        if row.id != .workspaceProgress || !hideWorkspaceProgress || !WorkspaceProgressService.canHideProgress(in: workspace) {
+                            settingsRow(for: row)
+                        }
                     }
                 } header: {
                     EmptyView()
@@ -222,13 +235,21 @@ struct SettingsView: View {
             if row.id == .about {
                 aboutRow
             } else {
-                SettingsRow(
-                    title: row.title,
-                    systemImage: row.systemImage,
-                    tint: row.tint
-                )
+                HStack {
+                    SettingsRow(
+                        title: row.title,
+                        systemImage: row.id == .workspaceProgress ? WorkspaceProgressService.settingsSymbol(in: workspace) : row.systemImage,
+                        tint: row.tint
+                    )
+                    if row.id == .workspaceProgress {
+                        Text("\(WorkspaceProgressService.percentage(in: workspace))%")
+                            .foregroundStyle(.secondary)
+                            .monospacedDigit()
+                    }
+                }
             }
         }
+        .accessibilityIdentifier(row.id == .workspaceProgress ? "settingsWorkspaceProgress" : "settings_\(row.id)")
     }
 
     @ViewBuilder
@@ -236,10 +257,12 @@ struct SettingsView: View {
         switch destination {
         case .about:
             SettingsAboutView()
+        case .workspaceProgress:
+            SettingsWorkspaceProgressView(workspace: workspace)
         case .help:
             SettingsHelpView()
         case .general:
-            SettingsGeneralView()
+            SettingsGeneralView(workspace: workspace)
         case .privacy:
             SettingsPrivacyView()
         case .notifications:
@@ -270,6 +293,7 @@ struct SettingsView: View {
                 id: "about",
                 rows: [
                     SettingsRowModel(id: .about, title: appDisplayName, systemImage: "", tint: .clear),
+                    SettingsRowModel(id: .workspaceProgress, title: String(localized: "Workspace Progress"), systemImage: WorkspaceProgressService.settingsSymbol(in: workspace), tint: .green),
                     SettingsRowModel(
                         id: .help,
                         title: String(localized: "help.title", defaultValue: "Help", comment: "Title for help screen."),

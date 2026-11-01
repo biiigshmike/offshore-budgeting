@@ -228,6 +228,108 @@ struct WorkspaceTransferServiceTests {
         #expect((exportedJSON["assistantAliasRules"] as? [Any])?.isEmpty == true)
     }
 
+    @Test func deletedCoreRecordMilestoneSurvivesArchiveRoundTrip() throws {
+        let context = try makeContext()
+        let workspace = Workspace(name: "Personal", hexColor: "#3B82F6")
+        let card = Card(name: "Former card", workspace: workspace)
+        context.insert(workspace)
+        context.insert(card)
+        try WorkspaceProgressService.saveCompleting([.card], in: workspace) {
+            try context.save()
+        }
+        context.delete(card)
+        try context.save()
+
+        let archive = try WorkspaceExportService().exportArchive(
+            for: workspace,
+            sections: Set(WorkspaceTransferSection.userVisibleCases),
+            modelContext: context
+        )
+        #expect(archive.cards.isEmpty)
+        #expect(archive.workspace.completedSetupSteps == [.card])
+
+        let decoded = try WorkspaceArchiveCoding.decode(WorkspaceArchiveCoding.encode(archive))
+        let imported = try WorkspaceImportService().importArchive(
+            decoded,
+            existingWorkspaces: try fetchAll(Workspace.self, in: context),
+            modelContext: context
+        )
+        #expect(WorkspaceProgressService.completedSteps(in: imported) == [.card])
+        #expect(try fetchAll(Card.self, in: context).isEmpty)
+    }
+
+    @Test func partialExportIncludesOnlySelectedCoreMilestones() throws {
+        let context = try makeContext()
+        let source = try seedTransferWorkspace(in: context)
+        try WorkspaceProgressService.backfill(in: source.workspace, modelContext: context)
+        #expect(WorkspaceProgressService.percentage(in: source.workspace) == 100)
+
+        let archive = try WorkspaceExportService().exportArchive(
+            for: source.workspace,
+            sections: [.budgets, .categories],
+            modelContext: context
+        )
+        #expect(Set(archive.workspace.completedSetupSteps ?? []) == [.category, .budget])
+        #expect(archive.cards.isEmpty)
+        #expect(archive.presets.isEmpty)
+        #expect(archive.incomes.isEmpty)
+
+        let imported = try WorkspaceImportService().importArchive(
+            archive,
+            existingWorkspaces: try fetchAll(Workspace.self, in: context),
+            modelContext: context
+        )
+        #expect(WorkspaceProgressService.completedSteps(in: imported) == [.category, .budget])
+        #expect(WorkspaceProgressService.percentage(in: source.workspace) == 100)
+    }
+
+    @Test func legacyArchiveWithoutSetupMetadataInfersProgressFromImportedRecords() throws {
+        let context = try makeContext()
+        let source = try seedTransferWorkspace(in: context)
+        let archive = try WorkspaceExportService().exportArchive(
+            for: source.workspace,
+            sections: Set(WorkspaceTransferSection.userVisibleCases),
+            modelContext: context
+        )
+        let data = try WorkspaceArchiveCoding.encode(archive)
+        var json = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        var workspaceJSON = try #require(json["workspace"] as? [String: Any])
+        workspaceJSON.removeValue(forKey: "completedSetupSteps")
+        json["workspace"] = workspaceJSON
+        let legacyData = try JSONSerialization.data(withJSONObject: json)
+
+        let decoded = try WorkspaceArchiveCoding.decode(legacyData)
+        #expect(decoded.schemaVersion == 1)
+        #expect(decoded.workspace.completedSetupSteps == nil)
+        let imported = try WorkspaceImportService().importArchive(
+            decoded,
+            existingWorkspaces: try fetchAll(Workspace.self, in: context),
+            modelContext: context
+        )
+        #expect(WorkspaceProgressService.percentage(in: imported) == 100)
+        #expect(imported.cards?.count == 1)
+        #expect(imported.incomes?.first?.amount == 2000)
+    }
+
+    @Test func importingHistoryWithoutRecordsRetainsOnlySelectedSectionMilestones() throws {
+        let context = try makeContext()
+        var archive = emptyArchive()
+        archive.selectedSections = [.cards, .incomes]
+        archive.workspace.completedSetupSteps = [.card, .income, .budget]
+
+        let decoded = try WorkspaceArchiveCoding.decode(WorkspaceArchiveCoding.encode(archive))
+        let imported = try WorkspaceImportService().importArchive(
+            decoded,
+            existingWorkspaces: [],
+            modelContext: context
+        )
+
+        #expect(WorkspaceProgressService.completedSteps(in: imported) == [.card, .income])
+        #expect(imported.cards?.isEmpty ?? true)
+        #expect(imported.incomes?.isEmpty ?? true)
+        #expect(imported.budgets?.isEmpty ?? true)
+    }
+
     @Test func export_skipsOtherWorkspaceRecords() throws {
         let context = try makeContext()
         let source = try seedTransferWorkspace(in: context)

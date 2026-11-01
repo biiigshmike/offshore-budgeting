@@ -263,7 +263,9 @@ struct AddBudgetView: View {
         )
 
         do {
-            try modelContext.save()
+            try WorkspaceProgressService.saveCompleting([.budget], in: workspace) {
+                try modelContext.save()
+            }
         } catch {
             // Discard only this failed creation attempt. A context-wide rollback
             // could discard unrelated changes made elsewhere in the app.

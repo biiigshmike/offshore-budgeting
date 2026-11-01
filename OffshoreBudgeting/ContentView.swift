@@ -29,6 +29,18 @@ struct ContentView: View {
         self.widgetRefreshExecutor = ContentViewWidgetRefreshExecutor(modelContainer: modelContainer)
     }
 
+    private func backfillSelectedWorkspaceProgress() {
+        guard let workspace = selectedWorkspace else { return }
+        do {
+            try WorkspaceProgressService.backfill(in: workspace, modelContext: modelContext)
+        } catch {
+            // Leave the milestones untouched and retry on the next foreground or selection.
+            #if DEBUG
+            print("Workspace progress backfill failed: \(error)")
+            #endif
+        }
+    }
+
     // MARK: - Selection
 
     @AppStorage("selectedWorkspaceID") private var selectedWorkspaceID: String = ""
@@ -165,6 +177,7 @@ struct ContentView: View {
                     metadata: ["selectedWorkspaceID": selectedWorkspaceID]
                 )
                 performImmediateResumeWiring()
+                backfillSelectedWorkspaceProgress()
                 scheduleDeferredResumeRefresh(
                     trigger: .initialAppear,
                     includesWidgets: true,
@@ -174,6 +187,7 @@ struct ContentView: View {
                 syncICloudPreferenceSnapshots()
             }
             .onChange(of: selectedWorkspaceID) { _, newValue in
+                backfillSelectedWorkspaceProgress()
                 syncSelectedWorkspaceToWidgetStores(newValue)
                 TabFlickerDiagnostics.markEvent(
                     "selectedWorkspaceChanged",
@@ -250,6 +264,7 @@ struct ContentView: View {
                     metadata: ["phase": debugScenePhase(newPhase)]
                 )
                 if newPhase == .active {
+                    backfillSelectedWorkspaceProgress()
                     TabFlickerDiagnostics.beginWatch(
                         reason: "sceneResume",
                         metadata: [
@@ -283,6 +298,7 @@ struct ContentView: View {
                     selectedWorkspaceID = workspaces.first?.id.uuidString ?? ""
                 }
 
+                backfillSelectedWorkspaceProgress()
                 performImmediateResumeWiring()
                 syncICloudPreferenceSnapshots()
                 scheduleDeferredResumeRefresh(

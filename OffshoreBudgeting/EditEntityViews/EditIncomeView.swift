@@ -231,6 +231,7 @@ struct EditIncomeView: View {
             }
 
             // Remove the original one-off
+            WorkspaceProgressService.markCompleted(.income, in: workspace)
             modelContext.delete(income)
 
             dismiss()
@@ -412,6 +413,9 @@ struct EditIncomeView: View {
                 series: series
             )
             modelContext.insert(created)
+            if let workspace = series.workspace {
+                WorkspaceProgressService.markCompleted(.income, in: workspace)
+            }
         }
     }
 

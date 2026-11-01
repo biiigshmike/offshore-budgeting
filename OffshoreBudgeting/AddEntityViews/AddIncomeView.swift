@@ -153,6 +153,7 @@ struct AddIncomeView: View {
                 series: nil
             )
             modelContext.insert(income)
+            WorkspaceProgressService.markCompleted(.income, in: workspace)
             dismiss()
             return
         }
@@ -200,6 +201,10 @@ struct AddIncomeView: View {
                 series: series
             )
             modelContext.insert(income)
+        }
+
+        if !occurrenceDays.isEmpty {
+            WorkspaceProgressService.markCompleted(.income, in: workspace)
         }
 
         dismiss()

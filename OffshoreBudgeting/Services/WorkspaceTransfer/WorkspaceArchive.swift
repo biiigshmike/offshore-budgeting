@@ -138,6 +138,20 @@ struct WorkspacePayload: Codable, Equatable {
     var id: UUID
     var name: String
     var hexColor: String
+    // Optional so version-1 archives created before setup progress still decode.
+    var completedSetupSteps: [WorkspaceProgressStep]? = nil
+}
+
+extension WorkspaceProgressStep {
+    var archiveSection: WorkspaceTransferSection {
+        switch self {
+        case .card: .cards
+        case .category: .categories
+        case .preset: .presets
+        case .income: .incomes
+        case .budget: .budgets
+        }
+    }
 }
 
 struct BudgetPayload: Codable, Equatable {

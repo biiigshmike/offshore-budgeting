@@ -587,7 +587,10 @@ final class ExpenseCSVImportViewModel: ObservableObject {
             }
         }
 
-        try? modelContext.save()
+        let completedSteps: Set<WorkspaceProgressStep> = importable.contains(where: { $0.kind == .income }) ? [.income] : []
+        try? WorkspaceProgressService.saveCompleting(completedSteps, in: workspace) {
+            try modelContext.save()
+        }
     }
 
     private func offsetNote(for description: String) -> String {

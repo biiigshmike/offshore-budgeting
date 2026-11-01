@@ -303,6 +303,13 @@ final class Workspace {
     var name: String = ""
     var hexColor: String = "#3B82F6"
 
+    // Permanent setup milestones. Additive defaults preserve existing local and CloudKit stores.
+    var setupHasCreatedCard: Bool = false
+    var setupHasCreatedCategory: Bool = false
+    var setupHasCreatedPreset: Bool = false
+    var setupHasCreatedIncome: Bool = false
+    var setupHasCreatedBudget: Bool = false
+
     @Relationship(deleteRule: .cascade)
     var budgets: [Budget]? = nil
 

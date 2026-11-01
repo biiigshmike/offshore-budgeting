@@ -28,6 +28,7 @@ enum UITestSupport {
         case iCloudDelayedWorkspace
         case uncategorizedReview
         case budgetMenus
+        case workspaceProgress
     }
 
     static var scenario: Scenario? {
@@ -37,6 +38,7 @@ enum UITestSupport {
         if args.contains("-uiTestScenarioICloudDelayedWorkspace") { return .iCloudDelayedWorkspace }
         if args.contains("-uiTestScenarioUncategorizedReview") { return .uncategorizedReview }
         if args.contains("-uiTestScenarioBudgetMenus") { return .budgetMenus }
+        if args.contains("-uiTestScenarioWorkspaceProgress") { return .workspaceProgress }
         return nil
     }
 
@@ -71,6 +73,10 @@ enum UITestSupport {
         guard isEnabled else { return }
 
         guard let scenario else { return }
+        if scenario == .workspaceProgress,
+           ProcessInfo.processInfo.arguments.contains("-uiTestPreserveScenarioData") {
+            return
+        }
 
         let context = ModelContext(container)
         wipeAllData(context: context)
@@ -114,6 +120,49 @@ enum UITestSupport {
             defaults.set(workspace.id.uuidString, forKey: "selectedWorkspaceID")
             defaults.set(false, forKey: "privacy_requireBiometrics")
             defaults.set(false, forKey: "general_reviewUncategorizedExpensesOnOpen")
+            if let release = SettingsReleaseLogsView.currentReleaseSection {
+                defaults.set(release.id, forKey: "releaseLogs_seenReleaseIDs")
+            }
+
+        case .workspaceProgress:
+            let workspace = Workspace(
+                id: UUID(uuidString: "5AA29E56-BBDB-4CC9-A286-720F6F35B001")!,
+                name: "Progress Workspace", hexColor: "#3B82F6"
+            )
+            let other = Workspace(
+                id: UUID(uuidString: "5AA29E56-BBDB-4CC9-A286-720F6F35B002")!,
+                name: "Other Workspace", hexColor: "#10B981"
+            )
+            context.insert(workspace)
+            context.insert(other)
+            let category = Category(name: "Bills", hexColor: "#3B82F6", workspace: workspace)
+            let budget = Budget(name: "First Budget", startDate: .now, endDate: .now, workspace: workspace)
+            context.insert(category)
+            context.insert(budget)
+            if ProcessInfo.processInfo.arguments.contains("-uiTestProgressNoCard") {
+                workspace.setupHasCreatedCard = true
+            } else {
+                let card = Card(name: "First Card", workspace: workspace)
+                let preset = Preset(title: "Internet", plannedAmount: 60, workspace: workspace,
+                                    defaultCard: card, defaultCategory: category)
+                context.insert(card)
+                context.insert(preset)
+                context.insert(BudgetCardLink(budget: budget, card: card))
+                context.insert(BudgetPresetLink(budget: budget, preset: preset))
+            }
+            if ProcessInfo.processInfo.arguments.contains("-uiTestProgressComplete") {
+                context.insert(Income(source: "First Paycheck", amount: 2_500, date: .now,
+                                      isPlanned: true, workspace: workspace))
+            }
+            let defaults = UserDefaults.standard
+            defaults.set(true, forKey: "didCompleteOnboarding")
+            defaults.set(true, forKey: "onboarding_didChooseDataSource")
+            defaults.set(true, forKey: "didSeedDefaultWorkspaces")
+            defaults.set(workspace.id.uuidString, forKey: "selectedWorkspaceID")
+            defaults.set(false, forKey: "privacy_requireBiometrics")
+            defaults.set(false, forKey: "general_reviewUncategorizedExpensesOnOpen")
+            defaults.set(false, forKey: WorkspaceProgressPreferences.hiddenKey(workspaceID: workspace.id))
+            defaults.set(false, forKey: WorkspaceProgressPreferences.hiddenKey(workspaceID: other.id))
             if let release = SettingsReleaseLogsView.currentReleaseSection {
                 defaults.set(release.id, forKey: "releaseLogs_seenReleaseIDs")
             }

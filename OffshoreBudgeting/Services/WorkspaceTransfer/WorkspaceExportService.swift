@@ -31,6 +31,16 @@ struct WorkspaceExportService {
         let budgetPresetLinks = sections.contains(.budgets) || sections.contains(.presets) ? try fetchBudgetPresetLinks(workspaceID: workspaceID, modelContext: modelContext) : []
         let budgetCategoryLimits = sections.contains(.budgets) ? try fetchBudgetCategoryLimits(workspaceID: workspaceID, modelContext: modelContext) : []
 
+        var completedSteps = WorkspaceProgressService.completedSteps(in: workspace)
+        if !cards.isEmpty { completedSteps.insert(.card) }
+        if !categories.isEmpty { completedSteps.insert(.category) }
+        if !presets.isEmpty { completedSteps.insert(.preset) }
+        if !incomes.isEmpty { completedSteps.insert(.income) }
+        if !budgets.isEmpty { completedSteps.insert(.budget) }
+        let exportedSteps = WorkspaceProgressStep.allCases.filter {
+            completedSteps.contains($0) && sections.contains($0.archiveSection)
+        }
+
         return WorkspaceArchive(
             exportedAt: now,
             sourceWorkspaceID: workspaceID,
@@ -38,7 +48,8 @@ struct WorkspaceExportService {
             workspace: WorkspacePayload(
                 id: workspace.id,
                 name: workspace.name,
-                hexColor: workspace.hexColor
+                hexColor: workspace.hexColor,
+                completedSetupSteps: exportedSteps
             ),
             budgets: budgets.map {
                 BudgetPayload(

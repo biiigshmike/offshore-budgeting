@@ -118,7 +118,14 @@ final class TransactionEntryService {
         )
 
         modelContext.insert(income)
-        try modelContext.save()
+        do {
+            try WorkspaceProgressService.saveCompleting([.income], in: workspace) {
+                try modelContext.save()
+            }
+        } catch {
+            modelContext.delete(income)
+            throw error
+        }
         return income
     }
 }

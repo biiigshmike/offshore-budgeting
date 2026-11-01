@@ -69,6 +69,7 @@ struct AddCategoryView: View {
         )
 
         modelContext.insert(category)
+        WorkspaceProgressService.markCompleted(.category, in: workspace)
         dismiss()
     }
 }

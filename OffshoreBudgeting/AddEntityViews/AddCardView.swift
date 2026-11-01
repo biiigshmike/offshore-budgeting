@@ -18,6 +18,8 @@ struct AddCardView: View {
     @State private var name: String = ""
     @State private var effect: CardEffectOption = .plastic
     @State private var theme: CardThemeOption = .ruby
+    @State private var saveErrorMessage = ""
+    @State private var showingSaveError = false
 
     private var canSave: Bool {
         CardFormView.canSave(name: name)
@@ -54,6 +56,12 @@ struct AddCardView: View {
                     name = DebugScreenshotFormDefaults.cardName
                 }
             }
+            .blocksAutomaticExpenseReview(while: showingSaveError)
+            .alert("Couldn’t Save Card", isPresented: $showingSaveError) {
+                Button("OK", role: .cancel) { }
+            } message: {
+                Text(saveErrorMessage)
+            }
     }
 
     private func save() {
@@ -67,7 +75,16 @@ struct AddCardView: View {
         )
 
         modelContext.insert(card)
-        try? modelContext.save()
+        do {
+            try WorkspaceProgressService.saveCompleting([.card], in: workspace) {
+                try modelContext.save()
+            }
+        } catch {
+            modelContext.delete(card)
+            saveErrorMessage = error.localizedDescription
+            showingSaveError = true
+            return
+        }
         dismiss()
     }
 }

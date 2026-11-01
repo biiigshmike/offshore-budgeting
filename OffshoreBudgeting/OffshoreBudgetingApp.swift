@@ -69,6 +69,11 @@ struct OffshoreBudgetingApp: App {
         #endif
 
         #if DEBUG
+        if UITestSupport.isEnabled, UITestSupport.scenario == .workspaceProgress {
+            let container = Self.makeModelContainer(useICloud: false, debugStoreOverride: "WorkspaceProgressUITests")
+            UITestSupport.applyScenarioDataIfNeeded(container: container)
+            return container
+        }
         if UITestSupport.isEnabled, UITestSupport.scenario == .uncategorizedReview {
             let container = Self.makeModelContainer(useICloud: false, debugStoreOverride: "UncategorizedReviewUITests")
             UITestSupport.applyScenarioDataIfNeeded(container: container)

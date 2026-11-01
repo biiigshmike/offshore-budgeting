@@ -181,6 +181,7 @@ struct AddPresetView: View {
         )
 
         modelContext.insert(preset)
+        WorkspaceProgressService.markCompleted(.preset, in: workspace)
         dismiss()
     }
 }

@@ -10,6 +10,8 @@ import SwiftData
 
 struct SettingsGeneralView: View {
 
+    let workspace: Workspace
+
     @AppStorage("general_confirmBeforeDeleting") private var confirmBeforeDeleting: Bool = true
 
     @AppStorage("general_defaultBudgetingPeriod")
@@ -94,6 +96,7 @@ struct SettingsGeneralView: View {
             Section("Maintenance") {
                 NavigationLink {
                     SettingsMaintenanceView(
+                        workspace: workspace,
                         onResetTipsConfirmed: { postBoardingTipsStore.resetTips() },
                         onRepeatOnboarding: { activeAlert = .repeatOnboardingConfirm },
                         onEraseContent: { activeAlert = .eraseConfirm }
@@ -231,13 +234,41 @@ private enum ActiveAlert: Identifiable {
 
 private struct SettingsMaintenanceView: View {
 
+    let workspace: Workspace
     let onResetTipsConfirmed: () -> Void
     let onRepeatOnboarding: () -> Void
     let onEraseContent: () -> Void
     @State private var activeMaintenanceAlert: MaintenanceAlert? = nil
+    @AppStorage private var hideWorkspaceProgress: Bool
+
+    init(
+        workspace: Workspace,
+        onResetTipsConfirmed: @escaping () -> Void,
+        onRepeatOnboarding: @escaping () -> Void,
+        onEraseContent: @escaping () -> Void
+    ) {
+        self.workspace = workspace
+        self.onResetTipsConfirmed = onResetTipsConfirmed
+        self.onRepeatOnboarding = onRepeatOnboarding
+        self.onEraseContent = onEraseContent
+        _hideWorkspaceProgress = AppStorage(
+            wrappedValue: false,
+            WorkspaceProgressPreferences.hiddenKey(workspaceID: workspace.id)
+        )
+    }
 
     var body: some View {
         List {
+            if WorkspaceProgressService.canHideProgress(in: workspace) {
+                Section {
+                    Toggle("Hide Workspace Progress", isOn: $hideWorkspaceProgress)
+                        .tint(Color("AccentColor"))
+                        .accessibilityIdentifier("hideWorkspaceProgress")
+                } footer: {
+                    Text("Hides the Workspace Progress row in Settings for \(workspace.name) on this device. Turn this off to show it again.")
+                }
+            }
+
             Section {
                 maintenanceButton(
                     title: "Reset Tips & Hints",
@@ -378,7 +409,11 @@ private struct SettingsExpenseDisplayView: View {
 }
 
 #Preview("Settings General") {
-    NavigationStack {
-        SettingsGeneralView()
+    let container = PreviewSeed.makeContainer()
+    PreviewHost(container: container) { workspace in
+        NavigationStack {
+            SettingsGeneralView(workspace: workspace)
+        }
+        .environment(PostBoardingTipsStore())
     }
 }
