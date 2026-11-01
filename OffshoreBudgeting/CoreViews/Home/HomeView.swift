@@ -1300,7 +1300,7 @@ struct HomeView: View {
         } label: {
             Label(String(localized: "home.actions", defaultValue: "Expense Display", comment: "Accessibility label for home actions menu."), systemImage: "eye")
         }
-        .accessibilityLabel(String(localized: "home.actions", defaultValue: "Home Actions", comment: "Accessibility label for home actions menu."))
+        .accessibilityLabel(String(localized: "home.actions", defaultValue: "Expense Display", comment: "Accessibility label for home actions menu."))
     }
 
     // MARK: - Date Range

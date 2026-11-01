@@ -1,14 +1,17 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-CATALOG_PATH="${1:-OffshoreBudgeting/Localizable.xcstrings}"
+# Usage: localization_audit.sh [catalog.xcstrings [locale]]
+# With no arguments, audit app + widget catalogs for all project languages.
+# Run from any directory. Relative catalog arguments remain relative to the caller.
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TARGET_LOCALE="${2:-}"
-SUPPORTED_LOCALES=("es" "fr" "de" "ar" "pt-BR" "zh-Hans")
-
-if [[ ! -f "$CATALOG_PATH" ]]; then
-  echo "error: catalog not found at '$CATALOG_PATH'" >&2
-  exit 2
+if [[ -n "${1:-}" ]]; then
+  CATALOG_PATHS=("$(python3 -c 'import pathlib, sys; print(pathlib.Path(sys.argv[1]).resolve())' "$1")")
+else
+  CATALOG_PATHS=("$REPO_ROOT/OffshoreBudgeting/Localizable.xcstrings" "$REPO_ROOT/OffshoreBudgetingWidgets/Localizable.xcstrings")
 fi
+cd "$REPO_ROOT"
 
 run_audit() {
   local target_locale="$1"
@@ -18,12 +21,12 @@ import re
 import sys
 from pathlib import Path
 
-catalog_path = Path(sys.argv[1])
+catalog_path = Path(sys.argv[1]).resolve()
 target_locale = sys.argv[2]
 data = json.loads(catalog_path.read_text(encoding="utf-8"))
 strings = data.get("strings", {})
-widget_catalog_path = Path("OffshoreBudgetingWidgets/Localizable.xcstrings")
-app_catalog_path = Path("OffshoreBudgeting/Localizable.xcstrings")
+widget_catalog_path = Path("OffshoreBudgetingWidgets/Localizable.xcstrings").resolve()
+app_catalog_path = Path("OffshoreBudgeting/Localizable.xcstrings").resolve()
 generated_help_path = Path("OffshoreBudgeting/CoreViews/Settings/GeneratedHelpContent.swift")
 release_logs_path = Path("OffshoreBudgeting/CoreViews/Settings/SettingsReleaseLogsView.swift")
 about_view_path = Path("OffshoreBudgeting/CoreViews/Settings/SettingsAboutView.swift")
@@ -329,15 +332,24 @@ equals_key_allowlist = {
     "zh-Hans": zh_hans_equals_key_allowlist,
 }.get(target_locale, set())
 
-variant_pairs = [
-    ("A-Z", "A–Z"),
-    ("Z-A", "Z–A"),
-    ("$ ↑", "$↑"),
-    ("$ ↓", "$↓"),
-]
+# Brand names and valid words shared with English are intentionally unchanged.
+equals_key_allowlist |= {"Offshore Savings"}
+equals_key_allowlist |= {
+    "es": {"Personal"},
+    "de": {"Optional", "Start"},
+    "fr": {"Message"},
+    "pt-BR": {"Email"},
+}.get(target_locale, set())
 
-placeholder_pattern = re.compile(r"%(?:\\d+\\$)?(?:[@dDuUxXfFeEgGcCsSpaA])")
-preset_term_pattern = re.compile(r"\\b(?:preset|presets|preajuste|preajustes)\\b", re.IGNORECASE)
+# Match complete printf tokens, including positional, precision and length forms.
+# Escaped %% is consumed as one token, never as a following placeholder.
+placeholder_pattern = re.compile(
+    r"%(?:#@(?P<substitution>[^@]+)@|(?:(?P<position>\d+)\$)?[-+#0 ']*"
+    r"(?P<width>\*(?:\d+\$)?|\d+)?"
+    r"(?:\.(?P<precision>\*(?:\d+\$)?|\d+))?"
+    r"(?P<length>hh|ll|[hljztLq])?(?P<type>[@diuoxXfFeEgGaAcCsSpDUO%]))"
+)
+preset_term_pattern = re.compile(r"\b(?:preset|presets|preajuste|preajustes)\b", re.IGNORECASE)
 
 required_widget_keys = [
     "Income",
@@ -366,8 +378,66 @@ widget_plist_required_keys = {
     "CFBundleDisplayName",
 }
 
-def extract_placeholders(text: str) -> list[str]:
-    return sorted(placeholder_pattern.findall(text or ""))
+def extract_placeholders(text: str) -> list[tuple[int, str]]:
+    arguments = []
+    next_position = 1
+    for match in placeholder_pattern.finditer(text or ""):
+        if match["substitution"]:
+            arguments.append((0, "substitution:" + match["substitution"]))
+            continue
+        if match["type"] == "%":
+            continue
+        for field in ("width", "precision"):
+            value = match[field] or ""
+            if value.startswith("*"):
+                position = int(value[1:-1]) if value.endswith("$") else next_position
+                arguments.append((position, "d"))
+                if not value.endswith("$"):
+                    next_position += 1
+        position = int(match["position"]) if match["position"] else next_position
+        kind = "d" if match["type"] == "i" else match["type"]
+        arguments.append((position, (match["length"] or "") + kind))
+        if not match["position"]:
+            next_position += 1
+    return sorted(arguments)
+
+
+def string_units(node, path=()):
+    """Yield direct units and units inside plural/device/substitution variants."""
+    if not isinstance(node, dict):
+        return
+    if "stringUnit" in node:
+        yield path, node["stringUnit"]
+    for name, child in node.items():
+        if name != "stringUnit" and isinstance(child, dict):
+            yield from string_units(child, path + (name,))
+
+
+def missing_plural_fallbacks(node, path=()):
+    if not isinstance(node, dict):
+        return
+    plural = node.get("variations", {}).get("plural")
+    if isinstance(plural, dict) and "other" not in plural:
+        yield path + ("variations", "plural", "other")
+    for name, child in node.items():
+        if isinstance(child, dict):
+            yield from missing_plural_fallbacks(child, path + (name,))
+
+
+def source_for_variant(source_units, path, fallback):
+    if path in source_units:
+        return source_units[path].get("value", fallback)
+    # Target languages can require more plural categories than English.
+    other_path = tuple("other" if i >= 2 and path[i - 2:i] == ("variations", "plural") else part
+                       for i, part in enumerate(path))
+    return source_units.get(other_path, source_units.get((), {})).get("value", fallback)
+
+
+def unchanged_is_allowed(key, source_text):
+    if key in equals_key_allowlist or source_text in equals_key_allowlist:
+        return True
+    # Placeholder-only and punctuation-only strings do not need translation.
+    return not any(char.isalpha() for char in placeholder_pattern.sub("", source_text))
 
 
 def extract_generated_help_strings(source_path: Path) -> list[str]:
@@ -484,7 +554,7 @@ missing_count = 0
 equals_key_count = 0
 equals_en_count = 0
 placeholder_mismatches = 0
-variant_coverage_issues = 0
+review_issues = 0
 glossary_issues = 0
 widget_coverage_issues = 0
 plist_coverage_issues = 0
@@ -494,61 +564,66 @@ equals_key_items: list[str] = []
 equals_en_items: list[str] = []
 missing_items: list[str] = []
 placeholder_mismatch_items: list[str] = []
-variant_issue_items: list[str] = []
+review_issue_items: list[str] = []
 glossary_issue_items: list[str] = []
 widget_issue_items: list[str] = []
 plist_issue_items: list[str] = []
 source_issue_items: list[str] = []
 
+source_language = data.get("sourceLanguage", "en")
 for key, entry in strings.items():
+    if entry.get("shouldTranslate") is False:
+        continue
     locs = entry.get("localizations", {})
-    en_value = locs.get("en", {}).get("stringUnit", {}).get("value")
-    target_value = locs.get(target_locale, {}).get("stringUnit", {}).get("value")
-
-    source_text = en_value if isinstance(en_value, str) else key
-
-    if target_value is None:
+    source_units = dict(string_units(locs.get(source_language, {})))
+    target_units = list(string_units(locs.get(target_locale, {})))
+    for path in missing_plural_fallbacks(locs.get(target_locale, {})):
+        missing_count += 1
+        missing_items.append(key + " [" + "/".join(path) + "]")
+    if not target_units:
         missing_count += 1
         missing_items.append(key)
         continue
 
-    if target_value == key and key not in equals_key_allowlist:
-        equals_key_count += 1
-        equals_key_items.append(key)
+    for path, unit in target_units:
+        label = key + (" [" + "/".join(path) + "]" if path else "")
+        source_text = source_for_variant(source_units, path, key)
+        target_value = unit.get("value")
+        if not isinstance(target_value, str) or (source_text.strip() and not target_value.strip()):
+            missing_count += 1
+            missing_items.append(label)
+            continue
+        if unit.get("state") != "translated":
+            review_issues += 1
+            review_issue_items.append(f"{label}: {unit.get('state', 'missing state')}")
 
-    if isinstance(en_value, str) and target_value == en_value and key not in equals_key_allowlist:
-        equals_en_count += 1
-        equals_en_items.append(key)
-
-    if extract_placeholders(source_text) != extract_placeholders(target_value):
-        placeholder_mismatches += 1
-        placeholder_mismatch_items.append(key)
-
-    if target_locale == "es":
-        # Glossary lock: no preset/preajuste terms in user-facing Spanish.
-        if preset_term_pattern.search(target_value):
-            glossary_issues += 1
-            glossary_issue_items.append(f"{key} => {target_value}")
-
-        # Glossary lock: Home-context copy should use "Panel" terminology.
-        if key == "app.section.home" or "home" in key.lower():
-            if len(target_value.split()) <= 3 and "inicio" in target_value.lower():
+        allowed = unchanged_is_allowed(key, source_text)
+        if target_value == key and not allowed:
+            equals_key_count += 1
+            equals_key_items.append(label)
+        if target_value == source_text and source_text != key and not allowed:
+            equals_en_count += 1
+            equals_en_items.append(label)
+        if extract_placeholders(source_text) != extract_placeholders(target_value):
+            placeholder_mismatches += 1
+            placeholder_mismatch_items.append(label)
+        if target_locale == "es":
+            if preset_term_pattern.search(target_value):
                 glossary_issues += 1
-                glossary_issue_items.append(f"{key} => {target_value}")
-
-for left, right in variant_pairs:
-    left_present = left in strings
-    right_present = right in strings
-    if left_present != right_present:
-        variant_coverage_issues += 1
-        variant_issue_items.append(f"{left} vs {right}")
+                glossary_issue_items.append(f"{label} => {target_value}")
+            if key == "app.section.home" or "home" in key.lower():
+                if len(target_value.split()) <= 3 and "inicio" in target_value.lower():
+                    glossary_issues += 1
+                    glossary_issue_items.append(f"{label} => {target_value}")
 
 if widget_catalog_path.exists():
     widget_data = json.loads(widget_catalog_path.read_text(encoding="utf-8"))
     widget_strings = widget_data.get("strings", {})
     for key, entry in widget_strings.items():
-        target_value = entry.get("localizations", {}).get(target_locale, {}).get("stringUnit", {}).get("value")
-        if not isinstance(target_value, str) or not target_value.strip():
+        if entry.get("shouldTranslate") is False:
+            continue
+        units = list(string_units(entry.get("localizations", {}).get(target_locale, {})))
+        if not units or any(not isinstance(unit.get("value"), str) or (key and not unit["value"].strip()) for _, unit in units):
             widget_coverage_issues += 1
             widget_issue_items.append(key)
 
@@ -743,54 +818,54 @@ print(f"{target_locale} missing: {missing_count}")
 print(f"{target_locale} equals key (non-allowlisted): {equals_key_count}")
 print(f"{target_locale} equals en (non-allowlisted): {equals_en_count}")
 print(f"placeholder mismatches: {placeholder_mismatches}")
-print(f"variant coverage issues: {variant_coverage_issues}")
+print(f"translation state issues: {review_issues}")
 print(f"glossary issues: {glossary_issues}")
 print(f"widget coverage issues: {widget_coverage_issues}")
 print(f"plist coverage issues: {plist_coverage_issues}")
 print(f"source coverage issues: {source_coverage_issues}")
 
 if missing_items:
-    print(f"\\nMissing {target_locale} items:")
+    print(f"\nMissing {target_locale} items:")
     for item in missing_items[:50]:
         print(f"- {item}")
 
 if equals_key_items:
-    print(f"\\nTop {target_locale}==key items:")
+    print(f"\nTop {target_locale}==key items:")
     for item in equals_key_items[:20]:
         print(f"- {item}")
 
 if equals_en_items:
-    print(f"\\nTop {target_locale}==en items:")
+    print(f"\nTop {target_locale}==en items:")
     for item in equals_en_items[:20]:
         print(f"- {item}")
 
 if placeholder_mismatch_items:
-    print("\\nTop placeholder mismatch items:")
+    print("\nTop placeholder mismatch items:")
     for item in placeholder_mismatch_items[:20]:
         print(f"- {item}")
 
-if variant_issue_items:
-    print("\\nVariant key issues:")
-    for item in variant_issue_items[:20]:
+if review_issue_items:
+    print("\nTranslations needing review:")
+    for item in review_issue_items[:20]:
         print(f"- {item}")
 
 if glossary_issue_items:
-    print("\\nGlossary issues:")
+    print("\nGlossary issues:")
     for item in glossary_issue_items[:20]:
         print(f"- {item}")
 
 if widget_issue_items:
-    print("\\nWidget coverage issues:")
+    print("\nWidget coverage issues:")
     for item in widget_issue_items[:20]:
         print(f"- {item}")
 
 if plist_issue_items:
-    print("\\nPlist coverage issues:")
+    print("\nPlist coverage issues:")
     for item in plist_issue_items[:20]:
         print(f"- {item}")
 
 if source_issue_items:
-    print("\\nSource coverage issues:")
+    print("\nSource coverage issues:")
     for item in source_issue_items[:20]:
         print(f"- {item}")
 
@@ -799,7 +874,7 @@ if (
     or equals_key_count > 0
     or equals_en_count > 0
     or placeholder_mismatches > 0
-    or variant_coverage_issues > 0
+    or review_issues > 0
     or glossary_issues > 0
     or widget_coverage_issues > 0
     or plist_coverage_issues > 0
@@ -809,15 +884,40 @@ if (
 PY
 }
 
-if [[ -n "$TARGET_LOCALE" ]]; then
-  run_audit "$TARGET_LOCALE"
-  exit $?
-fi
-
 status=0
-for locale in "${SUPPORTED_LOCALES[@]}"; do
-  run_audit "$locale" || status=1
-  echo
+for CATALOG_PATH in "${CATALOG_PATHS[@]}"; do
+  if [[ ! -f "$CATALOG_PATH" ]]; then
+    echo "error: catalog not found at '$CATALOG_PATH'" >&2
+    exit 2
+  fi
+  if [[ -n "$TARGET_LOCALE" ]]; then
+    locales=("$TARGET_LOCALE")
+  else
+    # Keep supported languages in sync with the Xcode project, including newly added ones.
+    locales=()
+    locale_list="$(python3 - <<'PYLOCALES'
+import plistlib
+import subprocess
+project = plistlib.loads(subprocess.check_output([
+    "plutil", "-convert", "xml1", "-o", "-", "OffshoreBudgeting.xcodeproj/project.pbxproj"
+]))
+settings = project["objects"][project["rootObject"]]
+for locale in settings["knownRegions"]:
+    if locale not in {"Base", settings.get("developmentRegion", "en")}:
+        print(locale)
+PYLOCALES
+)" || exit 2
+    while IFS= read -r locale; do
+      [[ -n "$locale" ]] && locales+=("$locale")
+    done <<< "$locale_list"
+    if [[ ${#locales[@]} -eq 0 ]]; then
+      echo "error: no target languages found in Xcode project" >&2
+      exit 2
+    fi
+  fi
+  for locale in "${locales[@]}"; do
+    run_audit "$locale" || status=1
+    echo
+  done
 done
-
 exit "$status"
