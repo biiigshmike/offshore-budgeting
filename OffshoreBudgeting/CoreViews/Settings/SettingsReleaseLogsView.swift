@@ -79,7 +79,7 @@ struct SettingsReleaseLogsView: View {
     static let releaseSections: [ReleaseSection] = [
         ReleaseSection(
             version: "2.5",
-            build: "22",
+            build: "23",
             items: [
                 ReleaseItem(
                     systemImage: "figure.wave",
