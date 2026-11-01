@@ -5,8 +5,8 @@ import ActivityKit
 
 // MARK: - ShoppingModeActivityAttributes
 
-struct ShoppingModeActivityAttributes: ActivityAttributes {
-    struct ContentState: Codable, Hashable {
+nonisolated struct ShoppingModeActivityAttributes: ActivityAttributes, Sendable {
+    nonisolated struct ContentState: Codable, Hashable, Sendable {
         let endDate: Date
         let statusText: String
     }

@@ -4,7 +4,7 @@ import Foundation
 /// Main-actor access makes a matching consume atomic across the app's scenes.
 @MainActor
 struct WorkspaceProgressHandoffStore {
-    static let pendingWorkspaceIDKey = "onboarding_pendingWorkspaceProgressID"
+    nonisolated static let pendingWorkspaceIDKey = "onboarding_pendingWorkspaceProgressID"
 
     private let defaults: UserDefaults
 

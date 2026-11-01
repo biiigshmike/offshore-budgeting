@@ -242,7 +242,7 @@ struct SettingsView: View {
                         tint: row.tint
                     )
                     if row.id == .workspaceProgress {
-                        Text("\(WorkspaceProgressService.percentage(in: workspace))%")
+                        Text(Double(WorkspaceProgressService.percentage(in: workspace)) / 100, format: .percent.precision(.fractionLength(0)))
                             .foregroundStyle(.secondary)
                             .monospacedDigit()
                     }

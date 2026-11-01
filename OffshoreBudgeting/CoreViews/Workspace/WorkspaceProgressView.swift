@@ -132,7 +132,7 @@ struct WorkspaceProgressView: View {
             VStack(spacing: 12) {
                 progressRing
 
-                Text("\(WorkspaceProgressService.percentage(in: workspace))%")
+                Text(Double(WorkspaceProgressService.percentage(in: workspace)) / 100, format: .percent.precision(.fractionLength(0)))
                     .font(.title.weight(.semibold))
                     .monospacedDigit()
                     .lineLimit(1)

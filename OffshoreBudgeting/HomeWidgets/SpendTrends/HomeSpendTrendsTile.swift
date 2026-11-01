@@ -89,7 +89,7 @@ struct HomeSpendTrendsTile: View {
     // MARK: - Mini chart
 
     private func miniChart(result: HomeSpendTrendsAggregator.Result) -> some View {
-        HomeSpendTrendChart(buckets: result.buckets.prefix(12).map(HomeSpendTrendBucket.init))
+        HomeSpendTrendChart(buckets: result.buckets.prefix(12).map { HomeSpendTrendBucket($0) })
     }
 
     // MARK: - Highest summary

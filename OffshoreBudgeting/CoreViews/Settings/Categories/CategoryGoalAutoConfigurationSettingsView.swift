@@ -25,7 +25,7 @@ struct CategoryGoalAutoConfigurationSettingsView: View {
                 .disabled(!settings.suggestMaximums)
                 Stepper(value: $settings.cushionPercent, in: 0...100, step: 5) {
                     LabeledContent("Extra Cushion") {
-                        Text("\(settings.cushionPercent, format: .number.precision(.fractionLength(0)))%")
+                        Text(settings.cushionPercent / 100, format: .percent.precision(.fractionLength(0)))
                     }
                 }
                 .accessibilityIdentifier("categoryGoals.settings.cushionPercent")
@@ -35,7 +35,7 @@ struct CategoryGoalAutoConfigurationSettingsView: View {
             }
             Section {
                 Text("Only completed, non-overlapping budgets in this workspace are compared. Fewer budgets are used when history is limited. Without category history, the maximum stays blank.")
-                Text("Extra Cushion adds your chosen percentage to the historical average before suggesting a maximum. Set it to 0% to add no cushion.")
+                Text("Extra Cushion adds your chosen percentage to the historical average before suggesting a maximum. Set it to zero to add no cushion.")
             }
             .foregroundStyle(.secondary)
         }

@@ -21,9 +21,9 @@ struct CategoryGoalSuggestionSection: View {
                     }
                 } label: {
                     if suggestion.samples.count == 1 {
-                        Text("Based on 1 past budget · \(suggestion.cushionPercent, format: .number.precision(.fractionLength(0)))% cushion")
+                        Text("Based on 1 past budget · \(suggestion.cushionPercent / 100, format: .percent.precision(.fractionLength(0))) cushion")
                     } else {
-                        Text("Based on \(suggestion.samples.count) past budgets · \(suggestion.cushionPercent, format: .number.precision(.fractionLength(0)))% cushion")
+                        Text("Based on \(suggestion.samples.count) past budgets · \(suggestion.cushionPercent / 100, format: .percent.precision(.fractionLength(0))) cushion")
                     }
                 }
                 .accessibilityIdentifier("categoryGoals.historyDisclosure")

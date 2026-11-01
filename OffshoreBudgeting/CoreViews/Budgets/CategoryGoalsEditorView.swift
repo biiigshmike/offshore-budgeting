@@ -74,9 +74,9 @@ struct CategoryGoalsEditorView: View {
                                     if let suggestion = maximumSuggestions[category.id] {
                                         Group {
                                             if suggestion.samples.count == 1 {
-                                                Text("History: 1 past budget · \(suggestion.cushionPercent, format: .number.precision(.fractionLength(0)))% cushion")
+                                                Text("History: 1 past budget · \(suggestion.cushionPercent / 100, format: .percent.precision(.fractionLength(0))) cushion")
                                             } else {
-                                                Text("History: \(suggestion.samples.count) past budgets · \(suggestion.cushionPercent, format: .number.precision(.fractionLength(0)))% cushion")
+                                                Text("History: \(suggestion.samples.count) past budgets · \(suggestion.cushionPercent / 100, format: .percent.precision(.fractionLength(0))) cushion")
                                             }
                                         }
                                         .font(.footnote)
