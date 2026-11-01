@@ -1247,6 +1247,9 @@
         }
       }
     },
+    "A Closer Look at Your Categories" : {
+
+    },
     "A daily reminder to open the app and log variable expenses." : {
       "localizations" : {
         "ar" : {
@@ -6145,7 +6148,7 @@
         }
       }
     },
-    "Auto-Configure Category Minimums & Maximums" : {
+    "Auto-Configure Category Goals" : {
 
     },
     "Auto-Configure Goals" : {
@@ -45313,6 +45316,9 @@
           }
         }
       }
+    },
+    "See the full picture of your category spending! Tap any category to explore expenses across all your cards, search your history, and review totals for any date range—all with the familiar controls you already know.\n\nTry it: Settings > Manage Categories > Tap a category" : {
+
     },
     "Select a Card" : {
       "localizations" : {
