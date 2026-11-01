@@ -91,6 +91,17 @@ struct EditBudgetView: View {
             presets: visiblePresets,
             categories: goalCategories,
             scheduleString: scheduleString(for:),
+            reconfiguresExistingGoals: true,
+            plannedGoalContributions: BudgetCategoryGoalStore.plannedContributions(
+                presets: presets, selectedPresetIDs: selectedPresetIDs, selectedCardIDs: selectedCardIDs,
+                workspaceID: workspace.id, startDate: startDate, endDate: endDate
+            ),
+            maximumGoalSuggestionProvider: workspace.categoryGoalAutoConfiguration.suggestMaximums ? {
+                try BudgetCategoryGoalStore.maximumSuggestions(
+                    workspace: workspace, categories: goalCategories, startDate: startDate, endDate: endDate,
+                    excludingBudgetID: budget.id, modelContext: modelContext
+                )
+            } : nil,
             name: $name,
             userEditedName: $userEditedName,
             startDate: $startDate,

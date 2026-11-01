@@ -8,6 +8,8 @@ struct CategoryGoalsEditorView: View {
     let variableContributions: [UUID: Double]
     let allowsPlannedMinimum: Bool
     let maximumSuggestionProvider: (() throws -> [UUID: CategoryGoalSuggestion])?
+    let replacesExistingGoals: Bool
+    let autoConfigurePlannedContributions: [UUID: Double]?
     let onSave: ([UUID: CategoryGoalDraft]) -> Void
 
     @Environment(\.dismiss) private var dismiss
@@ -24,6 +26,8 @@ struct CategoryGoalsEditorView: View {
         variableContributions: [UUID: Double] = [:],
         allowsPlannedMinimum: Bool = false,
         maximumSuggestionProvider: (() throws -> [UUID: CategoryGoalSuggestion])? = nil,
+        replacesExistingGoals: Bool = false,
+        autoConfigurePlannedContributions: [UUID: Double]? = nil,
         onSave: @escaping ([UUID: CategoryGoalDraft]) -> Void
     ) {
         self.categories = categories
@@ -31,6 +35,8 @@ struct CategoryGoalsEditorView: View {
         self.variableContributions = variableContributions
         self.allowsPlannedMinimum = allowsPlannedMinimum
         self.maximumSuggestionProvider = maximumSuggestionProvider
+        self.replacesExistingGoals = replacesExistingGoals
+        self.autoConfigurePlannedContributions = autoConfigurePlannedContributions
         self.onSave = onSave
         _drafts = State(initialValue: drafts)
     }
@@ -46,8 +52,13 @@ struct CategoryGoalsEditorView: View {
                                 configureGoals(enabled: enabled)
                             }
                     } footer: {
-                        Text("Sets minimums from attached presets assigned to selected cards within the budget dates. When Suggest Maximums is enabled in Manage Categories, fills blank maximums from comparable budget history. You can edit every amount. Turning this off restores generated values unless you edited them.")
-                        Text("For categories without preset spending, blank minimums use the lowest comparable historical spending, including zero. Historical suggestions require Suggest Maximums to be enabled.")
+                        Text("Auto-Configure sets minimums from attached presets on selected cards. Historical suggestions use comparable past budgets and your Extra Cushion setting. You can edit every amount. Turning Auto-Configure off restores previous values unless you edited them.")
+                        if replacesExistingGoals {
+                            Text("Existing goals are replaced where presets or history provide a value.")
+                        } else {
+                            Text("Only blank maximums are filled.")
+                        }
+                        Text("For categories without preset spending, historical minimum suggestions use the lowest comparable spending, including zero. Historical suggestions require Suggest Maximums to be enabled.")
                     }
                 }
                 Section {
@@ -161,8 +172,9 @@ struct CategoryGoalsEditorView: View {
             generatedValues.apply(
                 to: &drafts,
                 categoryIDs: categories.map(\.id),
-                plannedContributions: plannedContributions,
-                suggestions: maximumSuggestions
+                plannedContributions: autoConfigurePlannedContributions ?? plannedContributions,
+                suggestions: maximumSuggestions,
+                replacesExistingGoals: replacesExistingGoals
             )
         } else {
             generatedValues.restore(in: &drafts)

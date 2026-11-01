@@ -18,6 +18,7 @@ struct BudgetFormView: View {
     let categories: [Category]
     
     let scheduleString: (Preset) -> String
+    var reconfiguresExistingGoals = false
     var plannedGoalContributions: [UUID: Double]? = nil
     var maximumGoalSuggestionProvider: (() throws -> [UUID: CategoryGoalSuggestion])? = nil
     
@@ -268,7 +269,8 @@ struct BudgetFormView: View {
                 drafts: categoryGoalDrafts,
                 plannedContributions: plannedGoalContributions ?? [:],
                 allowsPlannedMinimum: plannedGoalContributions != nil,
-                maximumSuggestionProvider: maximumGoalSuggestionProvider
+                maximumSuggestionProvider: maximumGoalSuggestionProvider,
+                replacesExistingGoals: reconfiguresExistingGoals
             ) { updatedDrafts in
                 categoryGoalDrafts = updatedDrafts
             }

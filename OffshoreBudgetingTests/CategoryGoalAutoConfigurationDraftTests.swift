@@ -10,6 +10,35 @@ struct CategoryGoalAutoConfigurationDraftTests {
         CategoryGoalSuggestion(averageAmount: 200, cushionPercent: 10, samples: [])
     }
 
+    @Test func regeneratingExistingGoalsRestoresSnapshotAndPreservesSubsequentEdits() {
+        var drafts = [categoryID: CategoryGoalDraft(minimum: 900, maximum: 1000)]
+        let original = drafts
+        var configuration = CategoryGoalAutoConfigurationDraft()
+        configuration.apply(to: &drafts, categoryIDs: [categoryID],
+                            plannedContributions: [categoryID: 100], suggestions: [categoryID: suggestion],
+                            replacesExistingGoals: true)
+        #expect(drafts[categoryID]?.minimum == 100)
+        #expect(drafts[categoryID]?.maximum == 220)
+        configuration.restore(in: &drafts)
+        #expect(drafts == original)
+        configuration.apply(to: &drafts, categoryIDs: [categoryID],
+                            plannedContributions: [categoryID: 100], suggestions: [categoryID: suggestion],
+                            replacesExistingGoals: true)
+        drafts[categoryID]?.maximumText = "300"
+        configuration.restore(in: &drafts)
+        #expect(drafts[categoryID]?.minimum == 900)
+        #expect(drafts[categoryID]?.maximum == 300)
+    }
+
+    @Test func regenerationWithoutEvidencePreservesExistingGoals() {
+        var drafts = [categoryID: CategoryGoalDraft(minimum: 900, maximum: 1000)]
+        let original = drafts
+        var configuration = CategoryGoalAutoConfigurationDraft()
+        configuration.apply(to: &drafts, categoryIDs: [categoryID], plannedContributions: [:],
+                            suggestions: [:], replacesExistingGoals: true)
+        #expect(drafts == original)
+    }
+
     @Test(arguments: [0.0, 75])
     func fillsBlankMinimumFromLowestHistoryIncludingZero(lowest: Double) {
         let history = CategoryGoalSuggestion(averageAmount: 100, cushionPercent: 10, samples: [

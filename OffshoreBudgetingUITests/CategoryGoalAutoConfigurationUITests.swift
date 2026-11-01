@@ -123,4 +123,33 @@ final class CategoryGoalAutoConfigurationUITests: XCTestCase {
         XCTAssertEqual(app.textFields["Minimum"].value as? String, "860.00")
         XCTAssertEqual(app.textFields["Maximum"].value as? String, "Maximum")
     }
+
+    func testAutoConfigureIsAvailableFromBudgetDetailAndEditBudgetAndCancelDiscards() throws {
+        let app = launchApp()
+        app.tabBars.buttons["Budgets"].tap()
+        app.staticTexts["Existing Menu Budget"].firstMatch.tap()
+        let goals = app.buttons["Goals"]
+        if !goals.isHittable { app.swipeUp() }
+        goals.tap()
+        toggleAutoConfigure(in: app)
+        app.staticTexts["Bills"].firstMatch.tap()
+        XCTAssertEqual(app.textFields["Minimum"].value as? String, "60.00")
+        XCTAssertEqual(app.textFields["Maximum"].value as? String, "1,400.00")
+        app.navigationBars["Bills"].buttons["Category Goals"].tap()
+        app.navigationBars["Category Goals"].buttons["Cancel"].tap()
+        app.buttons["Budget Actions"].tap()
+        app.buttons["Edit Budget"].tap()
+        app.buttons["budget.categoryGoals"].tap()
+        toggleAutoConfigure(in: app)
+        app.staticTexts["Bills"].firstMatch.tap()
+        XCTAssertEqual(app.textFields["Minimum"].value as? String, "60.00")
+        XCTAssertEqual(app.textFields["Maximum"].value as? String, "1,400.00")
+        app.navigationBars["Bills"].buttons["Category Goals"].tap()
+        toggleAutoConfigure(in: app)
+        app.staticTexts["Bills"].firstMatch.tap()
+        XCTAssertEqual(app.textFields["Maximum"].value as? String, "Maximum")
+        app.navigationBars["Bills"].buttons["Category Goals"].tap()
+        app.navigationBars["Category Goals"].buttons["Cancel"].tap()
+        app.navigationBars["Edit Budget"].buttons["Cancel"].tap()
+    }
 }

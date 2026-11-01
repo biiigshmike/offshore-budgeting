@@ -3,6 +3,36 @@ import SwiftData
 
 @MainActor
 enum BudgetCategoryGoalStore {
+    /// Shared on-demand history lookup for creation and existing-budget editors.
+    static func maximumSuggestions(
+        workspace: Workspace, categories: [Category], startDate: Date, endDate: Date,
+        excludingBudgetID: UUID? = nil, modelContext: ModelContext
+    ) throws -> [UUID: CategoryGoalSuggestion] {
+        let workspaceID = workspace.id
+        let cutoff = min(Calendar.current.startOfDay(for: startDate), Calendar.current.startOfDay(for: .now))
+        let budgets = try modelContext.fetch(FetchDescriptor<Budget>(predicate: #Predicate {
+            $0.workspace?.id == workspaceID && $0.startDate < cutoff
+        }))
+        let planned = try modelContext.fetch(FetchDescriptor<PlannedExpense>(predicate: #Predicate {
+            $0.workspace?.id == workspaceID && $0.expenseDate < cutoff
+        }))
+        let variable = try modelContext.fetch(FetchDescriptor<VariableExpense>(predicate: #Predicate {
+            $0.workspace?.id == workspaceID && $0.transactionDate < cutoff
+        }))
+        let settings = workspace.categoryGoalAutoConfiguration
+        return CategoryGoalSuggestionCalculator.calculate(
+            workspaceID: workspaceID,
+            budgets: budgets.filter { $0.id != excludingBudgetID },
+            categories: categories,
+            plannedExpenses: planned,
+            variableExpenses: variable,
+            startDate: startDate,
+            endDate: endDate,
+            historyCount: settings.historyCount,
+            cushionPercent: settings.cushionPercent
+        )
+    }
+
     /// Previews only spending that will participate in the new budget's category totals.
     static func plannedContributions(
         presets: [Preset],

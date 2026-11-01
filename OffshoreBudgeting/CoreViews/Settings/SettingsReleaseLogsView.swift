@@ -89,7 +89,7 @@ struct SettingsReleaseLogsView: View {
                 ReleaseItem(
                     systemImage: "slider.horizontal.3",
                     title: "Auto-Configure Category Goals & Savings at Goal Maximums",
-                    description: "Plan your spending and see what you could save! Savings at Goal Maximums estimates your savings if you spend up to your category maximums. Auto-Configure fills goals from presets and past spending—including minimums of zero—with a lookback and cushion you can customize.\n\nSee your estimate: Budget Detail > Savings Outlook\nSet goals: Create a budget > Category Goals > Auto-Configure\nCustomize: Settings > Manage Categories > Auto-Configure Goals"
+                    description: "Plan your spending and see what you could save! Savings at Goal Maximums estimates your savings if you spend up to your category maximums. Auto-Configure fills goals from presets and past spending, including minimums of zero, with a lookback and cushion you can customize.\n\nSee your estimate: Budget Detail > Savings Outlook\nSet goals: Create a budget > Category Goals > Auto-Configure\nCustomize: Settings > Manage Categories > Auto-Configure Goals"
                 ),
                 ReleaseItem(
                     systemImage: "pencil.and.list.clipboard",
@@ -99,7 +99,7 @@ struct SettingsReleaseLogsView: View {
                 ReleaseItem(
                     systemImage: "tag.fill",
                     title: "A Closer Look at Your Categories",
-                    description: "See the full picture of your category spending! Tap any category to explore expenses across all your cards, search your history, and review totals for any date range—all with the familiar controls you already know.\n\nTry it: Settings > Manage Categories > Tap a category"
+                    description: "See the full picture of your category spending! Tap any category to explore expenses across all your cards, search your history, and review totals for any date range,vall with the familiar controls you already know.\n\nTry it: Settings > Manage Categories > Tap a category"
                 ),
                 ReleaseItem(
                     systemImage: "square.and.arrow.down",

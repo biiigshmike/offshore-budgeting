@@ -758,7 +758,21 @@ struct BudgetDetailView: View {
                     }),
                     variableContributions: Dictionary(uniqueKeysWithValues: derived.categoriesInBudget.map {
                         ($0.id, variableContribution(for: $0, derived: derived))
-                    })
+                    }),
+                    allowsPlannedMinimum: true,
+                    maximumSuggestionProvider: workspace.categoryGoalAutoConfiguration.suggestMaximums ? {
+                        try BudgetCategoryGoalStore.maximumSuggestions(
+                            workspace: workspace, categories: derived.categoriesInBudget,
+                            startDate: budget.startDate, endDate: budget.endDate,
+                            excludingBudgetID: budget.id, modelContext: modelContext
+                        )
+                    } : nil,
+                    replacesExistingGoals: true,
+                    autoConfigurePlannedContributions: BudgetCategoryGoalStore.plannedContributions(
+                        presets: workspacePresets, selectedPresetIDs: Set(linkedPresets.map(\.id)),
+                        selectedCardIDs: Set(linkedCards.map(\.id)), workspaceID: workspace.id,
+                        startDate: budget.startDate, endDate: budget.endDate
+                    )
                 ) { drafts in
                     BudgetCategoryGoalStore.apply(
                         drafts,
