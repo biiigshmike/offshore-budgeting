@@ -61,8 +61,7 @@ struct HomeCategorySpotlightTile: View {
                 plannedExpenses: plannedExpenses,
                 variableExpenses: variableExpenses,
                 startDate: startDate,
-                endDate: endDate,
-                topN: topN
+                endDate: endDate
             )
         } label: {
             HomeTileContainer(

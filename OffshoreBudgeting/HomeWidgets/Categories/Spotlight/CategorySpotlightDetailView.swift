@@ -15,9 +15,6 @@ struct CategorySpotlightDetailView: View {
     let variableExpenses: [VariableExpense]
     let startDate: Date
     let endDate: Date
-    let topN: Int
-
-    @State private var showsAll: Bool = false
 
     private var subtitle: String {
         let formatter = DateIntervalFormatter()
@@ -42,32 +39,12 @@ struct CategorySpotlightDetailView: View {
         result.metrics.first
     }
 
-    private var visibleMetrics: [CategorySpendMetric] {
-        showsAll ? result.metrics : Array(result.metrics.prefix(topN))
-    }
-
     private var slices: [DonutSlice] {
         DonutChartView.slicesFromCategoryMetrics(
-            visibleMetrics,
-            topN: visibleMetrics.count,
+            result.metrics,
+            topN: result.metrics.count,
             includeOther: false
         )
-    }
-
-    private var showAllButtonTitle: String {
-        if showsAll {
-            return String(localized: "homeWidget.categorySpotlight.hideAllCategories", defaultValue: "Hide All Categories", comment: "Button title to collapse full category list.")
-        } else {
-            return String(
-                format: String(
-                    localized: "homeWidget.categorySpotlight.showAllCategoriesFormat",
-                    defaultValue: "Show All Categories (%1$@)",
-                    comment: "Button title to expand full category list with count."
-                ),
-                locale: .current,
-                localizedInt(result.metrics.count)
-            )
-        }
     }
 
     var body: some View {
@@ -131,12 +108,7 @@ struct CategorySpotlightDetailView: View {
             }
 
             Section {
-                showAllCategoriesButton
-                    .listRowBackground(Color.clear)
-            }
-
-            Section {
-                ForEach(visibleMetrics) { metric in
+                ForEach(result.metrics) { metric in
                     let color = metric.categoryColorHex.flatMap { Color(hex: $0) } ?? .secondary
 
                     CategoryMetricRowView(
@@ -167,38 +139,4 @@ struct CategorySpotlightDetailView: View {
         }
     }
 
-    private func localizedInt(_ value: Int) -> String {
-        AppNumberFormat.integer(value)
-    }
-
-    @ViewBuilder
-    private var showAllCategoriesButton: some View {
-        if #available(iOS 26.0, *) {
-            baseShowAllCategoriesButton
-                .glassProminentButtonStyleCompat()
-                .tint(Color("AccentColor"))
-        } else {
-            baseShowAllCategoriesButton
-                .buttonStyle(.borderedProminent)
-                .tint(Color("AccentColor"))
-        }
-    }
-
-    private var baseShowAllCategoriesButton: some View {
-        Button {
-            withAnimation(.spring(response: 0.28, dampingFraction: 0.9)) {
-                showsAll.toggle()
-            }
-        } label: {
-            HStack(spacing: 8) {
-                Text(showAllButtonTitle)
-                    .font(.subheadline.weight(.semibold))
-
-                Image(systemName: showsAll ? "chevron.up" : "chevron.down")
-                    .font(.system(size: 12, weight: .semibold))
-            }
-            .frame(maxWidth: .infinity, minHeight: 44)
-            .multilineTextAlignment(.center)
-        }
-    }
 }

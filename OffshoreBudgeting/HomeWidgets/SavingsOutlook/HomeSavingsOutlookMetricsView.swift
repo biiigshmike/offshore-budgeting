@@ -102,16 +102,16 @@ struct HomeSavingsOutlookMetricsView: View {
                 )
 
                 if #available(iOS 26.0, macCatalyst 26.0, *) {
-                    Button {
-                        routeToAccountsSavings()
+                    NavigationLink {
+                        AccountsDestinationView(workspace: workspace, initialSegment: .savings)
                     } label: {
                         openSavingsAccountLabel
                     }
                     .glassProminentButtonStyleCompat()
                     .tint(Color("AccentColor"))
                 } else {
-                    Button {
-                        routeToAccountsSavings()
+                    NavigationLink {
+                        AccountsDestinationView(workspace: workspace, initialSegment: .savings)
                     } label: {
                         openSavingsAccountLabel
                     }
@@ -194,17 +194,6 @@ struct HomeSavingsOutlookMetricsView: View {
             Text(String(localized: "homeSavingsOutlook.openSavingsAccount", defaultValue: "Open Offshore Savings", comment: "Button title to open Offshore Savings."))
         }
         .frame(maxWidth: .infinity, minHeight: 44)
-    }
-
-    private func routeToAccountsSavings() {
-        UserDefaults.standard.set(
-            AppShortcutNavigationStore.PendingAccountsSegment.savings.rawValue,
-            forKey: AppShortcutNavigationStore.pendingAccountsSegmentKey
-        )
-        UserDefaults.standard.set(
-            AppSection.cards.rawValue,
-            forKey: AppShortcutNavigationStore.pendingSectionKey
-        )
     }
 
     // MARK: - Picker

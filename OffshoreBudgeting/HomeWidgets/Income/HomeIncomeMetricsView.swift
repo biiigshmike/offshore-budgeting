@@ -160,11 +160,11 @@ struct HomeIncomeMetricsView: View {
     ) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .firstTextBaseline) {
-                summaryMetric(title: String(localized: "common.actual", defaultValue: "Actual", comment: "Common label for actual values."), value: actualTotal)
+                summaryMetric(title: String(localized: "common.actual", defaultValue: "Actual", comment: "Common label for actual values."), value: actualTotal, color: .blue)
 
                 Spacer(minLength: 0)
 
-                summaryMetric(title: String(localized: "common.planned", defaultValue: "Planned", comment: "Common label for planned values."), value: plannedTotal)
+                summaryMetric(title: String(localized: "common.planned", defaultValue: "Planned", comment: "Common label for planned values."), value: plannedTotal, color: .orange)
             }
 
             Text(
@@ -183,7 +183,7 @@ struct HomeIncomeMetricsView: View {
         }
     }
 
-    private func summaryMetric(title: String, value: Double) -> some View {
+    private func summaryMetric(title: String, value: Double, color: Color) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(title)
                 .font(.subheadline)
@@ -191,6 +191,7 @@ struct HomeIncomeMetricsView: View {
 
             Text(value, format: CurrencyFormatter.currencyStyle())
                 .font(.title3.weight(.semibold))
+                .foregroundStyle(color)
         }
     }
 
@@ -231,6 +232,10 @@ struct HomeIncomeMetricsView: View {
                     .foregroundStyle(by: .value(String(localized: "common.type", defaultValue: "Type", comment: "Legend label for type."), point.kind))
                     .position(by: .value(String(localized: "common.type", defaultValue: "Type", comment: "Legend label for type."), point.kind))
                 }
+                .chartForegroundStyleScale([
+                    String(localized: "common.planned", defaultValue: "Planned", comment: "Common label for planned values."): Color.orange,
+                    String(localized: "common.actual", defaultValue: "Actual", comment: "Common label for actual values."): Color.blue
+                ])
                 .chartYAxis {
                     AxisMarks(position: .leading) {
                         AxisGridLine()
