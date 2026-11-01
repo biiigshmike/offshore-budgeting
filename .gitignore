@@ -26,3 +26,6 @@ paystub.pdf
 # Share Marina manual diagnostic instructions.
 !Docs/MarinaManualTokenTesting.md
 !Docs/MarinaCapabilities.md
+
+# Tip Jar release setup.
+!Docs/TipJarSetup.md

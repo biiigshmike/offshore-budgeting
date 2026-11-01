@@ -9,6 +9,12 @@ struct SettingsSupportFeedbackSection: View {
 
     var body: some View {
         Section {
+            NavigationLink {
+                SettingsTipJarView()
+            } label: {
+                Label("Tip Jar", systemImage: "heart")
+            }
+
             Button {
                 compose(.feedback)
             } label: {
