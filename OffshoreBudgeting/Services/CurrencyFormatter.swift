@@ -145,6 +145,16 @@ nonisolated enum CurrencyFormatter {
         return (value * factor).rounded() / factor
     }
 
+    /// Rounds a lower bound upward to minor units, ignoring only floating-point residue.
+    static func roundedUpToCurrency(_ value: Double) -> Double {
+        guard value.isFinite else { return 0 }
+        let rounded = roundedToCurrency(value)
+        let residue = max(1, abs(value)) * Double.ulpOfOne * 4
+        guard value - rounded > residue else { return rounded }
+        let factor = pow(10, Double(currencyFractionDigits()))
+        return (value * factor).rounded(.up) / factor
+    }
+
     // MARK: - Public: Currency Comparisons
 
     /// Compares values after rounding to the selected currency's minor units.

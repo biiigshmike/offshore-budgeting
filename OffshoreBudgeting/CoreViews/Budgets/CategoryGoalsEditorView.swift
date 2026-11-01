@@ -7,12 +7,14 @@ struct CategoryGoalsEditorView: View {
     let plannedContributions: [UUID: Double]
     let variableContributions: [UUID: Double]
     let allowsPlannedMinimum: Bool
+    let maximumSuggestionProvider: (() throws -> [UUID: CategoryGoalSuggestion])?
     let onSave: ([UUID: CategoryGoalDraft]) -> Void
 
     @Environment(\.dismiss) private var dismiss
     @State private var autoConfigure = false
-    @State private var previousMinimums: [UUID: String] = [:]
-    @State private var generatedMinimums: [UUID: String] = [:]
+    @State private var generatedValues = CategoryGoalAutoConfigurationDraft()
+    @State private var maximumSuggestions: [UUID: CategoryGoalSuggestion] = [:]
+    @State private var showingHistoryError = false
     @State private var drafts: [UUID: CategoryGoalDraft]
 
     init(
@@ -21,12 +23,14 @@ struct CategoryGoalsEditorView: View {
         plannedContributions: [UUID: Double] = [:],
         variableContributions: [UUID: Double] = [:],
         allowsPlannedMinimum: Bool = false,
+        maximumSuggestionProvider: (() throws -> [UUID: CategoryGoalSuggestion])? = nil,
         onSave: @escaping ([UUID: CategoryGoalDraft]) -> Void
     ) {
         self.categories = categories
         self.plannedContributions = plannedContributions
         self.variableContributions = variableContributions
         self.allowsPlannedMinimum = allowsPlannedMinimum
+        self.maximumSuggestionProvider = maximumSuggestionProvider
         self.onSave = onSave
         _drafts = State(initialValue: drafts)
     }
@@ -39,10 +43,10 @@ struct CategoryGoalsEditorView: View {
                         Toggle("Auto-Configure", isOn: $autoConfigure)
                             .accessibilityIdentifier("categoryGoals.autoConfigure")
                             .onChange(of: autoConfigure) { _, enabled in
-                                configureMinimums(enabled: enabled)
+                                configureGoals(enabled: enabled)
                             }
                     } footer: {
-                        Text("Sets category minimums from attached presets within the budget dates. Only presets assigned to selected cards are included. You can still edit each category’s Min and Max. Turning this off restores previous minimums unless you edited them.")
+                        Text("Sets minimums from attached presets assigned to selected cards within the budget dates. When Suggest Maximums is enabled in Manage Categories, fills blank maximums from comparable budget history. You can edit every amount. Turning this off restores generated values unless you edited them.")
                     }
                 }
                 Section {
@@ -52,7 +56,9 @@ struct CategoryGoalsEditorView: View {
                                 category: category,
                                 draft: draftBinding(for: category.id),
                                 plannedContribution: plannedContributions[category.id] ?? 0,
-                                variableContribution: variableContributions[category.id] ?? 0
+                                variableContribution: variableContributions[category.id] ?? 0,
+                                maximumSuggestion: maximumSuggestions[category.id],
+                                showsMaximumSuggestion: autoConfigure && maximumSuggestionProvider != nil
                             )
                         } label: {
                             VStack(alignment: .leading, spacing: 6) {
@@ -64,6 +70,23 @@ struct CategoryGoalsEditorView: View {
                                     Text(category.name)
                                 }
                                 goalSummary(for: category.id)
+                                if autoConfigure, maximumSuggestionProvider != nil {
+                                    if let suggestion = maximumSuggestions[category.id] {
+                                        Group {
+                                            if suggestion.samples.count == 1 {
+                                                Text("History: 1 past budget · \(suggestion.cushionPercent, format: .number.precision(.fractionLength(0)))% cushion")
+                                            } else {
+                                                Text("History: \(suggestion.samples.count) past budgets · \(suggestion.cushionPercent, format: .number.precision(.fractionLength(0)))% cushion")
+                                            }
+                                        }
+                                        .font(.footnote)
+                                        .foregroundStyle(.secondary)
+                                    } else {
+                                        Text("No comparable category history")
+                                            .font(.footnote)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                }
                             }
                         }
                     }
@@ -85,6 +108,11 @@ struct CategoryGoalsEditorView: View {
             }
             .navigationTitle("Category Goals")
             .navigationBarTitleDisplayMode(.inline)
+            .alert("Couldn’t Load Budget History", isPresented: $showingHistoryError) {
+                Button("OK", role: .cancel) { }
+            } message: {
+                Text("Minimums are still configured from your presets. Maximums were left unchanged. Turn Auto-Configure off and on to try again.")
+            }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
@@ -120,26 +148,23 @@ struct CategoryGoalsEditorView: View {
         }
     }
 
-    private func configureMinimums(enabled: Bool) {
+    private func configureGoals(enabled: Bool) {
         if enabled {
-            previousMinimums = [:]
-            generatedMinimums = [:]
-            for category in categories {
-                guard let amount = plannedContributions[category.id], amount > 0 else { continue }
-                var draft = drafts[category.id] ?? CategoryGoalDraft()
-                previousMinimums[category.id] = draft.minimumText
-                draft.minimumText = CurrencyFormatter.editingString(from: amount)
-                generatedMinimums[category.id] = draft.minimumText
-                drafts[category.id] = draft
+            do {
+                maximumSuggestions = try maximumSuggestionProvider?() ?? [:]
+            } catch {
+                maximumSuggestions = [:]
+                showingHistoryError = true
             }
+            generatedValues.apply(
+                to: &drafts,
+                categoryIDs: categories.map(\.id),
+                plannedContributions: plannedContributions,
+                suggestions: maximumSuggestions
+            )
         } else {
-            for (categoryID, generated) in generatedMinimums {
-                guard var draft = drafts[categoryID], draft.minimumText == generated else { continue }
-                draft.minimumText = previousMinimums[categoryID] ?? ""
-                drafts[categoryID] = draft
-            }
-            previousMinimums = [:]
-            generatedMinimums = [:]
+            generatedValues.restore(in: &drafts)
+            maximumSuggestions = [:]
         }
     }
 

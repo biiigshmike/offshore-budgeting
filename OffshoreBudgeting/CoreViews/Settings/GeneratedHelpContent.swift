@@ -827,6 +827,11 @@ enum GeneratedHelpContent {
                     id: "budgets-category-goals-creation",
                     header: "Goals During Budget Creation",
                     body: "Open the optional Category Goals section while creating a budget. Enter only the goals you need. These values remain a draft until you save the budget; canceling budget creation discards them.\n\nChoose which presets to include. Offshore creates their planned expenses within this budget’s dates. Select the cards you want this budget to track so their expenses can contribute to its totals."
+                ),
+                textSection(
+                    id: "budgets-category-goals-auto-configure",
+                    header: "Auto-Configure Goals",
+                    body: "While creating a budget, enable Auto-Configure to fill minimums from attached presets assigned to selected cards. Blank maximums can be suggested from average category spending in previous comparable budgets. Open a category to see the budgets behind its suggestion. You can edit every amount; turning Auto-Configure off restores generated values unless you edited them.\n\nSet workspace defaults in Settings > Manage Categories > Auto-Configure Goals. Start with 3 past budgets and no extra cushion, or choose 1–12 budgets and a cushion from 0–100%. Only budgets ending before today and before the new budget are used. Overlapping history windows are skipped. Durations match exactly, except 28–31 days, 90–92 days, and 365–366 days are treated as comparable groups.\n\nHistory follows Budget Detail totals: recorded actual amounts where available, planned amounts otherwise, with splits, refunds, and savings offsets included. Empty periods count as zero after the category first appears in expenses or goals. Limited history uses fewer samples; no history leaves the maximum blank. Suggestions are at least the planned or entered minimum. They are a starting point, not an assessment of affordability. Defaults sync with the workspace when using iCloud and are included in workspace backups. Changing defaults does not change saved goals."
                 )
             ]
         ),

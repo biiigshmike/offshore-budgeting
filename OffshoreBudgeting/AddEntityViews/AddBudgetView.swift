@@ -85,6 +85,8 @@ struct AddBudgetView: View {
                 startDate: startDate,
                 endDate: endDate
             ),
+            maximumGoalSuggestionProvider: workspace.categoryGoalAutoConfiguration.suggestMaximums
+                ? { try loadMaximumSuggestions() } : nil,
             name: $name,
             userEditedName: $userEditedName,
             startDate: $startDate,
@@ -141,6 +143,33 @@ struct AddBudgetView: View {
         } message: {
             Text(budgetSaveErrorMessage)
         }
+    }
+
+    /// Fetch history only when Auto-Configure is requested, never during form rendering.
+    private func loadMaximumSuggestions() throws -> [UUID: CategoryGoalSuggestion] {
+        let workspaceID = workspace.id
+        let cutoff = min(Calendar.current.startOfDay(for: startDate), Calendar.current.startOfDay(for: .now))
+        let budgets = try modelContext.fetch(FetchDescriptor<Budget>(predicate: #Predicate {
+            $0.workspace?.id == workspaceID && $0.startDate < cutoff
+        }))
+        let planned = try modelContext.fetch(FetchDescriptor<PlannedExpense>(predicate: #Predicate {
+            $0.workspace?.id == workspaceID && $0.expenseDate < cutoff
+        }))
+        let variable = try modelContext.fetch(FetchDescriptor<VariableExpense>(predicate: #Predicate {
+            $0.workspace?.id == workspaceID && $0.transactionDate < cutoff
+        }))
+        let settings = workspace.categoryGoalAutoConfiguration
+        return CategoryGoalSuggestionCalculator.calculate(
+            workspaceID: workspaceID,
+            budgets: budgets,
+            categories: CategoryArchivePolicy.activeCategories(from: categories),
+            plannedExpenses: planned,
+            variableExpenses: variable,
+            startDate: startDate,
+            endDate: endDate,
+            historyCount: settings.historyCount,
+            cushionPercent: settings.cushionPercent
+        )
     }
 
     // MARK: - Setup

@@ -5,6 +5,8 @@ struct CategoryGoalDraftEditorView: View {
     @Binding var draft: CategoryGoalDraft
     let plannedContribution: Double
     let variableContribution: Double
+    var maximumSuggestion: CategoryGoalSuggestion? = nil
+    var showsMaximumSuggestion = false
 
     var body: some View {
         CategoryLimitFormView(
@@ -17,7 +19,9 @@ struct CategoryGoalDraftEditorView: View {
             gaugeMax: draft.maximum,
             minText: $draft.minimumText,
             maxText: $draft.maximumText,
-            validationMessage: draft.validationMessage
+            validationMessage: draft.validationMessage,
+            maximumSuggestion: maximumSuggestion,
+            showsMaximumSuggestion: showsMaximumSuggestion
         )
         .navigationTitle(category.name)
         .navigationBarTitleDisplayMode(.inline)

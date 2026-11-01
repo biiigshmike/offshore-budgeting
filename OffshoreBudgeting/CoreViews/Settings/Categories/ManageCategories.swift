@@ -50,6 +50,14 @@ struct ManageCategoriesView: View {
 
     var body: some View {
         List {
+            Section {
+                NavigationLink {
+                    CategoryGoalAutoConfigurationSettingsView(workspace: workspace)
+                } label: {
+                    Label("Auto-Configure Goals", systemImage: "slider.horizontal.3")
+                }
+                .accessibilityIdentifier("categories.autoConfigureGoals")
+            }
             if activeCategories.isEmpty && archivedCategories.isEmpty {
                 ContentUnavailableView(
                     "No Categories Yet",

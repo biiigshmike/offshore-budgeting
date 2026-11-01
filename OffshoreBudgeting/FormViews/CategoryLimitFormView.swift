@@ -27,6 +27,8 @@ struct CategoryLimitFormView: View {
     @Binding var maxText: String
 
     let validationMessage: String?
+    var maximumSuggestion: CategoryGoalSuggestion? = nil
+    var showsMaximumSuggestion = false
 
     var body: some View {
         Form {
@@ -58,6 +60,9 @@ struct CategoryLimitFormView: View {
                 Text("Category Goals")
             } footer: {
                 Text("Goals apply only to this budget. Leave either amount blank if you don't want that goal.")
+            }
+            if showsMaximumSuggestion {
+                CategoryGoalSuggestionSection(suggestion: maximumSuggestion)
             }
         }
     }

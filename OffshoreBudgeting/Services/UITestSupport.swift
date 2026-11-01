@@ -114,6 +114,23 @@ enum UITestSupport {
             context.insert(budget)
             context.insert(BudgetCardLink(budget: budget, card: cardA))
             context.insert(BudgetPresetLink(budget: budget, preset: presetA))
+            if ProcessInfo.processInfo.arguments.contains("-uiTestCategoryGoalHistory") {
+                context.insert(Category(name: "New Category", hexColor: "#123456", workspace: workspace))
+                for monthsAgo in 1...3 {
+                    let start = Calendar.current.date(byAdding: .month, value: -monthsAgo, to: range.start)!
+                    let end = Calendar.current.date(byAdding: DateComponents(month: 1, day: -1), to: start)!
+                    let historical = Budget(name: "History \(monthsAgo)", startDate: start, endDate: end,
+                                            workspace: workspace)
+                    context.insert(historical)
+                    context.insert(BudgetCardLink(budget: historical, card: cardA))
+                    context.insert(PlannedExpense(title: "Historical bill", plannedAmount: 900,
+                                                 expenseDate: start, workspace: workspace,
+                                                 card: cardA, category: category, sourceBudgetID: historical.id))
+                    context.insert(VariableExpense(descriptionText: "Historical variable",
+                                                  amount: Double(100 + monthsAgo * 200), transactionDate: end,
+                                                  workspace: workspace, card: cardA, category: category))
+                }
+            }
             let defaults = UserDefaults.standard
             defaults.set(true, forKey: "didCompleteOnboarding")
             defaults.set(true, forKey: "onboarding_didChooseDataSource")

@@ -140,6 +140,8 @@ struct WorkspacePayload: Codable, Equatable {
     var hexColor: String
     // Optional so version-1 archives created before setup progress still decode.
     var completedSetupSteps: [WorkspaceProgressStep]? = nil
+    // Optional so archives predating automatic category maximums still decode.
+    var categoryGoalAutoConfiguration: CategoryGoalAutoConfigurationSettings? = nil
 }
 
 extension WorkspaceProgressStep {

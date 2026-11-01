@@ -68,6 +68,8 @@ struct WorkspaceImportService {
             ),
             hexColor: normalizedHexColor(archive.workspace.hexColor)
         )
+        importedWorkspace.categoryGoalAutoConfiguration = archive.workspace.categoryGoalAutoConfiguration
+            ?? CategoryGoalAutoConfigurationSettings()
         modelContext.insert(importedWorkspace)
 
         do {

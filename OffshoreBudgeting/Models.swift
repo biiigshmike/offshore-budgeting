@@ -303,6 +303,11 @@ final class Workspace {
     var name: String = ""
     var hexColor: String = "#3B82F6"
 
+    // Defaulted scalar settings are additive for existing local and CloudKit stores.
+    var categoryGoalSuggestMaximums: Bool = true
+    var categoryGoalHistoryCount: Int = 3
+    var categoryGoalCushionPercent: Double = 0
+
     // Permanent setup milestones. Additive defaults preserve existing local and CloudKit stores.
     var setupHasCreatedCard: Bool = false
     var setupHasCreatedCategory: Bool = false

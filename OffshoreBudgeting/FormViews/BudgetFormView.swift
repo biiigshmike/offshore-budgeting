@@ -19,6 +19,7 @@ struct BudgetFormView: View {
     
     let scheduleString: (Preset) -> String
     var plannedGoalContributions: [UUID: Double]? = nil
+    var maximumGoalSuggestionProvider: (() throws -> [UUID: CategoryGoalSuggestion])? = nil
     
     // MARK: - Multiple-selection menus
 
@@ -266,7 +267,8 @@ struct BudgetFormView: View {
                 categories: categories,
                 drafts: categoryGoalDrafts,
                 plannedContributions: plannedGoalContributions ?? [:],
-                allowsPlannedMinimum: plannedGoalContributions != nil
+                allowsPlannedMinimum: plannedGoalContributions != nil,
+                maximumSuggestionProvider: maximumGoalSuggestionProvider
             ) { updatedDrafts in
                 categoryGoalDrafts = updatedDrafts
             }
