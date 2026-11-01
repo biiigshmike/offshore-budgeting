@@ -75,6 +75,29 @@ struct ContentView: View {
     // MARK: - Onboarding
 
     @AppStorage("didCompleteOnboarding") private var didCompleteOnboarding: Bool = false
+    @AppStorage(WorkspaceProgressHandoffStore.pendingWorkspaceIDKey)
+    private var pendingWorkspaceProgressID = ""
+    @State private var progressHandoffCoordinator = WorkspaceProgressHandoffCoordinator.shared
+    @State private var progressHandoffOwnerID = UUID()
+    @State private var progressHandoffWorkspace: Workspace?
+    @State private var progressHandoffForcesHome = false
+
+    private var defersAutomaticLaunchPrompts: Bool {
+        !pendingWorkspaceProgressID.isEmpty || progressHandoffCoordinator.isPresenting
+    }
+
+    private var progressHandoffEligibility: [String] {
+        [pendingWorkspaceProgressID, selectedWorkspaceID, String(didCompleteOnboarding),
+         String(scenePhase == .active), String(presentationActivity.isBusy),
+         progressHandoffCoordinator.ownerID?.uuidString ?? "", String(activeUseICloud)]
+        + workspaces.map { $0.id.uuidString }
+    }
+
+    private var waitingForProgressHandoffWorkspace: Bool {
+        guard activeUseICloud, let requestedID = UUID(uuidString: pendingWorkspaceProgressID),
+              UUID(uuidString: selectedWorkspaceID) == requestedID else { return false }
+        return !workspaces.contains { $0.id == requestedID }
+    }
 
     // MARK: - Privacy
 
@@ -115,7 +138,7 @@ struct ContentView: View {
                     AppRootView(
                         workspace: selected,
                         selectedWorkspaceID: $selectedWorkspaceID,
-                        initialSectionOverride: initialSectionOverride,
+                        initialSectionOverride: !pendingWorkspaceProgressID.isEmpty || progressHandoffForcesHome ? .home : initialSectionOverride,
                         onTabInteraction: handleTabInteraction
                     )
                     .modifier(UncategorizedExpenseReviewPresenter(
@@ -137,6 +160,17 @@ struct ContentView: View {
                         )
                     }
                 }
+            }
+            .appSheet(item: $progressHandoffWorkspace, onDismiss: finishProgressHandoff) { workspace in
+                WorkspaceProgressHandoffView(workspace: workspace) {
+                    progressHandoffWorkspace = nil
+                }
+            }
+            .task(id: progressHandoffEligibility) {
+                // Mount Home inside the app-lock gate before trying to present a sheet.
+                await Task.yield()
+                guard !Task.isCancelled else { return }
+                presentProgressHandoffIfNeeded()
             }
             .task {
                 let discoveryPhase = ICloudBootstrap.workspaceDiscoveryPhase(
@@ -187,6 +221,10 @@ struct ContentView: View {
                 syncICloudPreferenceSnapshots()
             }
             .onChange(of: selectedWorkspaceID) { _, newValue in
+                if progressHandoffCoordinator.ownerID == progressHandoffOwnerID,
+                   progressHandoffCoordinator.workspaceID != UUID(uuidString: newValue) {
+                    progressHandoffWorkspace = nil
+                }
                 backfillSelectedWorkspaceProgress()
                 syncSelectedWorkspaceToWidgetStores(newValue)
                 TabFlickerDiagnostics.markEvent(
@@ -294,7 +332,8 @@ struct ContentView: View {
                     iCloudBootstrapStartedAt = 0
                 }
 
-                if didCompleteOnboarding, newCount > 0, selectedWorkspace == nil {
+                if didCompleteOnboarding, newCount > 0, selectedWorkspace == nil,
+                   !waitingForProgressHandoffWorkspace {
                     selectedWorkspaceID = workspaces.first?.id.uuidString ?? ""
                 }
 
@@ -335,6 +374,26 @@ struct ContentView: View {
             }
         }
         .environment(\.appPresentationActivity, presentationActivity)
+        .environment(\.automaticLaunchPromptsDeferred, defersAutomaticLaunchPrompts)
+        .onChange(of: didCompleteOnboarding) { _, completed in
+            if !completed { progressHandoffWorkspace = nil }
+        }
+        .onChange(of: workspaces.map(\.id)) { previousIDs, currentIDs in
+            let store = WorkspaceProgressHandoffStore()
+            if let requestedID = store.pendingWorkspaceID,
+               previousIDs.contains(requestedID), !currentIDs.contains(requestedID) {
+                store.cancel()
+            }
+            if progressHandoffCoordinator.ownerID == progressHandoffOwnerID,
+               let presentedID = progressHandoffCoordinator.workspaceID,
+               !currentIDs.contains(presentedID) {
+                progressHandoffWorkspace = nil
+            }
+        }
+        .onDisappear {
+            // Closing a window releases its process-wide claim; consumed requests stay consumed.
+            finishProgressHandoff()
+        }
         .onChange(of: scenePhase, initial: true) { _, phase in
             expenseReviewSession.update(phase: phase, enabled: reviewUncategorizedExpensesOnOpen)
         }
@@ -344,6 +403,43 @@ struct ContentView: View {
         .onChange(of: reviewUncategorizedExpensesOnOpen) { _, enabled in
             if !enabled { expenseReviewSession.consume() }
         }
+    }
+
+    private func presentProgressHandoffIfNeeded() {
+        guard didCompleteOnboarding, scenePhase == .active,
+              !progressHandoffCoordinator.isPresenting, !presentationActivity.isBusy,
+              !pendingWorkspaceProgressID.isEmpty else { return }
+        let store = WorkspaceProgressHandoffStore()
+        guard let requestedID = store.pendingWorkspaceID else {
+            store.cancel()
+            return
+        }
+        guard selectedWorkspaceID == requestedID.uuidString else {
+            store.cancel()
+            return
+        }
+        guard let workspace = workspaces.first(where: { $0.id == requestedID }) else {
+            // An empty iCloud query may still be restoring. Never substitute another workspace.
+            if !activeUseICloud { store.cancel() }
+            return
+        }
+        do {
+            try WorkspaceProgressService.backfill(in: workspace, modelContext: modelContext)
+        } catch {
+            // Keep the request for a future foreground retry if the store cannot be read/saved.
+            return
+        }
+        progressHandoffForcesHome = true
+        if WorkspaceProgressService.canHideProgress(in: workspace) {
+            store.consume(workspaceID: requestedID)
+            return
+        }
+        guard progressHandoffCoordinator.claim(workspaceID: requestedID, ownerID: progressHandoffOwnerID, store: store) else { return }
+        progressHandoffWorkspace = workspace
+    }
+
+    private func finishProgressHandoff() {
+        progressHandoffCoordinator.finish(ownerID: progressHandoffOwnerID)
     }
 
     private func syncICloudPreferenceSnapshots(changedKeys: [String]? = nil) {

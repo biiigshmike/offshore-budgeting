@@ -519,8 +519,13 @@ struct OnboardingView: View {
     // MARK: - Completion
     
     private func completeOnboarding() {
-        if selectedWorkspaceID.isEmpty {
-            selectedWorkspaceID = workspaces.first?.id.uuidString ?? ""
+        let handoffStore = WorkspaceProgressHandoffStore()
+        if let workspace = currentWorkspace {
+            selectedWorkspaceID = workspace.id.uuidString
+            handoffStore.enqueue(workspaceID: workspace.id)
+        } else {
+            selectedWorkspaceID = ""
+            handoffStore.cancel()
         }
         
         didCompleteOnboarding = true

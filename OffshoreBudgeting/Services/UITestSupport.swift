@@ -53,6 +53,7 @@ enum UITestSupport {
         defaults.set(false, forKey: "onboarding_didChooseDataSource")
         defaults.set(false, forKey: "onboarding_didPressGetStarted")
         defaults.set(0, forKey: "onboarding_step")
+        defaults.removeObject(forKey: WorkspaceProgressHandoffStore.pendingWorkspaceIDKey)
 
         defaults.set("", forKey: "selectedWorkspaceID")
         defaults.set(false, forKey: "didSeedDefaultWorkspaces")
@@ -125,6 +126,28 @@ enum UITestSupport {
             }
 
         case .workspaceProgress:
+            let arguments = ProcessInfo.processInfo.arguments
+            if arguments.contains("-uiTestProgressDelayedWorkspace") {
+                let workspaceID = UUID(uuidString: "5AA29E56-BBDB-4CC9-A286-720F6F35B001")!
+                let defaults = UserDefaults.standard
+                defaults.set(true, forKey: "didCompleteOnboarding")
+                defaults.set(true, forKey: "onboarding_didChooseDataSource")
+                defaults.set(true, forKey: "onboarding_didPressGetStarted")
+                defaults.set(true, forKey: "didSeedDefaultWorkspaces")
+                defaults.set(workspaceID.uuidString, forKey: "selectedWorkspaceID")
+                // Simulate asynchronous cloud discovery; the scenario container remains local-only.
+                defaults.set(true, forKey: "icloud_activeUseCloud")
+                defaults.set(Date().timeIntervalSince1970, forKey: "icloud_bootstrapStartedAt")
+                defaults.set(false, forKey: "privacy_requireBiometrics")
+                defaults.set(false, forKey: "general_reviewUncategorizedExpensesOnOpen")
+                defaults.set(false, forKey: WorkspaceProgressPreferences.hiddenKey(workspaceID: workspaceID))
+                WorkspaceProgressHandoffStore(defaults: defaults).enqueue(workspaceID: workspaceID)
+                if let release = SettingsReleaseLogsView.currentReleaseSection {
+                    defaults.set(release.id, forKey: "releaseLogs_seenReleaseIDs")
+                }
+                scheduleDelayedProgressWorkspaceInsert(using: container)
+                break
+            }
             let workspace = Workspace(
                 id: UUID(uuidString: "5AA29E56-BBDB-4CC9-A286-720F6F35B001")!,
                 name: "Progress Workspace", hexColor: "#3B82F6"
@@ -139,10 +162,12 @@ enum UITestSupport {
             let budget = Budget(name: "First Budget", startDate: .now, endDate: .now, workspace: workspace)
             context.insert(category)
             context.insert(budget)
+            var progressCard: Card?
             if ProcessInfo.processInfo.arguments.contains("-uiTestProgressNoCard") {
                 workspace.setupHasCreatedCard = true
             } else {
                 let card = Card(name: "First Card", workspace: workspace)
+                progressCard = card
                 let preset = Preset(title: "Internet", plannedAmount: 60, workspace: workspace,
                                     defaultCard: card, defaultCategory: category)
                 context.insert(card)
@@ -155,15 +180,35 @@ enum UITestSupport {
                                       isPlanned: true, workspace: workspace))
             }
             let defaults = UserDefaults.standard
-            defaults.set(true, forKey: "didCompleteOnboarding")
+            let finishesOnboarding = arguments.contains("-uiTestProgressFinishOnboarding")
+            let skipsCloudOnboarding = arguments.contains("-uiTestProgressSkipOnboarding")
+            defaults.set(!(finishesOnboarding || skipsCloudOnboarding), forKey: "didCompleteOnboarding")
             defaults.set(true, forKey: "onboarding_didChooseDataSource")
+            defaults.set(true, forKey: "onboarding_didPressGetStarted")
+            defaults.set(finishesOnboarding ? OnboardingStep.presets.rawValue : 0, forKey: "onboarding_step")
+            if skipsCloudOnboarding {
+                // Exercise the existing-data skip prompt using this isolated local fixture.
+                defaults.set(true, forKey: "icloud_activeUseCloud")
+            }
             defaults.set(true, forKey: "didSeedDefaultWorkspaces")
             defaults.set(workspace.id.uuidString, forKey: "selectedWorkspaceID")
             defaults.set(false, forKey: "privacy_requireBiometrics")
             defaults.set(false, forKey: "general_reviewUncategorizedExpensesOnOpen")
+            if arguments.contains("-uiTestProgressPendingPrompts"), let progressCard {
+                context.insert(VariableExpense(descriptionText: "Handoff review expense", amount: 12,
+                    transactionDate: .now, workspace: workspace, card: progressCard, category: nil))
+                defaults.set(true, forKey: "general_reviewUncategorizedExpensesOnOpen")
+            }
             defaults.set(false, forKey: WorkspaceProgressPreferences.hiddenKey(workspaceID: workspace.id))
             defaults.set(false, forKey: WorkspaceProgressPreferences.hiddenKey(workspaceID: other.id))
-            if let release = SettingsReleaseLogsView.currentReleaseSection {
+            if arguments.contains("-uiTestProgressHandoff") {
+                WorkspaceProgressHandoffStore(defaults: defaults).enqueue(workspaceID: workspace.id)
+            } else {
+                WorkspaceProgressHandoffStore(defaults: defaults).cancel()
+            }
+            if arguments.contains("-uiTestProgressPendingPrompts") {
+                defaults.set("", forKey: "releaseLogs_seenReleaseIDs")
+            } else if let release = SettingsReleaseLogsView.currentReleaseSection {
                 defaults.set(release.id, forKey: "releaseLogs_seenReleaseIDs")
             }
 
@@ -258,6 +303,43 @@ enum UITestSupport {
                 try context.save()
             } catch {
                 assertionFailure("UITestSupport failed to save delayed workspace seed data: \(error)")
+            }
+        }
+    }
+
+    private static func scheduleDelayedProgressWorkspaceInsert(using container: ModelContainer) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+            let context = ModelContext(container)
+            let other = Workspace(id: UUID(uuidString: "5AA29E56-BBDB-4CC9-A286-720F6F35B002")!,
+                                  name: "Other Workspace", hexColor: "#10B981")
+            context.insert(other)
+            do {
+                try context.save()
+            } catch {
+                assertionFailure("UITestSupport failed to insert first remote workspace: \(error)")
+            }
+        }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+            let context = ModelContext(container)
+            let workspace = Workspace(id: UUID(uuidString: "5AA29E56-BBDB-4CC9-A286-720F6F35B001")!,
+                                      name: "Progress Workspace", hexColor: "#3B82F6")
+            let card = Card(name: "First Card", workspace: workspace)
+            let category = Category(name: "Bills", hexColor: "#3B82F6", workspace: workspace)
+            let preset = Preset(title: "Internet", plannedAmount: 60, workspace: workspace,
+                                defaultCard: card, defaultCategory: category)
+            let budget = Budget(name: "First Budget", startDate: .now, endDate: .now, workspace: workspace)
+            context.insert(workspace)
+            context.insert(card)
+            context.insert(category)
+            context.insert(preset)
+            context.insert(budget)
+            context.insert(BudgetCardLink(budget: budget, card: card))
+            context.insert(BudgetPresetLink(budget: budget, preset: preset))
+            do {
+                try context.save()
+            } catch {
+                assertionFailure("UITestSupport failed to insert requested remote workspace: \(error)")
             }
         }
     }

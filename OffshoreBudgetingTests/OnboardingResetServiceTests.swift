@@ -24,6 +24,7 @@ final class OnboardingResetServiceTests: XCTestCase {
         defaults.set(true, forKey: OnboardingResetService.didPressGetStartedKey)
         defaults.set(true, forKey: OnboardingResetService.didChooseDataSourceKey)
         defaults.set(true, forKey: OnboardingResetService.didCompleteOnboardingKey)
+        defaults.set(UUID().uuidString, forKey: WorkspaceProgressHandoffStore.pendingWorkspaceIDKey)
 
         OnboardingResetService.repeatOnboarding(defaults: defaults)
 
@@ -31,5 +32,6 @@ final class OnboardingResetServiceTests: XCTestCase {
         XCTAssertFalse(defaults.bool(forKey: OnboardingResetService.didPressGetStartedKey))
         XCTAssertFalse(defaults.bool(forKey: OnboardingResetService.didCompleteOnboardingKey))
         XCTAssertTrue(defaults.bool(forKey: OnboardingResetService.didChooseDataSourceKey))
+        XCTAssertNil(defaults.string(forKey: WorkspaceProgressHandoffStore.pendingWorkspaceIDKey))
     }
 }

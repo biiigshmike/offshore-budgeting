@@ -24,6 +24,11 @@ private struct PostBoardingReleaseLogPromptModifier: ViewModifier {
     @AppStorage("releaseLogs_seenReleaseIDs") private var seenReleaseIDsCSV: String = ""
 
     @State private var showingReleasePrompt: Bool = false
+    @State private var ownsPresentation = false
+    @State private var reservationID = UUID()
+    @Environment(\.automaticLaunchPromptsDeferred) private var automaticLaunchPromptsDeferred
+    @Environment(\.appPresentationActivity) private var presentationActivity
+    @Environment(\.scenePhase) private var scenePhase
 
     private var currentSection: SettingsReleaseLogsView.ReleaseSection? {
         SettingsReleaseLogsView.currentReleaseSection
@@ -32,33 +37,59 @@ private struct PostBoardingReleaseLogPromptModifier: ViewModifier {
     func body(content: Content) -> some View {
         let base = content
             .onAppear {
-                showingReleasePrompt = shouldShowPrompt()
+                refreshPresentation()
+            }
+            .onChange(of: automaticLaunchPromptsDeferred) { _, _ in
+                refreshPresentation()
+            }
+            .onChange(of: presentationActivity?.isBusy) { _, busy in
+                if busy != true { refreshPresentation() }
+            }
+            .onChange(of: scenePhase) { _, phase in
+                if phase == .active { refreshPresentation() }
             }
 
-        if shouldAttachSheet {
-            base.appSheet(isPresented: $showingReleasePrompt) {
-                if let section = currentSection {
-                    CurrentReleaseLogSheet(section: section) {
-                        markCurrentReleaseSeen()
-                        showingReleasePrompt = false
+        Group {
+            if shouldAttachSheet {
+                base.appSheet(isPresented: $showingReleasePrompt, onDismiss: releasePresentation) {
+                    if let section = currentSection {
+                        CurrentReleaseLogSheet(section: section) {
+                            markCurrentReleaseSeen()
+                            showingReleasePrompt = false
+                        }
                     }
                 }
+            } else {
+                base
             }
-        } else {
-            base
         }
+        .onDisappear(perform: releasePresentation)
     }
 
     private var shouldAttachSheet: Bool {
-        guard didCompleteOnboarding else { return false }
-        guard let section = currentSection else { return false }
-        return hasSeen(section.id) == false
+        ownsPresentation || shouldShowPrompt()
     }
 
     private func shouldShowPrompt() -> Bool {
+        guard !automaticLaunchPromptsDeferred else { return false }
         guard didCompleteOnboarding else { return false }
         guard let section = currentSection else { return false }
+        guard showingReleasePrompt || (scenePhase == .active && presentationActivity?.isBusy != true) else { return false }
         return hasSeen(section.id) == false
+    }
+
+    private func refreshPresentation() {
+        let shouldShow = shouldShowPrompt()
+        if shouldShow {
+            ownsPresentation = true
+            presentationActivity?.setPresented(true, id: reservationID)
+        }
+        showingReleasePrompt = shouldShow
+    }
+
+    private func releasePresentation() {
+        ownsPresentation = false
+        presentationActivity?.setPresented(false, id: reservationID)
     }
 
     private func hasSeen(_ releaseID: String) -> Bool {

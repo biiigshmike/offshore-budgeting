@@ -79,24 +79,50 @@ private struct PostBoardingTipModifier: ViewModifier {
     @AppStorage("releaseLogs_seenReleaseIDs") private var seenReleaseIDsCSV: String = ""
 
     @Environment(\.postBoardingTipPresenterIsActive) private var postBoardingTipPresenterIsActive
+    @Environment(\.automaticLaunchPromptsDeferred) private var automaticLaunchPromptsDeferred
+    @Environment(\.appPresentationActivity) private var presentationActivity
+    @Environment(\.scenePhase) private var scenePhase
     @Environment(PostBoardingTipsStore.self) private var postBoardingTipsStore
 
     @State private var showingTip: Bool = false
     @State private var didAcknowledgeTip: Bool = false
+    @State private var ownsPresentation = false
+    @State private var reservationID = UUID()
+    @State private var dismissedForCurrentActivation = false
 
     func body(content: Content) -> some View {
         let base = content
+            .onChange(of: presentationActivity?.isBusy) { _, busy in
+                if busy != true && postBoardingTipPresenterIsActive {
+                    refreshPresentationForCurrentEligibility(deferPresentation: true)
+                }
+            }
+            .onChange(of: scenePhase) { _, phase in
+                if phase == .active && postBoardingTipPresenterIsActive {
+                    refreshPresentationForCurrentEligibility(deferPresentation: true)
+                }
+            }
+            .onChange(of: automaticLaunchPromptsDeferred) { _, deferred in
+                if deferred {
+                    showingTip = false
+                    didAcknowledgeTip = false
+                } else if postBoardingTipPresenterIsActive {
+                    refreshPresentationForCurrentEligibility(deferPresentation: true)
+                }
+            }
             .onAppear {
                 if postBoardingTipPresenterIsActive {
                     refreshPresentationForCurrentEligibility(deferPresentation: true)
                 }
             }
             .onChange(of: postBoardingTipsStore.changeSerial) { _, _ in
+                dismissedForCurrentActivation = false
                 if postBoardingTipPresenterIsActive {
                     refreshPresentationForCurrentEligibility(deferPresentation: true)
                 }
             }
             .onChange(of: didCompleteOnboarding) { _, _ in
+                dismissedForCurrentActivation = false
                 if postBoardingTipPresenterIsActive {
                     refreshPresentationForCurrentEligibility(deferPresentation: true)
                 }
@@ -108,6 +134,7 @@ private struct PostBoardingTipModifier: ViewModifier {
             }
             .onChange(of: postBoardingTipPresenterIsActive) { _, isActive in
                 if isActive {
+                    dismissedForCurrentActivation = false
                     refreshPresentationForCurrentEligibility(deferPresentation: true)
                 } else {
                     showingTip = false
@@ -115,39 +142,41 @@ private struct PostBoardingTipModifier: ViewModifier {
                 }
             }
 
-        if shouldAttachSheet {
-            base.appSheet(isPresented: $showingTip, onDismiss: handleTipDismissal) {
-                TipSheet(
-                    title: title,
-                    items: items,
-                    buttonTitle: buttonTitle,
-                    onContinue: {
-                        didAcknowledgeTip = true
-                        showingTip = false
-                    }
-                )
+        Group {
+            if shouldAttachSheet {
+                base.appSheet(isPresented: $showingTip, onDismiss: handleTipDismissal) {
+                    TipSheet(
+                        title: title,
+                        items: items,
+                        buttonTitle: buttonTitle,
+                        onContinue: {
+                            didAcknowledgeTip = true
+                            showingTip = false
+                        }
+                    )
+                }
+            } else {
+                base
             }
-        } else {
-            base
         }
+        .onDisappear(perform: releasePresentation)
     }
 
     /// Important: don't attach a `.sheet` modifier once the tip is not eligible to show.
     /// In complex hierarchies (e.g. `NavigationSplitView`), extra "inactive" sheet presenters can
     /// cause sluggish or conflicted presentation of other sheets.
     private var shouldAttachSheet: Bool {
-        guard didCompleteOnboarding else { return false }
-        guard postBoardingTipPresenterIsActive else { return false }
-        guard !items.isEmpty else { return false }
-        guard hasPendingCurrentReleaseLog == false else { return false }
-        return postBoardingTipsStore.hasSeen(key) == false
+        ownsPresentation || shouldShowTip()
     }
 
     private func shouldShowTip() -> Bool {
+        guard !automaticLaunchPromptsDeferred else { return false }
+        guard !dismissedForCurrentActivation else { return false }
         guard didCompleteOnboarding else { return false }
         guard postBoardingTipPresenterIsActive else { return false }
         guard !items.isEmpty else { return false }
         guard hasPendingCurrentReleaseLog == false else { return false }
+        guard showingTip || (scenePhase == .active && presentationActivity?.isBusy != true) else { return false }
         return postBoardingTipsStore.hasSeen(key) == false
     }
 
@@ -162,10 +191,21 @@ private struct PostBoardingTipModifier: ViewModifier {
     }
 
     private func handleTipDismissal() {
+        // An idle-slot retry must not immediately reopen a tip the user swiped away.
+        // A forced deferral retains eligibility for after the handoff instead.
+        if !automaticLaunchPromptsDeferred {
+            dismissedForCurrentActivation = true
+        }
         if didAcknowledgeTip {
             markSeen()
         }
         didAcknowledgeTip = false
+        releasePresentation()
+    }
+
+    private func releasePresentation() {
+        ownsPresentation = false
+        presentationActivity?.setPresented(false, id: reservationID)
     }
 
     private func refreshPresentationForCurrentEligibility(deferPresentation: Bool = false) {
@@ -182,7 +222,12 @@ private struct PostBoardingTipModifier: ViewModifier {
         }
 
         if postBoardingTipPresenterIsActive {
-            showingTip = shouldShowTip()
+            let shouldShow = shouldShowTip()
+            if shouldShow {
+                ownsPresentation = true
+                presentationActivity?.setPresented(true, id: reservationID)
+            }
+            showingTip = shouldShow
         } else {
             showingTip = false
             didAcknowledgeTip = false

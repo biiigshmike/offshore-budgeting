@@ -10,7 +10,7 @@ import SwiftData
 
 enum AppResetService {
 
-    static func eraseAllLocalData(modelContext: ModelContext) throws {
+    static func eraseAllLocalData(modelContext: ModelContext, defaults: UserDefaults = .standard) throws {
 
         try deleteAll(VariableExpense.self, modelContext: modelContext)
         try deleteAll(PlannedExpense.self, modelContext: modelContext)
@@ -28,6 +28,7 @@ enum AppResetService {
         try deleteAll(Workspace.self, modelContext: modelContext)
 
         try modelContext.save()
+        WorkspaceProgressHandoffStore(defaults: defaults).cancel()
     }
 
     // MARK: - Private

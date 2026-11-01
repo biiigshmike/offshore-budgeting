@@ -258,7 +258,7 @@ struct SettingsView: View {
         case .about:
             SettingsAboutView()
         case .workspaceProgress:
-            SettingsWorkspaceProgressView(workspace: workspace)
+            WorkspaceProgressView(workspace: workspace)
         case .help:
             SettingsHelpView()
         case .general:

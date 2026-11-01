@@ -1,11 +1,13 @@
 import SwiftUI
 import SwiftData
 
-struct SettingsWorkspaceProgressView: View {
+struct WorkspaceProgressView: View {
     let workspace: Workspace
+    let showsHandoffGuidance: Bool
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Query private var cards: [Card]
     @Query private var categories: [Category]
     @Query private var presets: [Preset]
@@ -14,8 +16,9 @@ struct SettingsWorkspaceProgressView: View {
     @State private var activeStep: WorkspaceProgressStep?
     @State private var showingRefreshError = false
 
-    init(workspace: Workspace) {
+    init(workspace: Workspace, showsHandoffGuidance: Bool = false) {
         self.workspace = workspace
+        self.showsHandoffGuidance = showsHandoffGuidance
         let workspaceID = workspace.id
 
         var cardDescriptor = FetchDescriptor<Card>(predicate: #Predicate { $0.workspace?.id == workspaceID })
@@ -58,7 +61,13 @@ struct SettingsWorkspaceProgressView: View {
             Section {
                 progressSummary
             } footer: {
-                Text("Each completed step represents a core feature of Offshore Budgeting enabled in this workspace. Steps stay checked even if you later archive or delete an item.")
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Each completed step represents a core feature of Offshore Budgeting enabled in this workspace. Steps stay checked even if you later archive or delete an item.")
+                    if showsHandoffGuidance {
+                        Text("You can return to Workspace Progress in Settings.")
+                            .accessibilityIdentifier("workspaceProgressReturnGuidance")
+                    }
+                }
             }
 
             Section("Checklist") {
@@ -115,7 +124,11 @@ struct SettingsWorkspaceProgressView: View {
     }
 
     private var progressSummary: some View {
-        HStack(alignment: .center, spacing: 16) {
+        let layout = dynamicTypeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 16))
+            : AnyLayout(HStackLayout(alignment: .center, spacing: 16))
+
+        return layout {
             VStack(spacing: 12) {
                 progressRing
 
@@ -242,7 +255,7 @@ struct SettingsWorkspaceProgressView: View {
     let container = PreviewSeed.makeContainer()
     PreviewHost(container: container) { workspace in
         NavigationStack {
-            SettingsWorkspaceProgressView(workspace: workspace)
+            WorkspaceProgressView(workspace: workspace)
         }
     }
 }

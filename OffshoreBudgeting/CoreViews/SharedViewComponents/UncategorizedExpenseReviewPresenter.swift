@@ -8,6 +8,7 @@ struct UncategorizedExpenseReviewPresenter: ViewModifier {
     let onSave: () -> Void
 
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.automaticLaunchPromptsDeferred) private var automaticLaunchPromptsDeferred
     @AppStorage("general_hideFutureVariableExpenses") private var hideFuture = false
     @AppStorage("releaseLogs_seenReleaseIDs") private var seenReleaseIDs = ""
     @Query private var expenses: [VariableExpense]
@@ -38,7 +39,7 @@ struct UncategorizedExpenseReviewPresenter: ViewModifier {
     private var eligibility: [String] {
         [String(session.generation), String(session.isPending), workspace.id.uuidString,
          String(activity.isBusy), String(scenePhase == .active), seenReleaseIDs,
-         String(expenses.count), String(categories.count), String(hideFuture)]
+         String(expenses.count), String(categories.count), String(hideFuture), String(automaticLaunchPromptsDeferred)]
     }
 
     func body(content: Content) -> some View {
@@ -60,7 +61,7 @@ struct UncategorizedExpenseReviewPresenter: ViewModifier {
                     session.consume()
                     return
                 }
-                guard session.isPending, scenePhase == .active,
+                guard session.isPending, scenePhase == .active, !automaticLaunchPromptsDeferred,
                       !activity.isBusy, !hasPendingRelease, reviewWorkspace == nil else { return }
                 let eligible = UncategorizedExpenseReviewService.expenses(
                     in: expenses, workspaceID: workspace.id, hideFuture: hideFuture
