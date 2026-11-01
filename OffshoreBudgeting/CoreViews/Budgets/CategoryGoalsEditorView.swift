@@ -93,7 +93,7 @@ struct CategoryGoalsEditorView: View {
                     }
                 } footer: {
                     Text("Goals apply only to this budget. Leave either amount blank if you don't want that goal.")
-                    Text("Maximums also power Savings at Goal Maximums in Budget Detail and Category Availability on Home.")
+                    Text("Maximums also power Savings at Goal Maximums in Budget Detail and Category Goals on Home.")
                 }
                 Section {
                     HelpTopicLink(topicID: "budgets-category-goals", title: "Category Goals guide", font: .body)

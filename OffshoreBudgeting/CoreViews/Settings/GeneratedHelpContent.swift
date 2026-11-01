@@ -675,6 +675,11 @@ enum GeneratedHelpContent {
             destinationID: "home",
             title: "Widgets",
             sections: [
+                textSection(
+                    id: "home-widgets-category-goals",
+                    header: "Category Goals",
+                    body: "Category Goals compares spending during Home’s selected dates with maximums from the budget named in the widget subtitle. The marker on each category’s chart is its maximum; spending can extend beyond it. Each row uses its own scale. Categories without a maximum show unlimited availability.\n\nTap a category to edit its minimum and maximum for that budget. The editor uses the full budget’s dates and linked cards, so its spending totals can differ from Home. Save to apply changes, or Cancel to keep the goals unchanged. Use the page controls to review more categories."
+                ),
                 mediaSection(
                     id: "home-widgets-overview",
                     header: "Widgets",
@@ -821,7 +826,7 @@ enum GeneratedHelpContent {
                 textSection(
                     id: "budgets-category-goals-savings",
                     header: "Savings at Goal Maximums",
-                    body: "Maximums also power Savings at Goal Maximums in Budget Detail and Category Availability on Home.\n\nThe savings estimate starts with planned income, subtracts current expense impact, then reserves the unused allowance under each category maximum. Planned expenses use recorded amounts when available and planned amounts otherwise. Shared splits, payments from savings, and refunds follow the usual budget-impact rules. Expenses are counted once, and spending already above a maximum stays included.\n\nThe estimate uses the full budget’s linked cards and dates, regardless of search, category filters, or expense-list type. Future-expense calculation settings still apply. Categories without a maximum, including minimum-only goals and Uncategorized, receive no extra allowance. Manual savings adjustments are not included.\n\nThis scenario appears when at least one maximum is set, including zero. Projected Savings keeps its existing meaning. Category Availability on Home uses goals from the budget named in its footnote and spending during Home’s selected dates, so its amounts can differ from Budget Detail."
+                    body: "Maximums also power Savings at Goal Maximums in Budget Detail and Category Goals on Home.\n\nThe savings estimate starts with planned income, subtracts current expense impact, then reserves the unused allowance under each category maximum. Planned expenses use recorded amounts when available and planned amounts otherwise. Shared splits, payments from savings, and refunds follow the usual budget-impact rules. Expenses are counted once, and spending already above a maximum stays included.\n\nThe estimate uses the full budget’s linked cards and dates, regardless of search, category filters, or expense-list type. Future-expense calculation settings still apply. Categories without a maximum, including minimum-only goals and Uncategorized, receive no extra allowance. Manual savings adjustments are not included.\n\nThis scenario appears when at least one maximum is set, including zero. Projected Savings keeps its existing meaning. Category Goals on Home uses goals from the budget named in its subtitle and spending during Home’s selected dates, so its amounts can differ from Budget Detail."
                 ),
                 textSection(
                     id: "budgets-category-goals-editing",

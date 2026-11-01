@@ -82,12 +82,15 @@ struct CategoryAvailabilityMetric: Identifiable, Equatable {
     }
 
     func status(for scope: AvailabilityScope, nearThreshold: Double) -> CategoryAvailabilityStatus {
-        guard let maxAmount, maxAmount > 0 else { return .ok }
+        guard let maxAmount, maxAmount >= 0 else { return .ok }
 
         let spentValue = spent(for: scope)
         if spentValue > maxAmount {
             return .over
         }
+
+        // An explicit zero goal with no spending is OK, rather than approaching a positive limit.
+        if maxAmount == 0 { return .ok }
 
         let available = maxAmount - spentValue
         let ratio = available / maxAmount
@@ -99,9 +102,9 @@ struct CategoryAvailabilityMetric: Identifiable, Equatable {
         return .ok
     }
 
-    /// True only when category has a real max (not ∞) and can be classified as over/near.
+    /// A nonnegative maximum, including zero, can be classified as over/near.
     var isLimited: Bool {
-        if let maxAmount, maxAmount > 0 { return true }
+        if let maxAmount, maxAmount >= 0 { return true }
         return false
     }
 }

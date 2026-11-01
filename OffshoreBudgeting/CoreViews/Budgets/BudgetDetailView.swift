@@ -991,7 +991,7 @@ struct BudgetDetailView: View {
             }
         } footer: {
             Text("Set optional minimum and maximum spending goals for each category. Tap Goals to edit them, or press and hold a category.")
-            Text("Maximums also power Savings at Goal Maximums in Budget Detail and Category Availability on Home.")
+            Text("Maximums also power Savings at Goal Maximums in Budget Detail and Category Goals on Home.")
         }
     }
 

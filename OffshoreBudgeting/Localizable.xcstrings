@@ -628,6 +628,7 @@
       }
     },
     "%@:" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -11521,6 +11522,53 @@
         }
       }
     },
+    "Category Goals compares spending during Home’s selected dates with maximums from the budget named in the widget subtitle. The marker on each category’s chart is its maximum; spending can extend beyond it. Each row uses its own scale. Categories without a maximum show unlimited availability.\n\nTap a category to edit its minimum and maximum for that budget. The editor uses the full budget’s dates and linked cards, so its spending totals can differ from Home. Save to apply changes, or Cancel to keep the goals unchanged. Use the page controls to review more categories." : {
+      "comment" : "Category Goals widget guidance.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تقارن أهداف الفئات الإنفاق خلال التواريخ المحددة في الرئيسية بالحدود القصوى من الميزانية المسماة في العنوان الفرعي للأداة. تمثل العلامة في مخطط كل فئة حدها الأقصى؛ ويمكن أن يمتد الإنفاق إلى ما بعده. لكل صف مقياسه الخاص. تعرض الفئات التي ليس لها حد أقصى مبلغًا متاحًا غير محدود.\n\nاضغط على فئة لتعديل حدها الأدنى والأقصى لهذه الميزانية. يستخدم المحرر تواريخ الميزانية وبطاقاتها المرتبطة كاملة، لذا قد تختلف إجماليات الإنفاق عن الرئيسية. احفظ لتطبيق التغييرات، أو ألغِ للاحتفاظ بالأهداف دون تغيير. استخدم عناصر التحكم بالصفحات لمراجعة مزيد من الفئات."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kategorieziele vergleicht Ausgaben an den auf der Startseite gewählten Daten mit Höchstwerten aus dem im Widget-Untertitel genannten Budget. Die Markierung im Diagramm jeder Kategorie ist ihr Höchstwert; Ausgaben können darüber hinausgehen. Jede Zeile verwendet eine eigene Skala. Kategorien ohne Höchstwert zeigen unbegrenzten Spielraum.\n\nTippen Sie auf eine Kategorie, um ihren Mindest- und Höchstwert für dieses Budget zu bearbeiten. Der Editor verwendet die Daten und verknüpften Karten des gesamten Budgets, daher können Ausgabensummen von der Startseite abweichen. Speichern übernimmt Änderungen, Abbrechen behält die Ziele bei. Blättern Sie mit den Seitensteuerelementen durch weitere Kategorien."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Category Goals compares spending during Home’s selected dates with maximums from the budget named in the widget subtitle. The marker on each category’s chart is its maximum; spending can extend beyond it. Each row uses its own scale. Categories without a maximum show unlimited availability.\n\nTap a category to edit its minimum and maximum for that budget. The editor uses the full budget’s dates and linked cards, so its spending totals can differ from Home. Save to apply changes, or Cancel to keep the goals unchanged. Use the page controls to review more categories."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Objetivos por categoría compara el gasto durante las fechas seleccionadas en Inicio con los máximos del presupuesto indicado en el subtítulo del widget. El marcador del gráfico de cada categoría indica su máximo; el gasto puede superarlo. Cada fila usa su propia escala. Las categorías sin máximo muestran disponibilidad ilimitada.\n\nToca una categoría para editar su mínimo y máximo para ese presupuesto. El editor usa todas las fechas y tarjetas vinculadas del presupuesto, por lo que los totales pueden diferir de Inicio. Guarda para aplicar los cambios o cancela para mantener los objetivos. Usa los controles de página para revisar más categorías."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les Objectifs par catégorie comparent les dépenses pendant les dates sélectionnées dans Accueil aux maximums du budget nommé dans le sous-titre du widget. Le repère sur le graphique de chaque catégorie indique son maximum ; les dépenses peuvent le dépasser. Chaque ligne utilise sa propre échelle. Les catégories sans maximum affichent un disponible illimité.\n\nTouchez une catégorie pour modifier son minimum et son maximum pour ce budget. L’éditeur utilise toutes les dates et les cartes associées au budget ; les totaux peuvent donc différer d’Accueil. Enregistrez pour appliquer les changements ou annulez pour conserver les objectifs. Utilisez les commandes de pagination pour consulter d’autres catégories."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Metas por categoria compara os gastos nas datas selecionadas no Início com os máximos do orçamento identificado no subtítulo do widget. O marcador no gráfico de cada categoria indica seu máximo; os gastos podem ultrapassá-lo. Cada linha usa sua própria escala. Categorias sem máximo mostram disponibilidade ilimitada.\n\nToque em uma categoria para editar seu mínimo e máximo para esse orçamento. O editor usa todas as datas e os cartões vinculados ao orçamento, então os totais podem diferir do Início. Salve para aplicar as alterações ou cancele para manter as metas. Use os controles de página para revisar mais categorias."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "类别目标将首页所选日期内的支出与小组件副标题所列预算的上限进行比较。每个类别图表上的标记表示其上限，支出可以超出该标记。每一行使用独立的刻度。未设置上限的类别会显示无限可用额度。\n\n轻点类别可编辑该预算的下限和上限。编辑器使用整个预算的日期和关联卡片，因此支出总额可能与首页不同。保存以应用更改，或取消以保留原有目标。使用分页控件查看更多类别。"
+          }
+        }
+      }
+    },
     "Category Goals guide" : {
       "localizations" : {
         "ar" : {
@@ -19436,6 +19484,54 @@
       "comment" : "A description of the checklist in the settings workspace progress view.",
       "isCommentAutoGenerated" : true
     },
+    "Each row uses its own scale · Marker = maximum" : {
+      "comment" : "Legend for the Category Goals per-row spending charts.",
+      "extractionState" : "stale",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "لكل صف مقياسه الخاص · العلامة = الحد الأقصى"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Jede Zeile hat ihre eigene Skala · Markierung = Höchstwert"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Each row uses its own scale · Marker = maximum"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cada fila usa su propia escala · Marcador = máximo"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chaque ligne a sa propre échelle · Repère = maximum"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cada linha usa sua própria escala · Marcador = máximo"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "每行使用独立刻度 · 标记 = 上限"
+          }
+        }
+      }
+    },
     "Edit" : {
       "localizations" : {
         "ar" : {
@@ -23705,6 +23801,7 @@
     },
     "Goals from %@. Availability uses Home’s selected dates. See Savings at Goal Maximums in Budget Detail for a full-budget estimate." : {
       "comment" : "Category goal savings scenario and guidance.",
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -26075,48 +26172,48 @@
       }
     },
     "homeWidget.categoryAvailability" : {
-      "comment" : "Pinned home widget title for category availability.",
+      "comment" : "Pinned home widget title for Category Goals.",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "توفر الفئة"
+            "value" : "أهداف الفئات"
           }
         },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Verfügbarkeit der Kategorie"
+            "value" : "Kategorieziele"
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Category Availability"
+            "value" : "Category Goals"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Disponibilidad por Categoria"
+            "value" : "Objetivos por categoría"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "catégorie Availability"
+            "value" : "Objectifs par catégorie"
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Disponibilidade da categoria"
+            "value" : "Metas por categoria"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "类别可用性"
+            "value" : "类别目标"
           }
         }
       }
@@ -26170,6 +26267,7 @@
     },
     "homeWidget.categoryAvailability.hint.near" : {
       "comment" : "Accessibility hint when category is near maximum.",
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -26217,6 +26315,7 @@
     },
     "homeWidget.categoryAvailability.hint.noMax" : {
       "comment" : "Accessibility hint when category has no maximum.",
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -26264,6 +26363,7 @@
     },
     "homeWidget.categoryAvailability.hint.ok" : {
       "comment" : "Accessibility hint when category is within maximum.",
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -26311,6 +26411,7 @@
     },
     "homeWidget.categoryAvailability.hint.over" : {
       "comment" : "Accessibility hint when category is over maximum.",
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -32650,96 +32751,96 @@
         }
       }
     },
-    "Maximums also power Savings at Goal Maximums in Budget Detail and Category Availability on Home." : {
+    "Maximums also power Savings at Goal Maximums in Budget Detail and Category Goals on Home." : {
       "comment" : "Category goal savings scenario and guidance.",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "تُستخدم الحدود القصوى أيضًا لحساب «المدخرات عند الحدود القصوى للأهداف» في تفاصيل الميزانية و«توفر الفئة» في الرئيسية."
+            "value" : "تُستخدم الحدود القصوى أيضًا لحساب «المدخرات عند الحدود القصوى للأهداف» في تفاصيل الميزانية و«أهداف الفئات» في الرئيسية."
           }
         },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Höchstwerte bestimmen auch „Ersparnisse bei Zielhöchstwerten“ in den Budgetdetails und „Verfügbarkeit der Kategorie“ auf der Startseite."
+            "value" : "Höchstwerte bestimmen auch „Ersparnisse bei Zielhöchstwerten“ in den Budgetdetails und „Kategorieziele“ auf der Startseite."
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Maximums also power Savings at Goal Maximums in Budget Detail and Category Availability on Home."
+            "value" : "Maximums also power Savings at Goal Maximums in Budget Detail and Category Goals on Home."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Los máximos también se usan para calcular Ahorro con los máximos de los objetivos en Detalle del presupuesto y Disponibilidad por categoría en Inicio."
+            "value" : "Los máximos también se usan para calcular Ahorro con los máximos de los objetivos en Detalle del presupuesto y Objetivos por categoría en Inicio."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Les maximums servent aussi au calcul de l’Épargne aux maximums des objectifs dans les détails du budget et de la disponibilité par catégorie dans Accueil."
+            "value" : "Les maximums servent aussi au calcul de l’Épargne aux maximums des objectifs dans les détails du budget et des Objectifs par catégorie dans Accueil."
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Os máximos também são usados em Economia nos máximos das metas nos detalhes do orçamento e em Disponibilidade da categoria no Início."
+            "value" : "Os máximos também são usados em Economia nos máximos das metas nos detalhes do orçamento e em Metas por categoria no Início."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "上限还用于计算预算详情中的“达到目标上限时的节省”和首页中的“类别可用性”。"
+            "value" : "上限还用于计算预算详情中的“达到目标上限时的节省”和首页中的“类别目标”。"
           }
         }
       }
     },
-    "Maximums also power Savings at Goal Maximums in Budget Detail and Category Availability on Home.\n\nThe savings estimate starts with planned income, subtracts current expense impact, then reserves the unused allowance under each category maximum. Planned expenses use recorded amounts when available and planned amounts otherwise. Shared splits, payments from savings, and refunds follow the usual budget-impact rules. Expenses are counted once, and spending already above a maximum stays included.\n\nThe estimate uses the full budget’s linked cards and dates, regardless of search, category filters, or expense-list type. Future-expense calculation settings still apply. Categories without a maximum, including minimum-only goals and Uncategorized, receive no extra allowance. Manual savings adjustments are not included.\n\nThis scenario appears when at least one maximum is set, including zero. Projected Savings keeps its existing meaning. Category Availability on Home uses goals from the budget named in its footnote and spending during Home’s selected dates, so its amounts can differ from Budget Detail." : {
+    "Maximums also power Savings at Goal Maximums in Budget Detail and Category Goals on Home.\n\nThe savings estimate starts with planned income, subtracts current expense impact, then reserves the unused allowance under each category maximum. Planned expenses use recorded amounts when available and planned amounts otherwise. Shared splits, payments from savings, and refunds follow the usual budget-impact rules. Expenses are counted once, and spending already above a maximum stays included.\n\nThe estimate uses the full budget’s linked cards and dates, regardless of search, category filters, or expense-list type. Future-expense calculation settings still apply. Categories without a maximum, including minimum-only goals and Uncategorized, receive no extra allowance. Manual savings adjustments are not included.\n\nThis scenario appears when at least one maximum is set, including zero. Projected Savings keeps its existing meaning. Category Goals on Home uses goals from the budget named in its subtitle and spending during Home’s selected dates, so its amounts can differ from Budget Detail." : {
       "comment" : "Category goal savings scenario and guidance.",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "تُستخدم الحدود القصوى أيضًا لحساب «المدخرات عند الحدود القصوى للأهداف» في تفاصيل الميزانية و«توفر الفئة» في الرئيسية.\n\nيبدأ تقدير المدخرات بالدخل المخطط، ويطرح أثر المصروفات الحالي، ثم يحجز المبلغ غير المستخدم ضمن الحد الأقصى لكل فئة. تستخدم المصروفات المخططة المبالغ المسجلة عند توفرها، وإلا فالمبالغ المخططة. تتبع التقسيمات المشتركة والمدفوعات من المدخرات والمبالغ المستردة قواعد الأثر المعتادة على الميزانية. يُحتسب كل مصروف مرة واحدة، ويظل الإنفاق الذي تجاوز الحد الأقصى مشمولًا.\n\nيستخدم التقدير البطاقات المرتبطة بالميزانية وتواريخها كاملة، بغض النظر عن البحث أو مرشحات الفئات أو نوع قائمة المصروفات. تظل إعدادات حساب المصروفات المستقبلية سارية. لا يُضاف مبلغ متاح للفئات التي ليس لها حد أقصى، بما فيها الفئات ذات هدف أدنى فقط و«غير مصنف». لا تُحتسب تعديلات المدخرات اليدوية.\n\nيظهر هذا السيناريو عند تعيين حد أقصى واحد على الأقل، بما في ذلك الصفر. تحتفظ «المدخرات المتوقعة» بمعناها الحالي. يستخدم «توفر الفئة» في الرئيسية أهداف الميزانية المذكورة في حاشيته والإنفاق خلال التواريخ المحددة في الرئيسية، لذا قد تختلف المبالغ عن تفاصيل الميزانية."
+            "value" : "تُستخدم الحدود القصوى أيضًا لحساب «المدخرات عند الحدود القصوى للأهداف» في تفاصيل الميزانية و«أهداف الفئات» في الرئيسية.\n\nيبدأ تقدير المدخرات بالدخل المخطط، ويطرح أثر المصروفات الحالي، ثم يحجز المبلغ غير المستخدم ضمن الحد الأقصى لكل فئة. تستخدم المصروفات المخططة المبالغ المسجلة عند توفرها، وإلا فالمبالغ المخططة. تتبع التقسيمات المشتركة والمدفوعات من المدخرات والمبالغ المستردة قواعد الأثر المعتادة على الميزانية. يُحتسب كل مصروف مرة واحدة، ويظل الإنفاق الذي تجاوز الحد الأقصى مشمولًا.\n\nيستخدم التقدير البطاقات المرتبطة بالميزانية وتواريخها كاملة، بغض النظر عن البحث أو مرشحات الفئات أو نوع قائمة المصروفات. تظل إعدادات حساب المصروفات المستقبلية سارية. لا يُضاف مبلغ متاح للفئات التي ليس لها حد أقصى، بما فيها الفئات ذات هدف أدنى فقط و«غير مصنف». لا تُحتسب تعديلات المدخرات اليدوية.\n\nيظهر هذا السيناريو عند تعيين حد أقصى واحد على الأقل، بما في ذلك الصفر. تحتفظ «المدخرات المتوقعة» بمعناها الحالي. تستخدم «أهداف الفئات» في الرئيسية أهداف الميزانية المذكورة في العنوان الفرعي والإنفاق خلال التواريخ المحددة في الرئيسية، لذا قد تختلف المبالغ عن تفاصيل الميزانية."
           }
         },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Höchstwerte bestimmen auch „Ersparnisse bei Zielhöchstwerten“ in den Budgetdetails und „Verfügbarkeit der Kategorie“ auf der Startseite.\n\nDie Sparschätzung beginnt mit dem geplanten Einkommen, zieht die aktuelle Ausgabenbelastung ab und reserviert anschließend den ungenutzten Spielraum unter jedem Kategoriehöchstwert. Geplante Ausgaben verwenden erfasste Beträge, sofern vorhanden, andernfalls Planbeträge. Geteilte Beträge, Zahlungen aus Ersparnissen und Erstattungen folgen den üblichen Regeln zur Budgetbelastung. Jede Ausgabe wird einmal gezählt, und bereits über einem Höchstwert liegende Ausgaben bleiben enthalten.\n\nDie Schätzung verwendet die verknüpften Karten und Daten des gesamten Budgets unabhängig von Suche, Kategoriefiltern oder dem Typ der Ausgabenliste. Einstellungen zur Berechnung zukünftiger Ausgaben gelten weiterhin. Kategorien ohne Höchstwert, einschließlich reiner Mindestziele und „Nicht kategorisiert“, erhalten keinen zusätzlichen Spielraum. Manuelle Sparanpassungen sind nicht enthalten.\n\nDieses Szenario erscheint, sobald mindestens ein Höchstwert festgelegt ist, auch bei null. „Voraussichtliche Einsparungen“ behält die bisherige Bedeutung. „Verfügbarkeit der Kategorie“ auf der Startseite verwendet Ziele aus dem in der Fußnote genannten Budget und Ausgaben an den auf der Startseite gewählten Daten. Die Beträge können daher von den Budgetdetails abweichen."
+            "value" : "Höchstwerte bestimmen auch „Ersparnisse bei Zielhöchstwerten“ in den Budgetdetails und „Kategorieziele“ auf der Startseite.\n\nDie Sparschätzung beginnt mit dem geplanten Einkommen, zieht die aktuelle Ausgabenbelastung ab und reserviert anschließend den ungenutzten Spielraum unter jedem Kategoriehöchstwert. Geplante Ausgaben verwenden erfasste Beträge, sofern vorhanden, andernfalls Planbeträge. Geteilte Beträge, Zahlungen aus Ersparnissen und Erstattungen folgen den üblichen Regeln zur Budgetbelastung. Jede Ausgabe wird einmal gezählt, und bereits über einem Höchstwert liegende Ausgaben bleiben enthalten.\n\nDie Schätzung verwendet die verknüpften Karten und Daten des gesamten Budgets unabhängig von Suche, Kategoriefiltern oder dem Typ der Ausgabenliste. Einstellungen zur Berechnung zukünftiger Ausgaben gelten weiterhin. Kategorien ohne Höchstwert, einschließlich reiner Mindestziele und „Nicht kategorisiert“, erhalten keinen zusätzlichen Spielraum. Manuelle Sparanpassungen sind nicht enthalten.\n\nDieses Szenario erscheint, sobald mindestens ein Höchstwert festgelegt ist, auch bei null. „Voraussichtliche Einsparungen“ behält die bisherige Bedeutung. „Kategorieziele“ auf der Startseite verwendet Ziele aus dem im Untertitel genannten Budget und Ausgaben an den auf der Startseite gewählten Daten. Die Beträge können daher von den Budgetdetails abweichen."
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Maximums also power Savings at Goal Maximums in Budget Detail and Category Availability on Home.\n\nThe savings estimate starts with planned income, subtracts current expense impact, then reserves the unused allowance under each category maximum. Planned expenses use recorded amounts when available and planned amounts otherwise. Shared splits, payments from savings, and refunds follow the usual budget-impact rules. Expenses are counted once, and spending already above a maximum stays included.\n\nThe estimate uses the full budget’s linked cards and dates, regardless of search, category filters, or expense-list type. Future-expense calculation settings still apply. Categories without a maximum, including minimum-only goals and Uncategorized, receive no extra allowance. Manual savings adjustments are not included.\n\nThis scenario appears when at least one maximum is set, including zero. Projected Savings keeps its existing meaning. Category Availability on Home uses goals from the budget named in its footnote and spending during Home’s selected dates, so its amounts can differ from Budget Detail."
+            "value" : "Maximums also power Savings at Goal Maximums in Budget Detail and Category Goals on Home.\n\nThe savings estimate starts with planned income, subtracts current expense impact, then reserves the unused allowance under each category maximum. Planned expenses use recorded amounts when available and planned amounts otherwise. Shared splits, payments from savings, and refunds follow the usual budget-impact rules. Expenses are counted once, and spending already above a maximum stays included.\n\nThe estimate uses the full budget’s linked cards and dates, regardless of search, category filters, or expense-list type. Future-expense calculation settings still apply. Categories without a maximum, including minimum-only goals and Uncategorized, receive no extra allowance. Manual savings adjustments are not included.\n\nThis scenario appears when at least one maximum is set, including zero. Projected Savings keeps its existing meaning. Category Goals on Home uses goals from the budget named in its subtitle and spending during Home’s selected dates, so its amounts can differ from Budget Detail."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Los máximos también se usan para calcular Ahorro con los máximos de los objetivos en Detalle del presupuesto y Disponibilidad por categoría en Inicio.\n\nLa estimación de ahorro parte de los ingresos planificados, resta el impacto actual de los gastos y reserva el importe no utilizado hasta el máximo de cada categoría. Los gastos planificados usan los importes registrados cuando existen y los planificados en caso contrario. Los repartos, los pagos desde ahorros y los reembolsos siguen las reglas habituales de impacto en el presupuesto. Cada gasto se cuenta una sola vez y se incluye el gasto que ya supera un máximo.\n\nLa estimación usa las tarjetas vinculadas y las fechas del presupuesto completo, independientemente de la búsqueda, los filtros de categorías o el tipo de lista de gastos. Se siguen aplicando los ajustes de cálculo de gastos futuros. Las categorías sin máximo, incluidas las que solo tienen un mínimo y Sin categoría, no reciben un importe adicional. No se incluyen los ajustes manuales de ahorros.\n\nEste escenario aparece cuando se establece al menos un máximo, incluido cero. Ahorro proyectado mantiene su significado actual. Disponibilidad por categoría en Inicio usa los objetivos del presupuesto indicado en su nota y el gasto durante las fechas seleccionadas en Inicio, por lo que los importes pueden diferir de Detalle del presupuesto."
+            "value" : "Los máximos también se usan para calcular Ahorro con los máximos de los objetivos en Detalle del presupuesto y Objetivos por categoría en Inicio.\n\nLa estimación de ahorro parte de los ingresos planificados, resta el impacto actual de los gastos y reserva el importe no utilizado hasta el máximo de cada categoría. Los gastos planificados usan los importes registrados cuando existen y los planificados en caso contrario. Los repartos, los pagos desde ahorros y los reembolsos siguen las reglas habituales de impacto en el presupuesto. Cada gasto se cuenta una sola vez y se incluye el gasto que ya supera un máximo.\n\nLa estimación usa las tarjetas vinculadas y las fechas del presupuesto completo, independientemente de la búsqueda, los filtros de categorías o el tipo de lista de gastos. Se siguen aplicando los ajustes de cálculo de gastos futuros. Las categorías sin máximo, incluidas las que solo tienen un mínimo y Sin categoría, no reciben un importe adicional. No se incluyen los ajustes manuales de ahorros.\n\nEste escenario aparece cuando se establece al menos un máximo, incluido cero. Ahorro proyectado mantiene su significado actual. Objetivos por categoría en Inicio usa los objetivos del presupuesto indicado en el subtítulo y el gasto durante las fechas seleccionadas en Inicio, por lo que los importes pueden diferir de Detalle del presupuesto."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Les maximums servent aussi au calcul de l’Épargne aux maximums des objectifs dans les détails du budget et de la disponibilité par catégorie dans Accueil.\n\nL’estimation de l’épargne part des revenus prévus, soustrait l’impact actuel des dépenses, puis réserve le montant inutilisé sous le maximum de chaque catégorie. Les dépenses planifiées utilisent les montants enregistrés lorsqu’ils existent, sinon les montants prévus. Les partages, les paiements depuis l’épargne et les remboursements suivent les règles habituelles d’impact sur le budget. Chaque dépense est comptée une fois et les dépenses dépassant déjà un maximum restent incluses.\n\nL’estimation utilise les cartes associées et les dates du budget complet, quels que soient la recherche, les filtres de catégories ou le type de liste de dépenses. Les réglages de calcul des dépenses futures s’appliquent toujours. Les catégories sans maximum, y compris celles avec un minimum seulement et Non catégorisé, ne reçoivent aucun montant supplémentaire. Les ajustements manuels de l’épargne sont exclus.\n\nCe scénario apparaît dès qu’au moins un maximum est défini, même zéro. Épargne projetée conserve son sens actuel. La disponibilité par catégorie dans Accueil utilise les objectifs du budget nommé dans sa note et les dépenses pendant les dates sélectionnées dans Accueil ; ses montants peuvent donc différer des détails du budget."
+            "value" : "Les maximums servent aussi au calcul de l’Épargne aux maximums des objectifs dans les détails du budget et des Objectifs par catégorie dans Accueil.\n\nL’estimation de l’épargne part des revenus prévus, soustrait l’impact actuel des dépenses, puis réserve le montant inutilisé sous le maximum de chaque catégorie. Les dépenses planifiées utilisent les montants enregistrés lorsqu’ils existent, sinon les montants prévus. Les partages, les paiements depuis l’épargne et les remboursements suivent les règles habituelles d’impact sur le budget. Chaque dépense est comptée une fois et les dépenses dépassant déjà un maximum restent incluses.\n\nL’estimation utilise les cartes associées et les dates du budget complet, quels que soient la recherche, les filtres de catégories ou le type de liste de dépenses. Les réglages de calcul des dépenses futures s’appliquent toujours. Les catégories sans maximum, y compris celles avec un minimum seulement et Non catégorisé, ne reçoivent aucun montant supplémentaire. Les ajustements manuels de l’épargne sont exclus.\n\nCe scénario apparaît dès qu’au moins un maximum est défini, même zéro. Épargne projetée conserve son sens actuel. Les Objectifs par catégorie dans Accueil utilisent les objectifs du budget nommé dans le sous-titre et les dépenses pendant les dates sélectionnées dans Accueil ; les montants peuvent donc différer des détails du budget."
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Os máximos também são usados em Economia nos máximos das metas nos detalhes do orçamento e em Disponibilidade da categoria no Início.\n\nA estimativa de economia parte da receita planejada, subtrai o impacto atual das despesas e reserva o valor não usado até o máximo de cada categoria. As despesas planejadas usam os valores registrados, quando disponíveis; caso contrário, usam os valores planejados. Divisões, pagamentos com economias e reembolsos seguem as regras habituais de impacto no orçamento. Cada despesa é contada uma vez, e gastos que já ultrapassam um máximo continuam incluídos.\n\nA estimativa usa os cartões vinculados e as datas do orçamento completo, independentemente da busca, dos filtros de categorias ou do tipo de lista de despesas. As configurações de cálculo de despesas futuras continuam valendo. Categorias sem máximo, incluindo as que têm apenas um mínimo e Sem categoria, não recebem valor adicional. Ajustes manuais de economias não são incluídos.\n\nEsse cenário aparece quando pelo menos um máximo é definido, incluindo zero. Economia projetada mantém seu significado atual. A Disponibilidade da categoria no Início usa as metas do orçamento identificado na nota e os gastos durante as datas selecionadas no Início, portanto os valores podem diferir dos detalhes do orçamento."
+            "value" : "Os máximos também são usados em Economia nos máximos das metas nos detalhes do orçamento e em Metas por categoria no Início.\n\nA estimativa de economia parte da receita planejada, subtrai o impacto atual das despesas e reserva o valor não usado até o máximo de cada categoria. As despesas planejadas usam os valores registrados, quando disponíveis; caso contrário, usam os valores planejados. Divisões, pagamentos com economias e reembolsos seguem as regras habituais de impacto no orçamento. Cada despesa é contada uma vez, e gastos que já ultrapassam um máximo continuam incluídos.\n\nA estimativa usa os cartões vinculados e as datas do orçamento completo, independentemente da busca, dos filtros de categorias ou do tipo de lista de despesas. As configurações de cálculo de despesas futuras continuam valendo. Categorias sem máximo, incluindo as que têm apenas um mínimo e Sem categoria, não recebem valor adicional. Ajustes manuais de economias não são incluídos.\n\nEsse cenário aparece quando pelo menos um máximo é definido, incluindo zero. Economia projetada mantém seu significado atual. As Metas por categoria no Início usam as metas do orçamento identificado no subtítulo e os gastos durante as datas selecionadas no Início, portanto os valores podem diferir dos detalhes do orçamento."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "上限还用于计算预算详情中的“达到目标上限时的节省”和首页中的“类别可用性”。\n\n节省估算以计划收入为起点，减去当前支出影响，再为每个类别预留上限内尚未使用的额度。计划支出使用已记录的金额（如有），否则使用计划金额。分摊、从储蓄付款和退款遵循通常的预算影响规则。每笔支出只计算一次，已超出上限的支出也会保留。\n\n估算使用整个预算关联的卡片和日期，不受搜索、类别筛选或支出列表类型影响。未来支出的计算设置仍然适用。未设置上限的类别（包括仅有下限目标的类别和“未分类”）不会获得额外额度。不计入手动储蓄调整。\n\n只要设置了至少一个上限（包括零），就会显示此情景。“预计节省”保留现有含义。首页中的“类别可用性”使用脚注所列预算的目标和首页所选日期内的支出，因此金额可能与预算详情不同。"
+            "value" : "上限还用于计算预算详情中的“达到目标上限时的节省”和首页中的“类别目标”。\n\n节省估算以计划收入为起点，减去当前支出影响，再为每个类别预留上限内尚未使用的额度。计划支出使用已记录的金额（如有），否则使用计划金额。分摊、从储蓄付款和退款遵循通常的预算影响规则。每笔支出只计算一次，已超出上限的支出也会保留。\n\n估算使用整个预算关联的卡片和日期，不受搜索、类别筛选或支出列表类型影响。未来支出的计算设置仍然适用。未设置上限的类别（包括仅有下限目标的类别和“未分类”）不会获得额外额度。不计入手动储蓄调整。\n\n只要设置了至少一个上限（包括零），就会显示此情景。“预计节省”保留现有含义。首页中的“类别目标”使用副标题所列预算的目标和首页所选日期内的支出，因此金额可能与预算详情不同。"
           }
         }
       }
@@ -37783,6 +37884,53 @@
         }
       }
     },
+    "Opens category goals for this budget." : {
+      "comment" : "Category Goals widget guidance.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "يفتح أهداف الفئات لهذه الميزانية."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Öffnet die Kategorieziele für dieses Budget."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Opens category goals for this budget."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abre los objetivos por categoría de este presupuesto."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvre les objectifs par catégorie de ce budget."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abre as metas por categoria deste orçamento."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开此预算的类别目标。"
+          }
+        }
+      }
+    },
     "Operating System" : {
       "localizations" : {
         "ar" : {
@@ -42005,6 +42153,10 @@
           }
         }
       }
+    },
+    "Range" : {
+      "comment" : "Label for the upper bound of the category's range.",
+      "isCommentAutoGenerated" : true
     },
     "Rate Offshore" : {
       "localizations" : {
@@ -48632,6 +48784,10 @@
         }
       }
     },
+    "Spent" : {
+      "comment" : "The color of the bar that shows how much of the category's limit has been spent.",
+      "isCommentAutoGenerated" : true
+    },
     "Split" : {
       "comment" : "Shared-balance action label for splitting a linked reconciliation entry.\nShared-balance action label for splitting a planned expense.\nShared-balance action label for splitting an expense.",
       "localizations" : {
@@ -49056,6 +49212,10 @@
           }
         }
       }
+    },
+    "Start" : {
+      "comment" : "A bar chart that visually represents the user's spending in a specific category.",
+      "isCommentAutoGenerated" : true
     },
     "Start a focused excursion mode session for a fixed time." : {
       "localizations" : {

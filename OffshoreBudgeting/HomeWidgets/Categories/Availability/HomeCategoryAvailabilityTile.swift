@@ -40,6 +40,13 @@ struct HomeCategoryAvailabilityTile: View {
 
     var inclusionPolicy: HomeCategoryLimitsAggregator.CategoryInclusionPolicy = .allCategoriesInfinityWhenMissing
 
+    private struct GoalEditorRoute: Identifiable {
+        let budget: Budget
+        let category: Category
+        var id: UUID { category.id }
+    }
+
+    @State private var goalEditor: GoalEditorRoute?
     @State private var scope: AvailabilityScope = .all
     @State private var pageIndex: Int = 0
     @State private var measuredSmallRowHeight: CGFloat = 0
@@ -80,8 +87,8 @@ struct HomeCategoryAvailabilityTile: View {
         )
 
         HomeTileContainer(
-            title: "Category Availability",
-            subtitle: subtitleText,
+            title: String(localized: "homeWidget.categoryAvailability", defaultValue: "Category Goals"),
+            subtitle: result.activeBudget.map { "\($0.name) • \(subtitleText)" } ?? subtitleText,
             accent: accentColor(for: result),
             showsChevron: false
         ) {
@@ -110,12 +117,7 @@ struct HomeCategoryAvailabilityTile: View {
                     CGFloat(rowsPerPage) * effectiveRowHeight + CGFloat(max(0, rowsPerPage - 1)) * rowSpacing
 
                 VStack(alignment: .leading, spacing: 12) {
-                    HStack(spacing: 10) {
-                        headerSummary(overCount: result.overCount, nearCount: result.nearCount)
-
-                        Spacer(minLength: 0)
-                        paginationControls(current: pageIndex, totalPages: totalPages)
-                    }
+                    headerSummary(overCount: result.overCount, nearCount: result.nearCount)
 
                     Divider().opacity(0.35)
 
@@ -123,7 +125,7 @@ struct HomeCategoryAvailabilityTile: View {
                     case .small:
                         VStack(spacing: rowSpacing) {
                             ForEach(slots) { slot in
-                                slotView(slot)
+                                slotView(slot, budget: result.activeBudget)
                             }
                         }
                         .frame(
@@ -140,7 +142,7 @@ struct HomeCategoryAvailabilityTile: View {
                             spacing: rowSpacing
                         ) {
                             ForEach(slots) { slot in
-                                slotView(slot)
+                                slotView(slot, budget: result.activeBudget)
                             }
                         }
                         .frame(
@@ -148,12 +150,8 @@ struct HomeCategoryAvailabilityTile: View {
                             alignment: .top
                         )
                     }
-                    if let budget = result.activeBudget {
-                        Text("Goals from \(budget.name). Availability uses Home’s selected dates. See Savings at Goal Maximums in Budget Detail for a full-budget estimate.")
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
+                    paginationControls(current: pageIndex, totalPages: totalPages)
+
                 }
                 .onChange(of: totalPages) { _, newValue in
                     // If data changes and is beyond the last page, clamp.
@@ -174,6 +172,32 @@ struct HomeCategoryAvailabilityTile: View {
                 }
             }
         }
+        .appSheet(item: $goalEditor) { route in
+            EditCategoryLimitView(
+                budget: route.budget,
+                category: route.category,
+                plannedContribution: plannedContribution(for: route),
+                variableContribution: variableContribution(for: route)
+            )
+        }
+    }
+
+    private func plannedContribution(for route: GoalEditorRoute) -> Double {
+        BudgetPlannedExpenseStore.plannedExpenses(in: workspace, for: route.budget)
+            .filter { $0.workspace?.id == workspace.id && $0.card?.workspace?.id == workspace.id
+                && $0.category?.id == route.category.id }
+            .reduce(0) { $0 + SavingsMathService.plannedBudgetImpactAmount(for: $1) }
+    }
+
+    private func variableContribution(for route: GoalEditorRoute) -> Double {
+        let cardIDs = BudgetPlannedExpenseStore.linkedCardIDs(for: route.budget)
+        let range = DateRange(start: route.budget.startDate, end: route.budget.endDate)
+        return (workspace.variableExpenses ?? []).filter {
+            $0.workspace?.id == workspace.id && $0.card?.workspace?.id == workspace.id
+                && $0.category?.id == route.category.id
+                && $0.card.map { cardIDs.contains($0.id) } == true
+                && $0.transactionDate >= range.start && $0.transactionDate <= range.end
+        }.reduce(0) { $0 + SavingsMathService.variableBudgetImpactAmount(for: $1) }
     }
 
     // MARK: - Slots
@@ -187,15 +211,24 @@ struct HomeCategoryAvailabilityTile: View {
     }
 
     @ViewBuilder
-    private func slotView(_ slot: AvailabilitySlot) -> some View {
+    private func slotView(_ slot: AvailabilitySlot, budget: Budget?) -> some View {
         switch slot {
         case .metric(let metric):
-            CategoryAvailabilityRowView(
-                metric: metric,
-                scope: scope,
-                currencyCode: CurrencyFormatter.currencyCode,
-                nearThreshold: HomeCategoryLimitsAggregator.defaultNearThreshold
-            )
+            Button {
+                guard let budget, budget.workspace?.id == workspace.id,
+                      let category = categories.first(where: { $0.id == metric.categoryID && $0.workspace?.id == workspace.id }) else { return }
+                goalEditor = GoalEditorRoute(budget: budget, category: category)
+            } label: {
+                CategoryAvailabilityRowView(
+                    metric: metric,
+                    scope: scope,
+                    currencyCode: CurrencyFormatter.currencyCode,
+                    nearThreshold: HomeCategoryLimitsAggregator.defaultNearThreshold
+                )
+            }
+            .buttonStyle(.plain)
+            .accessibilityHint(Text("Opens category goals for this budget."))
+            .accessibilityIdentifier("homeCategoryGoals.category.\(metric.categoryID.uuidString)")
             .background(rowHeightReader)
         case .placeholder:
             Color.clear
@@ -338,41 +371,16 @@ private struct AvailabilityCountPill: View {
 
     var body: some View {
         HStack(spacing: 6) {
+            Circle().fill(foregroundColor).frame(width: 6, height: 6)
+                .accessibilityHidden(true)
             Text(title)
-                .font(.caption.weight(.semibold))
-
-            Text(localizedInt(count))
-                .font(.caption.weight(.semibold))
+            Text(localizedInt(count)).monospacedDigit()
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 6)
-        .background(backgroundColor, in: Capsule())
-        .overlay {
-            Capsule()
-                .strokeBorder(borderColor, lineWidth: 1)
-        }
-        .foregroundStyle(foregroundColor)
+        .font(.footnote.weight(.medium))
+        .foregroundStyle(.secondary)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(title) categories")
         .accessibilityValue(localizedInt(count))
-    }
-
-    private var backgroundColor: Color {
-        switch style {
-        case .over:
-            return Color.red.opacity(0.14)
-        case .near:
-            return Color.orange.opacity(0.14)
-        }
-    }
-
-    private var borderColor: Color {
-        switch style {
-        case .over:
-            return Color.red.opacity(0.22)
-        case .near:
-            return Color.orange.opacity(0.22)
-        }
     }
 
     private var foregroundColor: Color {

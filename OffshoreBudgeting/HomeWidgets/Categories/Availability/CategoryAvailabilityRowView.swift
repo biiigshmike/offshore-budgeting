@@ -1,247 +1,164 @@
-//
-//  CategoryAvailabilityRowView.swift
-//  OffshoreBudgeting
-//
-//  Created by Michael Brown on 1/26/26.
-//
-
 import SwiftUI
+import Charts
 
 struct CategoryAvailabilityRowView: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-    @ScaledMetric(relativeTo: .caption) private var labelWidth: CGFloat = 62
 
     let metric: CategoryAvailabilityMetric
     let scope: AvailabilityScope
     let currencyCode: String
     let nearThreshold: Double
 
+    private var spent: Double { metric.spent(for: scope) }
+    private var available: Double? { metric.availableRaw(for: scope) }
+    private var categoryColor: Color { Color(hex: metric.colorHex) ?? .accentColor }
+    private var status: CategoryAvailabilityStatus { metric.status(for: scope, nearThreshold: nearThreshold) }
+    private var statusColor: Color {
+        switch status {
+        case .over: .red
+        case .near: .orange
+        case .ok: .secondary
+        }
+    }
+
     var body: some View {
-        let layout = dynamicTypeSize.isAccessibilitySize
-            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 12))
-            : AnyLayout(HStackLayout(alignment: .center, spacing: 12))
-        layout {
-
-            // Left: name + labels
-            VStack(alignment: .leading, spacing: 6) {
-                HStack(spacing: 8) {
-                    Circle()
-                        .fill(Color(hex: metric.colorHex) ?? .primary)
-                        .frame(width: 8, height: 8)
-
-                    Text(metric.name)
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.primary)
-                        .fixedSize(horizontal: false, vertical: true)
-
-                    Spacer(minLength: 0)
+        VStack(alignment: .leading, spacing: 9) {
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .firstTextBaseline) {
+                    categoryLabel.fixedSize()
+                    Spacer(minLength: 12)
+                    statusLabel.fixedSize()
                 }
-
                 VStack(alignment: .leading, spacing: 4) {
-                    labelLine(title: String(localized: "common.max", defaultValue: "Max", comment: "Common label for maximum value."), value: maxText)
-                    labelLine(title: String(localized: "common.available", defaultValue: "Available", comment: "Common label for available amount."), value: availableText)
-                    labelLine(title: String(localized: "common.spent", defaultValue: "Spent", comment: "Common label for spent amount."), value: spentText)
+                    categoryLabel
+                    statusLabel
                 }
-                .font(.caption)
-                .foregroundStyle(.secondary)
             }
 
-            // Right: progress always reserves height/space
-            VStack(alignment: .trailing, spacing: 6) {
-                AvailabilityProgressBar(
-                    progress: progressValue,
-                    isUnlimited: metric.maxAmount == nil,
-                    status: status
-                )
-                .frame(width: 110)
-
-                statusTag
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    availableAmount.fixedSize()
+                    availableLabel.fixedSize()
+                }
+                VStack(alignment: .leading, spacing: 2) {
+                    availableAmount
+                    availableLabel
+                }
             }
+
+            limitChart
+
+            let layout = dynamicTypeSize.isAccessibilitySize
+                ? AnyLayout(VStackLayout(alignment: .leading, spacing: 4))
+                : AnyLayout(HStackLayout(spacing: 12))
+            layout {
+                Text("\(String(localized: "common.spent", defaultValue: "Spent")) \(formatCurrency(spent))")
+                if !dynamicTypeSize.isAccessibilitySize { Spacer(minLength: 0) }
+                Text("\(String(localized: "common.max", defaultValue: "Max")) \(maxText)")
+            }
+            .font(.footnote)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
         }
-        .padding(.vertical, 10)
-        .padding(.horizontal, 12)
-        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .strokeBorder(borderTint, lineWidth: 1)
+        .padding(.vertical, 14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .overlay(alignment: .bottom) {
+            Rectangle()
+                .fill(Color.primary.opacity(0.1))
+                .frame(height: 0.5)
+                .allowsHitTesting(false)
         }
+        .contentShape(Rectangle())
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(metric.name)
-        .accessibilityValue(accessibilityValueText)
-        .accessibilityHint(accessibilityHintText)
+        .accessibilityValue(String(
+            format: String(localized: "homeWidget.categoryAvailability.accessibilityValueFormat", defaultValue: "Max %1$@, Available %2$@, Spent %3$@"),
+            locale: .current, maxText, available.map(formatCurrency) ?? "∞", formatCurrency(spent)
+        ))
     }
 
-    // MARK: - Derived
-
-    private var status: CategoryAvailabilityStatus {
-        metric.status(for: scope, nearThreshold: nearThreshold)
-    }
-
-    private var borderTint: Color {
-        // Soft border, but a tiny nudge if over/near.
-        switch status {
-        case .over:
-            return Color.red.opacity(0.22)
-        case .near:
-            return Color.orange.opacity(0.20)
-        case .ok:
-            return Color.primary.opacity(0.10)
+    private var categoryLabel: some View {
+        HStack(spacing: 8) {
+            Circle().fill(categoryColor).frame(width: 8, height: 8).accessibilityHidden(true)
+            Text(metric.name)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.primary)
+                .fixedSize(horizontal: false, vertical: true)
+            Image(systemName: "chevron.right")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.tertiary)
+                .accessibilityHidden(true)
         }
     }
 
-    private var maxText: String {
-        if metric.maxAmount == nil { return "∞" }
-        return formatCurrency(metric.maxAmount ?? 0)
+    private var availableAmount: some View {
+        Text(available.map { formatCurrency(abs($0)) } ?? "∞")
+            .font(.title3.weight(.semibold))
+            .monospacedDigit()
+            .foregroundStyle(.primary)
+            .fixedSize(horizontal: false, vertical: true)
     }
 
-    private var spentText: String {
-        formatCurrency(metric.spent(for: scope))
-    }
-
-    private var availableText: String {
-        if metric.maxAmount == nil { return "∞" }
-
-        let raw = metric.availableRaw(for: scope) ?? 0
-        return formatCurrency(raw)
-    }
-
-    private var progressValue: Double? {
-        // For limited categories, show progress
-        if let pct = metric.percentUsed(for: scope) {
-            return min(max(pct, 0), 1)
+    private var availableLabel: some View {
+        Group {
+            if let available, available < 0 {
+                Text(String(localized: "homeWidget.categoryAvailability.over", defaultValue: "Over"))
+            } else {
+                Text(String(localized: "common.available", defaultValue: "Available"))
+            }
         }
-        // Unlimited: still render a track-only bar (nil progress)
-        return nil
+        .font(.footnote)
+        .foregroundStyle(.secondary)
     }
 
-    private var statusTag: some View {
+    private var statusLabel: some View {
         Group {
             if metric.maxAmount == nil {
-                Text(String(localized: "homeWidget.categoryAvailability.unlimited", defaultValue: "Unlimited", comment: "Status tag for categories without a spending limit."))
-                    .font(.caption2.weight(.semibold))
-                    .foregroundStyle(.secondary)
+                Text(String(localized: "homeWidget.categoryAvailability.unlimited", defaultValue: "Unlimited"))
             } else {
                 switch status {
-                case .over:
-                    Text(String(localized: "homeWidget.categoryAvailability.over", defaultValue: "Over", comment: "Status tag for category over spending limit."))
-                        .font(.caption2.weight(.semibold))
-                        .foregroundStyle(.red)
-                case .near:
-                    Text(String(localized: "homeWidget.categoryAvailability.near", defaultValue: "Near", comment: "Status tag for category near spending limit."))
-                        .font(.caption2.weight(.semibold))
-                        .foregroundStyle(.orange)
-                case .ok:
-                    Text(String(localized: "homeWidget.categoryAvailability.ok", defaultValue: "OK", comment: "Status tag for category within spending limit."))
-                        .font(.caption2.weight(.semibold))
-                        .foregroundStyle(.secondary)
+                case .over: Text(String(localized: "homeWidget.categoryAvailability.over", defaultValue: "Over"))
+                case .near: Text(String(localized: "homeWidget.categoryAvailability.near", defaultValue: "Near"))
+                case .ok: Text(String(localized: "homeWidget.categoryAvailability.ok", defaultValue: "OK"))
                 }
             }
         }
+        .font(.footnote.weight(.medium))
+        .foregroundStyle(statusColor)
     }
 
-    private func labelLine(title: String, value: String) -> some View {
-        let layout = dynamicTypeSize.isAccessibilitySize
-            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 2))
-            : AnyLayout(HStackLayout(spacing: 6))
-        return layout {
-            Text("\(title):")
-                .frame(width: dynamicTypeSize.isAccessibilitySize ? nil : labelWidth, alignment: .leading)
-
-            Text(value)
-                .foregroundStyle(.primary)
-                .fixedSize(horizontal: false, vertical: true)
-
-            if !dynamicTypeSize.isAccessibilitySize { Spacer(minLength: 0) }
-        }
-    }
-
-    // MARK: - Currency formatting
-
-    private func formatCurrency(_ value: Double) -> String {
-        value.formatted(
-            .currency(code: currencyCode)
-            .presentation(.standard)
-        )
-    }
-
-    // MARK: - Accessibility
-
-    private var accessibilityValueText: String {
-        String(
-            format: String(
-                localized: "homeWidget.categoryAvailability.accessibilityValueFormat",
-                defaultValue: "Max %1$@, Available %2$@, Spent %3$@",
-                comment: "Accessibility summary for category availability row."
-            ),
-            locale: .current,
-            maxText,
-            availableText,
-            spentText
-        )
-    }
-
-    private var accessibilityHintText: String {
-        if metric.maxAmount == nil {
-            return String(localized: "homeWidget.categoryAvailability.hint.noMax", defaultValue: "No maximum set for this category.", comment: "Accessibility hint when category has no maximum.")
-        }
-
-        switch status {
-        case .over:
-            return String(localized: "homeWidget.categoryAvailability.hint.over", defaultValue: "You are over the maximum for this category.", comment: "Accessibility hint when category is over maximum.")
-        case .near:
-            return String(localized: "homeWidget.categoryAvailability.hint.near", defaultValue: "You are close to the maximum for this category.", comment: "Accessibility hint when category is near maximum.")
-        case .ok:
-            return String(localized: "homeWidget.categoryAvailability.hint.ok", defaultValue: "Spending is within the maximum for this category.", comment: "Accessibility hint when category is within maximum.")
-        }
-    }
-}
-
-// MARK: - Progress bar (consistent height)
-
-private struct AvailabilityProgressBar: View {
-
-    let progress: Double?          // nil means unlimited track-only
-    let isUnlimited: Bool
-    let status: CategoryAvailabilityStatus
-
-    var body: some View {
-        ZStack(alignment: .leading) {
-            Capsule()
-                .fill(trackColor)
-                .frame(height: 8)
-
-            if let progress {
-                Capsule()
-                    .fill(fillColor)
-                    .frame(width: max(0, min(1, progress)) * 110, height: 8)
-            } else {
-                // Unlimited: render nothing on top, but keep exact height.
-                Color.clear.frame(height: 8)
+    /// Each category gets a local scale so even a small overspend extends past its maximum marker.
+    private var limitChart: some View {
+        let lower = min(0, spent)
+        let upperBound = max(0, spent, metric.maxAmount ?? 0)
+        // Only an entirely empty range needs a fallback; all other tracks end at their largest value.
+        let upper = upperBound > lower ? upperBound : lower + 1
+        return Chart {
+            BarMark(xStart: .value("Start", lower), xEnd: .value("Range", upper),
+                    y: .value("Category", metric.name), height: .fixed(6))
+                .foregroundStyle(Color.primary.opacity(0.08))
+                .cornerRadius(3)
+            BarMark(xStart: .value("Start", min(0, spent)), xEnd: .value("Spent", max(0, spent)),
+                    y: .value("Category", metric.name), height: .fixed(6))
+                .foregroundStyle(categoryColor)
+                .cornerRadius(3)
+            if let maximum = metric.maxAmount, maximum >= 0 {
+                RuleMark(x: .value("Maximum", maximum))
+                    .foregroundStyle(Color.primary)
+                    .lineStyle(StrokeStyle(lineWidth: 2))
             }
         }
+        .chartXScale(domain: lower...upper, range: .plotDimension(startPadding: 2, endPadding: 2))
+        .chartXAxis(.hidden)
+        .chartYAxis(.hidden)
+        .chartLegend(.hidden)
+        .frame(height: 16)
         .accessibilityHidden(true)
     }
 
-    private var trackColor: Color {
-        // Subtle track. A tiny hint for over/near, but still very soft.
-        switch status {
-        case .over:
-            return Color.red.opacity(0.12)
-        case .near:
-            return Color.orange.opacity(0.12)
-        case .ok:
-            return Color.primary.opacity(0.08)
-        }
-    }
+    private var maxText: String { metric.maxAmount.map(formatCurrency) ?? "∞" }
 
-    private var fillColor: Color {
-        switch status {
-        case .over:
-            return Color.red.opacity(0.55)
-        case .near:
-            return Color.orange.opacity(0.55)
-        case .ok:
-            return Color.primary.opacity(0.28)
-        }
+    private func formatCurrency(_ value: Double) -> String {
+        value.formatted(.currency(code: currencyCode).presentation(.standard))
     }
 }
