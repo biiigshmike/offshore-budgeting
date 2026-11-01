@@ -41,6 +41,616 @@
         }
       }
     },
+    "For categories without preset spending, blank minimums use the lowest comparable historical spending, including zero. Historical suggestions require Suggest Maximums to be enabled." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "For categories without preset spending, blank minimums use the lowest comparable historical spending, including zero. Historical suggestions require Suggest Maximums to be enabled."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En las categorías sin gastos predefinidos, los mínimos vacíos usan el gasto histórico comparable más bajo, incluido cero. Las sugerencias históricas requieren activar Sugerir máximos."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pour les catégories sans dépenses prédéfinies, les minimums vides utilisent la dépense historique comparable la plus basse, y compris zéro. Les suggestions historiques nécessitent d’activer Suggérer les maximums."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bei Kategorien ohne Vorlagenausgaben werden leere Mindestwerte aus den niedrigsten vergleichbaren historischen Ausgaben gefüllt, auch mit null. Historische Vorschläge erfordern aktivierte Höchstwertvorschläge."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Para categorias sem despesas predefinidas, os mínimos em branco usam o menor gasto histórico comparável, incluindo zero. As sugestões históricas exigem que Sugerir máximos esteja ativado."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "对于没有预设支出的类别，空白的最低目标将使用可比历史支出中的最低值，包括零。历史建议需要启用“建议最高目标”。"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "للفئات التي لا تتضمن إنفاقًا محددًا مسبقًا، تستخدم الحدود الدنيا الفارغة أدنى إنفاق تاريخي قابل للمقارنة، بما في ذلك الصفر. تتطلب الاقتراحات التاريخية تفعيل اقتراح الحدود القصوى."
+          }
+        }
+      }
+    },
+    "Savings at Goal Maximums" : {
+      "comment" : "Category goal savings scenario and guidance.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "المدخرات عند الحدود القصوى للأهداف"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ersparnisse bei Zielhöchstwerten"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Savings at Goal Maximums"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ahorro con los máximos de los objetivos"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Épargne aux maximums des objectifs"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Economia nos máximos das metas"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "达到目标上限时的节省"
+          }
+        }
+      }
+    },
+    "Full-budget estimate if you use your remaining category allowances. Spending already above a maximum is included." : {
+      "comment" : "Category goal savings scenario and guidance.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تقدير للميزانية كاملة إذا استخدمت المبالغ المتبقية المتاحة للفئات. يشمل الإنفاق الذي تجاوز بالفعل أي حد أقصى."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Schätzung für das gesamte Budget, wenn Sie die verbleibenden Kategorie-Spielräume ausschöpfen. Bereits über einem Höchstwert liegende Ausgaben sind enthalten."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Full-budget estimate if you use your remaining category allowances. Spending already above a maximum is included."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Estimación del presupuesto completo si usas los importes disponibles restantes por categoría. Incluye el gasto que ya supera un máximo."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Estimation pour tout le budget si vous utilisez les montants encore disponibles par catégorie. Les dépenses dépassant déjà un maximum sont incluses."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Estimativa do orçamento completo se você usar os valores restantes disponíveis por categoria. Inclui gastos que já ultrapassam um máximo."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "假设您用完各类别的剩余额度，对整个预算进行估算。已超出上限的支出也会计入。"
+          }
+        }
+      }
+    },
+    "Maximums also power Savings at Goal Maximums in Budget Detail and Category Availability on Home." : {
+      "comment" : "Category goal savings scenario and guidance.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تُستخدم الحدود القصوى أيضًا لحساب «المدخرات عند الحدود القصوى للأهداف» في تفاصيل الميزانية و«توفر الفئة» في الرئيسية."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Höchstwerte bestimmen auch „Ersparnisse bei Zielhöchstwerten“ in den Budgetdetails und „Verfügbarkeit der Kategorie“ auf der Startseite."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Maximums also power Savings at Goal Maximums in Budget Detail and Category Availability on Home."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Los máximos también se usan para calcular Ahorro con los máximos de los objetivos en Detalle del presupuesto y Disponibilidad por categoría en Inicio."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les maximums servent aussi au calcul de l’Épargne aux maximums des objectifs dans les détails du budget et de la disponibilité par catégorie dans Accueil."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Os máximos também são usados em Economia nos máximos das metas nos detalhes do orçamento e em Disponibilidade da categoria no Início."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "上限还用于计算预算详情中的“达到目标上限时的节省”和首页中的“类别可用性”。"
+          }
+        }
+      }
+    },
+    "Goals from %@. Availability uses Home’s selected dates. See Savings at Goal Maximums in Budget Detail for a full-budget estimate." : {
+      "comment" : "Category goal savings scenario and guidance.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "الأهداف من %@. يُحسب المتاح باستخدام التواريخ المحددة في الرئيسية. راجع «المدخرات عند الحدود القصوى للأهداف» في تفاصيل الميزانية للحصول على تقدير للميزانية كاملة."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ziele aus %@. Die Verfügbarkeit verwendet die auf der Startseite gewählten Daten. Eine Schätzung für das gesamte Budget finden Sie unter „Ersparnisse bei Zielhöchstwerten“ in den Budgetdetails."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Goals from %@. Availability uses Home’s selected dates. See Savings at Goal Maximums in Budget Detail for a full-budget estimate."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Objetivos de %@. La disponibilidad usa las fechas seleccionadas en Inicio. Consulta Ahorro con los máximos de los objetivos en Detalle del presupuesto para ver una estimación del presupuesto completo."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Objectifs de %@. La disponibilité utilise les dates sélectionnées dans Accueil. Consultez Épargne aux maximums des objectifs dans les détails du budget pour une estimation du budget complet."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Metas de %@. A disponibilidade usa as datas selecionadas no Início. Veja Economia nos máximos das metas nos detalhes do orçamento para uma estimativa do orçamento completo."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "目标来自%@。可用额度使用首页所选日期。请在预算详情中查看“达到目标上限时的节省”，获取整个预算的估算。"
+          }
+        }
+      }
+    },
+    "Uses the full budget, regardless of search, selected categories, or expense-list type." : {
+      "comment" : "Category goal savings scenario and guidance.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "يستخدم الميزانية كاملة بغض النظر عن البحث أو الفئات المحددة أو نوع قائمة المصروفات."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verwendet das gesamte Budget unabhängig von Suche, ausgewählten Kategorien oder dem Typ der Ausgabenliste."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Uses the full budget, regardless of search, selected categories, or expense-list type."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Usa el presupuesto completo, independientemente de la búsqueda, las categorías seleccionadas o el tipo de lista de gastos."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Utilise tout le budget, quels que soient la recherche, les catégories sélectionnées ou le type de liste de dépenses."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Usa o orçamento completo, independentemente da busca, das categorias selecionadas ou do tipo de lista de despesas."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用整个预算，不受搜索、所选类别或支出列表类型影响。"
+          }
+        }
+      }
+    },
+    "Current expense impact includes recorded planned amounts when available, otherwise planned amounts, plus variable expenses. Shared splits, payments from savings, and refunds follow the usual budget-impact rules." : {
+      "comment" : "Category goal savings scenario and guidance.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "يشمل أثر المصروفات الحالي المبالغ الفعلية المسجلة للمصروفات المخططة عند توفرها، وإلا فالمبالغ المخططة، إضافة إلى المصروفات المتغيرة. تتبع التقسيمات المشتركة والمدفوعات من المدخرات والمبالغ المستردة قواعد الأثر المعتادة على الميزانية."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die aktuelle Ausgabenbelastung umfasst erfasste Istbeträge geplanter Ausgaben, sofern vorhanden, sonst Planbeträge, sowie variable Ausgaben. Geteilte Beträge, Zahlungen aus Ersparnissen und Erstattungen folgen den üblichen Regeln zur Budgetbelastung."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Current expense impact includes recorded planned amounts when available, otherwise planned amounts, plus variable expenses. Shared splits, payments from savings, and refunds follow the usual budget-impact rules."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El impacto actual de los gastos incluye los importes reales registrados de los gastos planificados cuando existen; en caso contrario, los importes planificados, más los gastos variables. Los repartos, los pagos desde ahorros y los reembolsos siguen las reglas habituales de impacto en el presupuesto."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’impact actuel des dépenses comprend les montants réels enregistrés des dépenses planifiées lorsqu’ils existent, sinon les montants prévus, ainsi que les dépenses variables. Les partages, les paiements depuis l’épargne et les remboursements suivent les règles habituelles d’impact sur le budget."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O impacto atual das despesas inclui os valores reais registrados das despesas planejadas, quando disponíveis; caso contrário, os valores planejados, mais as despesas variáveis. Divisões, pagamentos com economias e reembolsos seguem as regras habituais de impacto no orçamento."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "当前支出影响包括计划支出已记录的实际金额（如有），否则使用计划金额，另加可变支出。分摊、从储蓄付款和退款遵循通常的预算影响规则。"
+          }
+        }
+      }
+    },
+    "Each category maximum reserves only the allowance left after its current expense impact. Spending above a maximum is kept in full." : {
+      "comment" : "Category goal savings scenario and guidance.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "يحجز الحد الأقصى لكل فئة المبلغ المتبقي فقط بعد أثر مصروفاتها الحالي. يُحتسب الإنفاق الذي يتجاوز الحد الأقصى بالكامل."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Jeder Kategoriehöchstwert reserviert nur den Spielraum, der nach der aktuellen Ausgabenbelastung verbleibt. Ausgaben über einem Höchstwert bleiben vollständig enthalten."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Each category maximum reserves only the allowance left after its current expense impact. Spending above a maximum is kept in full."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cada máximo por categoría reserva solo el importe que queda tras el impacto actual de sus gastos. El gasto por encima de un máximo se mantiene íntegro."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chaque maximum par catégorie ne réserve que le montant restant après l’impact actuel de ses dépenses. Les dépenses dépassant un maximum sont conservées intégralement."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cada máximo por categoria reserva apenas o valor restante após o impacto atual das despesas. Os gastos acima de um máximo são mantidos integralmente."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "每个类别上限仅预留扣除当前支出影响后的剩余额度。超出上限的支出仍会全额计入。"
+          }
+        }
+      }
+    },
+    "Categories without a maximum, including minimum-only goals and Uncategorized, receive no extra allowance. Manual savings adjustments are not included." : {
+      "comment" : "Category goal savings scenario and guidance.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "لا يُضاف مبلغ متاح للفئات التي ليس لها حد أقصى، بما فيها الفئات ذات هدف أدنى فقط و«غير مصنف». لا تُحتسب تعديلات المدخرات اليدوية."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kategorien ohne Höchstwert, einschließlich reiner Mindestziele und „Nicht kategorisiert“, erhalten keinen zusätzlichen Spielraum. Manuelle Sparanpassungen sind nicht enthalten."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Categories without a maximum, including minimum-only goals and Uncategorized, receive no extra allowance. Manual savings adjustments are not included."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Las categorías sin máximo, incluidas las que solo tienen un mínimo y Sin categoría, no reciben un importe adicional. No se incluyen los ajustes manuales de ahorros."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les catégories sans maximum, y compris celles avec un minimum seulement et Non catégorisé, ne reçoivent aucun montant supplémentaire. Les ajustements manuels de l’épargne sont exclus."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Categorias sem máximo, incluindo as que têm apenas um mínimo e Sem categoria, não recebem valor adicional. Ajustes manuais de economias não são incluídos."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未设置上限的类别（包括仅有下限目标的类别和“未分类”）不会获得额外额度。不计入手动储蓄调整。"
+          }
+        }
+      }
+    },
+    "Planned income minus current expense impact and the remaining allowance under category maximums." : {
+      "comment" : "Category goal savings scenario and guidance.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "الدخل المخطط مطروحًا منه أثر المصروفات الحالي والمبلغ المتبقي المتاح ضمن الحدود القصوى للفئات."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Geplantes Einkommen abzüglich der aktuellen Ausgabenbelastung und des verbleibenden Spielraums unter den Kategoriehöchstwerten."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Planned income minus current expense impact and the remaining allowance under category maximums."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ingresos planificados menos el impacto actual de los gastos y el importe restante disponible hasta los máximos por categoría."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Revenus prévus moins l’impact actuel des dépenses et les montants encore disponibles sous les maximums des catégories."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Receita planejada menos o impacto atual das despesas e o valor restante disponível até os máximos por categoria."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "计划收入减去当前支出影响，再减去各类别上限内的剩余额度。"
+          }
+        }
+      }
+    },
+    "Current Expense Impact" : {
+      "comment" : "Category goal savings scenario and guidance.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "أثر المصروفات الحالي"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aktuelle Ausgabenbelastung"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Current Expense Impact"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impacto actual de los gastos"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impact actuel des dépenses"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impacto atual das despesas"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "当前支出影响"
+          }
+        }
+      }
+    },
+    "Remaining Category Allowances" : {
+      "comment" : "Category goal savings scenario and guidance.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "المبالغ المتبقية المتاحة للفئات"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verbleibende Kategorie-Spielräume"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remaining Category Allowances"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Importes restantes por categoría"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Montants restants par catégorie"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Valores restantes por categoria"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "各类别剩余额度"
+          }
+        }
+      }
+    },
+    "Maximums also power Savings at Goal Maximums in Budget Detail and Category Availability on Home.\n\nThe savings estimate starts with planned income, subtracts current expense impact, then reserves the unused allowance under each category maximum. Planned expenses use recorded amounts when available and planned amounts otherwise. Shared splits, payments from savings, and refunds follow the usual budget-impact rules. Expenses are counted once, and spending already above a maximum stays included.\n\nThe estimate uses the full budget’s linked cards and dates, regardless of search, category filters, or expense-list type. Future-expense calculation settings still apply. Categories without a maximum, including minimum-only goals and Uncategorized, receive no extra allowance. Manual savings adjustments are not included.\n\nThis scenario appears when at least one maximum is set, including zero. Projected Savings keeps its existing meaning. Category Availability on Home uses goals from the budget named in its footnote and spending during Home’s selected dates, so its amounts can differ from Budget Detail." : {
+      "comment" : "Category goal savings scenario and guidance.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تُستخدم الحدود القصوى أيضًا لحساب «المدخرات عند الحدود القصوى للأهداف» في تفاصيل الميزانية و«توفر الفئة» في الرئيسية.\n\nيبدأ تقدير المدخرات بالدخل المخطط، ويطرح أثر المصروفات الحالي، ثم يحجز المبلغ غير المستخدم ضمن الحد الأقصى لكل فئة. تستخدم المصروفات المخططة المبالغ المسجلة عند توفرها، وإلا فالمبالغ المخططة. تتبع التقسيمات المشتركة والمدفوعات من المدخرات والمبالغ المستردة قواعد الأثر المعتادة على الميزانية. يُحتسب كل مصروف مرة واحدة، ويظل الإنفاق الذي تجاوز الحد الأقصى مشمولًا.\n\nيستخدم التقدير البطاقات المرتبطة بالميزانية وتواريخها كاملة، بغض النظر عن البحث أو مرشحات الفئات أو نوع قائمة المصروفات. تظل إعدادات حساب المصروفات المستقبلية سارية. لا يُضاف مبلغ متاح للفئات التي ليس لها حد أقصى، بما فيها الفئات ذات هدف أدنى فقط و«غير مصنف». لا تُحتسب تعديلات المدخرات اليدوية.\n\nيظهر هذا السيناريو عند تعيين حد أقصى واحد على الأقل، بما في ذلك الصفر. تحتفظ «المدخرات المتوقعة» بمعناها الحالي. يستخدم «توفر الفئة» في الرئيسية أهداف الميزانية المذكورة في حاشيته والإنفاق خلال التواريخ المحددة في الرئيسية، لذا قد تختلف المبالغ عن تفاصيل الميزانية."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Höchstwerte bestimmen auch „Ersparnisse bei Zielhöchstwerten“ in den Budgetdetails und „Verfügbarkeit der Kategorie“ auf der Startseite.\n\nDie Sparschätzung beginnt mit dem geplanten Einkommen, zieht die aktuelle Ausgabenbelastung ab und reserviert anschließend den ungenutzten Spielraum unter jedem Kategoriehöchstwert. Geplante Ausgaben verwenden erfasste Beträge, sofern vorhanden, andernfalls Planbeträge. Geteilte Beträge, Zahlungen aus Ersparnissen und Erstattungen folgen den üblichen Regeln zur Budgetbelastung. Jede Ausgabe wird einmal gezählt, und bereits über einem Höchstwert liegende Ausgaben bleiben enthalten.\n\nDie Schätzung verwendet die verknüpften Karten und Daten des gesamten Budgets unabhängig von Suche, Kategoriefiltern oder dem Typ der Ausgabenliste. Einstellungen zur Berechnung zukünftiger Ausgaben gelten weiterhin. Kategorien ohne Höchstwert, einschließlich reiner Mindestziele und „Nicht kategorisiert“, erhalten keinen zusätzlichen Spielraum. Manuelle Sparanpassungen sind nicht enthalten.\n\nDieses Szenario erscheint, sobald mindestens ein Höchstwert festgelegt ist, auch bei null. „Voraussichtliche Einsparungen“ behält die bisherige Bedeutung. „Verfügbarkeit der Kategorie“ auf der Startseite verwendet Ziele aus dem in der Fußnote genannten Budget und Ausgaben an den auf der Startseite gewählten Daten. Die Beträge können daher von den Budgetdetails abweichen."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Maximums also power Savings at Goal Maximums in Budget Detail and Category Availability on Home.\n\nThe savings estimate starts with planned income, subtracts current expense impact, then reserves the unused allowance under each category maximum. Planned expenses use recorded amounts when available and planned amounts otherwise. Shared splits, payments from savings, and refunds follow the usual budget-impact rules. Expenses are counted once, and spending already above a maximum stays included.\n\nThe estimate uses the full budget’s linked cards and dates, regardless of search, category filters, or expense-list type. Future-expense calculation settings still apply. Categories without a maximum, including minimum-only goals and Uncategorized, receive no extra allowance. Manual savings adjustments are not included.\n\nThis scenario appears when at least one maximum is set, including zero. Projected Savings keeps its existing meaning. Category Availability on Home uses goals from the budget named in its footnote and spending during Home’s selected dates, so its amounts can differ from Budget Detail."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Los máximos también se usan para calcular Ahorro con los máximos de los objetivos en Detalle del presupuesto y Disponibilidad por categoría en Inicio.\n\nLa estimación de ahorro parte de los ingresos planificados, resta el impacto actual de los gastos y reserva el importe no utilizado hasta el máximo de cada categoría. Los gastos planificados usan los importes registrados cuando existen y los planificados en caso contrario. Los repartos, los pagos desde ahorros y los reembolsos siguen las reglas habituales de impacto en el presupuesto. Cada gasto se cuenta una sola vez y se incluye el gasto que ya supera un máximo.\n\nLa estimación usa las tarjetas vinculadas y las fechas del presupuesto completo, independientemente de la búsqueda, los filtros de categorías o el tipo de lista de gastos. Se siguen aplicando los ajustes de cálculo de gastos futuros. Las categorías sin máximo, incluidas las que solo tienen un mínimo y Sin categoría, no reciben un importe adicional. No se incluyen los ajustes manuales de ahorros.\n\nEste escenario aparece cuando se establece al menos un máximo, incluido cero. Ahorro proyectado mantiene su significado actual. Disponibilidad por categoría en Inicio usa los objetivos del presupuesto indicado en su nota y el gasto durante las fechas seleccionadas en Inicio, por lo que los importes pueden diferir de Detalle del presupuesto."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les maximums servent aussi au calcul de l’Épargne aux maximums des objectifs dans les détails du budget et de la disponibilité par catégorie dans Accueil.\n\nL’estimation de l’épargne part des revenus prévus, soustrait l’impact actuel des dépenses, puis réserve le montant inutilisé sous le maximum de chaque catégorie. Les dépenses planifiées utilisent les montants enregistrés lorsqu’ils existent, sinon les montants prévus. Les partages, les paiements depuis l’épargne et les remboursements suivent les règles habituelles d’impact sur le budget. Chaque dépense est comptée une fois et les dépenses dépassant déjà un maximum restent incluses.\n\nL’estimation utilise les cartes associées et les dates du budget complet, quels que soient la recherche, les filtres de catégories ou le type de liste de dépenses. Les réglages de calcul des dépenses futures s’appliquent toujours. Les catégories sans maximum, y compris celles avec un minimum seulement et Non catégorisé, ne reçoivent aucun montant supplémentaire. Les ajustements manuels de l’épargne sont exclus.\n\nCe scénario apparaît dès qu’au moins un maximum est défini, même zéro. Épargne projetée conserve son sens actuel. La disponibilité par catégorie dans Accueil utilise les objectifs du budget nommé dans sa note et les dépenses pendant les dates sélectionnées dans Accueil ; ses montants peuvent donc différer des détails du budget."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Os máximos também são usados em Economia nos máximos das metas nos detalhes do orçamento e em Disponibilidade da categoria no Início.\n\nA estimativa de economia parte da receita planejada, subtrai o impacto atual das despesas e reserva o valor não usado até o máximo de cada categoria. As despesas planejadas usam os valores registrados, quando disponíveis; caso contrário, usam os valores planejados. Divisões, pagamentos com economias e reembolsos seguem as regras habituais de impacto no orçamento. Cada despesa é contada uma vez, e gastos que já ultrapassam um máximo continuam incluídos.\n\nA estimativa usa os cartões vinculados e as datas do orçamento completo, independentemente da busca, dos filtros de categorias ou do tipo de lista de despesas. As configurações de cálculo de despesas futuras continuam valendo. Categorias sem máximo, incluindo as que têm apenas um mínimo e Sem categoria, não recebem valor adicional. Ajustes manuais de economias não são incluídos.\n\nEsse cenário aparece quando pelo menos um máximo é definido, incluindo zero. Economia projetada mantém seu significado atual. A Disponibilidade da categoria no Início usa as metas do orçamento identificado na nota e os gastos durante as datas selecionadas no Início, portanto os valores podem diferir dos detalhes do orçamento."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "上限还用于计算预算详情中的“达到目标上限时的节省”和首页中的“类别可用性”。\n\n节省估算以计划收入为起点，减去当前支出影响，再为每个类别预留上限内尚未使用的额度。计划支出使用已记录的金额（如有），否则使用计划金额。分摊、从储蓄付款和退款遵循通常的预算影响规则。每笔支出只计算一次，已超出上限的支出也会保留。\n\n估算使用整个预算关联的卡片和日期，不受搜索、类别筛选或支出列表类型影响。未来支出的计算设置仍然适用。未设置上限的类别（包括仅有下限目标的类别和“未分类”）不会获得额外额度。不计入手动储蓄调整。\n\n只要设置了至少一个上限（包括零），就会显示此情景。“预计节省”保留现有含义。首页中的“类别可用性”使用脚注所列预算的目标和首页所选日期内的支出，因此金额可能与预算详情不同。"
+          }
+        }
+      }
+    },
     "“%@” will be deleted." : {
       "localizations" : {
         "ar" : {
@@ -31584,8 +32194,8 @@
         }
       }
     },
-    "Less typing, more smooth sailing! Auto-Configure fills category minimums from attached presets and suggests maximums from past budgets. Choose how far back to look, add a little cushion, and make every amount your own.\n\nTry it: Create a budget > Category Goals > Auto-Configure\nCustomize defaults: Settings > Manage Categories > Auto-Configure Goals" : {
-      "comment" : "Release note describing automatic category minimum and maximum suggestions and where to configure them."
+    "Your category goals now have a savings outlook! Savings at Goal Maximums shows what you could save if you use your remaining category allowances. Existing expenses are counted once, and spending already above a maximum stays included.\n\nAuto-Configure gets smarter, too: minimums come from attached presets, with blank minimums filled from the lowest comparable historical spending—including zero—when there’s no preset amount. Suggest maximums from past budgets, choose your lookback and cushion, and make every goal your own.\n\nSee your estimate: Budgets > Select a budget > Savings Outlook\nTry Auto-Configure: Create a budget > Category Goals > Auto-Configure\nCustomize defaults: Settings > Manage Categories > Auto-Configure Goals" : {
+      "comment" : "Release note highlighting Savings at Goal Maximums, historical minimum suggestions including zero, and where to find the features."
     },
     "Linked" : {
       "localizations" : {

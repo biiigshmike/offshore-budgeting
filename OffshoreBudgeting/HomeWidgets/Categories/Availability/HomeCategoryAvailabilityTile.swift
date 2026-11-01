@@ -148,6 +148,12 @@ struct HomeCategoryAvailabilityTile: View {
                             alignment: .top
                         )
                     }
+                    if let budget = result.activeBudget {
+                        Text("Goals from \(budget.name). Availability uses Home’s selected dates. See Savings at Goal Maximums in Budget Detail for a full-budget estimate.")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                 }
                 .onChange(of: totalPages) { _, newValue in
                     // If data changes and is beyond the last page, clamp.

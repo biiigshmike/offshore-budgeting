@@ -17,9 +17,13 @@ struct CategoryGoalAutoConfigurationDraft {
             var draft = drafts[categoryID] ?? CategoryGoalDraft()
             let enteredMinimum = draft.minimum
             let plannedMinimum = plannedContributions[categoryID] ?? 0
-            if plannedMinimum.isFinite, plannedMinimum > 0 {
+            let suggestedMinimum = suggestions[categoryID]?.minimum
+            let historicalMinimum = draft.minimumText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                && (suggestedMinimum ?? 0) <= (draft.maximum ?? .infinity) ? suggestedMinimum : nil
+            let generatedMinimum = plannedMinimum.isFinite && plannedMinimum > 0 ? plannedMinimum : historicalMinimum
+            if let generatedMinimum {
                 previousMinimums[categoryID] = draft.minimumText
-                draft.minimumText = CurrencyFormatter.editingString(from: plannedMinimum)
+                draft.minimumText = CurrencyFormatter.editingString(from: generatedMinimum)
                 generatedMinimums[categoryID] = draft.minimumText
             }
             if draft.maximumText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,

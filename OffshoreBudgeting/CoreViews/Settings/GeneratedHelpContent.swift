@@ -819,6 +819,11 @@ enum GeneratedHelpContent {
             title: "Category Goals",
             sections: [
                 textSection(
+                    id: "budgets-category-goals-savings",
+                    header: "Savings at Goal Maximums",
+                    body: "Maximums also power Savings at Goal Maximums in Budget Detail and Category Availability on Home.\n\nThe savings estimate starts with planned income, subtracts current expense impact, then reserves the unused allowance under each category maximum. Planned expenses use recorded amounts when available and planned amounts otherwise. Shared splits, payments from savings, and refunds follow the usual budget-impact rules. Expenses are counted once, and spending already above a maximum stays included.\n\nThe estimate uses the full budget’s linked cards and dates, regardless of search, category filters, or expense-list type. Future-expense calculation settings still apply. Categories without a maximum, including minimum-only goals and Uncategorized, receive no extra allowance. Manual savings adjustments are not included.\n\nThis scenario appears when at least one maximum is set, including zero. Projected Savings keeps its existing meaning. Category Availability on Home uses goals from the budget named in its footnote and spending during Home’s selected dates, so its amounts can differ from Budget Detail."
+                ),
+                textSection(
                     id: "budgets-category-goals-editing",
                     header: "Set Minimum and Maximum Goals",
                     body: "Set optional minimum and maximum spending goals for each category. Tap Goals to edit them, or press and hold a category. A minimum is a spending target you want to reach; a maximum is a ceiling you want to stay within. Either can be left blank.\n\nGoals belong to one budget, so Groceries can have a different maximum in a weekly budget and a monthly budget. They guide your review without preventing you from recording expenses. All categories in the workspace are available, including ones with no spending yet."

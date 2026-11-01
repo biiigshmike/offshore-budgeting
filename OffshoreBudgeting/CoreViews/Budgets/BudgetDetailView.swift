@@ -214,6 +214,7 @@ struct BudgetDetailView: View {
         let variableExpensesTotal: Double
         let maxSavings: Double
         let projectedSavings: Double
+        let goalMaximumSavings: CategoryGoalSavingsCalculator.Summary?
         let actualSavings: Double
         let presetBySourceID: [UUID: Preset]
 
@@ -234,6 +235,7 @@ struct BudgetDetailView: View {
             variableExpensesTotal: 0,
             maxSavings: 0,
             projectedSavings: 0,
+            goalMaximumSavings: nil,
             actualSavings: 0,
             presetBySourceID: [:]
         )
@@ -454,6 +456,17 @@ struct BudgetDetailView: View {
         let maxSavings = plannedIncomeTotal - plannedExpensesEffectiveTotal
         let projectedSavings = plannedIncomeTotal - plannedExpensesPlannedTotal
         let actualSavings = actualIncomeTotal - plannedExpensesEffectiveTotal - variableExpensesTotal + actualSavingsAdjustments
+        let goalMaximumSavings = CategoryGoalSavingsCalculator.calculate(
+            for: budget,
+            workspaceID: workspace.id,
+            linkedCardIDs: linkedCardIDs,
+            incomes: workspaceIncomes,
+            plannedExpenses: workspacePlannedExpenses,
+            variableExpenses: workspaceVariableExpenses,
+            categoryLimits: budgetCategoryLimits,
+            excludeFuturePlannedExpenses: excludeFuturePlannedExpensesFromCalculationsInView,
+            excludeFutureVariableExpenses: excludeFutureVariableExpensesFromCalculationsInView
+        )
 
         return BudgetDetailDerivedState(
             plannedExpensesInBudget: plannedExpensesInBudget,
@@ -472,6 +485,7 @@ struct BudgetDetailView: View {
             variableExpensesTotal: variableExpensesTotal,
             maxSavings: maxSavings,
             projectedSavings: projectedSavings,
+            goalMaximumSavings: goalMaximumSavings,
             actualSavings: actualSavings,
             presetBySourceID: presetLookup(for: plannedExpensesFiltered)
         )
@@ -825,12 +839,14 @@ struct BudgetDetailView: View {
                 BudgetSummaryBucketCard(
                     title: String(localized: "accounts.segment.savings", defaultValue: "Savings Outlook", comment: "Accounts section segment for Offshore Savings."),
                     titleColor: .green,
-                    rows: [
-                        .init(label: String(localized: "budgetDetail.summary.maxSavings", defaultValue: "Max Savings", comment: "Budget detail summary row for max savings."), value: derived.maxSavings),
-                        .init(label: String(localized: "budgetDetail.summary.projectedSavings", defaultValue: "Projected Savings", comment: "Budget detail summary row for projected savings."), value: derived.projectedSavings),
-                        .init(label: String(localized: "budgetDetail.summary.actualSavings", defaultValue: "Actual Savings", comment: "Budget detail summary row for actual savings."), value: derived.actualSavings)
-                    ]
+                    rows: savingsRows(derived)
                 )
+                if derived.goalMaximumSavings != nil {
+                    Text("Full-budget estimate if you use your remaining category allowances. Spending already above a maximum is included.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
             }
             .padding(.vertical, 4)
             Button("How is this calculated?", systemImage: "info.circle") {
@@ -843,6 +859,18 @@ struct BudgetDetailView: View {
                 Text(footnote)
             }
         }
+    }
+
+    private func savingsRows(_ derived: BudgetDetailDerivedState) -> [BudgetSummaryBucketCard.Row] {
+        var rows: [BudgetSummaryBucketCard.Row] = [
+            .init(label: String(localized: "budgetDetail.summary.maxSavings", defaultValue: "Max Savings", comment: "Budget detail summary row for max savings."), value: derived.maxSavings),
+            .init(label: String(localized: "budgetDetail.summary.projectedSavings", defaultValue: "Projected Savings", comment: "Budget detail summary row for projected savings."), value: derived.projectedSavings)
+        ]
+        if let scenario = derived.goalMaximumSavings {
+            rows.append(.init(label: String(localized: "Savings at Goal Maximums"), value: scenario.estimatedSavings))
+        }
+        rows.append(.init(label: String(localized: "budgetDetail.summary.actualSavings", defaultValue: "Actual Savings", comment: "Budget detail summary row for actual savings."), value: derived.actualSavings))
+        return rows
     }
 
     private func calculationSections(_ derived: BudgetDetailDerivedState) -> [FinancialCalculationSection] {
@@ -862,7 +890,7 @@ struct BudgetDetailView: View {
         if excludeFutureVariableExpensesFromCalculationsInView {
             notes.append("Future variable expenses are excluded from these totals.")
         }
-        return [
+        var sections = [
             FinancialCalculationSection(
                 id: "max-savings",
                 title: "Max Savings",
@@ -897,6 +925,33 @@ struct BudgetDetailView: View {
                 notes: notes
             )
         ]
+        if let scenario = derived.goalMaximumSavings {
+            var scenarioNotes = [
+                "Uses the full budget, regardless of search, selected categories, or expense-list type.",
+                "Current expense impact includes recorded planned amounts when available, otherwise planned amounts, plus variable expenses. Shared splits, payments from savings, and refunds follow the usual budget-impact rules.",
+                "Each category maximum reserves only the allowance left after its current expense impact. Spending above a maximum is kept in full.",
+                "Categories without a maximum, including minimum-only goals and Uncategorized, receive no extra allowance. Manual savings adjustments are not included."
+            ]
+            if excludeFuturePlannedExpensesFromCalculationsInView {
+                scenarioNotes.append("Future planned expenses are excluded from these totals.")
+            }
+            if excludeFutureVariableExpensesFromCalculationsInView {
+                scenarioNotes.append("Future variable expenses are excluded from these totals.")
+            }
+            sections.insert(FinancialCalculationSection(
+                id: "goal-maximum-savings",
+                title: "Savings at Goal Maximums",
+                explanation: "Planned income minus current expense impact and the remaining allowance under category maximums.",
+                rows: [
+                    .init(id: "income", title: "Planned Income", amount: scenario.plannedIncome),
+                    .init(id: "expenses", title: "Current Expense Impact", amount: -scenario.currentExpenseImpact),
+                    .init(id: "allowance", title: "Remaining Category Allowances", amount: -scenario.remainingCategoryAllowance),
+                    .init(id: "total", title: "Savings at Goal Maximums", amount: scenario.estimatedSavings, isTotal: true)
+                ],
+                notes: scenarioNotes
+            ), at: 2)
+        }
+        return sections
     }
 
     private func categorySection(_ derived: BudgetDetailDerivedState) -> some View {
@@ -936,6 +991,7 @@ struct BudgetDetailView: View {
             }
         } footer: {
             Text("Set optional minimum and maximum spending goals for each category. Tap Goals to edit them, or press and hold a category.")
+            Text("Maximums also power Savings at Goal Maximums in Budget Detail and Category Availability on Home.")
         }
     }
 
@@ -1580,27 +1636,42 @@ private struct BudgetSummaryBucketCard: View {
                 .foregroundStyle(titleColor)
 
             ForEach(rows) { row in
-                HStack {
-                    Text(row.label)
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-
-                    Spacer(minLength: 0)
-
-                    if let value = row.value {
-                        Text(value, format: CurrencyFormatter.currencyStyle())
-                            .font(.subheadline.weight(.semibold))
-                    } else if let valueText = row.valueText {
-                        Text(valueText)
-                            .font(.subheadline.weight(.semibold))
+                ViewThatFits(in: .horizontal) {
+                    HStack(alignment: .firstTextBaseline) {
+                        rowLabel(row).fixedSize()
+                        Spacer(minLength: 12)
+                        rowValue(row).fixedSize()
+                    }
+                    VStack(alignment: .leading, spacing: 4) {
+                        rowLabel(row)
+                        rowValue(row)
                     }
                 }
+                .accessibilityElement(children: .combine)
             }
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
         .frame(minHeight: fixedHeight)
         .background(.clear, in: RoundedRectangle(cornerRadius: cornerRadius))
+    }
+
+    private func rowLabel(_ row: Row) -> some View {
+        Text(row.label)
+            .font(.subheadline)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+
+    @ViewBuilder
+    private func rowValue(_ row: Row) -> some View {
+        if let value = row.value {
+            Text(value, format: CurrencyFormatter.currencyStyle())
+                .font(.subheadline.weight(.semibold))
+        } else if let valueText = row.valueText {
+            Text(valueText)
+                .font(.subheadline.weight(.semibold))
+        }
     }
 }
 

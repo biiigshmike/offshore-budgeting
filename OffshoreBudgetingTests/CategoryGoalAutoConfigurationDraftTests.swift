@@ -10,6 +10,36 @@ struct CategoryGoalAutoConfigurationDraftTests {
         CategoryGoalSuggestion(averageAmount: 200, cushionPercent: 10, samples: [])
     }
 
+    @Test(arguments: [0.0, 75])
+    func fillsBlankMinimumFromLowestHistoryIncludingZero(lowest: Double) {
+        let history = CategoryGoalSuggestion(averageAmount: 100, cushionPercent: 10, samples: [
+            CategoryGoalHistorySample(budgetID: UUID(), name: "Low", startDate: .now, endDate: .now, amount: lowest),
+            CategoryGoalHistorySample(budgetID: UUID(), name: "High", startDate: .now, endDate: .now, amount: 200)
+        ])
+        var drafts: [UUID: CategoryGoalDraft] = [:]
+        var configuration = CategoryGoalAutoConfigurationDraft()
+        configuration.apply(to: &drafts, categoryIDs: [categoryID], plannedContributions: [:], suggestions: [categoryID: history])
+        #expect(drafts[categoryID]?.minimum == lowest)
+        #expect(drafts[categoryID]?.isValid == true)
+        configuration.restore(in: &drafts)
+        #expect(drafts[categoryID]?.minimum == nil)
+        #expect(drafts[categoryID]?.maximum == nil)
+
+        drafts = [categoryID: CategoryGoalDraft(minimum: 25, maximum: nil)]
+        configuration.apply(to: &drafts, categoryIDs: [categoryID], plannedContributions: [:], suggestions: [categoryID: history])
+        #expect(drafts[categoryID]?.minimum == 25)
+        configuration.restore(in: &drafts)
+        drafts = [:]
+        configuration.apply(to: &drafts, categoryIDs: [categoryID], plannedContributions: [categoryID: 50], suggestions: [categoryID: history])
+        #expect(drafts[categoryID]?.minimum == 50)
+        configuration.restore(in: &drafts)
+        drafts = [categoryID: CategoryGoalDraft(minimum: nil, maximum: 50)]
+        configuration.apply(to: &drafts, categoryIDs: [categoryID], plannedContributions: [:], suggestions: [categoryID: history])
+        #expect(drafts[categoryID]?.minimum == (lowest <= 50 ? lowest : nil))
+        #expect(drafts[categoryID]?.maximum == 50)
+        #expect(drafts[categoryID]?.isValid == true)
+    }
+
     @Test func generatesBothFieldsAndRestoresPreviousValues() {
         var drafts = [categoryID: CategoryGoalDraft(minimum: 25, maximum: nil)]
         let original = drafts

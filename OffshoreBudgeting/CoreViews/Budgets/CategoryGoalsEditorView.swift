@@ -47,6 +47,7 @@ struct CategoryGoalsEditorView: View {
                             }
                     } footer: {
                         Text("Sets minimums from attached presets assigned to selected cards within the budget dates. When Suggest Maximums is enabled in Manage Categories, fills blank maximums from comparable budget history. You can edit every amount. Turning this off restores generated values unless you edited them.")
+                        Text("For categories without preset spending, blank minimums use the lowest comparable historical spending, including zero. Historical suggestions require Suggest Maximums to be enabled.")
                     }
                 }
                 Section {
@@ -92,6 +93,7 @@ struct CategoryGoalsEditorView: View {
                     }
                 } footer: {
                     Text("Goals apply only to this budget. Leave either amount blank if you don't want that goal.")
+                    Text("Maximums also power Savings at Goal Maximums in Budget Detail and Category Availability on Home.")
                 }
                 Section {
                     HelpTopicLink(topicID: "budgets-category-goals", title: "Category Goals guide", font: .body)

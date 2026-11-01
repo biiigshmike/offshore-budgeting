@@ -88,8 +88,8 @@ struct SettingsReleaseLogsView: View {
                 ),
                 ReleaseItem(
                     systemImage: "slider.horizontal.3",
-                    title: "Auto-Configure Category Goals",
-                    description: "Less typing, more smooth sailing! Auto-Configure fills category minimums from attached presets and suggests maximums from past budgets. Choose how far back to look, add a little cushion, and make every amount your own.\n\nTry it: Create a budget > Category Goals > Auto-Configure\nCustomize defaults: Settings > Manage Categories > Auto-Configure Goals"
+                    title: "Auto-Configure Category Goals & Savings at Goal Maximums",
+                    description: "Plan your spending and see what you could save! Savings at Goal Maximums estimates your savings if you spend up to your category maximums. Auto-Configure fills goals from presets and past spending—including minimums of zero—with a lookback and cushion you can customize.\n\nSee your estimate: Budget Detail > Savings Outlook\nSet goals: Create a budget > Category Goals > Auto-Configure\nCustomize: Settings > Manage Categories > Auto-Configure Goals"
                 ),
                 ReleaseItem(
                     systemImage: "pencil.and.list.clipboard",
