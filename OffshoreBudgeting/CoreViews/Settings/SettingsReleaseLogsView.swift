@@ -87,14 +87,9 @@ struct SettingsReleaseLogsView: View {
                     description: "Marina has been removed in this update as I refocus on what makes Offshore special: private, intentional, manual-first budgeting. While building the experience Marina deserves requires more resources and a growing community, I hope to welcome her back someday."
                 ),
                 ReleaseItem(
-                    systemImage: "widget.extralarge",
-                    title: "Layout Adjustments for Extra Large Income and Next Planned Expense Widgets",
-                    description: "Fixed truncation of text in the Extra Large Income and Next Planned Expense widgets. This update also delivers a more effective way of keeping all of the iOS and macOS widgets up-to-date without the app needing to be opened."
-                ),
-                ReleaseItem(
-                    systemImage: "square.and.arrow.down",
-                    title: "Workspace Import & Export",
-                    description: "Workspaces can now be saved to a file and imported later as a new copy, making it easier to back up your data, move between Local and iCloud, or recover after a reinstall."
+                    systemImage: "pencil.and.list.clipboard",
+                    title: "Auto-Configure Category Minimums & Maximums",
+                    description: "Less typing, more smooth sailing! Auto-Configure fills category minimums from attached presets and suggests maximums from past budgets. Choose how far back to look, add a little cushion, and make every amount your own.\n\nTry it: Create a budget > Category Goals > Auto-Configure\nCustomize defaults: Settings > Manage Categories > Auto-Configure Goals"
                 ),
                 ReleaseItem(
                     systemImage: "tag.fill",
@@ -102,9 +97,14 @@ struct SettingsReleaseLogsView: View {
                     description: "When enabled, review uncategorized expenses when you next open the app or return it to the foreground.\n\nHow to enable: Settings > General > Behavior"
                 ),
                 ReleaseItem(
-                    systemImage: "desktopcomputer",
-                    title: "Optimized Interface for Mac",
-                    description: "Reconfigured the user interface for a better experience while using a Mac."
+                    systemImage: "square.and.arrow.down",
+                    title: "Workspace Import & Export",
+                    description: "Workspaces can now be saved to a file and imported later as a new copy, making it easier to back up your data, move between Local and iCloud, or recover after a reinstall."
+                ),
+                ReleaseItem(
+                    systemImage: "star",
+                    title: "Quality of Life Improvements",
+                    description: "Several quality of life improvements made to make using Offshore a better experience on your iPhone, iPad, and Mac."
                 )
             ]
         ),
