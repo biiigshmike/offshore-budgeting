@@ -46,7 +46,8 @@ enum ContentViewDeferredRefreshPlanner {
                 notificationSignature: notificationSignature,
                 forceWidgetRefresh: resolvedWidgetSignature != nil,
                 forceSavingsRefresh: resolvedSavingsSignature != nil,
-                forceNotificationRefresh: false
+                // Permission can change outside the app even when reminder preferences are identical.
+                forceNotificationRefresh: notificationSignature != nil
             )
         case .workspaceCountChanged:
             return ContentViewDeferredRefreshPlan(

@@ -49,6 +49,15 @@ enum UITestSupport {
 
         let defaults = UserDefaults.standard
 
+        for key in [
+            ReminderPreferences.Key.enabled, ReminderPreferences.Key.daily,
+            ReminderPreferences.Key.income, ReminderPreferences.Key.preset,
+            ReminderPreferences.Key.hour, ReminderPreferences.Key.minute,
+            ReminderPreferences.Key.configured
+        ] {
+            defaults.removeObject(forKey: key)
+        }
+
         defaults.set(false, forKey: "didCompleteOnboarding")
         defaults.set(false, forKey: "onboarding_didChooseDataSource")
         defaults.set(false, forKey: "onboarding_didPressGetStarted")

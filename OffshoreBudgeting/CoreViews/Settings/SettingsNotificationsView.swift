@@ -18,18 +18,20 @@ struct SettingsNotificationsView: View {
 
     // MARK: - Persisted Settings
 
-    @AppStorage("notifications_enabled") private var notificationsEnabled: Bool = false
-    @AppStorage("notifications_reminderHour") private var reminderHour: Int = 20
-    @AppStorage("notifications_reminderMinute") private var reminderMinute: Int = 0
+    @AppStorage(ReminderPreferences.Key.enabled) private var notificationsEnabled: Bool = false
+    @AppStorage(ReminderPreferences.Key.hour) private var reminderHour: Int = 20
+    @AppStorage(ReminderPreferences.Key.minute) private var reminderMinute: Int = 0
 
-    @AppStorage("notifications_dailyExpenseReminderEnabled") private var dailyExpenseReminderEnabled: Bool = false
-    @AppStorage("notifications_plannedIncomeReminderEnabled") private var plannedIncomeReminderEnabled: Bool = false
-    @AppStorage("notifications_presetDueReminderEnabled") private var presetDueReminderEnabled: Bool = false
+    @AppStorage(ReminderPreferences.Key.daily) private var dailyExpenseReminderEnabled: Bool = false
+    @AppStorage(ReminderPreferences.Key.income) private var plannedIncomeReminderEnabled: Bool = false
+    @AppStorage(ReminderPreferences.Key.preset) private var presetDueReminderEnabled: Bool = false
 
     // MARK: - Local UI State
 
-    @State private var notificationsToggle: Bool = false
-    @State private var reminderTime: Date = Date()
+    @State private var reminderTime = ReminderPreferences.load().time
+    @State private var showingReminderSetup = false
+    @State private var isRequestingPermission = false
+    @Environment(\.scenePhase) private var scenePhase
 
     @StateObject private var notificationService = LocalNotificationService()
     @StateObject private var shoppingModeManager = ShoppingModeManager.shared
@@ -43,14 +45,30 @@ struct SettingsNotificationsView: View {
         List {
             // MARK: - Permission
 
-            Section("Permission") {
-                Toggle("Enable Notifications", isOn: $notificationsToggle)
+            Section("Scheduled Reminders") {
+                Toggle("Send Scheduled Reminders", isOn: $notificationsEnabled)
+                    .accessibilityIdentifier("scheduledRemindersEnabled")
                     .tint(Color("AccentColor"))
-                    .onChange(of: notificationsToggle) { _, newValue in
+                    .disabled(isRequestingPermission)
+                    .onChange(of: notificationsEnabled) { _, newValue in
                         Task { await handleToggleChange(newValue) }
                     }
 
-                statusRow
+                Text("Controls Daily Expense, Planned Income, and Preset Expense Due reminders. Excursion Mode is managed separately.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+
+                ReminderPermissionView(
+                    notificationService: notificationService,
+                    remindersEnabled: notificationsEnabled,
+                    hasSelectedReminders: hasSelectedReminders
+                )
+
+                if !hasSelectedReminders {
+                    Button("Set Up Reminders", systemImage: "bell.badge") {
+                        showingReminderSetup = true
+                    }
+                }
             }
 
             // MARK: - Reminder Time
@@ -61,7 +79,7 @@ struct SettingsNotificationsView: View {
                     Spacer()
                     PillTimePickerField(title: "Time", time: $reminderTime)
                 }
-                .disabled(!canEditReminderTime)
+                .disabled(isRequestingPermission)
                 .onChange(of: reminderTime) { _, newValue in
                     persistReminderTime(newValue)
                     Task { await syncSchedulesIfPossible() }
@@ -77,7 +95,7 @@ struct SettingsNotificationsView: View {
             Section("Expenses") {
                 Toggle("Daily Expense Reminder", isOn: $dailyExpenseReminderEnabled)
                     .tint(Color("AccentColor"))
-                    .disabled(!canEditReminderToggles)
+                    .disabled(isRequestingPermission)
                     .onChange(of: dailyExpenseReminderEnabled) { _, _ in
                         Task { await syncSchedulesIfPossible() }
                     }
@@ -93,7 +111,7 @@ struct SettingsNotificationsView: View {
                 Toggle("Planned Income Reminder", isOn: $plannedIncomeReminderEnabled)
                     .tint(Color("AccentColor"))
 
-                    .disabled(!canEditReminderToggles)
+                    .disabled(isRequestingPermission)
                     .onChange(of: plannedIncomeReminderEnabled) { _, _ in
                         Task { await syncSchedulesIfPossible() }
                     }
@@ -109,7 +127,7 @@ struct SettingsNotificationsView: View {
                 Toggle("Preset Expense Due Reminder", isOn: $presetDueReminderEnabled)
                     .tint(Color("AccentColor"))
 
-                    .disabled(!canEditReminderToggles)
+                    .disabled(isRequestingPermission)
                     .onChange(of: presetDueReminderEnabled) { _, _ in
                         Task { await syncSchedulesIfPossible() }
                     }
@@ -173,12 +191,8 @@ struct SettingsNotificationsView: View {
                     Button {
                         notificationService.openSystemSettings()
                     } label: {
-                        Label("Open System Settings", systemImage: "gearshape")
+                        Label("Open Settings", systemImage: "gearshape")
                     }
-
-                    Text("Notifications are currently off at the system level. Turn them on in Settings, then come back here.")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
                 }
             }
         }
@@ -187,12 +201,19 @@ struct SettingsNotificationsView: View {
         .task {
             shoppingModeManager.refreshIfExpired()
             await notificationService.refreshAuthorizationStatus()
-            syncUIFromCurrentState()
-
-            reminderTime = makeDate(hour: reminderHour, minute: reminderMinute)
-
-            // If authorized and enabled, make sure schedules match current toggles/time.
+            reminderTime = ReminderPreferences.load().time
             await syncSchedulesIfPossible()
+        }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active {
+                Task { await syncSchedulesIfPossible() }
+            }
+        }
+        .appSheet(isPresented: $showingReminderSetup, onDismiss: {
+            reminderTime = ReminderPreferences.load().time
+        }) {
+            ReminderSetupView(workspaceID: workspaceID, notificationService: notificationService)
+                .presentationDetents([.large])
         }
         .blocksAutomaticExpenseReview(while: showingErrorAlert)
         .alert("Notification Error", isPresented: $showingErrorAlert) {
@@ -204,12 +225,8 @@ struct SettingsNotificationsView: View {
 
     // MARK: - Computed
 
-    private var canEditReminderTime: Bool {
-        notificationService.authorizationState == .authorized && notificationsEnabled
-    }
-
-    private var canEditReminderToggles: Bool {
-        canEditReminderTime
+    private var hasSelectedReminders: Bool {
+        dailyExpenseReminderEnabled || plannedIncomeReminderEnabled || presetDueReminderEnabled
     }
 
     private var isExcursionControlsAvailable: Bool {
@@ -220,124 +237,36 @@ struct SettingsNotificationsView: View {
         #endif
     }
 
-    // MARK: - UI
-
-    private var statusRow: some View {
-        HStack(spacing: 10) {
-            Image(systemName: statusIconName)
-                .foregroundStyle(statusIconColor)
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(statusTitle)
-                    .font(.subheadline.weight(.semibold))
-
-                Text(statusSubtitle)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            }
-
-            Spacer(minLength: 8)
-        }
-        .padding(.vertical, 4)
-    }
-
-    private var statusIconName: String {
-        switch notificationService.authorizationState {
-        case .authorized: return "checkmark.circle.fill"
-        case .denied: return "xmark.octagon.fill"
-        case .notDetermined: return "questionmark.circle.fill"
-        }
-    }
-
-    private var statusIconColor: Color {
-        switch notificationService.authorizationState {
-        case .authorized: return .green
-        case .denied: return .red
-        case .notDetermined: return .orange
-        }
-    }
-
-    private var statusTitle: String {
-        switch notificationService.authorizationState {
-        case .authorized: return "Allowed"
-        case .denied: return "Denied"
-        case .notDetermined: return "Not Asked Yet"
-        }
-    }
-
-    private var statusSubtitle: String {
-        switch notificationService.authorizationState {
-        case .authorized:
-            return notificationsEnabled
-            ? "App will send notifications."
-            : "Permission is allowed. Use the toggle to turn notifications on."
-
-        case .denied:
-            return "Allow notifications in System Settings."
-
-        case .notDetermined:
-            return "Turn on the toggle to request permission."
-        }
-    }
-
     // MARK: - Actions
 
-    private func syncUIFromCurrentState() {
-        if notificationService.authorizationState == .denied {
-            notificationsEnabled = false
-            notificationsToggle = false
-            return
-        }
-
-        notificationsToggle = notificationsEnabled
-    }
-
     private func handleToggleChange(_ wantsEnabled: Bool) async {
-        if wantsEnabled == false {
-            notificationsEnabled = false
-
-            // Cancel our reminder notifications when the app-level toggle is off.
-            notificationService.cancelNotification(identifier: LocalNotificationService.NotificationID.dailyExpenseReminder)
-            await notificationService.removeScheduledNotifications(
-                matchingPrefix: LocalNotificationService.NotificationID.plannedIncomeReminder
-            )
-            await notificationService.removeScheduledNotifications(
-                matchingPrefix: LocalNotificationService.NotificationID.presetDueReminder
-            )
-
+        // Initialization and permission refresh never write this preference.
+        guard wantsEnabled else {
+            await syncSchedulesIfPossible()
             return
         }
-
-        await notificationService.refreshAuthorizationStatus()
-
-        switch notificationService.authorizationState {
-        case .authorized:
-            notificationsEnabled = true
-            notificationsToggle = true
-            await syncSchedulesIfPossible()
-
-        case .notDetermined:
-            do {
-                let granted = try await notificationService.requestAuthorization()
-                if granted {
-                    notificationsEnabled = true
-                    notificationsToggle = true
-                    await syncSchedulesIfPossible()
-                } else {
-                    notificationsEnabled = false
-                    notificationsToggle = false
-                }
-            } catch {
+        guard hasSelectedReminders else {
+            notificationsEnabled = false
+            showingReminderSetup = true
+            return
+        }
+        isRequestingPermission = true
+        defer { isRequestingPermission = false }
+        do {
+            await notificationService.refreshAuthorizationStatus()
+            if notificationService.authorizationState == .notDetermined {
+                _ = try await notificationService.requestAuthorization()
+            }
+            if !notificationService.isAuthorized {
                 notificationsEnabled = false
-                notificationsToggle = false
-                errorMessage = error.localizedDescription
+                errorMessage = String(localized: "Notifications are not allowed. Your reminder choices are saved. You can allow notifications in System Settings.")
                 showingErrorAlert = true
             }
-
-        case .denied:
+            await syncSchedulesIfPossible()
+        } catch {
             notificationsEnabled = false
-            notificationsToggle = false
-            errorMessage = "Notifications are denied at the system level. Please enable them in System Settings."
+            await syncSchedulesIfPossible()
+            errorMessage = error.localizedDescription
             showingErrorAlert = true
         }
     }
@@ -348,52 +277,15 @@ struct SettingsNotificationsView: View {
         reminderMinute = components.minute ?? reminderMinute
     }
 
-    private func makeDate(hour: Int, minute: Int) -> Date {
-        Calendar.current.date(
-            bySettingHour: hour,
-            minute: minute,
-            second: 0,
-            of: Date()
-        ) ?? Date()
-    }
-
     private func syncSchedulesIfPossible() async {
-        await notificationService.refreshAuthorizationStatus()
-
-        guard notificationService.authorizationState == .authorized else { return }
-
         do {
             try await notificationService.syncReminders(
-                modelContext: modelContext,
-                workspaceID: workspaceID,
-                notificationsEnabled: notificationsEnabled,
-                dailyExpenseEnabled: dailyExpenseReminderEnabled,
-                plannedIncomeEnabled: plannedIncomeReminderEnabled,
-                presetDueEnabled: presetDueReminderEnabled,
-                hour: reminderHour,
-                minute: reminderMinute
+                modelContext: modelContext, workspaceID: workspaceID,
+                preferences: ReminderPreferences.load()
             )
         } catch {
             errorMessage = error.localizedDescription
             showingErrorAlert = true
-        }
-    }
-
-    private func sendTestNotification() async {
-        do {
-            await notificationService.refreshAuthorizationStatus()
-
-            guard notificationService.isAuthorized else {
-                errorMessage = "Notifications are not authorized yet."
-                showingErrorAlert = true
-                return
-            }
-
-            guard notificationsEnabled else {
-                errorMessage = "Your in-app notifications toggle is off."
-                showingErrorAlert = true
-                return
-            }
         }
     }
 

@@ -64,13 +64,13 @@ struct ContentView: View {
 
     // MARK: - Notifications
 
-    @AppStorage("notifications_enabled") private var notificationsEnabled: Bool = false
-    @AppStorage("notifications_reminderHour") private var reminderHour: Int = 20
-    @AppStorage("notifications_reminderMinute") private var reminderMinute: Int = 0
+    @AppStorage(ReminderPreferences.Key.enabled) private var notificationsEnabled: Bool = false
+    @AppStorage(ReminderPreferences.Key.hour) private var reminderHour: Int = 20
+    @AppStorage(ReminderPreferences.Key.minute) private var reminderMinute: Int = 0
 
-    @AppStorage("notifications_dailyExpenseReminderEnabled") private var dailyExpenseReminderEnabled: Bool = false
-    @AppStorage("notifications_plannedIncomeReminderEnabled") private var plannedIncomeReminderEnabled: Bool = false
-    @AppStorage("notifications_presetDueReminderEnabled") private var presetDueReminderEnabled: Bool = false
+    @AppStorage(ReminderPreferences.Key.daily) private var dailyExpenseReminderEnabled: Bool = false
+    @AppStorage(ReminderPreferences.Key.income) private var plannedIncomeReminderEnabled: Bool = false
+    @AppStorage(ReminderPreferences.Key.preset) private var presetDueReminderEnabled: Bool = false
 
     // MARK: - Onboarding
 
@@ -377,6 +377,12 @@ struct ContentView: View {
         .environment(\.automaticLaunchPromptsDeferred, defersAutomaticLaunchPrompts)
         .onChange(of: didCompleteOnboarding) { _, completed in
             if !completed { progressHandoffWorkspace = nil }
+            if completed {
+                scheduleDeferredResumeRefresh(
+                    trigger: .settingsChanged,
+                    includesWidgets: false, includesSavings: false, includesNotifications: true
+                )
+            }
         }
         .onChange(of: workspaces.map(\.id)) { previousIDs, currentIDs in
             let store = WorkspaceProgressHandoffStore()
@@ -885,28 +891,12 @@ struct ContentView: View {
             "notificationsRefreshStarted",
             metadata: ["workspaceID": workspaceID.uuidString]
         )
-        await notificationService.refreshAuthorizationStatus()
-        guard notificationService.isAuthorized else {
-            TabFlickerDiagnostics.markEvent(
-                "notificationsRefreshSkipped",
-                metadata: [
-                    "workspaceID": workspaceID.uuidString,
-                    "reason": "notAuthorized"
-                ]
-            )
-            return
-        }
 
         do {
             try await notificationService.syncReminders(
                 modelContext: modelContext,
                 workspaceID: workspaceID,
-                notificationsEnabled: notificationsEnabled,
-                dailyExpenseEnabled: dailyExpenseReminderEnabled,
-                plannedIncomeEnabled: plannedIncomeReminderEnabled,
-                presetDueEnabled: presetDueReminderEnabled,
-                hour: reminderHour,
-                minute: reminderMinute
+                preferences: ReminderPreferences.load()
             )
         } catch {
             // intentionally ignoring errors here so notifications never block app startup.

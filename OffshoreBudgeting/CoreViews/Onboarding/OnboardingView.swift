@@ -280,6 +280,7 @@ struct OnboardingView: View {
         OnboardingPrivacySyncStep(
             requireBiometrics: $requireBiometrics,
             hasExistingDataInCurrentStore: !workspaces.isEmpty,
+            workspaceID: currentWorkspace?.id,
             notificationService: notificationService
         )
     }
@@ -805,13 +806,20 @@ private struct OnboardingPrivacySyncStep: View {
     
     @Binding var requireBiometrics: Bool
     let hasExistingDataInCurrentStore: Bool
+    let workspaceID: UUID?
     @AppStorage("icloud_useCloud") private var desiredUseICloud: Bool = false
     @AppStorage("icloud_activeUseCloud") private var activeUseICloud: Bool = false
     
     @ObservedObject var notificationService: LocalNotificationService
     
     @State private var biometricsInfo = LocalAuthenticationService.biometricAvailability()
-    @State private var showingNotificationsDeniedInfo: Bool = false
+    @State private var showingReminderSetup = false
+    @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.modelContext) private var modelContext
+    @AppStorage(ReminderPreferences.Key.enabled) private var remindersEnabled = false
+    @AppStorage(ReminderPreferences.Key.daily) private var dailyReminder = false
+    @AppStorage(ReminderPreferences.Key.income) private var incomeReminder = false
+    @AppStorage(ReminderPreferences.Key.preset) private var presetReminder = false
     @State private var showingICloudSwitchConfirm: Bool = false
     @State private var showingICloudUnavailable: Bool = false
     @State private var showingRestartRequired: Bool = false
@@ -909,16 +917,32 @@ private struct OnboardingPrivacySyncStep: View {
             )
             .presentationDetents([.large])
         }
-        .alert("Notifications Disabled", isPresented: $showingNotificationsDeniedInfo) {
-            Button("OK", role: .cancel) { }
-            Button("Open Settings") {
-                notificationService.openSystemSettings()
+        .task { await refreshReminders() }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active {
+                Task { await refreshReminders() }
             }
-        } message: {
-            Text("Notifications are currently disabled for Offshore. You can enable them in Settings.")
+        }
+        .appSheet(isPresented: $showingReminderSetup) {
+            if let workspaceID {
+                ReminderSetupView(workspaceID: workspaceID, notificationService: notificationService)
+                    .presentationDetents([.large])
+            }
         }
     }
     
+    private func refreshReminders() async {
+        if let workspaceID {
+            // Background refresh is best effort; explicit setup surfaces scheduling errors.
+            try? await notificationService.syncReminders(
+                modelContext: modelContext, workspaceID: workspaceID,
+                preferences: ReminderPreferences.load()
+            )
+        } else {
+            await notificationService.refreshAuthorizationStatus()
+        }
+    }
+
     private var isICloudAvailable: Bool {
         FileManager.default.ubiquityIdentityToken != nil
     }
@@ -949,43 +973,28 @@ private struct OnboardingPrivacySyncStep: View {
         }
     }
     
-    @ViewBuilder
     private var notificationRow: some View {
-        switch notificationService.authorizationState {
-        case .notDetermined:
-            Button {
-                Task {
-                    do {
-                        _ = try await notificationService.requestAuthorization()
-                        if notificationService.authorizationState == .denied {
-                            showingNotificationsDeniedInfo = true
-                        } else {}
-                    } catch {
-                        showingNotificationsDeniedInfo = true
-                    }
-                }
-            } label: {
-                Label("Enable Notifications", systemImage: "bell.badge")
+        Group {
+            Button("Set Up Reminders", systemImage: "bell.badge") {
+                showingReminderSetup = true
             }
-            
-            Text("Enable reminders for logging expenses and reviewing presets.")
+            .disabled(workspaceID == nil)
+
+            Text("Choose reminders for daily expenses, planned income, and preset expenses due. Setup is optional.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
-            
-        case .denied:
-            Button {
-                showingNotificationsDeniedInfo = true
-            } label: {
-                Label("Notifications Disabled", systemImage: "bell.slash")
+
+            ReminderPermissionView(
+                notificationService: notificationService,
+                remindersEnabled: remindersEnabled,
+                hasSelectedReminders: dailyReminder || incomeReminder || presetReminder
+            )
+            if notificationService.authorizationState == .denied {
+                Button("Open Settings") { notificationService.openSystemSettings() }
             }
-            .foregroundStyle(.secondary)
-            
-        case .authorized:
-            Label("Notifications Enabled", systemImage: "bell.fill")
-                .foregroundStyle(.secondary)
         }
     }
-    
+
     @ViewBuilder
     private func header(title: String, subtitle: String) -> some View {
         VStack(alignment: .leading, spacing: 6) {

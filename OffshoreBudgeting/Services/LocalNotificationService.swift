@@ -62,81 +62,119 @@ final class LocalNotificationService: ObservableObject {
         static let maxNamesInPresetDueBody: Int = 2
     }
 
-    // MARK: - AppStorage Keys
-
-    private enum SettingsKey {
-        static let notificationsEnabled = "notifications_enabled"
-        static let reminderHour = "notifications_reminderHour"
-        static let reminderMinute = "notifications_reminderMinute"
-        static let dailyExpenseReminderEnabled = "notifications_dailyExpenseReminderEnabled"
-        static let plannedIncomeReminderEnabled = "notifications_plannedIncomeReminderEnabled"
-        static let presetDueReminderEnabled = "notifications_presetDueReminderEnabled"
-    }
-
     // MARK: - Authorization State
 
     enum AuthorizationState: Equatable {
+        case unknown
         case notDetermined
         case denied
         case authorized
+        case provisional
+        case ephemeral
     }
 
-    @Published private(set) var authorizationState: AuthorizationState = .notDetermined
+    @Published private(set) var settings: NotificationSettingsSnapshot?
+    private let center: any LocalNotificationCenter
+
+    // All service instances share this queue because the system owns one set of reminder IDs.
+    private static var reminderSyncTail: Task<Void, Never>?
+
+    var authorizationState: AuthorizationState {
+        guard let settings else { return .unknown }
+        switch settings.authorization {
+        case .notDetermined: return .notDetermined
+        case .denied: return .denied
+        case .authorized: return .authorized
+        case .provisional: return .provisional
+        case .ephemeral: return .ephemeral
+        @unknown default: return .unknown
+        }
+    }
 
     var isAuthorized: Bool {
-        authorizationState == .authorized
+        switch authorizationState {
+        case .authorized, .provisional, .ephemeral: return true
+        default: return false
+        }
     }
 
-    // MARK: - Init
-
-    init() {
-        Task {
-            await refreshAuthorizationStatus()
+    var deliveryDescription: String {
+        guard isAuthorized, let settings else {
+            return String(localized: "Allow notifications to receive your reminders.")
         }
+        if authorizationState == .provisional {
+            return String(localized: "Notifications are delivered quietly to Notification Center.")
+        }
+        if authorizationState == .ephemeral {
+            return String(localized: "Your device has allowed notifications for a limited time.")
+        }
+        if settings.alerts != .enabled {
+            return String(localized: "Notification alerts are off. You can change this in your device’s Settings.")
+        }
+        if settings.sounds != .enabled {
+            return String(localized: "Notification sounds are off. You can change this in your device’s Settings.")
+        }
+        return String(localized: "Your device’s settings control when reminders appear.")
+    }
+
+    init(center: (any LocalNotificationCenter)? = nil) {
+        self.center = center ?? SystemLocalNotificationCenter()
     }
 
     // MARK: - Convenience Sync
 
     static func syncFromUserDefaultsIfPossible(modelContext: ModelContext, workspaceID: UUID) async {
-        let defaults = UserDefaults.standard
-
-        let notificationsEnabled = defaults.bool(forKey: SettingsKey.notificationsEnabled)
-        let reminderHour = defaults.object(forKey: SettingsKey.reminderHour) as? Int ?? 20
-        let reminderMinute = defaults.object(forKey: SettingsKey.reminderMinute) as? Int ?? 0
-
-        let dailyExpenseEnabled = defaults.bool(forKey: SettingsKey.dailyExpenseReminderEnabled)
-        let plannedIncomeEnabled = defaults.bool(forKey: SettingsKey.plannedIncomeReminderEnabled)
-        let presetDueEnabled = defaults.bool(forKey: SettingsKey.presetDueReminderEnabled)
-
-        let service = LocalNotificationService()
-        await service.refreshAuthorizationStatus()
-        guard service.isAuthorized else { return }
-
         do {
-            try await service.syncReminders(
-                modelContext: modelContext,
-                workspaceID: workspaceID,
-                notificationsEnabled: notificationsEnabled,
-                dailyExpenseEnabled: dailyExpenseEnabled,
-                plannedIncomeEnabled: plannedIncomeEnabled,
-                presetDueEnabled: presetDueEnabled,
-                hour: reminderHour,
-                minute: reminderMinute
+            try await LocalNotificationService().syncReminders(
+                modelContext: modelContext, workspaceID: workspaceID,
+                preferences: ReminderPreferences.load()
             )
         } catch {
-            // intentionally ignoring errors so scheduling never blocks UI flows.
+            // Background refresh must not block the financial editing flow.
+        }
+    }
+
+    /// Saves an explicit setup choice. Denial keeps the categories/time but leaves reminders off.
+    func configureReminders(
+        _ draft: ReminderPreferences,
+        defaults: UserDefaults = .standard,
+        modelContext: ModelContext,
+        workspaceID: UUID
+    ) async throws {
+        var preferences = draft
+        preferences.enabled = false
+        preferences.save(to: defaults)
+        do {
+            if preferences.hasSelectedReminders {
+                await refreshAuthorizationStatus()
+                if authorizationState == .notDetermined {
+                    _ = try await requestAuthorization()
+                }
+                preferences.enabled = isAuthorized
+            }
+            preferences.save(to: defaults)
+            try await syncReminders(
+                modelContext: modelContext, workspaceID: workspaceID, preferences: preferences
+            )
+        } catch {
+            // A failed authorization request must also remove previously scheduled reminders.
+            if !preferences.enabled {
+                try? await syncReminders(
+                    modelContext: modelContext, workspaceID: workspaceID, preferences: preferences
+                )
+            }
+            throw error
         }
     }
 
     // MARK: - Authorization
 
     func refreshAuthorizationStatus() async {
-        let settings = await fetchNotificationSettings()
-        authorizationState = Self.mapAuthorizationStatus(settings.authorizationStatus)
+        settings = await center.settings()
     }
 
     func requestAuthorization() async throws -> Bool {
-        let granted = try await requestAuthorizationInternal(options: [.alert, .sound, .badge])
+        let granted = try await center.requestAuthorization(options: [.alert, .sound, .badge])
         await refreshAuthorizationStatus()
         return granted
     }
@@ -151,15 +189,11 @@ final class LocalNotificationService: ObservableObject {
     // MARK: - Removal
 
     func removeAllScheduledNotifications() {
-        let center = UNUserNotificationCenter.current()
-        center.removeAllPendingNotificationRequests()
-        center.removeAllDeliveredNotifications()
+        center.removeAll()
     }
 
     func removeScheduledNotifications(identifiers: [String]) {
-        let center = UNUserNotificationCenter.current()
-        center.removePendingNotificationRequests(withIdentifiers: identifiers)
-        center.removeDeliveredNotifications(withIdentifiers: identifiers)
+        center.remove(identifiers: identifiers)
     }
 
     // MARK: - Scheduling (Daily)
@@ -240,18 +274,32 @@ final class LocalNotificationService: ObservableObject {
     ///
     /// This is deterministic and safe to call anytime (toggle changes, time changes, app launch).
     func syncReminders(
-        modelContext: ModelContext,
-        workspaceID: UUID,
-        notificationsEnabled: Bool,
-        dailyExpenseEnabled: Bool,
-        plannedIncomeEnabled: Bool,
-        presetDueEnabled: Bool,
-        hour: Int,
-        minute: Int
+        modelContext: ModelContext, workspaceID: UUID, preferences: ReminderPreferences
     ) async throws {
+        let predecessor = Self.reminderSyncTail
+        let operation = Task { @MainActor in
+            await predecessor?.value
+            try await self.performReminderSync(
+                modelContext: modelContext, workspaceID: workspaceID, preferences: preferences
+            )
+        }
+        Self.reminderSyncTail = Task { _ = try? await operation.value }
+        try await operation.value
+    }
 
+    private func performReminderSync(
+        modelContext: ModelContext, workspaceID: UUID, preferences: ReminderPreferences
+    ) async throws {
+        await refreshAuthorizationStatus()
+        let dailyExpenseEnabled = preferences.daily
+        let plannedIncomeEnabled = preferences.income
+        let presetDueEnabled = preferences.preset
+        let hour = preferences.hour
+        let minute = preferences.minute
+
+        // A blocked system permission never overwrites the person's app preferences.
         // If app-level notifications are off, cancel app’s reminder IDs.
-        guard notificationsEnabled else {
+        guard preferences.enabled && isAuthorized else {
             cancelNotification(identifier: NotificationID.dailyExpenseReminder)
             await removeScheduledNotifications(matchingPrefix: NotificationID.plannedIncomeReminder)
             await removeScheduledNotifications(matchingPrefix: NotificationID.presetDueReminder)
@@ -484,11 +532,7 @@ final class LocalNotificationService: ObservableObject {
     }
 
     private func fetchPendingNotificationRequests() async -> [UNNotificationRequest] {
-        await withCheckedContinuation { continuation in
-            UNUserNotificationCenter.current().getPendingNotificationRequests { requests in
-                continuation.resume(returning: requests)
-            }
-        }
+        await center.pendingRequests()
     }
 
     func debugPendingRequestLines() async -> [String] {
@@ -640,48 +684,7 @@ final class LocalNotificationService: ObservableObject {
         AppNumberFormat.integer(value)
     }
 
-    private func fetchNotificationSettings() async -> UNNotificationSettings {
-        await withCheckedContinuation { continuation in
-            UNUserNotificationCenter.current().getNotificationSettings { settings in
-                continuation.resume(returning: settings)
-            }
-        }
-    }
-
-    private func requestAuthorizationInternal(options: UNAuthorizationOptions) async throws -> Bool {
-        try await withCheckedThrowingContinuation { continuation in
-            UNUserNotificationCenter.current().requestAuthorization(options: options) { granted, error in
-                if let error {
-                    continuation.resume(throwing: error)
-                    return
-                }
-                continuation.resume(returning: granted)
-            }
-        }
-    }
-
     private func addNotificationRequest(_ request: UNNotificationRequest) async throws {
-        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-            UNUserNotificationCenter.current().add(request) { error in
-                if let error {
-                    continuation.resume(throwing: error)
-                } else {
-                    continuation.resume(returning: ())
-                }
-            }
-        }
-    }
-
-    private static func mapAuthorizationStatus(_ status: UNAuthorizationStatus) -> AuthorizationState {
-        switch status {
-        case .notDetermined:
-            return .notDetermined
-        case .denied:
-            return .denied
-        case .authorized, .provisional, .ephemeral:
-            return .authorized
-        @unknown default:
-            return .notDetermined
-        }
+        try await center.add(request)
     }
 }

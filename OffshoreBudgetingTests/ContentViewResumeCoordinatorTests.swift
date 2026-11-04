@@ -204,7 +204,7 @@ struct ContentViewResumeCoordinatorTests {
         #expect(coordinator.pendingRequest == nil)
     }
 
-    @Test func planner_sceneBecameActive_sameDaySkipsWidgetAndSavingsWork() {
+    @Test func planner_sceneBecameActive_sameDaySkipsWidgetAndSavingsButRechecksNotifications() {
         let plan = ContentViewDeferredRefreshPlanner.plan(
             trigger: .sceneBecameActive,
             widgetSignature: widgetSignature,
@@ -219,6 +219,19 @@ struct ContentViewResumeCoordinatorTests {
         expectNotificationSignature(plan.notificationSignature, equals: notificationSignature)
         #expect(plan.forceWidgetRefresh == false)
         #expect(plan.forceSavingsRefresh == false)
+        #expect(plan.forceNotificationRefresh)
+
+        var coordinator = ContentViewResumeCoordinator()
+        let previous = coordinator.schedule(
+            widgetSignature: nil, savingsSignature: nil, notificationSignature: notificationSignature
+        )!
+        coordinator.markNotificationRefreshCompleted(previous)
+        let resumed = coordinator.schedule(
+            widgetSignature: plan.widgetSignature, savingsSignature: plan.savingsSignature,
+            notificationSignature: plan.notificationSignature,
+            forceNotificationRefresh: plan.forceNotificationRefresh
+        )
+        #expect(resumed?.notificationSignature != nil)
     }
 
     @Test func planner_workspaceSelectionChangedKeepsRequestedWorkWithoutForcing() {
