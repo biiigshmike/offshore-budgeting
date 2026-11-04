@@ -5,6 +5,10 @@ struct SettingsThemeView: View {
     @AppStorage(CustomThemePalette.storageKey) private var customPalette = ""
     @Environment(\.appearanceTheme) private var theme
 
+    private var customAccentSwatch: Color {
+        CustomThemePalette(storedValue: customPalette)?.color(at: \.accent) ?? .gray.opacity(0.35)
+    }
+
     var body: some View {
         List {
             Section {
@@ -36,7 +40,7 @@ struct SettingsThemeView: View {
                 Button(action: selectCustomTheme) {
                     HStack {
                         Circle()
-                            .fill(.gray.opacity(0.35))
+                            .fill(customAccentSwatch)
                             .frame(width: 22, height: 22)
                             .accessibilityHidden(true)
                         Text("Custom")

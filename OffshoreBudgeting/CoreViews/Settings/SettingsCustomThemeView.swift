@@ -15,7 +15,7 @@ struct SettingsCustomThemeView: View {
         colorField("Top Glow", detail: "Adds a soft color near the top of Home.", field: \.highlight)
         colorField("Bottom Blend", detail: "Adds a second color that fades in near the bottom.", field: \.wash)
 
-        Text("Changes are saved automatically. Offshore adapts these colors to light and dark mode.")
+        Text("Changes are saved automatically. Offshore adapts the background colors to light and dark mode.")
             .font(.footnote)
             .foregroundStyle(.secondary)
     }

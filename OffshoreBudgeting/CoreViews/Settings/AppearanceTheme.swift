@@ -14,10 +14,10 @@ enum AppearanceTheme: String, CaseIterable, Identifiable {
     var title: LocalizedStringResource {
         switch self {
         case .offshoreDefault: "Default"
-        case .harbor: "Harbor"
+        case .harbor: "Moss"
         case .slate: "Slate"
         case .dune: "Dune"
-        case .heather: "Heather"
+        case .heather: "Botanical"
         }
     }
 

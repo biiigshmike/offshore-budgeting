@@ -82,9 +82,19 @@ struct SettingsReleaseLogsView: View {
             build: "24",
             items: [
                 ReleaseItem(
+                    systemImage: "paintpalette.fill",
+                    title: "Themes",
+                    description: "Make Offshore even more your own with Themes! Choose from four pre-made ones, or create your own custom one. Try it out in Settings > Theme."
+                ),
+                ReleaseItem(
                     systemImage: "ladybug.slash",
                     title: "Set Aside as Savings",
                     description: "Fixed an issue where Set Aside as Savings could push Actual Savings further into the negative. Setting money aside now reduces your available Offshore Savings balance and leaves Actual Savings unchanged."
+                ),
+                ReleaseItem(
+                    systemImage: "sparkles",
+                    title: "Fine Polish",
+                    description: "Made minor but important tweaks here and there to improve the Offshore experience."
                 )
             ]
         ),

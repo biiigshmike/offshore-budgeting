@@ -44,7 +44,7 @@ struct CustomThemePalette {
         let backgroundAnchor: Color = dark ? .black : .white
         return ResolvedAppearanceTheme(
             id: Self.themeID,
-            accent: color(at: \.accent).mix(with: dark ? .white : .black, by: dark ? 0.35 : 0.25),
+            accent: color(at: \.accent),
             homeBackgroundPalette: (
                 color(at: \.base).mix(with: backgroundAnchor, by: dark ? 0.65 : 0.60),
                 color(at: \.highlight).mix(with: backgroundAnchor, by: 0.70),
