@@ -16,6 +16,8 @@ struct CategorySpotlightDetailView: View {
     let startDate: Date
     let endDate: Date
 
+    @State private var showingCalculationHelp = false
+
     private var subtitle: String {
         let formatter = DateIntervalFormatter()
         formatter.calendar = .autoupdatingCurrent
@@ -104,7 +106,9 @@ struct CategorySpotlightDetailView: View {
                     .font(.footnote)
                     .foregroundStyle(.secondary)
 
-                HelpTopicLink(topicID: "home-widgets", title: "How spending is calculated")
+                Button("How is this calculated?", systemImage: "info.circle") {
+                    showingCalculationHelp = true
+                }
             }
 
             Section {
@@ -122,6 +126,19 @@ struct CategorySpotlightDetailView: View {
             } header: {
                 Text(String(localized: "homeWidget.categorySpotlight.spendingByCategory", defaultValue: "Spending by Category", comment: "Section header for category spending list."))
             }
+        }
+        .appSheet(isPresented: $showingCalculationHelp) {
+            let sections = SpendingCalculationExplanation.spotlight(
+                plannedExpenses: plannedExpenses, variableExpenses: variableExpenses,
+                startDate: startDate, endDate: endDate
+            )
+            FinancialCalculationHelpView(
+                sections: sections.filter { !$0.id.hasPrefix("category-") },
+                dateRange: subtitle,
+                helpTopicID: "home-widgets",
+                expandableGroups: sections.filter { $0.id.hasPrefix("category-") }
+                    .compactMap { FinancialCalculationDisclosure(section: $0) }
+            )
         }
         .listStyle(.insetGrouped)
         .navigationTitle(String(localized: "homeWidget.categorySpotlight", defaultValue: "Category Spotlight", comment: "Pinned home widget title for category spotlight."))

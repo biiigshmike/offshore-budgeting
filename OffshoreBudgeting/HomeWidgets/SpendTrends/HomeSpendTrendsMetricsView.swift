@@ -23,6 +23,8 @@ struct HomeSpendTrendsMetricsView: View {
     @State private var selectedCardID: UUID? = nil
     @State private var selectedBucketID: HomeSpendTrendsAggregator.Bucket.ID? = nil
 
+    @State private var showingCalculationHelp = false
+
     private let selectableBucketEpsilon: Double = 0
 
     init(
@@ -72,7 +74,9 @@ struct HomeSpendTrendsMetricsView: View {
                     .font(.footnote)
                     .foregroundStyle(.secondary)
 
-                HelpTopicLink(topicID: "home-widgets", title: "How spending is calculated")
+                Button("How is this calculated?", systemImage: "info.circle") {
+                    showingCalculationHelp = true
+                }
 
                 periodPicker
 
@@ -106,6 +110,18 @@ struct HomeSpendTrendsMetricsView: View {
                 }
                 .accessibilityElement(children: .combine)
             }
+        }
+        .appSheet(isPresented: $showingCalculationHelp) {
+            let sections = SpendingCalculationExplanation.trends(
+                result: result, card: selectedCard,
+                plannedExpenses: plannedExpenses, variableExpenses: variableExpenses
+            )
+            FinancialCalculationHelpView(
+                sections: sections.filter { !$0.id.hasPrefix("bucket-") },
+                dateRange: "\(formattedDate(result.resolvedStart)) – \(formattedDate(result.resolvedEnd))",
+                helpTopicID: "home-widgets",
+                expandableGroups: SpendingCalculationExplanation.trendPeriods(result: result, sections: sections)
+            )
         }
         .onChange(of: selectedPeriod) { _, _ in
             selectedBucketID = nil
@@ -267,7 +283,7 @@ struct HomeSpendTrendsMetricsView: View {
                     // Invisible marks: these define x buckets + y scale for the chart.
                     ForEach(result.buckets) { bucket in
                         PointMark(
-                            x: .value("Bucket", bucket.label),
+                            x: .value("Spending Period", bucket.label),
                             y: .value("Amount", max(bucket.total, 0.000_001))
                         )
                         .symbolSize(0)
@@ -339,8 +355,8 @@ struct HomeSpendTrendsMetricsView: View {
 
                 Text(
                     String(
-                        localized: "homeWidget.spendTrends.bucketInstruction",
-                        defaultValue: "Press a bar to view the expenses in that spending bucket. Press it again to hide the breakdown.",
+                        localized: "homeWidget.spendTrends.periodInstruction",
+                        defaultValue: "Press a bar to view the expenses in that spending period. Press it again to hide the breakdown.",
                         comment: "Instruction text explaining that spend trends chart bars are actionable."
                     )
                 )
@@ -629,15 +645,15 @@ private struct HeatMapBucketSelectionButton: View {
     private var accessibilityHint: String {
         if isSelected {
             return String(
-                localized: "homeWidget.spendTrends.bucketHideHint",
-                defaultValue: "Double tap to hide expenses in this bucket.",
+                localized: "homeWidget.spendTrends.periodHideHint",
+                defaultValue: "Double tap to hide expenses in this period.",
                 comment: "Accessibility hint for hiding selected spend trends bucket expenses."
             )
         }
 
         return String(
-            localized: "homeWidget.spendTrends.bucketShowHint",
-            defaultValue: "Double tap to show expenses in this bucket.",
+            localized: "homeWidget.spendTrends.periodShowHint",
+            defaultValue: "Double tap to show expenses in this period.",
             comment: "Accessibility hint for showing spend trends bucket expenses."
         )
     }
