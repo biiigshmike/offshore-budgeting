@@ -6,6 +6,8 @@
 //
 
 import SwiftUI
+import UIKit
+import CoreLocation
 
 #if canImport(CoreLocation)
 import CoreLocation
@@ -30,6 +32,12 @@ struct SettingsNotificationsView: View {
 
     @State private var reminderTime = ReminderPreferences.load().time
     @State private var showingReminderSetup = false
+    @State private var showingExcursionSetup = false
+    @ObservedObject private var excursionLocation = ShoppingModeLocationService.shared
+    @State private var showingExcursionStartAlert = false
+    @State private var showingExcursionLocationUnavailable = false
+    @State private var selectedExcursionMinutes = 0
+    @State private var pendingExcursionMinutes: Int?
     @State private var isRequestingPermission = false
     @Environment(\.scenePhase) private var scenePhase
 
@@ -143,8 +151,8 @@ struct SettingsNotificationsView: View {
                 Section("Excursion Mode") {
                     if shoppingModeManager.status.isActive, let expiresAt = shoppingModeManager.status.expiresAt {
                         LabeledContent("Status") {
-                            Text("Active")
-                                .foregroundStyle(.green)
+                            Text(shoppingModeManager.locationCapability.canMonitor ? "Active" : "Paused")
+                                .foregroundStyle(shoppingModeManager.locationCapability.canMonitor ? .green : .secondary)
                         }
 
                         LabeledContent("Ends") {
@@ -181,6 +189,16 @@ struct SettingsNotificationsView: View {
                     Text(locationStatusText)
                         .font(.footnote)
                         .foregroundStyle(.secondary)
+                    if shoppingModeManager.status.isActive {
+                        switch shoppingModeManager.locationCapability {
+                        case .foregroundOnly, .paused:
+                            Button("Allow background reminders") { showLocationSetup() }
+                        case .needsPermission, .denied:
+                            Button("Set Up Location") { showLocationSetup() }
+                        case .background, .restricted:
+                            EmptyView()
+                        }
+                    }
                 }
             }
 
@@ -206,6 +224,7 @@ struct SettingsNotificationsView: View {
         }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active {
+                advanceExcursionStart()
                 Task { await syncSchedulesIfPossible() }
             }
         }
@@ -215,7 +234,30 @@ struct SettingsNotificationsView: View {
             ReminderSetupView(workspaceID: workspaceID, notificationService: notificationService)
                 .presentationDetents([.large])
         }
-        .blocksAutomaticExpenseReview(while: showingErrorAlert)
+        .appSheet(isPresented: $showingExcursionSetup) {
+            ExcursionLocationSetupView()
+                .presentationDetents([.large])
+        }
+        .onChange(of: excursionLocation.authorizationStatus) { _, _ in
+            advanceExcursionStart()
+        }
+        .alert("Get nearby reminders while you’re out", isPresented: $showingExcursionStartAlert) {
+            Button("Continue") { beginExcursionLocationRequest() }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("For reminders when Offshore is closed, choose Allow While Using App first, then Change to Always Allow. If you choose Allow Once, reminders work only while Offshore is open.")
+        }
+        .alert("Location access is off", isPresented: $showingExcursionLocationUnavailable) {
+            if excursionLocation.authorizationStatus == .denied {
+                Button("Open Settings") { notificationService.openSystemSettings() }
+            }
+            Button("Dismiss", role: .cancel) { }
+        } message: {
+            Text(excursionLocation.capability.statusText)
+        }
+        .blocksAutomaticExpenseReview(
+            while: showingErrorAlert || showingExcursionStartAlert || showingExcursionLocationUnavailable
+        )
         .alert("Notification Error", isPresented: $showingErrorAlert) {
             Button("OK", role: .cancel) { }
         } message: {
@@ -290,49 +332,80 @@ struct SettingsNotificationsView: View {
     }
 
     private func startExcursionMode(hours: Int) async {
-        let result = await shoppingModeManager.start(hours: hours)
-        switch result {
-        case .started:
-            return
-        case .blocked(let blockers):
-            errorMessage = blockers.map(\.message).joined(separator: "\n")
-            showingErrorAlert = true
-        }
+        await prepareExcursion(minutes: hours * 60)
     }
 
     #if DEBUG
     private func startDebugExcursionMode(minutes: Int) async {
-        let result = await shoppingModeManager.start(minutes: minutes)
-        switch result {
-        case .started:
-            return
-        case .blocked(let blockers):
+        await prepareExcursion(minutes: minutes)
+    }
+    #endif
+
+    private func showLocationSetup() {
+        pendingExcursionMinutes = nil
+        showingExcursionSetup = true
+    }
+
+    private func prepareExcursion(minutes: Int) async {
+        guard pendingExcursionMinutes == nil else { return }
+        switch excursionLocation.currentAuthorizationStatus() {
+        case .authorizedAlways:
+            await activateExcursion(minutes: minutes)
+        case .notDetermined, .authorizedWhenInUse:
+            selectedExcursionMinutes = minutes
+            showingExcursionStartAlert = true
+        default:
+            showingExcursionLocationUnavailable = true
+        }
+    }
+
+    private func beginExcursionLocationRequest() {
+        pendingExcursionMinutes = selectedExcursionMinutes
+        if excursionLocation.currentAuthorizationStatus() == .notDetermined {
+            excursionLocation.requestAuthorizationForExcursionMode()
+        } else {
+            advanceExcursionStart()
+        }
+    }
+
+    private func advanceExcursionStart() {
+        guard let minutes = pendingExcursionMinutes, scenePhase == .active,
+              UIApplication.shared.applicationState == .active else { return }
+
+        let status = excursionLocation.currentAuthorizationStatus()
+        guard status != .notDetermined else { return }
+        pendingExcursionMinutes = nil
+        switch status {
+        case .authorizedWhenInUse, .authorizedAlways:
+            if status == .authorizedWhenInUse {
+                excursionLocation.requestAuthorizationForExcursionMode()
+            }
+            // A declined or suppressed upgrade may leave authorization unchanged.
+            Task { await activateExcursion(minutes: minutes) }
+        default:
+            showingExcursionLocationUnavailable = true
+        }
+    }
+
+    private func activateExcursion(minutes: Int) async {
+        let result: ShoppingModeStartResult
+        #if DEBUG
+        if minutes < 60 {
+            result = await shoppingModeManager.start(minutes: minutes)
+        } else {
+            result = await shoppingModeManager.start(hours: minutes / 60)
+        }
+        #else
+        result = await shoppingModeManager.start(hours: minutes / 60)
+        #endif
+        if case .blocked(let blockers) = result {
             errorMessage = blockers.map(\.message).joined(separator: "\n")
             showingErrorAlert = true
         }
     }
-    #endif
 
     private var locationStatusText: String {
-        #if canImport(CoreLocation)
-        let status = ShoppingModeLocationService.shared.currentAuthorizationStatus()
-        switch status {
-        case .authorizedAlways:
-            return "Location access is set to Always Allow, so store-entry suggestions can run while the app is in the background."
-        case .authorizedWhenInUse:
-            return "Location access is While Using. Excursion Mode will work best after upgrading this to Always Allow in System Settings."
-        case .denied:
-            return "Location access is denied. Enable Location in System Settings to get Excursion Mode store suggestions."
-        case .restricted:
-            return "Location access is restricted on this device."
-        case .notDetermined:
-            return "Start Excursion Mode to request Location permission for store-entry suggestions."
-        @unknown default:
-            return "Location permission status is unknown."
-        }
-        #else
-        return "Location status is unavailable on this platform."
-        #endif
+        shoppingModeManager.locationCapability.statusText
     }
 }
 

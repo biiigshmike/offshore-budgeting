@@ -22,6 +22,16 @@ final class NotificationsAppDelegate: NSObject, UIApplicationDelegate, UNUserNot
         let center = UNUserNotificationCenter.current()
         center.delegate = self
         center.setNotificationCategories(Self.notificationCategories)
+        #if !targetEnvironment(macCatalyst)
+        if launchOptions?[.location] != nil {
+            // Core Location can wake an existing session without mounting a foreground scene.
+            // Starting monitoring never requests permission.
+            let locationService = ShoppingModeLocationService.shared
+            locationService.setApplicationInForeground(application.applicationState == .active)
+            locationService.startMonitoringIfPossible()
+            ShoppingModeManager.shared.refreshIfExpired()
+        }
+        #endif
         return true
     }
 

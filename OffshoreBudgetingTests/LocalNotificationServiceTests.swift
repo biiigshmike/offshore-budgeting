@@ -325,6 +325,32 @@ struct LocalNotificationServiceTests {
         #expect(center.requests.values.first?.identifier.hasPrefix(LocalNotificationService.NotificationID.plannedIncomeReminder) == true)
     }
 
+    @MainActor
+    private final class DeliveryGate {
+        var allowed = true
+    }
+
+    @Test func excursionDeliveryIsRemovedIfLocationAccessChangesDuringAdd() async throws {
+        let center = Center()
+        let service = LocalNotificationService(center: center)
+        let gate = DeliveryGate()
+        center.pauseNextAdd = true
+        let delivery = Task {
+            try await service.scheduleShoppingModeSuggestionNotification(
+                merchantName: "Nearby Shop", isStillValid: { gate.allowed }
+            )
+        }
+        await center.waitForPausedAdd()
+        gate.allowed = false
+        center.resumeAdd?.resume()
+        center.resumeAdd = nil
+        do {
+            _ = try await delivery.value
+            Issue.record("Expected canceled delivery")
+        } catch is CancellationError { }
+        #expect(center.requests.isEmpty)
+    }
+
     @Test func schedulingFailureIsReportedAndCanBeRetried() async throws {
         let center = Center()
         let service = LocalNotificationService(center: center)

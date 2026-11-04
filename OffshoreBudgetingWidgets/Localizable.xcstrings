@@ -222,6 +222,7 @@
       }
     },
     "Active until %@" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -839,6 +840,7 @@
       }
     },
     "Ended" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -3646,6 +3648,7 @@
       }
     },
     "Until %@" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {

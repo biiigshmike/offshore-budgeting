@@ -9,51 +9,28 @@ private func liveActivityLocalized(_ key: String) -> String {
 private struct ExcursionStatusTextView: View {
     let endDate: Date
     let isExpired: Bool
+    let reminderStatus: String
     let font: Font
     let foregroundStyle: Color
 
     var body: some View {
-        ViewThatFits(in: .horizontal) {
-            primaryText
-            secondaryText
-            compactText
-            timeOnlyText
+        VStack(alignment: .leading, spacing: 2) {
+            if isExpired {
+                statusText(Text(liveActivityLocalized("Session ended")))
+            } else {
+                // The countdown is the session duration, not a guarantee that detection is running.
+                statusText(Text(reminderStatus))
+                    .fixedSize(horizontal: false, vertical: true)
+                statusText(Text("Ends \(endDate, format: .dateTime.hour().minute())"))
+            }
         }
-    }
-
-    private var primaryText: some View {
-        statusText(
-            isExpired
-            ? Text(liveActivityLocalized("Session ended"))
-            : Text("Active until \(endDate, format: .dateTime.hour().minute())")
-        )
-    }
-
-    private var secondaryText: some View {
-        statusText(
-            isExpired
-            ? Text(liveActivityLocalized("Session ended"))
-            : Text("Ends \(endDate, format: .dateTime.hour().minute())")
-        )
-    }
-
-    private var compactText: some View {
-        statusText(
-            isExpired
-            ? Text(liveActivityLocalized("Ended"))
-            : Text("Until \(endDate, format: .dateTime.hour().minute())")
-        )
-    }
-
-    private var timeOnlyText: some View {
-        statusText(isExpired ? Text(liveActivityLocalized("Done")) : Text(endDate, format: .dateTime.hour().minute()))
     }
 
     private func statusText(_ text: Text) -> some View {
         text
             .font(font)
             .foregroundStyle(foregroundStyle)
-            .lineLimit(1)
+            .lineLimit(2)
             .minimumScaleFactor(0.9)
             .allowsTightening(true)
     }
@@ -148,6 +125,7 @@ private struct ShoppingModeLockScreenLiveActivityView: View {
                     ExcursionStatusTextView(
                         endDate: context.state.endDate,
                         isExpired: isExpired,
+                        reminderStatus: context.state.statusText,
                         font: .footnote.weight(.medium),
                         foregroundStyle: ShoppingModeLiveActivityPalette.secondaryText
                     )
@@ -320,6 +298,7 @@ private struct ShoppingModeExpandedIslandLeadingContentView: View {
                 ExcursionStatusTextView(
                     endDate: context.state.endDate,
                     isExpired: isExpired,
+                    reminderStatus: context.state.statusText,
                     font: .system(size: metrics.subtitleSize, weight: .medium, design: .rounded),
                     foregroundStyle: ShoppingModeLiveActivityPalette.secondaryText
                 )

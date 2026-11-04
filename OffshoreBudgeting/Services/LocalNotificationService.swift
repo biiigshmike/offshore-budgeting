@@ -241,9 +241,14 @@ final class LocalNotificationService: ObservableObject {
         removeScheduledNotifications(identifiers: [identifier])
     }
 
-    func scheduleShoppingModeSuggestionNotification(merchantName: String) async throws {
+    @discardableResult
+    func scheduleShoppingModeSuggestionNotification(
+        merchantName: String,
+        isStillValid: @escaping @MainActor @Sendable () -> Bool = { true }
+    ) async throws -> String? {
+        guard isStillValid() else { throw CancellationError() }
         let trimmed = merchantName.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return }
+        guard !trimmed.isEmpty else { return nil }
 
         let content = UNMutableNotificationContent()
         content.title = Self.localizedAppName
@@ -264,7 +269,13 @@ final class LocalNotificationService: ObservableObject {
         let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 1, repeats: false)
         let identifier = "\(NotificationID.shoppingModeSuggestion)_\(UUID().uuidString)"
         let request = UNNotificationRequest(identifier: identifier, content: content, trigger: trigger)
+        guard isStillValid() else { throw CancellationError() }
         try await addNotificationRequest(request)
+        guard isStillValid() else {
+            removeScheduledNotifications(identifiers: [identifier])
+            throw CancellationError()
+        }
+        return identifier
     }
 
     /// Syncs the three reminder types based on toggles + reminder time + SwiftData.

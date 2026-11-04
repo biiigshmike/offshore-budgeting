@@ -1,4 +1,5 @@
 import Foundation
+import UserNotifications
 
 #if canImport(CoreLocation)
 import CoreLocation
@@ -23,6 +24,8 @@ final class ShoppingModeSuggestionService {
 
     private let defaults = UserDefaults.standard
     private let policy = ExcursionDetectionPolicy()
+    private var deliveryInFlight = false
+    private var latestSuggestionID: String?
 
     private init() {}
 
@@ -53,13 +56,21 @@ final class ShoppingModeSuggestionService {
         defaults.removeObject(forKey: Key.lastDeliveredStopLongitude)
     }
 
+    func cancelPendingSuggestion() {
+        guard let latestSuggestionID else { return }
+        UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: [latestSuggestionID])
+        self.latestSuggestionID = nil
+    }
+
     func handleRegionEntry(
         merchant: ShoppingModeMerchant,
         currentLocation: CLLocation? = nil,
         now: Date = .now,
+        isStillValid: @escaping @MainActor @Sendable () -> Bool = { true },
         onSuccessfulNotification: (@MainActor () -> Void)? = nil
     ) {
-        guard SpendingSessionStore.isActive(now: now) else { return }
+        guard SpendingSessionStore.isActive(now: now), isStillValid(), !deliveryInFlight else { return }
+        let sessionID = SpendingSessionStore.sessionID(now: now)
         let decision = notificationDecision(
             merchantID: merchant.id,
             currentLocation: currentLocation,
@@ -70,10 +81,23 @@ final class ShoppingModeSuggestionService {
             return
         }
 
+        deliveryInFlight = true
         Task { @MainActor in
+            defer { self.deliveryInFlight = false }
+            let canDeliver: @MainActor @Sendable () -> Bool = {
+                isStillValid() && sessionID != nil && SpendingSessionStore.sessionID() == sessionID
+            }
+            guard canDeliver() else { return }
             let service = LocalNotificationService()
             do {
-                try await service.scheduleShoppingModeSuggestionNotification(merchantName: merchant.name)
+                guard let identifier = try await service.scheduleShoppingModeSuggestionNotification(
+                    merchantName: merchant.name, isStillValid: canDeliver
+                ) else { return }
+                self.latestSuggestionID = identifier
+                guard canDeliver() else {
+                    self.cancelPendingSuggestion()
+                    return
+                }
                 self.recordSuccessfulFire(
                     merchantID: merchant.id,
                     currentLocation: currentLocation,
@@ -92,17 +116,23 @@ final class ShoppingModeSuggestionService {
         merchant: ShoppingModeMerchant,
         sessionID: String?,
         currentLocation: CLLocation? = nil,
-        now: Date = .now
+        now: Date = .now,
+        isStillValid: @escaping @MainActor @Sendable () -> Bool = { true }
     ) -> Bool {
         guard let sessionID else { return false }
-        guard SpendingSessionStore.isActive(now: now) else { return false }
+        guard SpendingSessionStore.isActive(now: now), isStillValid() else { return false }
 
         if defaults.string(forKey: Key.startupNudgedSessionID) == sessionID {
             return false
         }
 
-        defaults.set(sessionID, forKey: Key.startupNudgedSessionID)
-        handleRegionEntry(merchant: merchant, currentLocation: currentLocation, now: now)
+        handleRegionEntry(
+            merchant: merchant, currentLocation: currentLocation, now: now,
+            isStillValid: isStillValid,
+            onSuccessfulNotification: { [weak self] in
+                self?.defaults.set(sessionID, forKey: Key.startupNudgedSessionID)
+            }
+        )
         return true
     }
     #endif

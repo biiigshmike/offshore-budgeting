@@ -35,7 +35,11 @@ final class ShoppingModeManager: ObservableObject {
     private static let liveActivityRelevanceScore: Double = 80
 
     @Published private(set) var status: ShoppingModeStatus = .inactive
+    @Published private(set) var locationCapability: ExcursionLocationCapability = .needsPermission
     private var expiryTask: Task<Void, Never>?
+    private var locationObserver: AnyCancellable?
+    private var activityUpdateTask: Task<Void, Never>?
+    private var activityGeneration = 0
 
     private enum SessionEndReason: String {
         case manual
@@ -46,10 +50,16 @@ final class ShoppingModeManager: ObservableObject {
 
     private init() {
         refreshIfExpired()
+        locationObserver = NotificationCenter.default.publisher(
+            for: ShoppingModeLocationService.authorizationDidChangeNotification
+        ).sink { [weak self] _ in
+            Task { @MainActor in self?.refreshIfExpired() }
+        }
     }
 
     deinit {
         expiryTask?.cancel()
+        activityUpdateTask?.cancel()
     }
 
     enum DeepLink {
@@ -116,6 +126,7 @@ final class ShoppingModeManager: ObservableObject {
     }
 
     func refreshIfExpired(now: Date = .now) {
+        locationCapability = ShoppingModeLocationService.shared.capability
         let expiresAt = SpendingSessionStore.expirationDate(now: now)
         guard let expiresAt else {
             cancelExpiryTask()
@@ -162,24 +173,29 @@ final class ShoppingModeManager: ObservableObject {
         guard ActivityAuthorizationInfo().areActivitiesEnabled else { return }
         guard Self.shouldUseLiveActivitySurface else { return }
 
-        let attributes = ShoppingModeActivityAttributes(
-            sessionID: sessionID,
-            startDate: status.startedAt ?? .now,
-            endDate: expiresAt
-        )
-
-        let state = ShoppingModeActivityAttributes.ContentState(
-            endDate: expiresAt,
-            statusText: "Excursion mode active"
-        )
-
-        Task {
+        activityGeneration += 1
+        let generation = activityGeneration
+        let predecessor = activityUpdateTask
+        activityUpdateTask = Task {
+            await predecessor?.value
+            guard self.activityGeneration == generation, SpendingSessionStore.sessionID() == sessionID else { return }
             for activity in Activity<ShoppingModeActivityAttributes>.activities {
                 if activity.attributes.sessionID != sessionID {
                     await activity.end(nil, dismissalPolicy: .immediate)
                 }
             }
 
+            guard self.activityGeneration == generation, SpendingSessionStore.sessionID() == sessionID else { return }
+            guard let currentExpiry = SpendingSessionStore.expirationDate() else { return }
+            let attributes = ShoppingModeActivityAttributes(
+                sessionID: sessionID,
+                startDate: SpendingSessionStore.startDate() ?? .now,
+                endDate: currentExpiry
+            )
+            let state = ShoppingModeActivityAttributes.ContentState(
+                endDate: currentExpiry,
+                statusText: self.locationCapability.statusText
+            )
             if let existing = Activity<ShoppingModeActivityAttributes>.activities.first(where: { $0.attributes.sessionID == sessionID }) {
                 #if DEBUG
                 debugLog("Updating Live Activity id=\(sessionID) endDate=\(debugTimestamp(expiresAt))")
@@ -187,12 +203,13 @@ final class ShoppingModeManager: ObservableObject {
                 await existing.update(
                     ActivityContent(
                         state: state,
-                        staleDate: expiresAt,
+                        staleDate: currentExpiry,
                         relevanceScore: Self.liveActivityRelevanceScore
                     )
                 )
             } else {
                 do {
+                    guard self.activityGeneration == generation, SpendingSessionStore.sessionID() == sessionID else { return }
                     #if DEBUG
                     debugLog("Requesting Live Activity id=\(sessionID) endDate=\(debugTimestamp(expiresAt))")
                     #endif
@@ -200,7 +217,7 @@ final class ShoppingModeManager: ObservableObject {
                         attributes: attributes,
                         content: ActivityContent(
                             state: state,
-                            staleDate: expiresAt,
+                            staleDate: currentExpiry,
                             relevanceScore: Self.liveActivityRelevanceScore
                         )
                     )
@@ -214,7 +231,10 @@ final class ShoppingModeManager: ObservableObject {
 
     private func endLiveActivity() {
         #if canImport(ActivityKit) && !targetEnvironment(macCatalyst)
-        Task {
+        activityGeneration += 1
+        let predecessor = activityUpdateTask
+        activityUpdateTask = Task {
+            await predecessor?.value
             #if DEBUG
             let requestedAt = Date.now
             debugLog("Calling endLiveActivity at \(debugTimestamp(requestedAt))")
@@ -264,7 +284,11 @@ final class ShoppingModeManager: ObservableObject {
             await MainActor.run {
                 guard let self else { return }
                 guard self.status.isActive, self.status.sessionID == sessionID else { return }
-                guard let currentExpiry = self.status.expiresAt, currentExpiry <= .now else { return }
+                // The widget can extend the shared session without updating this process's status.
+                if SpendingSessionStore.expirationDate() != nil {
+                    self.refreshIfExpired()
+                    return
+                }
                 #if DEBUG
                 self.debugLog(
                     "Expiry task woke for id=\(sessionID) at \(self.debugTimestamp(.now))"

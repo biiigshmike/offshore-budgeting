@@ -16,12 +16,15 @@ import ActivityKit
 // MARK: - ShoppingModeStartBlocker
 
 enum ShoppingModeStartBlocker: String, Equatable, CaseIterable {
+    case locationNotAuthorized
     case notificationsNotAuthorized
     case liveActivitiesDisabled
     case backgroundRefreshUnavailable
 
     nonisolated var message: String {
         switch self {
+        case .locationNotAuthorized:
+            return "Open Offshore to allow location access for nearby reminders."
         case .notificationsNotAuthorized:
             return "Enable Notifications for Offshore in System Settings."
         case .liveActivitiesDisabled:
@@ -49,6 +52,12 @@ final class ShoppingModeReadinessEvaluator {
 
     func evaluate() async -> [ShoppingModeStartBlocker] {
         var blockers: [ShoppingModeStartBlocker] = []
+        #if canImport(CoreLocation)
+        let location = ShoppingModeLocationService.shared.currentAuthorizationStatus()
+        if location != .authorizedAlways && location != .authorizedWhenInUse {
+            blockers.append(.locationNotAuthorized)
+        }
+        #endif
 
         let notificationSettings = await fetchNotificationSettings()
         if Self.isNotificationAuthorized(notificationSettings.authorizationStatus) == false {
@@ -56,7 +65,8 @@ final class ShoppingModeReadinessEvaluator {
         }
 
         #if canImport(UIKit)
-        if UIApplication.shared.backgroundRefreshStatus != .available {
+        if ShoppingModeLocationService.shared.capability == .background,
+           UIApplication.shared.backgroundRefreshStatus != .available {
             blockers.append(.backgroundRefreshUnavailable)
         }
         #endif

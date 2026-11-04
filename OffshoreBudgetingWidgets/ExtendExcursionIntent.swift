@@ -20,16 +20,15 @@ private enum ExtendExcursionIntentExecutor {
             return
         }
 
-        let state = ShoppingModeActivityAttributes.ContentState(
-            endDate: newExpiry,
-            statusText: "Excursion mode active"
-        )
-
         #if DEBUG
         print("[ExtendExcursionIntent] perform() invoked sessionID=\(sessionID) newExpiry=\(newExpiry)")
         #endif
 
         for activity in Activity<ShoppingModeActivityAttributes>.activities where activity.attributes.sessionID == sessionID {
+            let state = ShoppingModeActivityAttributes.ContentState(
+                endDate: newExpiry,
+                statusText: activity.content.state.statusText
+            )
             #if DEBUG
             print("[ExtendExcursionIntent] updating activity id=\(activity.id)")
             #endif

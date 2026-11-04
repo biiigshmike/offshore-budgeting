@@ -119,7 +119,12 @@ struct OffshoreBudgetingApp: App {
                         #endif
                     }
                     .onChange(of: scenePhase) { _, newValue in
+                        if newValue == .background {
+                            ShoppingModeLocationService.shared.setApplicationInForeground(false)
+                            ShoppingModeManager.shared.refreshIfExpired()
+                        }
                         guard newValue == .active else { return }
+                        ShoppingModeLocationService.shared.setApplicationInForeground(true)
                         consumePendingWidgetActionIfNeeded()
                         refreshShoppingModeForForeground(reason: "sceneBecameActive")
                     }
@@ -176,6 +181,7 @@ struct OffshoreBudgetingApp: App {
 
     @MainActor
     private func refreshShoppingModeForForeground(reason: String) {
+        guard scenePhase == .active else { return }
         let start = DispatchTime.now().uptimeNanoseconds
         traceShoppingModeForeground("starting reason=\(reason)")
         TabFlickerDiagnostics.markEvent(
@@ -183,6 +189,8 @@ struct OffshoreBudgetingApp: App {
             metadata: ["reason": reason]
         )
 
+        ShoppingModeLocationService.shared.setApplicationInForeground(true)
+        ShoppingModeLocationService.shared.refreshAuthorizationState()
         ShoppingModeManager.shared.refreshIfExpired()
         let isActive = ShoppingModeManager.shared.status.isActive
         traceShoppingModeForeground("refreshed reason=\(reason) isActive=\(isActive)")

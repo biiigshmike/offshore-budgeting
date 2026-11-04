@@ -43,10 +43,15 @@ struct EnableSpendingSessionIntent: AppIntent {
     func perform() async throws -> some IntentResult & ProvidesDialog {
         #if canImport(CoreLocation)
         let locationStatus = CLLocationManager().authorizationStatus
-        if locationStatus != .authorizedAlways {
+        #if targetEnvironment(macCatalyst)
+        let canRunInBackground = locationStatus == .authorizedAlways || locationStatus == .authorizedWhenInUse
+        #else
+        let canRunInBackground = locationStatus == .authorizedAlways
+        #endif
+        if !canRunInBackground {
             return .result(
                 dialog: IntentDialog(
-                    stringLiteral: "Excursion mode needs Location access set to Always Allow. Open Offshore and start Excursion Mode once to finish setup in the app."
+                    stringLiteral: "Open Offshore to finish location setup or use Excursion Mode while the app is open."
                 )
             )
         }

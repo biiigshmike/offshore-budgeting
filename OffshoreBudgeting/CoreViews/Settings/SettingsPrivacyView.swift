@@ -33,6 +33,8 @@ struct SettingsPrivacyView: View {
         case photos
     }
 
+    @State private var showingExcursionLocationSetup = false
+
     @AppStorage("privacy_requireBiometrics") private var requireBiometrics: Bool = false
     @AppStorage("privacy_hideBalances") private var hideBalances: Bool = false
 
@@ -174,6 +176,10 @@ struct SettingsPrivacyView: View {
                 await attemptEnableBiometricLock()
             }
         }
+        .appSheet(isPresented: $showingExcursionLocationSetup) {
+            ExcursionLocationSetupView()
+                .presentationDetents([.large])
+        }
         .blocksAutomaticExpenseReview(while: showingEnableError)
         .alert("Unable to Enable App Lock", isPresented: $showingEnableError) {
             Button("OK", role: .cancel) { }
@@ -197,13 +203,20 @@ struct SettingsPrivacyView: View {
             switch locationPermissionState {
             case .notDetermined:
                 Button(isMacCatalyst ? "Allow Location Access" : "Enable for Excursion Mode") {
-                    ShoppingModeLocationService.shared.requestAuthorizationForExcursionMode()
+                    if isMacCatalyst {
+                        ShoppingModeLocationService.shared.requestAuthorizationForExcursionMode()
+                    } else {
+                        showingExcursionLocationSetup = true
+                    }
                 }
             case .authorizedWhenInUse:
                 if !isMacCatalyst {
-                    Button("Upgrade in App Settings") {
-                        openAppOrSystemSettings()
+                    Text("Allow Always location access to get nearby reminders when Offshore isn’t open.")
+                        .font(.footnote).foregroundStyle(.secondary)
+                    Button("Allow background reminders") {
+                        showingExcursionLocationSetup = true
                     }
+                    Button("Open Settings") { openAppOrSystemSettings() }
                 }
             case .denied, .restricted:
                 Button(isMacCatalyst ? "Open Location Settings" : "Manage in App Settings") {

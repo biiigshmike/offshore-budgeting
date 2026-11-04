@@ -1,4 +1,8 @@
 import Foundation
+import Combine
+#if canImport(UIKit)
+import UIKit
+#endif
 
 #if canImport(CoreLocation)
 import CoreLocation
@@ -12,7 +16,7 @@ import MapKit
 
 #if canImport(CoreLocation)
 @MainActor
-final class ShoppingModeLocationService: NSObject, CLLocationManagerDelegate {
+final class ShoppingModeLocationService: NSObject, ObservableObject, CLLocationManagerDelegate {
     static let shared = ShoppingModeLocationService()
     static let authorizationDidChangeNotification = Notification.Name("ShoppingModeLocationService.authorizationDidChange")
 
@@ -55,14 +59,22 @@ final class ShoppingModeLocationService: NSObject, CLLocationManagerDelegate {
         let routeMetrics: ExcursionCandidateScorer.RouteMetrics
     }
 
-    private let locationManager = CLLocationManager()
-    private let poiResolver = ShoppingModePOIResolver()
+    private let locationManager: any ExcursionLocationClient
+    private let sessionIDProvider: () -> String?
+    private let discoverMerchants: (CLLocation) async -> [ShoppingModeMerchant]
+    private let monitoringAvailable: () -> Bool
+    private let isMacCatalyst: Bool
+    private var monitoringGeneration = UUID()
+    private var monitoringStartedAt: Date?
+    private var discoverySequence = 0
+    private var monitoringSessionID: String?
+    private var runningCapability: ExcursionLocationCapability?
+    private(set) var isForeground: Bool
+    @Published private(set) var authorizationStatus: CLAuthorizationStatus = .notDetermined
     private let detectionPolicy = ExcursionDetectionPolicy()
     private let candidateScorer = ExcursionCandidateScorer()
-    private let defaults = UserDefaults.standard
+    private let defaults: UserDefaults
 
-    private var requestedAlwaysUpgrade = false
-    private var cachedAuthorizationStatus: CLAuthorizationStatus = .notDetermined
     private var monitoredMerchantsByRegionID: [String: ShoppingModeMerchant] = [:]
     private var currentInsideRegionIDs: Set<String> = []
     private var lastRefreshLocation: CLLocation?
@@ -76,90 +88,133 @@ final class ShoppingModeLocationService: NSObject, CLLocationManagerDelegate {
     private var activeLocationRequest: LocationRequestPurpose?
     private var startupConfirmationState: StartupConfirmationState?
 
-    private override init() {
+    init(
+        locationManager: (any ExcursionLocationClient)? = nil,
+        defaults: UserDefaults = .standard,
+        isForeground: Bool? = nil,
+        isMacCatalyst: Bool? = nil,
+        sessionIDProvider: (() -> String?)? = nil,
+        monitoringAvailable: (() -> Bool)? = nil,
+        discoverMerchants: ((CLLocation) async -> [ShoppingModeMerchant])? = nil
+    ) {
+        self.locationManager = locationManager ?? CLLocationManager()
+        self.defaults = defaults
+        #if targetEnvironment(macCatalyst)
+        self.isMacCatalyst = isMacCatalyst ?? true
+        #else
+        self.isMacCatalyst = isMacCatalyst ?? false
+        #endif
+        #if canImport(UIKit)
+        self.isForeground = isForeground ?? (UIApplication.shared.applicationState != .background)
+        #else
+        self.isForeground = isForeground ?? true
+        #endif
+        self.sessionIDProvider = sessionIDProvider ?? { SpendingSessionStore.sessionID() }
+        self.monitoringAvailable = monitoringAvailable ?? {
+            CLLocationManager.isMonitoringAvailable(for: CLCircularRegion.self)
+        }
+        if let discoverMerchants {
+            self.discoverMerchants = discoverMerchants
+        } else {
+            let resolver = ShoppingModePOIResolver()
+            self.discoverMerchants = { location in
+                await resolver.discoverNearbyMerchants(
+                    around: location.coordinate,
+                    searchRadiusMeters: ShoppingModeMerchantCatalog.searchRadiusMeters,
+                    maxResults: ShoppingModeMerchantCatalog.maxMonitoredRegions
+                )
+            }
+        }
         super.init()
-        locationManager.delegate = self
-        locationManager.desiredAccuracy = kCLLocationAccuracyHundredMeters
-        locationManager.distanceFilter = kCLDistanceFilterNone
-        cachedAuthorizationStatus = locationManager.authorizationStatus
+        self.locationManager.delegate = self
+        self.locationManager.desiredAccuracy = kCLLocationAccuracyHundredMeters
+        self.locationManager.distanceFilter = 50
+        authorizationStatus = self.locationManager.authorizationStatus
         monitoredMerchantsByRegionID = loadPersistedMerchants()
-        debugLog("Loaded persisted monitored merchants: \(monitoredMerchantsByRegionID.count)")
+    }
+
+    var capability: ExcursionLocationCapability {
+        .resolve(authorization: locationManager.authorizationStatus, isForeground: isForeground, isMacCatalyst: isMacCatalyst)
+    }
+
+    var canProcessLocationEvents: Bool {
+        let currentCapability = capability
+        return currentCapability.canMonitor && runningCapability == currentCapability
+            && monitoringSessionID != nil && monitoringSessionID == sessionIDProvider()
+    }
+
+    /// Capture both the session and monitoring generation before any asynchronous work.
+    /// Stop, backgrounding limited mode, and permission changes invalidate existing work.
+    func deliveryValidation() -> @MainActor @Sendable () -> Bool {
+        let generation = monitoringGeneration
+        let sessionID = monitoringSessionID
+        return { [weak self] in
+            guard let self else { return false }
+            return self.canProcessLocationEvents && self.monitoringGeneration == generation
+                && self.monitoringSessionID == sessionID
+        }
     }
 
     func requestAuthorizationForExcursionMode() {
-        let status = locationManager.authorizationStatus
-        cachedAuthorizationStatus = status
-
-        switch status {
+        guard isForeground else { return }
+        authorizationStatus = locationManager.authorizationStatus
+        switch authorizationStatus {
         case .notDetermined:
-            requestedAlwaysUpgrade = false
-            debugLog("Requesting initial When In Use authorization for Excursion Mode")
             locationManager.requestWhenInUseAuthorization()
         case .authorizedWhenInUse:
-            #if targetEnvironment(macCatalyst)
-            requestedAlwaysUpgrade = false
-            debugLog("Location already authorized for Excursion Mode on Mac Catalyst")
-            #else
-            requestedAlwaysUpgrade = true
-            debugLog("Requesting Always authorization upgrade for Excursion Mode")
-            locationManager.requestAlwaysAuthorization()
-            #endif
-        case .authorizedAlways, .restricted, .denied:
-            break
-        @unknown default:
+            if !isMacCatalyst { locationManager.requestAlwaysAuthorization() }
+        default:
             break
         }
+        // No automatic retry: Allow Once and Keep While Using may produce no callback.
+    }
+
+    func refreshAuthorizationState() {
+        authorizationStatus = locationManager.authorizationStatus
+        startMonitoringIfPossible()
+        NotificationCenter.default.post(name: Self.authorizationDidChangeNotification, object: self)
+    }
+
+    func setApplicationInForeground(_ foreground: Bool) {
+        guard isForeground != foreground else { return }
+        isForeground = foreground
+        refreshAuthorizationState()
     }
 
     func startMonitoringIfPossible() {
-        guard SpendingSessionStore.isActive() else {
-            debugLog("Shopping Mode inactive, stopping all monitored regions")
+        authorizationStatus = locationManager.authorizationStatus
+        guard let sessionID = sessionIDProvider(), capability.canMonitor else {
             stopMonitoringAllRegions()
             return
         }
-
-        guard CLLocationManager.isMonitoringAvailable(for: CLCircularRegion.self) else { return }
-
-        let status = locationManager.authorizationStatus
-        cachedAuthorizationStatus = status
-        debugLog("Starting monitoring flow with authorization status: \(status.rawValue)")
-
-        switch status {
-        case .notDetermined:
-            requestAuthorizationForExcursionMode()
-        case .authorizedWhenInUse:
-            #if targetEnvironment(macCatalyst)
-            requestedAlwaysUpgrade = false
+        let nextCapability = capability
+        guard runningCapability != nextCapability || monitoringSessionID != sessionID else { return }
+        // A geofence may have launched a fresh process in the background. Keep its
+        // persisted merchant map until the replacement discovery is ready.
+        let restoringBackgroundRegions = runningCapability == nil && nextCapability == .background
+            && !monitoredMerchantsByRegionID.isEmpty
+        if !restoringBackgroundRegions { stopMonitoringAllRegions() }
+        monitoringGeneration = UUID()
+        monitoringSessionID = sessionID
+        monitoringStartedAt = .now
+        runningCapability = nextCapability
+        if nextCapability == .foregroundOnly {
+            setBackgroundLocationUpdatesEnabled(false)
+            locationManager.startUpdatingLocation()
+        } else {
             setBackgroundLocationUpdatesEnabled(true)
             locationManager.startMonitoringSignificantLocationChanges()
-            debugLog("Authorized for Location on Mac Catalyst. Refreshing nearby monitored merchants")
-            refreshNearbyMonitoredMerchants(trigger: .startup)
-            #else
-            if requestedAlwaysUpgrade {
-                requestedAlwaysUpgrade = false
-                debugLog("Requesting Always authorization upgrade")
-                locationManager.requestAlwaysAuthorization()
-            } else {
-                debugLog("Authorized When In Use only. Waiting for App Settings upgrade to Always")
-                stopMonitoringAllRegions()
-            }
-            #endif
-        case .authorizedAlways:
-            requestedAlwaysUpgrade = false
-            setBackgroundLocationUpdatesEnabled(true)
-            locationManager.startMonitoringSignificantLocationChanges()
-            debugLog("Authorized Always. Refreshing nearby monitored merchants")
-            refreshNearbyMonitoredMerchants(trigger: .startup)
-        case .restricted, .denied:
-            debugLog("Location authorization denied/restricted. Clearing monitored regions")
-            stopMonitoringAllRegions()
-        @unknown default:
-            debugLog("Unknown location authorization status. Clearing monitored regions")
-            stopMonitoringAllRegions()
         }
+        refreshNearbyMonitoredMerchants(trigger: .startup)
     }
 
     func stopMonitoringAllRegions() {
+        ShoppingModeSuggestionService.shared.cancelPendingSuggestion()
+        monitoringGeneration = UUID()
+        monitoringSessionID = nil
+        monitoringStartedAt = nil
+        runningCapability = nil
+        locationManager.stopUpdatingLocation()
         debugLog("Stopping all monitored regions: \(locationManager.monitoredRegions.count)")
         stopMonitoredRegionsOnly()
         currentInsideRegionIDs = []
@@ -182,8 +237,8 @@ final class ShoppingModeLocationService: NSObject, CLLocationManagerDelegate {
     }
 
     func currentAuthorizationStatus() -> CLAuthorizationStatus {
-        cachedAuthorizationStatus = locationManager.authorizationStatus
-        return cachedAuthorizationStatus
+        authorizationStatus = locationManager.authorizationStatus
+        return authorizationStatus
     }
 
     private func stopMonitoredRegionsOnly() {
@@ -199,11 +254,12 @@ final class ShoppingModeLocationService: NSObject, CLLocationManagerDelegate {
     }
 
     private func beginLocationRequest(for purpose: LocationRequestPurpose) {
+        guard canProcessLocationEvents else { return }
         activeLocationRequest = purpose
         locationWaitTask?.cancel()
         let timeoutNanoseconds = UInt64(detectionPolicy.startupLocationWindowSeconds * 1_000_000_000)
         locationWaitTask = Task { [weak self] in
-            try? await Task.sleep(nanoseconds: timeoutNanoseconds)
+            do { try await Task.sleep(nanoseconds: timeoutNanoseconds) } catch { return }
             await self?.handleLocationWaitTimeout(for: purpose)
         }
 
@@ -215,12 +271,12 @@ final class ShoppingModeLocationService: NSObject, CLLocationManagerDelegate {
         around location: CLLocation,
         trigger: RefreshTrigger
     ) async {
-        let center = location.coordinate
-        let discovered = await poiResolver.discoverNearbyMerchants(
-            around: center,
-            searchRadiusMeters: ShoppingModeMerchantCatalog.searchRadiusMeters,
-            maxResults: ShoppingModeMerchantCatalog.maxMonitoredRegions
-        )
+        let isStillValid = deliveryValidation()
+        guard isStillValid() else { return }
+        discoverySequence += 1
+        let sequence = discoverySequence
+        let discovered = await discoverMerchants(location)
+        guard isStillValid(), discoverySequence == sequence else { return }
 
         debugLog(
             "Discovered nearby MapKit POIs: \(discovered.count) [trigger=\(trigger.rawValue)] accuracy=\(Int(location.horizontalAccuracy))m"
@@ -250,6 +306,7 @@ final class ShoppingModeLocationService: NSObject, CLLocationManagerDelegate {
         currentInsideRegionIDs = []
         debugLog("Applying monitored merchants count: \(merchants.count)")
 
+        let shouldRegisterRegions = runningCapability == .background && monitoringAvailable()
         var map: [String: ShoppingModeMerchant] = [:]
         for merchant in merchants {
             let regionID = regionIdentifier(for: merchant)
@@ -260,14 +317,16 @@ final class ShoppingModeLocationService: NSObject, CLLocationManagerDelegate {
             )
             region.notifyOnEntry = true
             region.notifyOnExit = false
-            locationManager.startMonitoring(for: region)
-            locationManager.requestState(for: region)
+            if shouldRegisterRegions {
+                locationManager.startMonitoring(for: region)
+                locationManager.requestState(for: region)
+            }
             debugLog("Monitoring region -> \(merchant.name) id=\(regionID) radius=\(Int(merchant.radiusMeters))")
             map[regionID] = merchant
         }
 
         monitoredMerchantsByRegionID = map
-        persistMerchants(map)
+        if shouldRegisterRegions { persistMerchants(map) }
 
         if trigger == .startup {
             startStartupConfirmation()
@@ -296,7 +355,7 @@ final class ShoppingModeLocationService: NSObject, CLLocationManagerDelegate {
     }
 
     private func maybeRefreshMonitoredMerchantsForMovement(_ location: CLLocation, now: Date = .now) {
-        guard SpendingSessionStore.isActive(now: now) else { return }
+        guard canProcessLocationEvents else { return }
         guard location.horizontalAccuracy > 0 else {
             debugLog("Movement refresh skipped: invalid horizontal accuracy")
             return
@@ -326,7 +385,9 @@ final class ShoppingModeLocationService: NSObject, CLLocationManagerDelegate {
         debugLog(
             "Movement refresh triggered: moved \(Int(movedMeters))m in \(Int(elapsed))s at speed=\(Int(max(0, location.speed)))m/s"
         )
+        let isStillValid = deliveryValidation()
         Task {
+            guard isStillValid() else { return }
             await monitorNearbyMerchants(around: location, trigger: .distance)
         }
     }
@@ -346,13 +407,13 @@ final class ShoppingModeLocationService: NSObject, CLLocationManagerDelegate {
         followUpRefreshTask?.cancel()
         let delaySeconds: TimeInterval = 90
         followUpRefreshTask = Task { [weak self] in
-            try? await Task.sleep(nanoseconds: UInt64(delaySeconds * 1_000_000_000))
+            do { try await Task.sleep(nanoseconds: UInt64(delaySeconds * 1_000_000_000)) } catch { return }
             await self?.performFollowUpRefreshIfNeeded(expectedBaselineDate: baselineDate)
         }
     }
 
     private func performFollowUpRefreshIfNeeded(expectedBaselineDate: Date) async {
-        guard SpendingSessionStore.isActive() else { return }
+        guard canProcessLocationEvents else { return }
         guard activeLocationRequest == nil else {
             debugLog("Follow-up refresh skipped: location request already in flight")
             return
@@ -406,7 +467,7 @@ final class ShoppingModeLocationService: NSObject, CLLocationManagerDelegate {
     }
 
     private func handleLocationWaitTimeout(for purpose: LocationRequestPurpose) async {
-        guard activeLocationRequest == purpose else { return }
+        guard canProcessLocationEvents, activeLocationRequest == purpose else { return }
         locationWaitTask = nil
 
         switch purpose {
@@ -432,7 +493,7 @@ final class ShoppingModeLocationService: NSObject, CLLocationManagerDelegate {
     }
 
     private func schedulePOIRetryIfNeeded(reason: String) {
-        guard SpendingSessionStore.isActive() else { return }
+        guard canProcessLocationEvents else { return }
         let nextAttempt = pendingPOIRetryAttempts + 1
         guard let delay = detectionPolicy.retryDelay(forAttempt: nextAttempt) else {
             debugLog("POI retry skipped: no more attempts [reason=\(reason)]")
@@ -444,13 +505,13 @@ final class ShoppingModeLocationService: NSObject, CLLocationManagerDelegate {
         debugLog("Scheduling POI retry attempt \(nextAttempt) in \(Int(delay))s [reason=\(reason)]")
 
         poiRetryTask = Task { [weak self] in
-            try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+            do { try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000)) } catch { return }
             await self?.performPOIRetry(attempt: nextAttempt)
         }
     }
 
     private func performPOIRetry(attempt: Int) async {
-        guard SpendingSessionStore.isActive() else { return }
+        guard canProcessLocationEvents else { return }
         guard attempt == pendingPOIRetryAttempts else { return }
         debugLog("Executing POI retry attempt \(attempt)")
         refreshNearbyMonitoredMerchants(trigger: .retry)
@@ -480,10 +541,12 @@ final class ShoppingModeLocationService: NSObject, CLLocationManagerDelegate {
     }
 
     private func processStartupConfirmationSample(_ location: CLLocation) async {
-        guard var state = startupConfirmationState else { return }
+        let isStillValid = deliveryValidation()
+        guard isStillValid(), var state = startupConfirmationState else { return }
 
         state.samplesCollected += 1
         let rankedCandidates = await rankedStartupCandidates(for: location)
+        guard isStillValid() else { return }
         guard let topCandidate = rankedCandidates.first else {
             debugLog("Startup confirmation sample had no ranked candidates")
             startupConfirmationState = state
@@ -514,8 +577,9 @@ final class ShoppingModeLocationService: NSObject, CLLocationManagerDelegate {
         ) {
             let didSend = ShoppingModeSuggestionService.shared.sendStartupNudge(
                 merchant: topCandidate.merchant,
-                sessionID: SpendingSessionStore.sessionID(),
-                currentLocation: location
+                sessionID: monitoringSessionID,
+                currentLocation: location,
+                isStillValid: isStillValid
             )
 
             if didSend {
@@ -602,6 +666,7 @@ final class ShoppingModeLocationService: NSObject, CLLocationManagerDelegate {
         ShoppingModeSuggestionService.shared.handleRegionEntry(
             merchant: merchant,
             currentLocation: location,
+            isStillValid: deliveryValidation(),
             onSuccessfulNotification: { [weak self, location] in
                 self?.handleSuccessfulRegionEntryNotification(at: location)
             }
@@ -611,49 +676,19 @@ final class ShoppingModeLocationService: NSObject, CLLocationManagerDelegate {
     // MARK: - CLLocationManagerDelegate
 
     func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
-        let status = manager.authorizationStatus
-        cachedAuthorizationStatus = status
-        debugLog("Authorization changed: \(status.rawValue)")
-        NotificationCenter.default.post(
-            name: Self.authorizationDidChangeNotification,
-            object: self,
-            userInfo: ["status": status.rawValue]
-        )
-
-        #if !targetEnvironment(macCatalyst)
-        if status == .authorizedWhenInUse && requestedAlwaysUpgrade {
-            requestedAlwaysUpgrade = false
-            manager.requestAlwaysAuthorization()
-            return
-        }
-        #endif
-
-        #if targetEnvironment(macCatalyst)
-        if status == .authorizedWhenInUse || status == .authorizedAlways {
-            requestedAlwaysUpgrade = false
-            startMonitoringIfPossible()
-            return
-        }
-        #else
-        if status == .authorizedAlways {
-            startMonitoringIfPossible()
-            return
-        }
-        #endif
-
-        if status == .denied || status == .restricted {
-            requestedAlwaysUpgrade = false
-            stopMonitoringAllRegions()
-            return
-        }
+        refreshAuthorizationState()
     }
 
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+        guard canProcessLocationEvents else { return }
         guard let latest = locations.last else {
             debugLog("Location update returned empty set")
             return
         }
 
+        if let monitoringStartedAt, latest.timestamp < monitoringStartedAt.addingTimeInterval(-1) {
+            return
+        }
         lastKnownLocation = latest
         lastKnownLocationDate = .now
         debugLog(
@@ -662,6 +697,13 @@ final class ShoppingModeLocationService: NSObject, CLLocationManagerDelegate {
 
         guard let requestPurpose = activeLocationRequest else {
             maybeRefreshMonitoredMerchantsForMovement(latest)
+            if runningCapability == .foregroundOnly,
+               let candidate = candidateScorer.topCandidate(
+                    merchants: Array(monitoredMerchantsByRegionID.values),
+                    referenceLocation: latest, insideRegionIDs: currentInsideRegionIDs
+               ), candidate.distanceMeters <= candidate.merchant.radiusMeters {
+                processRegionConfirmationSample(location: latest, merchantID: candidate.merchant.id)
+            }
             return
         }
 
@@ -669,13 +711,16 @@ final class ShoppingModeLocationService: NSObject, CLLocationManagerDelegate {
         locationWaitTask?.cancel()
         locationWaitTask = nil
 
+        let isStillValid = deliveryValidation()
         switch requestPurpose {
         case .refresh(let trigger):
             Task {
+                guard isStillValid() else { return }
                 await monitorNearbyMerchants(around: latest, trigger: trigger)
             }
         case .startupConfirmation:
             Task {
+                guard isStillValid() else { return }
                 await processStartupConfirmationSample(latest)
             }
         case .regionConfirmation(let merchantID):
@@ -684,7 +729,7 @@ final class ShoppingModeLocationService: NSObject, CLLocationManagerDelegate {
     }
 
     func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
-        guard let purpose = activeLocationRequest else { return }
+        guard canProcessLocationEvents, let purpose = activeLocationRequest else { return }
         activeLocationRequest = nil
         locationWaitTask?.cancel()
         locationWaitTask = nil
@@ -701,7 +746,7 @@ final class ShoppingModeLocationService: NSObject, CLLocationManagerDelegate {
     }
 
     func locationManager(_ manager: CLLocationManager, didEnterRegion region: CLRegion) {
-        guard SpendingSessionStore.isActive() else { return }
+        guard canProcessLocationEvents, runningCapability == .background else { return }
         currentInsideRegionIDs.insert(region.identifier)
 
         guard let merchant = monitoredMerchantsByRegionID[region.identifier] ?? loadPersistedMerchants()[region.identifier] else { return }
@@ -714,6 +759,7 @@ final class ShoppingModeLocationService: NSObject, CLLocationManagerDelegate {
             ShoppingModeSuggestionService.shared.handleRegionEntry(
                 merchant: merchant,
                 currentLocation: lastKnownLocation,
+                isStillValid: deliveryValidation(),
                 onSuccessfulNotification: { [weak self, lastKnownLocation] in
                     self?.handleSuccessfulRegionEntryNotification(at: lastKnownLocation)
                 }
@@ -726,7 +772,7 @@ final class ShoppingModeLocationService: NSObject, CLLocationManagerDelegate {
     }
 
     func locationManager(_ manager: CLLocationManager, didDetermineState state: CLRegionState, for region: CLRegion) {
-        guard SpendingSessionStore.isActive() else { return }
+        guard canProcessLocationEvents, runningCapability == .background else { return }
 
         switch state {
         case .inside:
@@ -750,9 +796,7 @@ final class ShoppingModeLocationService: NSObject, CLLocationManagerDelegate {
     }
 
     private func setBackgroundLocationUpdatesEnabled(_ isEnabled: Bool) {
-        #if canImport(UIKit) && !targetEnvironment(macCatalyst)
-        locationManager.allowsBackgroundLocationUpdates = isEnabled
-        #endif
+        locationManager.setExcursionBackgroundUpdates(isEnabled)
     }
 
     #if canImport(MapKit)
