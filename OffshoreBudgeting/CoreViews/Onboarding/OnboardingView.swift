@@ -124,6 +124,14 @@ struct OnboardingView: View {
         }
         .navigationBarBackButtonHidden(true)
         .onAppear {
+            #if DEBUG
+            if activeUseICloud {
+                ICloudBootstrap.logMilestone(
+                    "Onboarding appeared. Workspace query count: \(workspaces.count)",
+                    startedAt: iCloudBootstrapStartedAt
+                )
+            }
+            #endif
             onboardingStep = Step.resolve(onboardingStep).rawValue
             Task { await maybeOfferSkipIfCloudAlreadyHasData() }
         }

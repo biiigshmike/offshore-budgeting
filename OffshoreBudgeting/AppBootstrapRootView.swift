@@ -31,11 +31,18 @@ struct AppBootstrapRootView: View {
 
                 if useICloud {
                     ICloudBootstrap.logICloudSelection(startedAt: iCloudBootstrapStartedAt)
+                    #if DEBUG
+                    ICloudBootstrap.observeCloudKitEvents(startedAt: iCloudBootstrapStartedAt)
+                    ICloudBootstrap.logMilestone("Creating iCloud model container", startedAt: iCloudBootstrapStartedAt)
+                    #endif
                 }
 
                 modelContainer = OffshoreBudgetingApp.makeModelContainer(useICloud: useICloud)
 
                 #if DEBUG
+                if useICloud {
+                    ICloudBootstrap.logMilestone("Model container returned", startedAt: iCloudBootstrapStartedAt)
+                }
                 UITestSupport.applyScenarioDataIfNeeded(container: modelContainer)
                 #endif
 
