@@ -24704,6 +24704,46 @@
         }
       }
     },
+    "Fixed an issue where Set Aside as Savings could push Actual Savings further into the negative. Setting money aside now reduces your available Offshore Savings balance and leaves Actual Savings unchanged." : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "أصلحنا مشكلة كان فيها خيار «تخصيص كادخار» قد يجعل الادخار الفعلي أكثر سلبية. يقلل تخصيص المال الآن رصيد Offshore Savings المتاح ويُبقي الادخار الفعلي كما هو."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ein Fehler wurde behoben, durch den „Als Ersparnis zurücklegen“ die tatsächlichen Ersparnisse weiter ins Minus treiben konnte. Das Zurücklegen verringert jetzt den verfügbaren Saldo von Offshore Savings und lässt die tatsächlichen Ersparnisse unverändert."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Se corrigió un problema por el que Apartar como ahorro podía hacer que el ahorro real fuera aún más negativo. Apartar dinero ahora reduce el saldo disponible de Offshore Savings y deja el ahorro real sin cambios."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Correction d’un problème où Mettre de côté en épargne pouvait creuser le déficit de l’épargne réelle. Mettre de l’argent de côté réduit désormais le solde disponible d’Offshore Savings et laisse l’épargne réelle inchangée."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Corrigimos um problema em que Separar como poupança podia deixar a poupança real ainda mais negativa. Separar dinheiro agora reduz o saldo disponível do Offshore Savings e mantém a poupança real inalterada."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "修复了“留作储蓄”可能导致实际储蓄负值进一步扩大的问题。现在，留出资金会减少 Offshore Savings 的可用余额，实际储蓄保持不变。"
+          }
+        }
+      }
+    },
     "Fixed an issue where split transactions counted toward savings. Amounts split to a Reconciliation now affect only that balance and no longer impact Offshore Savings Outlook." : {
       "localizations" : {
         "ar" : {

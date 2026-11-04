@@ -78,6 +78,17 @@ struct SettingsReleaseLogsView: View {
 
     static let releaseSections: [ReleaseSection] = [
         ReleaseSection(
+            version: "2.5.1",
+            build: "24",
+            items: [
+                ReleaseItem(
+                    systemImage: "ladybug.slash",
+                    title: "Set Aside as Savings",
+                    description: "Fixed an issue where Set Aside as Savings could push Actual Savings further into the negative. Setting money aside now reduces your available Offshore Savings balance and leaves Actual Savings unchanged."
+                )
+            ]
+        ),
+        ReleaseSection(
             version: "2.5",
             build: "23",
             items: [
