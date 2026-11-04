@@ -285,7 +285,7 @@ enum GeneratedHelpContent {
             id: "accounts",
             title: "Accounts",
             group: .coreScreens,
-            iconSystemName: "creditcard.fill",
+            iconSystemName: "wallet.bifold.fill",
             iconStyle: .green,
             leafTopicIDs: [
                 "accounts-overview",
