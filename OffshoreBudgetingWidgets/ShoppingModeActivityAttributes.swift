@@ -8,7 +8,7 @@ import ActivityKit
 nonisolated struct ShoppingModeActivityAttributes: ActivityAttributes, Sendable {
     nonisolated struct ContentState: Codable, Hashable, Sendable {
         let endDate: Date
-        let statusText: String
+        let statusText: String?
     }
 
     let sessionID: String

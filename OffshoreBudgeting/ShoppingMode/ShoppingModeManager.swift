@@ -194,7 +194,7 @@ final class ShoppingModeManager: ObservableObject {
             )
             let state = ShoppingModeActivityAttributes.ContentState(
                 endDate: currentExpiry,
-                statusText: self.locationCapability.statusText
+                statusText: self.locationCapability == .background ? nil : self.locationCapability.statusText
             )
             if let existing = Activity<ShoppingModeActivityAttributes>.activities.first(where: { $0.attributes.sessionID == sessionID }) {
                 #if DEBUG
