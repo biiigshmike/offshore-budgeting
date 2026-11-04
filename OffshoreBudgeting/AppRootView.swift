@@ -61,7 +61,7 @@ enum AppSection: String, CaseIterable, Identifiable, Hashable {
         case .home: return "house"
         case .budgets: return "chart.pie"
         case .income: return "calendar"
-        case .cards: return "creditcard"
+        case .cards: return "wallet.bifold.fill"
         case .settings: return "gear"
         }
     }

@@ -283,7 +283,7 @@ struct SettingsReleaseLogsView: View {
                     description: "Heading out to explore? Activate Excursion Mode to receive gentle reminders to log expenses when you’re near relevant points of interest. All processing happens on-device and can be turned on or off anytime."
                 ),
                 ReleaseItem(
-                    systemImage: "creditcard.fill",
+                    systemImage: "wallet.bifold.fill",
                     title: "Reconciliations and Savings: Now on the Accounts Tab",
                     description: "Accounts is now your place for Cards, Reconciliations, and workspace-scoped Offshore Savings! You can now split expenses and track reconciliations. When adding or editing an expense, choose to split or offset it against a Reconciliation. View the running total and full expense history in Cards > Reconciliation. At the end of your budget periods, your Offshore Savings will keep a running total. This feature is designed to help offset future expenses with any surplus savings."
                 ),
