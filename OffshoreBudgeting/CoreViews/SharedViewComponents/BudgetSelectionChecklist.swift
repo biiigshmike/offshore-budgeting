@@ -4,6 +4,8 @@ import SwiftUI
 /// Mac menus dismiss after selection. Keep budget choices inline until the
 /// user collapses the row, without changing the budget's draft bindings.
 struct BudgetSelectionChecklist<Item: Identifiable, ItemLabel: View>: View {
+    @Environment(\.appearanceTheme) private var theme
+
     let title: LocalizedStringKey
     let items: [Item]
     let selectedCount: Int
@@ -59,7 +61,7 @@ struct BudgetSelectionChecklist<Item: Identifiable, ItemLabel: View>: View {
                 } label: {
                     HStack(spacing: 12) {
                         Image(systemName: binding.wrappedValue ? "checkmark.square.fill" : "square")
-                            .foregroundStyle(binding.wrappedValue ? Color.accentColor : Color.secondary)
+                            .foregroundStyle(binding.wrappedValue ? theme.accent : Color.secondary)
                             .accessibilityHidden(true)
                         itemLabel(item)
                             .labelStyle(.titleAndIcon)

@@ -108,7 +108,7 @@ struct HomeSavingsOutlookMetricsView: View {
                         openSavingsAccountLabel
                     }
                     .glassProminentButtonStyleCompat()
-                    .tint(Color("AccentColor"))
+                    .offshoreAccentTint()
                 } else {
                     NavigationLink {
                         AccountsDestinationView(workspace: workspace, initialSegment: .savings)
@@ -116,7 +116,7 @@ struct HomeSavingsOutlookMetricsView: View {
                         openSavingsAccountLabel
                     }
                     .buttonStyle(.borderedProminent)
-                    .tint(Color("AccentColor"))
+                    .offshoreAccentTint()
                 }
 
                 Spacer(minLength: 12)

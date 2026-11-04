@@ -410,6 +410,10 @@ private struct WindowSceneRootView: View {
     let postBoardingTipsStore: PostBoardingTipsStore
     let initialSectionOverride: AppSection?
 
+    @AppStorage(AppearanceTheme.storageKey) private var themeID = AppearanceTheme.offshoreDefault.rawValue
+    @AppStorage(CustomThemePalette.storageKey) private var customPalette = ""
+    @Environment(\.colorScheme) private var colorScheme
+
     @StateObject private var commandHub: AppCommandHub = Self.makeCommandHub()
     @StateObject private var resumeState = ContentViewResumeState()
 
@@ -435,6 +439,7 @@ private struct WindowSceneRootView: View {
     }
 
     var body: some View {
+        let theme = ResolvedAppearanceTheme.resolve(id: themeID, customPalette: customPalette, scheme: colorScheme)
         let root = AppBootstrapRootView(
             modelContainer: $modelContainer,
             initialSectionOverride: initialSectionOverride,
@@ -442,6 +447,8 @@ private struct WindowSceneRootView: View {
         )
         .environment(\.appCommandHub, commandHub)
         .environment(postBoardingTipsStore)
+        .environment(\.appearanceTheme, theme)
+        .tint(theme.id == AppearanceTheme.offshoreDefault.id ? nil : theme.accent)
 
         if shouldUseFocusedSceneObject {
             root.focusedSceneObject(commandHub)

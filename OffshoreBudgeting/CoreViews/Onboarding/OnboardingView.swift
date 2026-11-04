@@ -249,7 +249,7 @@ struct OnboardingView: View {
                         .frame(maxWidth: .infinity, minHeight: 52)
                 }
                 .glassProminentButtonStyleCompat()
-                .tint(.accentColor)
+                .offshoreAccentTint()
                 .disabled(isCheckingICloudForGetStarted)
 
                 Spacer(minLength: 18)
@@ -261,7 +261,7 @@ struct OnboardingView: View {
                         .frame(maxWidth: .infinity, minHeight: 52)
                 }
                 .buttonStyle(.borderedProminent)
-                .tint(.accentColor)
+                .offshoreAccentTint()
                 .disabled(isCheckingICloudForGetStarted)
 
                 Spacer(minLength: 18)
@@ -400,7 +400,7 @@ struct OnboardingView: View {
                         .frame(maxWidth: .infinity, minHeight: 44)
                 }
                 .glassProminentButtonStyleCompat()
-                .tint(.accentColor)
+                .offshoreAccentTint()
             } else {
                 Button {
                     primaryActionTapped()
@@ -409,7 +409,7 @@ struct OnboardingView: View {
                         .frame(maxWidth: .infinity, minHeight: 44)
                 }
                 .buttonStyle(.borderedProminent)
-                .tint(.accentColor)
+                .offshoreAccentTint()
             }
         }
     }
@@ -675,7 +675,7 @@ private struct OnboardingWorkspaceStep: View {
 
                 Section {
                     Toggle("Confirm Before Deleting", isOn: $confirmBeforeDeleting)
-                        .tint(Color("AccentColor"))
+                        .offshoreAccentTint()
                 } footer: {
                     Text("You can change these later in Settings.")
                 }
@@ -693,7 +693,7 @@ private struct OnboardingWorkspaceStep: View {
                         .frame(maxWidth: .infinity, minHeight: 44)
                 }
                 .glassProminentButtonStyleCompat()
-                .tint(.accentColor)
+                .offshoreAccentTint()
             } else {
                 Button {
                     sheetRoute = .add
@@ -702,7 +702,7 @@ private struct OnboardingWorkspaceStep: View {
                         .frame(maxWidth: .infinity, minHeight: 44)
                 }
                 .buttonStyle(.borderedProminent)
-                .tint(.accentColor)
+                .offshoreAccentTint()
             }
 
             Spacer(minLength: 0)
@@ -854,7 +854,7 @@ private struct OnboardingPrivacySyncStep: View {
             Form {
                 Section("App Lock") {
                     Toggle(biometricsInfo.kind.displayName, isOn: $requireBiometrics)
-                        .tint(Color("AccentColor"))
+                        .offshoreAccentTint()
                         .disabled(!biometricsInfo.isAvailable)
                     
                     
@@ -876,7 +876,7 @@ private struct OnboardingPrivacySyncStep: View {
                             set: { wantsEnabled in
                                 handleICloudToggleChanged(wantsEnabled: wantsEnabled)
                             }
-                        )).tint(Color("AccentColor"))
+                        )).offshoreAccentTint()
 
                         
                         Text("Use iCloud to sync your workspaces and budgets across your devices signed into this Apple ID.")
@@ -1083,7 +1083,7 @@ private struct OnboardingCategoriesStep: View {
                         .frame(maxWidth: .infinity, minHeight: 44)
                 }
                 .glassProminentButtonStyleCompat()
-                .tint(.accentColor)
+                .offshoreAccentTint()
             } else {
                 Button {
                     sheetRoute = .add
@@ -1092,7 +1092,7 @@ private struct OnboardingCategoriesStep: View {
                         .frame(maxWidth: .infinity, minHeight: 44)
                 }
                 .buttonStyle(.borderedProminent)
-                .tint(.accentColor)
+                .offshoreAccentTint()
             }
             Spacer(minLength: 0)
         }
@@ -1198,7 +1198,7 @@ private struct OnboardingCardsStep: View {
                         .frame(maxWidth: .infinity, minHeight: 44)
                 }
                 .glassProminentButtonStyleCompat()
-                .tint(.accentColor)
+                .offshoreAccentTint()
             } else {
                 Button {
                     sheetRoute = .add
@@ -1207,7 +1207,7 @@ private struct OnboardingCardsStep: View {
                         .frame(maxWidth: .infinity, minHeight: 44)
                 }
                 .buttonStyle(.borderedProminent)
-                .tint(.accentColor)
+                .offshoreAccentTint()
             }
 
             Spacer(minLength: 0)
@@ -1276,7 +1276,7 @@ private struct OnboardingCardsStep: View {
             } label: {
                 Label("Edit", systemImage: "pencil")
             }
-            .tint(Color("AccentColor"))
+            .offshoreAccentTint()
 
             Button(role: .destructive) {
                 deleteCardWithOptionalConfirm(card)
@@ -1424,7 +1424,7 @@ private struct OnboardingPresetsStep: View {
                             } label: {
                                 Label("Edit", systemImage: "pencil")
                             }
-                            .tint(Color("AccentColor"))
+                            .offshoreAccentTint()
 
                             if preset.isArchived {
                                 Button {
@@ -1467,7 +1467,7 @@ private struct OnboardingPresetsStep: View {
                         .frame(maxWidth: .infinity, minHeight: 44)
                 }
                 .glassProminentButtonStyleCompat()
-                .tint(.accentColor)
+                .offshoreAccentTint()
             } else {
                 Button {
                     sheetRoute = .add
@@ -1476,7 +1476,7 @@ private struct OnboardingPresetsStep: View {
                         .frame(maxWidth: .infinity, minHeight: 44)
                 }
                 .buttonStyle(.borderedProminent)
-                .tint(.accentColor)
+                .offshoreAccentTint()
             }
             
             Spacer(minLength: 0)

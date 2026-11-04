@@ -151,7 +151,7 @@ struct ManagePresetsView: View {
                             } label: {
                                 Label("Edit", systemImage: "pencil")
                             }
-                            .tint(Color("AccentColor"))
+                            .offshoreAccentTint()
 
                             Button {
                                 archive(pinned)
@@ -195,7 +195,7 @@ struct ManagePresetsView: View {
                             } label: {
                                 Label("Edit", systemImage: "pencil")
                             }
-                            .tint(Color("AccentColor"))
+                            .offshoreAccentTint()
 
                             Button {
                                 archive(preset)
@@ -247,7 +247,7 @@ struct ManagePresetsView: View {
                                 } label: {
                                     Label("Edit", systemImage: "pencil")
                                 }
-                                .tint(Color("AccentColor"))
+                                .offshoreAccentTint()
                             }
                             .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                                 Button(role: .destructive) {

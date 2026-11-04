@@ -56,7 +56,7 @@ struct ReminderSetupView: View {
                     Text("All reminders use this time. If needed, the next step asks for system permission to send notifications.")
                 }
             }
-            .tint(Color("AccentColor"))
+            .offshoreAccentTint()
             .disabled(isSaving)
             .navigationTitle("Set Up Reminders")
             .navigationBarTitleDisplayMode(.inline)

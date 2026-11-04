@@ -38,14 +38,14 @@ struct AddCategoryView: View {
                     ToolbarItem(placement: .topBarTrailing) {
                         Button("Save") { save() }
                             .disabled(!canSave)
-                            .tint(.accentColor)
+                            .offshoreAccentTint()
                             .glassProminentButtonStyleCompat()
                     }
                 } else {
                     ToolbarItem(placement: .topBarTrailing) {
                         Button("Save") { save() }
                             .disabled(!canSave)
-                            .tint(.accentColor)
+                            .offshoreAccentTint()
                             .controlSize(.large)
                             .buttonStyle(.plain)
                     }

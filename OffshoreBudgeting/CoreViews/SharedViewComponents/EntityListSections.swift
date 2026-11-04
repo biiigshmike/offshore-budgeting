@@ -59,7 +59,7 @@ struct WorkspaceListRows: View {
                     } label: {
                         Label("Edit", systemImage: "pencil")
                     }
-                    .tint(Color("AccentColor"))
+                    .offshoreAccentTint()
                 }
                 .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                     Button(role: .destructive) {
@@ -199,7 +199,7 @@ struct CategoryListRows<Destination: View>: View {
                     } label: {
                         Label("Edit", systemImage: "pencil")
                     }
-                    .tint(Color("AccentColor"))
+                    .offshoreAccentTint()
 
                     if let onArchive {
                         Button {

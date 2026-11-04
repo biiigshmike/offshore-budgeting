@@ -79,7 +79,7 @@ struct OnboardingStartGateView: View {
                             .frame(maxWidth: .infinity, minHeight: 44)
                     }
                     .glassProminentButtonStyleCompat()
-                    .tint(.accentColor)
+                    .offshoreAccentTint()
                 } else {
                     Button {
                         beginWelcomeExitThenNavigate()
@@ -89,7 +89,7 @@ struct OnboardingStartGateView: View {
                             .frame(maxWidth: .infinity, minHeight: 44)
                     }
                     .buttonStyle(.borderedProminent)
-                    .tint(.accentColor)
+                    .offshoreAccentTint()
                 }
             }
             .padding(.horizontal, layout.horizontalPadding)

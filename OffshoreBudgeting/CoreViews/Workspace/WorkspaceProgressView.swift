@@ -2,6 +2,8 @@ import SwiftUI
 import SwiftData
 
 struct WorkspaceProgressView: View {
+    @Environment(\.appearanceTheme) private var theme
+
     let workspace: Workspace
     let showsHandoffGuidance: Bool
 
@@ -178,7 +180,7 @@ struct WorkspaceProgressView: View {
         let isComplete = completedSteps.contains(step)
         return HStack(alignment: .top, spacing: 12) {
             Image(systemName: isComplete ? "checkmark.circle.fill" : "circle")
-                .foregroundStyle(isComplete ? Color.accentColor : Color.secondary)
+                .foregroundStyle(isComplete ? theme.accent : Color.secondary)
                 .imageScale(.large)
                 .accessibilityHidden(true)
 

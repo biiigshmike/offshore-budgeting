@@ -108,7 +108,7 @@ struct AllocationAccountView: View {
                                 } label: {
                                     Label("Edit", systemImage: "pencil")
                                 }
-                                .tint(Color("AccentColor"))
+                                .offshoreAccentTint()
 
                                 if hasSharedBalanceHistory(account) {
                                     Button(role: .destructive) {

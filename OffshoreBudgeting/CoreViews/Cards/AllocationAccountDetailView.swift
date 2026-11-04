@@ -557,7 +557,7 @@ struct AllocationAccountDetailView: View {
                                 } label: {
                                     Label("Edit", systemImage: "pencil")
                                 }
-                                .tint(Color("AccentColor"))
+                                .offshoreAccentTint()
                             }
                             if isEditableChargeRow(row), !account.isArchived {
                                 Button {
@@ -570,7 +570,7 @@ struct AllocationAccountDetailView: View {
                                 } label: {
                                     Label("Edit", systemImage: "pencil")
                                 }
-                                .tint(Color("AccentColor"))
+                                .offshoreAccentTint()
                             }
                         }
                         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
@@ -1234,14 +1234,14 @@ private struct EditSharedBalanceEntryView: View {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Save") { save() }
                         .disabled(!canSave)
-                        .tint(.accentColor)
+                        .offshoreAccentTint()
                         .glassProminentButtonStyleCompat()
                 }
             } else {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Save") { save() }
                         .disabled(!canSave)
-                        .tint(.accentColor)
+                        .offshoreAccentTint()
                         .controlSize(.large)
                         .buttonStyle(.plain)
                 }
@@ -1629,14 +1629,14 @@ private struct AddAllocationSettlementView: View {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Save") { save() }
                         .disabled(!canSave)
-                        .tint(.accentColor)
+                        .offshoreAccentTint()
                         .glassProminentButtonStyleCompat()
                 }
             } else {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Save") { save() }
                         .disabled(!canSave)
-                        .tint(.accentColor)
+                        .offshoreAccentTint()
                         .controlSize(.large)
                         .buttonStyle(.plain)
                 }

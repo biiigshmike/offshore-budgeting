@@ -53,14 +53,14 @@ struct SettingsGeneralView: View {
             Section("Behavior") {
                 Toggle("Confirm Before Deleting", isOn: $confirmBeforeDeleting
                 )
-                .tint(Color("AccentColor"))
+                .offshoreAccentTint()
 
                 Text("When enabled, you’ll always be asked to confirm before anything is deleted.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
 
                 Toggle("Review Uncategorized Expenses on App Open", isOn: $reviewUncategorizedExpensesOnOpen)
-                    .tint(Color("AccentColor"))
+                    .offshoreAccentTint()
                     .accessibilityIdentifier("reviewUncategorizedExpensesOnOpen")
 
                 Text("When enabled, review uncategorized expenses in your selected workspace when you next open or return to the app. You can choose Later to skip a review.")
@@ -233,6 +233,8 @@ private enum ActiveAlert: Identifiable {
 // MARK: - Maintenance Screen
 
 private struct SettingsMaintenanceView: View {
+    @Environment(\.appearanceTheme) private var theme
+
 
     let workspace: Workspace
     let onResetTipsConfirmed: () -> Void
@@ -262,7 +264,7 @@ private struct SettingsMaintenanceView: View {
             if WorkspaceProgressService.canHideProgress(in: workspace) {
                 Section {
                     Toggle("Hide Workspace Progress", isOn: $hideWorkspaceProgress)
-                        .tint(Color("AccentColor"))
+                        .offshoreAccentTint()
                         .accessibilityIdentifier("hideWorkspaceProgress")
                 } footer: {
                     Text("Hides the Workspace Progress row in Settings for \(workspace.name) on this device. Turn this off to show it again.")
@@ -279,7 +281,7 @@ private struct SettingsMaintenanceView: View {
 
                 maintenanceButton(
                     title: "Repeat Onboarding",
-                    tint: Color("AccentColor"),
+                    tint: theme.accent,
                     action: onRepeatOnboarding
                 )
                 .listRowSeparator(.hidden)
@@ -367,7 +369,7 @@ private struct SettingsExpenseDisplayView: View {
         List {
             Section("Planned Expenses") {
                 Toggle("Hide Future Planned Expenses", isOn: $hideFuturePlannedExpenses)
-                    .tint(Color("AccentColor"))
+                    .offshoreAccentTint()
 
                 Text("When enabled, planned expenses scheduled after today are hidden from expense lists.")
                     .font(.footnote)
@@ -377,7 +379,7 @@ private struct SettingsExpenseDisplayView: View {
                     "Exclude Future Planned Expenses from Totals",
                     isOn: $excludeFuturePlannedExpensesFromCalculations
                 )
-                .tint(Color("AccentColor"))
+                .offshoreAccentTint()
 
                 Text("When enabled, planned expenses scheduled after today are excluded from totals and savings calculations.")
                     .font(.footnote)
@@ -386,7 +388,7 @@ private struct SettingsExpenseDisplayView: View {
 
             Section("Variable Expenses") {
                 Toggle("Hide Future Variable Expenses", isOn: $hideFutureVariableExpenses)
-                    .tint(Color("AccentColor"))
+                    .offshoreAccentTint()
 
                 Text("When enabled, variable expenses dated after today are hidden from expense lists.")
                     .font(.footnote)
@@ -396,7 +398,7 @@ private struct SettingsExpenseDisplayView: View {
                     "Exclude Future Variable Expenses from Totals",
                     isOn: $excludeFutureVariableExpensesFromCalculations
                 )
-                .tint(Color("AccentColor"))
+                .offshoreAccentTint()
 
                 Text("When enabled, variable expenses dated after today are excluded from totals and savings calculations.")
                     .font(.footnote)

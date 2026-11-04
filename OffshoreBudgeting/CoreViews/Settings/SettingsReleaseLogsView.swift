@@ -514,7 +514,7 @@ private struct ReleaseRow: View {
         HStack(alignment: .top, spacing: 12) {
             Image(systemName: item.systemImage)
                 .font(.system(size: 18))
-                .foregroundStyle(Color("AccentColor"))
+                .foregroundStyle(.tint)
                 .frame(width: 24)
 
             VStack(alignment: .leading, spacing: 4) {

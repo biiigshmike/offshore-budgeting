@@ -150,6 +150,7 @@ struct HomeView: View {
     // MARK: - A11y + Layout Environment
 
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.appearanceTheme) private var theme
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.accessibilityVoiceOverEnabled) private var voiceOverEnabled
     @Environment(\.appTabActivationContext) private var tabActivationContext
@@ -329,21 +330,32 @@ struct HomeView: View {
         .navigationTitle(String(localized: "app.section.home", defaultValue: "Home", comment: "Main tab title for the Home section."))
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
-                Button {
+                let editWidgetsButton = Button {
                     isEditingWidgets = true
                 } label: {
-                    Label(
+                    let label = Label(
                         String(localized: "homeEdit.navigationTitle", defaultValue: "Edit", comment: "Navigation title for editing Home pinned items."),
                         systemImage: "widget.grid.2x1.rectangle"
                     )
+                    #if targetEnvironment(macCatalyst)
+                    label.foregroundStyle(theme.accent)
+                    #else
+                    label
+                    #endif
                 }
                 .labelStyle(.iconOnly)
+                #if targetEnvironment(macCatalyst)
+                editWidgetsButton.tint(nil)
+                #else
+                editWidgetsButton
+                #endif
             }
 
             ToolbarItemGroup(placement: .primaryAction) {
                 DateRangeToolbarControls(
                     startDate: appliedStartDate,
                     endDate: appliedEndDate,
+                    usesNeutralMacEditor: true,
                     onApply: { start, end in
                         draftStartDate = start
                         draftEndDate = end

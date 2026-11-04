@@ -108,14 +108,14 @@ struct AddBudgetView: View {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Save") { createBudget() }
                         .disabled(!canCreate)
-                        .tint(.accentColor)
+                        .offshoreAccentTint()
                         .glassProminentButtonStyleCompat()
                 }
             } else {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Save") { createBudget() }
                         .disabled(!canCreate)
-                        .tint(.accentColor)
+                        .offshoreAccentTint()
                         .controlSize(.large)
                         .buttonStyle(.plain)
                 }

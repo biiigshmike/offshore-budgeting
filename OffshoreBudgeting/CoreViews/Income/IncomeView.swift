@@ -636,7 +636,7 @@ struct IncomeView: View {
             } label: {
                 Label("Edit", systemImage: "pencil")
             }
-            .tint(Color("AccentColor"))
+            .offshoreAccentTint()
         }
     }
 

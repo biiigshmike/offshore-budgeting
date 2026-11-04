@@ -149,7 +149,7 @@ private struct CurrentReleaseLogSheet: View {
                         .frame(maxWidth: .infinity, minHeight: 52)
                 }
                 .glassProminentButtonStyleCompat()
-                .tint(.accentColor)
+                .offshoreAccentTint()
                 .padding(.horizontal, 22)
                 .padding(.bottom, 18)
             } else {
@@ -158,7 +158,7 @@ private struct CurrentReleaseLogSheet: View {
                         .frame(maxWidth: .infinity, minHeight: 52)
                 }
                 .buttonStyle(.borderedProminent)
-                .tint(.accentColor)
+                .offshoreAccentTint()
                 .padding(.horizontal, 22)
                 .padding(.bottom, 18)
             }

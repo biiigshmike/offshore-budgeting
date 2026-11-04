@@ -1107,7 +1107,7 @@ struct BudgetDetailView: View {
                 } label: {
                     Label("Edit", systemImage: "pencil")
                 }
-                .tint(Color("AccentColor"))
+                .offshoreAccentTint()
 
                 if let presetID = expense.sourcePresetID, let preset = presetBySourceID[presetID] {
                     Button {
@@ -1141,7 +1141,7 @@ struct BudgetDetailView: View {
             } label: {
                 Label("Edit", systemImage: "pencil")
             }
-            .tint(Color("AccentColor"))
+            .offshoreAccentTint()
         }
         .swipeActions(edge: .trailing, allowsFullSwipe: true) {
             Button {
@@ -1199,7 +1199,7 @@ struct BudgetDetailView: View {
             } label: {
                 Label(String(localized: "budgetDetail.editBudget", defaultValue: "Edit Budget", comment: "Menu action to edit the current budget."), systemImage: "pencil")
             }
-            .tint(Color("AccentColor"))
+            .offshoreAccentTint()
             Button(role: .destructive) {
                 handleDeleteBudgetTapped()
             } label: {

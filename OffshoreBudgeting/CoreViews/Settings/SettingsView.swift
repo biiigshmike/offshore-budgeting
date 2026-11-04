@@ -38,6 +38,7 @@ struct SettingsView: View {
         case workspaceProgress
         case help
         case general
+        case theme
         case privacy
         case notifications
         case iCloud
@@ -263,6 +264,8 @@ struct SettingsView: View {
             SettingsHelpView()
         case .general:
             SettingsGeneralView(workspace: workspace)
+        case .theme:
+            SettingsThemeView()
         case .privacy:
             SettingsPrivacyView()
         case .notifications:
@@ -309,6 +312,12 @@ struct SettingsView: View {
                     SettingsRowModel(id: .privacy, title: String(localized: "settings.privacy", defaultValue: "Privacy", comment: "Title for privacy settings."), systemImage: "faceid", tint: Color(.systemBlue)),
                     SettingsRowModel(id: .notifications, title: String(localized: "settings.notifications", defaultValue: "Notifications", comment: "Title for notifications settings."), systemImage: "bell.badge", tint: Color(.systemRed)),
                     SettingsRowModel(id: .iCloud, title: String(localized: "settings.icloud", defaultValue: "iCloud", comment: "Title for iCloud settings."), systemImage: "icloud", tint: Color(.systemBlue))
+                ]
+            ),
+            SettingsSectionModel(
+                id: "appearance",
+                rows: [
+                    SettingsRowModel(id: .theme, title: String(localized: "Theme"), systemImage: "paintpalette", tint: .indigo)
                 ]
             ),
             SettingsSectionModel(

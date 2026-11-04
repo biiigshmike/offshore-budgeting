@@ -481,7 +481,7 @@ struct BudgetsView: View {
             } label: {
                 Label("Edit", systemImage: "pencil")
             }
-            .tint(Color("AccentColor"))
+            .offshoreAccentTint()
         }
         .swipeActions(edge: .trailing, allowsFullSwipe: true) {
             Button(role: .destructive) {

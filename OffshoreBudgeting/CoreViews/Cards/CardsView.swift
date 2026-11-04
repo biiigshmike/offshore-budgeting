@@ -106,7 +106,7 @@ struct CardsView: View {
                                 } label: {
                                     Label("Edit", systemImage: "pencil")
                                 }
-                                .tint(Color("AccentColor"))
+                                .offshoreAccentTint()
 
                                 Button(role: .destructive) {
                                     if confirmBeforeDeleting {

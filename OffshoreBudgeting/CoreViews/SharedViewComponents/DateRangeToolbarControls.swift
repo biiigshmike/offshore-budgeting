@@ -5,16 +5,27 @@ struct DateRangeToolbarControls: View {
     let startDate: Date
     let endDate: Date
     var isEnabled: Bool = true
+    var usesNeutralMacEditor = false
     let onApply: (Date, Date) -> Void
     let onSelectQuickRange: (CalendarQuickRangePreset) -> Void
 
+    @Environment(\.appearanceTheme) private var theme
     @State private var editorDraft: DateRangeEditorDraft?
 
     var body: some View {
         let editorButton = Button {
             editorDraft = DateRangeEditorDraft(startDate: startDate, endDate: endDate)
         } label: {
-            Label("Date Range", systemImage: "calendar.badge.clock")
+            let label = Label("Date Range", systemImage: "calendar.badge.clock")
+            #if targetEnvironment(macCatalyst)
+            if usesNeutralMacEditor {
+                label.foregroundStyle(theme.accent)
+            } else {
+                label
+            }
+            #else
+            label
+            #endif
         }
         .accessibilityLabel("Date Range")
         .accessibilityValue("\(AppDateFormat.abbreviatedDate(startDate)) – \(AppDateFormat.abbreviatedDate(endDate))")
@@ -22,14 +33,20 @@ struct DateRangeToolbarControls: View {
         .help("Edit Date Range")
         .disabled(!isEnabled)
 
+        #if targetEnvironment(macCatalyst)
+        let styledEditorButton = usesNeutralMacEditor ? AnyView(editorButton.tint(nil)) : AnyView(editorButton)
+        #else
+        let styledEditorButton = editorButton
+        #endif
+
         if UIDevice.current.userInterfaceIdiom == .phone {
-            editorButton.appSheet(item: $editorDraft) { draft in
+            styledEditorButton.appSheet(item: $editorDraft) { draft in
                 DateRangeEditorView(draft: draft, onApply: onApply)
                     .presentationDetents([.medium, .large])
                     .presentationDragIndicator(.visible)
             }
         } else {
-            editorButton
+            styledEditorButton
                 .blocksAutomaticExpenseReview(while: editorDraft != nil)
                 .popover(item: $editorDraft, arrowEdge: .top) { draft in
                     DateRangeEditorView(draft: draft, onApply: onApply)

@@ -573,6 +573,8 @@ struct HelpTopicDetailView: View {
 }
 
 private struct HelpTopicPagerBar: View {
+    @Environment(\.appearanceTheme) private var theme
+
     let previousTitle: String?
     let nextTitle: String?
     let onBack: () -> Void
@@ -591,7 +593,7 @@ private struct HelpTopicPagerBar: View {
     }
 
     private var nextTint: Color {
-        isNextEnabled ? Color("AccentColor") : Color("OffshoreWave")
+        isNextEnabled ? theme.accent : Color("OffshoreWave")
     }
 
     private var previousDisplayTitle: String {
@@ -700,6 +702,8 @@ private struct HelpSectionMediaStrip: View {
 }
 
 private struct HelpSectionThumbnail: View {
+    @Environment(\.appearanceTheme) private var theme
+
     let item: GeneratedHelpSectionMediaItem
     let isSelected: Bool
 
@@ -778,12 +782,12 @@ private struct HelpSectionThumbnail: View {
         .overlay(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .stroke(
-                    isSelected ? Color.accentColor : Color.primary.opacity(0.15),
+                    isSelected ? theme.accent : Color.primary.opacity(0.15),
                     lineWidth: isSelected ? 2.5 : 1
                 )
         )
         .shadow(
-            color: isSelected ? Color.accentColor.opacity(0.25) : .clear,
+            color: isSelected ? theme.accent.opacity(0.25) : .clear,
             radius: isSelected ? 8 : 0,
             x: 0,
             y: isSelected ? 2 : 0
@@ -825,7 +829,7 @@ private struct HelpSectionLinkCard: View {
                 HStack(alignment: .top, spacing: 8) {
                     Image(systemName: item.systemImageName)
                         .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(Color("AccentColor"))
+                        .foregroundStyle(.tint)
                 }
 
                 Text(item.title)

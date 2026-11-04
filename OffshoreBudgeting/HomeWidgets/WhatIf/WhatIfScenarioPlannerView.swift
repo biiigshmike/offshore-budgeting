@@ -610,7 +610,7 @@ struct WhatIfScenarioPlannerView: View {
             } label: {
                 Label(String(localized: "common.rename", defaultValue: "Rename", comment: "Common action label for renaming."), systemImage: "pencil")
             }
-            .tint(Color("AccentColor"))
+            .offshoreAccentTint()
             .disabled(selectedScenarioID == nil)
 
             Button(role: .destructive) {

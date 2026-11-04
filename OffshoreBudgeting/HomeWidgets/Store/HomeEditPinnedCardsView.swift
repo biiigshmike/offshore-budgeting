@@ -222,7 +222,7 @@ struct HomeEditPinnedCardsView: View {
 
         HStack(spacing: 10) {
             Text(title(for: item.wrappedValue))
-                .foregroundStyle(Color("AccentColor"))
+                .foregroundStyle(.tint)
 
             if showsTileSizePicker {
                 Spacer()
