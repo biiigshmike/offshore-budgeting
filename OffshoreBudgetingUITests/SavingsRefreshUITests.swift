@@ -91,7 +91,13 @@ final class SavingsRefreshUITests: XCTestCase {
 
         let reserved = ledgerRow("Reserved balance entry", in: app)
         XCTAssertTrue(reserved.exists)
-        reserved.swipeLeft()
+        reserved.tap()
+        XCTAssertTrue(app.navigationBars["Edit Savings Entry"].waitForExistence(timeout: 5))
+        XCTAssertEqual(app.switches["Set Aside as Savings"].value as? String, "1")
+        app.buttons["Save"].tap()
+        assertBalance("50.00", in: app)
+
+        ledgerRow("Reserved balance entry", in: app).swipeLeft()
         app.buttons["Delete"].firstMatch.tap()
         if app.alerts["Delete Entry?"].waitForExistence(timeout: 2) {
             app.alerts["Delete Entry?"].buttons["Delete"].tap()

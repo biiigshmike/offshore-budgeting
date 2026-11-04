@@ -282,6 +282,7 @@ struct SavingsLedgerEntryPayload: Codable, Equatable {
     var amount: Double
     var note: String
     var kindRaw: String
+    var setAsideAsSavings: Bool? = nil
     var linkedAllocationSettlementID: UUID?
     var periodStartDate: Date?
     var periodEndDate: Date?

@@ -96,18 +96,16 @@ enum SafeSpendTodayCalculator {
             .filter { $0.transactionDate >= rangeStart && $0.transactionDate < startOfTomorrow }
             .reduce(0.0) { $0 + SavingsMathService.variableBudgetImpactAmount(for: $1) }
 
-        let actualSavingsAdjustmentsToDate = SavingsMathService.actualSavingsAdjustmentTotal(
-            from: savingsEntries,
-            startDate: rangeStart,
-            endDate: toDateEnd
-        )
+        let manualSavingsMovementsToDate = savingsEntries
+            .filter { $0.kind == .manualAdjustment && $0.date >= rangeStart && $0.date <= toDateEnd }
+            .reduce(0.0) { $0 + $1.amount }
 
         let periodRemainingRoom = actualIncomeToDate
             + plannedIncomeRemaining
             - plannedExpensesAlreadyConsumed
             - remainingPlannedExpenses
             - actualVariableExpensesToDate
-            + actualSavingsAdjustmentsToDate
+            + manualSavingsMovementsToDate
             - sanitizedVirtualSpend
 
         let categoryCapRemainingRoom = categoryCapRemainingRoom(
@@ -149,7 +147,7 @@ enum SafeSpendTodayCalculator {
             || plannedExpensesAlreadyConsumed != 0
             || remainingPlannedExpenses != 0
             || actualVariableExpensesToDate != 0
-            || actualSavingsAdjustmentsToDate != 0
+            || manualSavingsMovementsToDate != 0
             || sanitizedVirtualSpend != 0
 
         return Summary(

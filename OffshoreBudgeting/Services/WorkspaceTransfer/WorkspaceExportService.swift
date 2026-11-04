@@ -192,6 +192,7 @@ struct WorkspaceExportService {
                     amount: $0.amount,
                     note: $0.note,
                     kindRaw: $0.kindRaw,
+                    setAsideAsSavings: $0.setAsideAsSavings,
                     linkedAllocationSettlementID: $0.linkedAllocationSettlementID,
                     periodStartDate: $0.periodStartDate,
                     periodEndDate: $0.periodEndDate,

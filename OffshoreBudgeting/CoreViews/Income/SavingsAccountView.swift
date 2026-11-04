@@ -489,8 +489,8 @@ struct SavingsAccountView<TrailingToolbar: ToolbarContent>: View {
                     workspace: workspace,
                     account: account,
                     entry: editingEntry,
-                    onSave: { date, amount, note, kind in
-                        saveEntry(date: date, amount: amount, note: note, kind: kind)
+                    onSave: { date, amount, note, kind, setAsideAsSavings in
+                        saveEntry(date: date, amount: amount, note: note, kind: kind, setAsideAsSavings: setAsideAsSavings)
                     }
                 )
             }
@@ -722,7 +722,9 @@ struct SavingsAccountView<TrailingToolbar: ToolbarContent>: View {
 
     // MARK: - Actions
 
-    private func saveEntry(date: Date, amount: Double, note: String, kind: SavingsLedgerEntryKind) {
+    private func saveEntry(
+        date: Date, amount: Double, note: String, kind: SavingsLedgerEntryKind, setAsideAsSavings: Bool?
+    ) {
         let account = account ?? SavingsAccountService.ensureSavingsAccount(
             for: workspace,
             modelContext: modelContext
@@ -733,6 +735,7 @@ struct SavingsAccountView<TrailingToolbar: ToolbarContent>: View {
             editingEntry.amount = amount
             editingEntry.note = note
             editingEntry.kind = kind
+            editingEntry.setAsideAsSavings = setAsideAsSavings
             editingEntry.updatedAt = .now
         } else {
             let entry = SavingsLedgerEntry(
@@ -740,6 +743,7 @@ struct SavingsAccountView<TrailingToolbar: ToolbarContent>: View {
                 amount: amount,
                 note: note,
                 kindRaw: kind.rawValue,
+                setAsideAsSavings: setAsideAsSavings,
                 workspace: workspace,
                 account: account
             )
@@ -862,7 +866,7 @@ private struct SavingsLedgerEntryFormView: View {
     let workspace: Workspace
     let account: SavingsAccount?
     let entry: SavingsLedgerEntry?
-    let onSave: (Date, Double, String, SavingsLedgerEntryKind) -> Void
+    let onSave: (Date, Double, String, SavingsLedgerEntryKind, Bool?) -> Void
 
     @Environment(\.dismiss) private var dismiss
 
@@ -873,8 +877,7 @@ private struct SavingsLedgerEntryFormView: View {
 
     @State private var showingInvalidAmount: Bool = false
 
-    private let transferDefaultNote: String = "Set Aside as Savings"
-    private let legacyTransferDefaultNote: String = "Transfer to True Savings"
+    private let transferDefaultNote = SavingsLedgerEntry.setAsideDefaultNote
 
     private var saveTitle: String {
         entry == nil ? "Add Savings Entry" : "Edit Savings Entry"
@@ -924,7 +927,7 @@ private struct SavingsLedgerEntryFormView: View {
                         normalizeAmountTextForTransfer()
                     }
 
-                Text("Record money you have moved into savings and no longer want available for future expenses. This subtracts it from Offshore Savings and reduces Actual Savings for this entry’s date. Offshore records the change; it does not transfer money between bank accounts.")
+                Text("Record money you have moved into savings and no longer want available for future expenses. This reduces the Offshore Savings running balance and leaves Actual Savings unchanged. Offshore records the change; it does not transfer money between bank accounts.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
 
@@ -975,11 +978,7 @@ private struct SavingsLedgerEntryFormView: View {
                 date = entry.date
                 amountText = CurrencyFormatter.editingString(from: entry.amount)
                 note = entry.note
-                isTransferToTrueSavings = (
-                    entry.kind == .manualAdjustment &&
-                    entry.amount < 0 &&
-                    (entry.note == transferDefaultNote || entry.note == legacyTransferDefaultNote)
-                )
+                isTransferToTrueSavings = entry.isSetAsideAsSavings
             }
         }
     }
@@ -992,17 +991,17 @@ private struct SavingsLedgerEntryFormView: View {
 
         var finalAmount = amount
         var finalNote = note.trimmingCharacters(in: .whitespacesAndNewlines)
-        var finalKind: SavingsLedgerEntryKind = entry?.kind ?? .manualAdjustment
+        let finalKind: SavingsLedgerEntryKind = entry?.kind ?? .manualAdjustment
 
         if isTransferToTrueSavings && !isEditingSystemManagedEntry {
             finalAmount = amount > 0 ? -amount : amount
             if finalNote.isEmpty {
                 finalNote = transferDefaultNote
             }
-            finalKind = .manualAdjustment
         }
 
-        onSave(date, finalAmount, finalNote, finalKind)
+        let setAsideAsSavings = finalKind == .manualAdjustment ? isTransferToTrueSavings : nil
+        onSave(date, finalAmount, finalNote, finalKind, setAsideAsSavings)
         dismiss()
     }
 

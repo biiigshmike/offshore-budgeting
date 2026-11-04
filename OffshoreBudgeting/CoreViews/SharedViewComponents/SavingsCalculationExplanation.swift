@@ -50,7 +50,7 @@ enum SavingsCalculationExplanation {
                 notes: [
                     "A planned expense uses its actual amount when recorded; otherwise, its planned amount is still allowed for.",
                     "Shared splits and Pay From Savings reduce expense budget impact. Refunds reduce variable-expense impact; adjustments have no budget impact.",
-                    "Set Aside as Savings is a negative manual adjustment, so it also reduces Actual Savings for its date.",
+                    "Set Aside as Savings reduces the Offshore Savings running balance and leaves Actual Savings unchanged.",
                     "These totals use the expenses included by this screen’s calculation settings. Hiding an expense does not by itself exclude it from totals."
                 ]
             )

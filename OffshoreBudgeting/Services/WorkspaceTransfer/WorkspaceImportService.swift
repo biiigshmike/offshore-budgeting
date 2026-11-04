@@ -333,6 +333,7 @@ struct WorkspaceImportService {
                     amount: payload.amount,
                     note: payload.note,
                     kindRaw: payload.kindRaw,
+                    setAsideAsSavings: payload.setAsideAsSavings,
                     linkedAllocationSettlementID: payload.linkedAllocationSettlementID.flatMap { allocationSettlementIDMap[$0] },
                     periodStartDate: payload.periodStartDate,
                     periodEndDate: payload.periodEndDate,

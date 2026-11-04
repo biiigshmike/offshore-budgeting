@@ -1050,6 +1050,7 @@ final class SavingsLedgerEntry {
     var amount: Double = 0
     var note: String = ""
     var kindRaw: String = SavingsLedgerEntryKind.manualAdjustment.rawValue
+    var setAsideAsSavings: Bool? = nil
     var linkedAllocationSettlementID: UUID? = nil
     var periodStartDate: Date? = nil
     var periodEndDate: Date? = nil
@@ -1074,6 +1075,7 @@ final class SavingsLedgerEntry {
         amount: Double,
         note: String,
         kindRaw: String,
+        setAsideAsSavings: Bool? = nil,
         linkedAllocationSettlementID: UUID? = nil,
         periodStartDate: Date? = nil,
         periodEndDate: Date? = nil,
@@ -1089,6 +1091,7 @@ final class SavingsLedgerEntry {
         self.amount = amount
         self.note = note
         self.kindRaw = kindRaw
+        self.setAsideAsSavings = setAsideAsSavings
         self.linkedAllocationSettlementID = linkedAllocationSettlementID
         self.periodStartDate = periodStartDate
         self.periodEndDate = periodEndDate
@@ -1102,6 +1105,15 @@ final class SavingsLedgerEntry {
 }
 
 extension SavingsLedgerEntry {
+    static let setAsideDefaultNote = "Set Aside as Savings"
+
+    var isSetAsideAsSavings: Bool {
+        guard kind == .manualAdjustment else { return false }
+        return setAsideAsSavings ?? (amount < 0 && (
+            note == Self.setAsideDefaultNote || note == "Transfer to True Savings"
+        ))
+    }
+
     var kind: SavingsLedgerEntryKind {
         get { SavingsLedgerEntryKind(rawValue: kindRaw) ?? .manualAdjustment }
         set { kindRaw = newValue.rawValue }

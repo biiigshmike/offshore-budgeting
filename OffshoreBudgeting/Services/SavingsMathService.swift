@@ -90,7 +90,7 @@ struct SavingsMathService {
     static func actualSavingsAdjustmentAmount(for entry: SavingsLedgerEntry) -> Double {
         switch entry.kind {
         case .manualAdjustment:
-            return entry.amount
+            return entry.isSetAsideAsSavings ? 0 : entry.amount
         case .periodClose, .expenseOffset, .reconciliationSettlement:
             return 0
         }

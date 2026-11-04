@@ -911,7 +911,7 @@ enum SavingsAccountService {
     }
 
     static func recalculateAccountTotal(_ account: SavingsAccount) {
-        let entries = (account.entries ?? []).sorted { lhs, rhs in
+        let entries = (account.entries ?? []).filter { !$0.isDeleted }.sorted { lhs, rhs in
             if lhs.date == rhs.date {
                 return lhs.createdAt < rhs.createdAt
             }
@@ -1071,6 +1071,7 @@ enum SavingsAccountService {
         let day: Date
         let roundedAmount: Double
         let normalizedNote: String
+        let isSetAsideAsSavings: Bool
     }
 
     private enum PeriodCloseRefreshMutation {
@@ -1187,7 +1188,8 @@ enum SavingsAccountService {
             accountID: entry.account?.id,
             day: Calendar.current.startOfDay(for: entry.date),
             roundedAmount: CurrencyFormatter.roundedToCurrency(entry.amount),
-            normalizedNote: normalizeManualNoteForDeduplication(entry.note)
+            normalizedNote: normalizeManualNoteForDeduplication(entry.note),
+            isSetAsideAsSavings: entry.isSetAsideAsSavings
         )
     }
 
@@ -1231,12 +1233,7 @@ enum SavingsAccountService {
         entries = entries.filter { $0.kind == .manualAdjustment }
         var firstManualByKey: [ManualDeduplicationKey: SavingsLedgerEntry] = [:]
         for entry in entries {
-            let key = ManualDeduplicationKey(
-                accountID: entry.account?.id,
-                day: Calendar.current.startOfDay(for: entry.date),
-                roundedAmount: CurrencyFormatter.roundedToCurrency(entry.amount),
-                normalizedNote: normalizeManualNoteForDeduplication(entry.note)
-            )
+            let key = manualDeduplicationKey(for: entry)
             if firstManualByKey[key] == nil {
                 firstManualByKey[key] = entry
                 continue
@@ -1566,7 +1563,7 @@ enum SavingsAccountService {
             ]
         )
         let entries = (try? modelContext.fetch(entryDescriptor)) ?? []
-        account.total = entries.reduce(0) { $0 + $1.amount }
+        account.total = entries.filter { !$0.isDeleted }.reduce(0) { $0 + $1.amount }
         account.updatedAt = .now
     }
 

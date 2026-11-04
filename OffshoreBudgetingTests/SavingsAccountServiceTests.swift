@@ -647,6 +647,38 @@ struct SavingsAccountServiceTests {
         #expect(entries.first?.id == oldest.id)
     }
 
+    @Test func autoCaptureDeduplicatesEquivalentSetAsidesSeparatelyFromOrdinaryAdjustments() throws {
+        let context = try makeContext()
+        let workspace = Workspace(name: "WS", hexColor: "#3B82F6")
+        context.insert(workspace)
+        let account = SavingsAccountService.ensureSavingsAccount(for: workspace, modelContext: context)
+        account.didBackfillHistory = true
+        account.autoCaptureThroughDate = makeDate(2026, 1, 31)
+
+        let flags: [Bool?] = [nil, true, false]
+        for (index, flag) in flags.enumerated() {
+            context.insert(SavingsLedgerEntry(
+                date: makeDate(2026, 1, 20), amount: -50, note: "Set Aside as Savings",
+                kindRaw: SavingsLedgerEntryKind.manualAdjustment.rawValue, setAsideAsSavings: flag,
+                createdAt: makeDate(2026, 1, 20 + index), workspace: workspace, account: account
+            ))
+        }
+        try context.save()
+
+        SavingsAccountService.runAutoCaptureIfNeeded(
+            for: workspace, defaultBudgetingPeriodRaw: BudgetingPeriod.monthly.rawValue,
+            incomes: [], plannedExpenses: [], variableExpenses: [],
+            modelContext: context, now: makeDate(2026, 2, 15)
+        )
+
+        let entries = try fetchAll(SavingsLedgerEntry.self, in: context)
+            .filter { $0.workspace?.id == workspace.id && $0.kind == .manualAdjustment }
+        #expect(entries.count == 2)
+        #expect(entries.filter { $0.isSetAsideAsSavings }.count == 1)
+        #expect(entries.contains { $0.setAsideAsSavings == false })
+        #expect(account.total == -100)
+    }
+
     @Test func autoCapture_keepsDistinctManualAdjustments_whenNotesDiffer() throws {
         let context = try makeContext()
 

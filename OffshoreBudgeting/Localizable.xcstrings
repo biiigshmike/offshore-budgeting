@@ -32716,42 +32716,42 @@
         }
       }
     },
-    "In Accounts > Offshore Savings, add a savings entry, enter the amount, and enable Set Aside as Savings. Record money you have moved into savings and no longer want available for future expenses. This subtracts it from Offshore Savings; Offshore does not transfer money between bank accounts or create a second savings balance.\n\nFor example, with $500 available, covering $40 of a $100 purchase leaves $460 available and gives that purchase a $60 budget impact. Setting aside another $200 leaves $260 available. The full $100 purchase remains in card history and gross spending totals.\n\nSet Aside is a negative manual adjustment. It reduces the available running total and the Actual Savings metric for the adjustment’s date range. The ledger keeps a record of the change." : {
+    "In Accounts > Offshore Savings, add a savings entry, enter the amount, and enable Set Aside as Savings. Record money you have moved into savings and no longer want available for future expenses. This subtracts it from Offshore Savings; Offshore does not transfer money between bank accounts or create a second savings balance.\n\nFor example, with $500 available, covering $40 of a $100 purchase leaves $460 available and gives that purchase a $60 budget impact. Setting aside another $200 leaves $260 available. The full $100 purchase remains in card history and gross spending totals.\n\nSet Aside reduces the available Offshore Savings running total and leaves Actual Savings unchanged. The ledger keeps a record of the change." : {
       "localizations" : {
         "ar" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "في الحسابات > Offshore Savings، أضف قيد ادخار وأدخل المبلغ وفعّل «تخصيص كادخار». سجل المال الذي نقلته إلى الادخار ولم تعد ترغب في إتاحته للمصروفات المستقبلية. يُطرح من Offshore Savings؛ ولا يحول Offshore المال بين الحسابات البنكية أو ينشئ رصيد ادخار ثانيًا.\n\nمثلًا، إذا كان المتاح $500، فإن تغطية $40 من شراء بقيمة $100 تترك $460 متاحًا وتجعل أثر الشراء على الميزانية $60. وتخصيص $200 إضافية يترك $260 متاحًا. تبقى عملية الشراء الكاملة بقيمة $100 في سجل البطاقة وإجمالي الإنفاق قبل الخصومات.\n\nالتخصيص تعديل يدوي سالب. يقلل الإجمالي التراكمي المتاح والادخار الفعلي لنطاق تاريخ التعديل. ويحتفظ السجل بالتغيير."
+            "value" : "في الحسابات > Offshore Savings، أضف قيد ادخار وأدخل المبلغ وفعّل «تخصيص كادخار». سجل المال الذي نقلته إلى الادخار ولم تعد ترغب في إتاحته للمصروفات المستقبلية. يُطرح من Offshore Savings؛ ولا يحول Offshore المال بين الحسابات البنكية أو ينشئ رصيد ادخار ثانيًا.\n\nمثلًا، إذا كان المتاح $500، فإن تغطية $40 من شراء بقيمة $100 تترك $460 متاحًا وتجعل أثر الشراء على الميزانية $60. وتخصيص $200 إضافية يترك $260 متاحًا. تبقى عملية الشراء الكاملة بقيمة $100 في سجل البطاقة وإجمالي الإنفاق قبل الخصومات.\n\nيقلل التخصيص الرصيد التراكمي المتاح في Offshore Savings ويُبقي الادخار الفعلي كما هو. ويحتفظ السجل بالتغيير."
           }
         },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Fügen Sie unter Konten > Offshore Savings einen Spareintrag hinzu, geben Sie den Betrag ein und aktivieren Sie Als Ersparnis zurücklegen. Erfassen Sie Geld, das Sie in Ersparnisse verschoben haben und nicht mehr für künftige Ausgaben bereithalten möchten. Es wird von Offshore Savings abgezogen; Offshore überweist kein Geld zwischen Bankkonten und erstellt keinen zweiten Sparsaldo.\n\nBei $500 verfügbarem Geld bleiben nach Abdeckung von $40 eines Kaufs über $100 noch $460 verfügbar; der Kauf belastet das Budget mit $60. Legen Sie weitere $200 zurück, bleiben $260 verfügbar. Der vollständige Kauf über $100 bleibt im Kartenverlauf und den Bruttoausgaben.\n\nZurücklegen ist eine negative manuelle Anpassung. Sie reduziert den verfügbaren Gesamtsaldo und die tatsächlichen Ersparnisse im Zeitraum ihres Buchungsdatums. Das Buch dokumentiert die Änderung."
+            "value" : "Fügen Sie unter Konten > Offshore Savings einen Spareintrag hinzu, geben Sie den Betrag ein und aktivieren Sie Als Ersparnis zurücklegen. Erfassen Sie Geld, das Sie in Ersparnisse verschoben haben und nicht mehr für künftige Ausgaben bereithalten möchten. Es wird von Offshore Savings abgezogen; Offshore überweist kein Geld zwischen Bankkonten und erstellt keinen zweiten Sparsaldo.\n\nBei $500 verfügbarem Geld bleiben nach Abdeckung von $40 eines Kaufs über $100 noch $460 verfügbar; der Kauf belastet das Budget mit $60. Legen Sie weitere $200 zurück, bleiben $260 verfügbar. Der vollständige Kauf über $100 bleibt im Kartenverlauf und den Bruttoausgaben.\n\nDas Zurücklegen verringert den verfügbaren laufenden Saldo von Offshore Savings. Die tatsächlichen Ersparnisse bleiben unverändert. Das Buch dokumentiert die Änderung."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "En Cuentas > Offshore Savings, añade una entrada de ahorro, introduce el importe y activa Apartar como ahorro. Registra dinero que has movido a ahorros y ya no quieres disponible para gastos futuros. Se resta de Offshore Savings; Offshore no transfiere dinero entre cuentas bancarias ni crea otro saldo de ahorro.\n\nPor ejemplo, si tienes $500 disponibles, cubrir $40 de una compra de $100 deja $460 disponibles y un impacto presupuestario de $60. Apartar otros $200 deja $260 disponibles. La compra completa de $100 permanece en el historial y el gasto bruto.\n\nApartar es un ajuste manual negativo. Reduce el acumulado disponible y el ahorro real del intervalo correspondiente a su fecha. El registro conserva el cambio."
+            "value" : "En Cuentas > Offshore Savings, añade una entrada de ahorro, introduce el importe y activa Apartar como ahorro. Registra dinero que has movido a ahorros y ya no quieres disponible para gastos futuros. Se resta de Offshore Savings; Offshore no transfiere dinero entre cuentas bancarias ni crea otro saldo de ahorro.\n\nPor ejemplo, si tienes $500 disponibles, cubrir $40 de una compra de $100 deja $460 disponibles y un impacto presupuestario de $60. Apartar otros $200 deja $260 disponibles. La compra completa de $100 permanece en el historial y el gasto bruto.\n\nApartar reduce el saldo acumulado disponible de Offshore Savings y deja el ahorro real sin cambios. El registro conserva el cambio."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Dans Comptes > Offshore Savings, ajoutez une écriture d’épargne, saisissez le montant et activez Mettre de côté en épargne. Enregistrez l’argent placé en épargne que vous ne souhaitez plus utiliser pour des dépenses futures. Il est soustrait d’Offshore Savings ; Offshore ne transfère pas d’argent entre comptes bancaires et ne crée pas un second solde d’épargne.\n\nPar exemple, avec 500 $ disponibles, couvrir 40 $ d’un achat de 100 $ laisse 460 $ disponibles et un impact budgétaire de 60 $. Mettre encore 200 $ de côté laisse 260 $ disponibles. L’achat entier de 100 $ reste dans l’historique et les dépenses brutes.\n\nMettre de côté est un ajustement manuel négatif. Il réduit le solde cumulé disponible et l’épargne réelle pour la plage contenant sa date. Le registre conserve la trace du changement."
+            "value" : "Dans Comptes > Offshore Savings, ajoutez une écriture d’épargne, saisissez le montant et activez Mettre de côté en épargne. Enregistrez l’argent placé en épargne que vous ne souhaitez plus utiliser pour des dépenses futures. Il est soustrait d’Offshore Savings ; Offshore ne transfère pas d’argent entre comptes bancaires et ne crée pas un second solde d’épargne.\n\nPar exemple, avec 500 $ disponibles, couvrir 40 $ d’un achat de 100 $ laisse 460 $ disponibles et un impact budgétaire de 60 $. Mettre encore 200 $ de côté laisse 260 $ disponibles. L’achat entier de 100 $ reste dans l’historique et les dépenses brutes.\n\nLa mise de côté réduit le solde cumulé disponible d’Offshore Savings et laisse l’épargne réelle inchangée. Le registre conserve la trace du changement."
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Em Contas > Offshore Savings, adicione um lançamento, digite o valor e ative Separar como poupança. Registre dinheiro que você moveu para a poupança e não quer mais disponível para despesas futuras. Ele é subtraído de Offshore Savings; Offshore não transfere dinheiro entre contas bancárias nem cria um segundo saldo de poupança.\n\nPor exemplo, com $500 disponíveis, cobrir $40 de uma compra de $100 deixa $460 disponíveis e um impacto de $60 no orçamento. Separar mais $200 deixa $260 disponíveis. A compra completa de $100 permanece no histórico e nos gastos brutos.\n\nSeparar é um ajuste manual negativo. Ele reduz o total acumulado disponível e a poupança real no intervalo da data do ajuste. O registro mantém o histórico da mudança."
+            "value" : "Em Contas > Offshore Savings, adicione um lançamento, digite o valor e ative Separar como poupança. Registre dinheiro que você moveu para a poupança e não quer mais disponível para despesas futuras. Ele é subtraído de Offshore Savings; Offshore não transfere dinheiro entre contas bancárias nem cria um segundo saldo de poupança.\n\nPor exemplo, com $500 disponíveis, cobrir $40 de uma compra de $100 deixa $460 disponíveis e um impacto de $60 no orçamento. Separar mais $200 deixa $260 disponíveis. A compra completa de $100 permanece no histórico e nos gastos brutos.\n\nSeparar reduz o saldo acumulado disponível do Offshore Savings e mantém a poupança real inalterada. O registro mantém o histórico da mudança."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "在“账户 > Offshore Savings”中添加储蓄记录，输入金额，并启用“留作储蓄”。记录你已转入储蓄、且不再用于未来支出的资金。这会从 Offshore Savings 扣除相应金额；Offshore 不会在银行账户间转账，也不会创建第二个储蓄余额。\n\n例如，可用余额为 $500 时，为一笔 $100 的消费支付 $40，会剩余 $460，可计入预算的影响为 $60。再留出 $200 后，可用余额变为 $260。完整的 $100 消费保留在卡片历史和支出原始总额中。\n\n留作储蓄是负向手动调整，会减少可用累计总额及调整日期范围内的实际储蓄。账目会保留变化记录。"
+            "value" : "在“账户 > Offshore Savings”中添加储蓄记录，输入金额，并启用“留作储蓄”。记录你已转入储蓄、且不再用于未来支出的资金。这会从 Offshore Savings 扣除相应金额；Offshore 不会在银行账户间转账，也不会创建第二个储蓄余额。\n\n例如，可用余额为 $500 时，为一笔 $100 的消费支付 $40，会剩余 $460，可计入预算的影响为 $60。再留出 $200 后，可用余额变为 $260。完整的 $100 消费保留在卡片历史和支出原始总额中。\n\n留作储蓄会减少 Offshore Savings 的可用累计余额，实际储蓄保持不变。账目会保留变化记录。"
           }
         }
       }
@@ -46199,42 +46199,42 @@
         }
       }
     },
-    "Record money you have moved into savings and no longer want available for future expenses. This subtracts it from Offshore Savings and reduces Actual Savings for this entry’s date. Offshore records the change; it does not transfer money between bank accounts." : {
+    "Record money you have moved into savings and no longer want available for future expenses. This reduces the Offshore Savings running balance and leaves Actual Savings unchanged. Offshore records the change; it does not transfer money between bank accounts." : {
       "localizations" : {
         "ar" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "سجل المال الذي نقلته إلى الادخار ولم تعد ترغب في إتاحته للمصروفات المستقبلية. يُطرح من Offshore Savings ويقلل الادخار الفعلي في تاريخ هذا القيد. يسجل Offshore التغيير ولا يحول الأموال بين الحسابات البنكية."
+            "value" : "سجل المال الذي نقلته إلى الادخار ولم تعد ترغب في إتاحته للمصروفات المستقبلية. يقلل هذا الرصيد التراكمي في Offshore Savings ويُبقي الادخار الفعلي كما هو. يسجل Offshore التغيير ولا يحول الأموال بين الحسابات البنكية."
           }
         },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Erfassen Sie Geld, das Sie in Ersparnisse verschoben haben und nicht mehr für künftige Ausgaben vorhalten möchten. Es wird von Offshore Savings abgezogen und reduziert die tatsächlichen Ersparnisse am Buchungsdatum. Offshore erfasst die Änderung, überweist aber kein Geld zwischen Bankkonten."
+            "value" : "Erfassen Sie Geld, das Sie in Ersparnisse verschoben haben und nicht mehr für künftige Ausgaben vorhalten möchten. Dadurch sinkt der laufende Saldo von Offshore Savings. Die tatsächlichen Ersparnisse bleiben unverändert. Offshore erfasst die Änderung, überweist aber kein Geld zwischen Bankkonten."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Registra dinero que has movido a ahorros y ya no quieres disponible para gastos futuros. Se resta de Offshore Savings y reduce el ahorro real de la fecha de esta entrada. Offshore registra el cambio; no transfiere dinero entre cuentas bancarias."
+            "value" : "Registra dinero que has movido a ahorros y ya no quieres disponible para gastos futuros. Esto reduce el saldo acumulado de Offshore Savings y deja el ahorro real sin cambios. Offshore registra el cambio; no transfiere dinero entre cuentas bancarias."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Enregistrez l’argent placé en épargne que vous ne souhaitez plus utiliser pour des dépenses futures. Il est soustrait d’Offshore Savings et réduit l’épargne réelle à la date de cette écriture. Offshore enregistre le changement ; il ne transfère pas d’argent entre comptes bancaires."
+            "value" : "Enregistrez l’argent placé en épargne que vous ne souhaitez plus utiliser pour des dépenses futures. Cela réduit le solde cumulé d’Offshore Savings et laisse l’épargne réelle inchangée. Offshore enregistre le changement ; il ne transfère pas d’argent entre comptes bancaires."
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Registre dinheiro que você transferiu para a poupança e não quer mais disponível para despesas futuras. Ele é subtraído de Offshore Savings e reduz a poupança real na data deste lançamento. Offshore registra a mudança; não transfere dinheiro entre contas bancárias."
+            "value" : "Registre dinheiro que você transferiu para a poupança e não quer mais disponível para despesas futuras. Isso reduz o saldo acumulado do Offshore Savings e mantém a poupança real inalterada. Offshore registra a mudança; não transfere dinheiro entre contas bancárias."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "记录你已转入储蓄、且不再用于未来支出的资金。该金额会从 Offshore Savings 扣除，并减少此记录日期所属期间的实际储蓄。Offshore 只记录变化，不会在银行账户之间转账。"
+            "value" : "记录你已转入储蓄、且不再用于未来支出的资金。这会减少 Offshore Savings 的累计余额，实际储蓄保持不变。Offshore 只记录变化，不会在银行账户之间转账。"
           }
         }
       }
@@ -49772,42 +49772,42 @@
         }
       }
     },
-    "Set Aside as Savings is a negative manual adjustment, so it also reduces Actual Savings for its date." : {
+    "Set Aside as Savings reduces the Offshore Savings running balance and leaves Actual Savings unchanged." : {
       "localizations" : {
         "ar" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "«تخصيص كادخار» تعديل يدوي سالب، لذا يقلل أيضًا الادخار الفعلي في تاريخه."
+            "value" : "يقلل «تخصيص كادخار» الرصيد التراكمي في Offshore Savings ويُبقي الادخار الفعلي كما هو."
           }
         },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Als Ersparnis zurücklegen ist eine negative manuelle Anpassung und reduziert daher auch die tatsächlichen Ersparnisse am Buchungsdatum."
+            "value" : "„Als Ersparnis zurücklegen“ verringert den laufenden Saldo von Offshore Savings und lässt die tatsächlichen Ersparnisse unverändert."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Apartar como ahorro es un ajuste manual negativo, por lo que también reduce el ahorro real de su fecha."
+            "value" : "Apartar como ahorro reduce el saldo acumulado de Offshore Savings y deja el ahorro real sin cambios."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Mettre de côté en épargne est un ajustement manuel négatif ; il réduit donc aussi l’épargne réelle à sa date."
+            "value" : "Mettre de côté en épargne réduit le solde cumulé d’Offshore Savings et laisse l’épargne réelle inchangée."
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Separar como poupança é um ajuste manual negativo, por isso também reduz a poupança real na sua data."
+            "value" : "Separar como poupança reduz o saldo acumulado do Offshore Savings e mantém a poupança real inalterada."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "“留作储蓄”是负向手动调整，因此也会减少对应日期的实际储蓄。"
+            "value" : "“留作储蓄”会减少 Offshore Savings 的累计余额，实际储蓄保持不变。"
           }
         }
       }

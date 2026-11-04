@@ -45,6 +45,28 @@ struct SavingsCalculationExplanationTests {
         }
     }
 
+    @Test func setAsidesReduceRunningTotalWithoutReducingActualSavings() throws {
+        let entries = [
+            SavingsLedgerEntry(date: start, amount: -50, note: "Emergency fund", kindRaw: "manualAdjustment", setAsideAsSavings: true),
+            SavingsLedgerEntry(date: start, amount: -20, note: "Set Aside as Savings", kindRaw: "manualAdjustment"),
+            SavingsLedgerEntry(date: end, amount: -10, note: "Transfer to True Savings", kindRaw: "manualAdjustment"),
+            SavingsLedgerEntry(date: end, amount: -60, note: "Set Aside as Savings", kindRaw: "manualAdjustment", setAsideAsSavings: false),
+            SavingsLedgerEntry(date: start, amount: -50, note: "Legacy custom note", kindRaw: "manualAdjustment"),
+            SavingsLedgerEntry(date: end, amount: 10, note: "Set Aside as Savings", kindRaw: "manualAdjustment"),
+            SavingsLedgerEntry(date: end.addingTimeInterval(1), amount: 75, note: "Outside", kindRaw: "manualAdjustment")
+        ]
+
+        #expect(entries.map(\.isSetAsideAsSavings) == [true, true, true, false, false, false, false])
+        let sections = SavingsCalculationExplanation.outlook(
+            incomes: [], plannedExpenses: [], variableExpenses: [], savingsEntries: entries,
+            startDate: start, endDate: end
+        )
+        let actual = try #require(sections.first { $0.id == "actual" })
+        #expect(actual.rows.last?.amount == -100)
+        let ledger = try #require(SavingsCalculationExplanation.runningTotal(entries: entries).first)
+        #expect(ledger.rows.last?.amount == -105)
+    }
+
     @Test func runningTotalShowsAllDatesAndExcludesLegacyReconciliationMirrors() throws {
         let entries = [
             SavingsLedgerEntry(date: start, amount: 500, note: "Closed period", kindRaw: SavingsLedgerEntryKind.periodClose.rawValue),

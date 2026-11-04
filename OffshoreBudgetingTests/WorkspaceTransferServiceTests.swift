@@ -162,6 +162,33 @@ struct WorkspaceTransferServiceTests {
         #expect(importedIncomes.first?.card?.id == importedCard.id)
     }
 
+    @Test func savingsSetAsideFlagSurvivesArchiveRoundTrip() throws {
+        let context = try makeContext()
+        let source = try seedTransferWorkspace(in: context)
+        let account = try #require(source.workspace.savingsAccounts?.first)
+        let entry = SavingsLedgerEntry(
+            date: date(2026, 6, 8), amount: -50, note: "Emergency fund",
+            kindRaw: SavingsLedgerEntryKind.manualAdjustment.rawValue, setAsideAsSavings: true,
+            workspace: source.workspace, account: account
+        )
+        context.insert(entry)
+        try context.save()
+
+        let archive = try WorkspaceExportService().exportArchive(
+            for: source.workspace, sections: Set(WorkspaceTransferSection.allCases), modelContext: context
+        )
+        let decoded = try WorkspaceArchiveCoding.decode(WorkspaceArchiveCoding.encode(archive))
+        let imported = try WorkspaceImportService().importArchive(
+            decoded, existingWorkspaces: [source.workspace], modelContext: context
+        )
+        let entries = try fetchAll(SavingsLedgerEntry.self, in: context).filter { $0.workspace?.id == imported.id }
+        let setAside = try #require(entries.first { $0.note == "Emergency fund" })
+        #expect(setAside.setAsideAsSavings == true)
+        #expect(setAside.isSetAsideAsSavings)
+        #expect(setAside.amount == -50)
+        #expect(entries.first { $0.note == "Coffee offset" }?.setAsideAsSavings == nil)
+    }
+
     @Test func legacyVersionOneArchive_ignoresAliasesAndPreservesFinancialRecords() throws {
         let context = try makeContext()
         let source = try seedTransferWorkspace(in: context)
