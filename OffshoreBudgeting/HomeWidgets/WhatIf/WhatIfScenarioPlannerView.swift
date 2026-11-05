@@ -618,7 +618,7 @@ struct WhatIfScenarioPlannerView: View {
             } label: {
                 Label(String(localized: "common.delete", defaultValue: "Delete", comment: "Common action label for deleting."), systemImage: "trash")
             }
-            .tint(Color("OffshoreDepth"))
+            .offshoreAccentTint()
             .disabled(scenarios.count <= 1 || selectedScenarioID == nil)
 
         } label: {

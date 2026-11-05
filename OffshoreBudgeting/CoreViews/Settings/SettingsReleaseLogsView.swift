@@ -92,6 +92,11 @@ struct SettingsReleaseLogsView: View {
                     description: "Fixed an issue where Set Aside as Savings could push Actual Savings further into the negative. Setting money aside now reduces your available Offshore Savings balance and leaves Actual Savings unchanged."
                 ),
                 ReleaseItem(
+                    systemImage: "sailboat.fill",
+                    title: "Excursion Mode",
+                    description: "Refined Excursion Mode to be more precise. Choose which places trigger nearby spending reminders and how long to wait before being reminded. Configure this to your liking in Settings > Notifications > Excursion Mode"
+                ),
+                ReleaseItem(
                     systemImage: "sparkles",
                     title: "Fine Polish",
                     description: "Made minor but important tweaks here and there to improve the Offshore experience."

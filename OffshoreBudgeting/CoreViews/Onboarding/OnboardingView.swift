@@ -1257,7 +1257,7 @@ private struct OnboardingCardsStep: View {
             } label: {
                 Label("Delete", systemImage: "trash")
             }
-            .tint(Color("OffshoreDepth"))
+            .offshoreAccentTint()
         }
     }
 
@@ -1407,7 +1407,7 @@ private struct OnboardingPresetsStep: View {
                                 } label: {
                                     Label("Unarchive", systemImage: "arrow.uturn.backward")
                                 }
-                                .tint(.green)
+                                .offshoreSecondaryAccentTint()
                             } else {
                                 Button {
                                     preset.isArchived = true
@@ -1415,7 +1415,7 @@ private struct OnboardingPresetsStep: View {
                                 } label: {
                                     Label("Archive", systemImage: "archivebox")
                                 }
-                                .tint(Color("OffshoreSand"))
+                                .offshoreSecondaryAccentTint()
                             }
                         }
                         .swipeActions(edge: .trailing, allowsFullSwipe: true) {
@@ -1424,7 +1424,7 @@ private struct OnboardingPresetsStep: View {
                             } label: {
                                 Label("Delete", systemImage: "trash")
                             }
-                            .tint(Color("OffshoreDepth"))
+                            .offshoreAccentTint()
                         }
                     }
                 }

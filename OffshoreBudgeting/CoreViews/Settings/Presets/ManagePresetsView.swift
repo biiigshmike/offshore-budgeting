@@ -158,7 +158,7 @@ struct ManagePresetsView: View {
                             } label: {
                                 Label("Archive", systemImage: "archivebox")
                             }
-                            .tint(Color("OffshoreSand"))
+                            .offshoreSecondaryAccentTint()
                         }
                         .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                             Button(role: .destructive) {
@@ -166,7 +166,7 @@ struct ManagePresetsView: View {
                             } label: {
                                 Label("Delete", systemImage: "trash")
                             }
-                            .tint(Color("OffshoreDepth"))
+                            .offshoreAccentTint()
                         }
                     }
                 }
@@ -202,7 +202,7 @@ struct ManagePresetsView: View {
                             } label: {
                                 Label("Archive", systemImage: "archivebox")
                             }
-                            .tint(Color("OffshoreSand"))
+                            .offshoreSecondaryAccentTint()
                         }
                         .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                             Button(role: .destructive) {
@@ -210,7 +210,7 @@ struct ManagePresetsView: View {
                             } label: {
                                 Label("Delete", systemImage: "trash")
                             }
-                            .tint(Color("OffshoreDepth"))
+                            .offshoreAccentTint()
                         }
                     }
                 }
@@ -236,18 +236,18 @@ struct ManagePresetsView: View {
                             }
                             .swipeActions(edge: .leading, allowsFullSwipe: false) {
                                 Button {
-                                    unarchive(preset)
-                                } label: {
-                                    Label("Unarchive", systemImage: "arrow.uturn.backward")
-                                }
-                                .tint(.green)
-
-                                Button {
                                     sheetRoute = .edit(preset)
                                 } label: {
                                     Label("Edit", systemImage: "pencil")
                                 }
                                 .offshoreAccentTint()
+
+                                Button {
+                                    unarchive(preset)
+                                } label: {
+                                    Label("Unarchive", systemImage: "arrow.uturn.backward")
+                                }
+                                .offshoreSecondaryAccentTint()
                             }
                             .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                                 Button(role: .destructive) {
@@ -255,7 +255,7 @@ struct ManagePresetsView: View {
                                 } label: {
                                     Label("Delete", systemImage: "trash")
                                 }
-                                .tint(Color("OffshoreDepth"))
+                                .offshoreAccentTint()
                             }
                         }
                     }

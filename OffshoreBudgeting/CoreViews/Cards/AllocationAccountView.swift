@@ -116,14 +116,14 @@ struct AllocationAccountView: View {
                                     } label: {
                                         Label("Archive", systemImage: "archivebox")
                                     }
-                                    .tint(Color("OffshoreDepth"))
+                                    .offshoreSecondaryAccentTint()
                                 } else if canDeleteSharedBalance(account) {
                                     Button(role: .destructive) {
                                         requestDeleteSharedBalance(account)
                                     } label: {
                                         Label("Delete", systemImage: "trash")
                                     }
-                                    .tint(Color("OffshoreDepth"))
+                                    .offshoreAccentTint()
                                 }
                             }
                         }

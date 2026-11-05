@@ -192,6 +192,8 @@ struct HomeEditPinnedCardsView: View {
                         )
                     }
                     .labelStyle(.iconOnly)
+                    .glassProminentButtonStyleCompat()
+                    .offshoreAccentTint()
                     .id("finishEditing")
                 } else {
                     Button(
@@ -205,6 +207,7 @@ struct HomeEditPinnedCardsView: View {
                             editMode = .active
                         }
                     }
+                    .tint(.primary)
                     .id("startEditing")
                 }
             }

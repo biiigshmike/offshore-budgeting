@@ -236,7 +236,7 @@ struct CategoryDetailView: View, Equatable {
                     if let presetID = expense.sourcePresetID,
                        let preset = workspacePresets.first(where: { $0.id == presetID }) {
                         Button("Edit Preset", systemImage: "list.bullet.rectangle") { modal = .editPreset(preset) }
-                            .tint(Color("OffshoreSand"))
+                            .offshoreSecondaryAccentTint()
                     }
                 }
                 .swipeActions(edge: .trailing, allowsFullSwipe: true) { deleteButton(item) }
@@ -262,7 +262,7 @@ struct CategoryDetailView: View, Equatable {
                 delete(item)
             }
         }
-        .tint(Color("OffshoreDepth"))
+        .offshoreAccentTint()
     }
 
     private var displayMenu: some View {

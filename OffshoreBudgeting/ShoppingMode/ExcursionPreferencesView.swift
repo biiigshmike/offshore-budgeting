@@ -15,12 +15,6 @@ struct ExcursionPreferencesView: View {
     var body: some View {
         Form {
             Section {
-                Button("Select All") {
-                    var next = store.value
-                    next.categoryIDs.formUnion(ExcursionPOICategoryCatalog.supportedIDs)
-                    store.update(next)
-                }
-                .accessibilityIdentifier("excursionSelectAll")
                 ForEach(ExcursionPOICategoryCatalog.groups) { group in
                     categoryGroupButton(group)
                 }
@@ -35,12 +29,13 @@ struct ExcursionPreferencesView: View {
                 }
                 .accessibilityIdentifier("excursionAllCategories")
                 Toggle("Include uncategorized places", isOn: $includeUncategorized)
+                    .offshoreAccentTint()
                     .disabled(store.value.selectedSupportedCategoryIDs.isEmpty)
                     .accessibilityIdentifier("excursionIncludeUncategorized")
             } header: {
                 Text("Places to Include")
             } footer: {
-                Text("Select All selects every category. Include uncategorized places also allows places without a recognized Apple Maps category. A dash means part of a group is selected.")
+                Text("Use Edit in All Categories to select or deselect all categories. Include uncategorized places also allows places without a recognized Apple Maps category. A dash means part of a group is selected.")
             }
 
             Section {

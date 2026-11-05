@@ -123,6 +123,7 @@ struct AllocationAccountDetailView: View {
                         } label: {
                             Label("Edit Reconciliation", systemImage: "pencil")
                         }
+                        .offshoreAccentTint()
 
                         Divider()
 
@@ -171,6 +172,7 @@ struct AllocationAccountDetailView: View {
                         } label: {
                             Label("Edit Reconciliation", systemImage: "pencil")
                         }
+                        .offshoreAccentTint()
 
                         Divider()
 

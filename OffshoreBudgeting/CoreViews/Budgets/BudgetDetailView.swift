@@ -1115,7 +1115,7 @@ struct BudgetDetailView: View {
                     } label: {
                         Label("Edit Preset", systemImage: "list.bullet.rectangle")
                     }
-                    .tint(Color("OffshoreSand"))
+                    .offshoreSecondaryAccentTint()
                 }
             }
             .swipeActions(edge: .trailing, allowsFullSwipe: true) {
@@ -1124,7 +1124,7 @@ struct BudgetDetailView: View {
                 } label: {
                     Label("Delete", systemImage: "trash")
                 }
-                .tint(Color("OffshoreDepth"))
+                .offshoreAccentTint()
             }
     }
 
@@ -1149,7 +1149,7 @@ struct BudgetDetailView: View {
             } label: {
                 Label("Delete", systemImage: "trash")
             }
-            .tint(Color("OffshoreDepth"))
+            .offshoreAccentTint()
         }
     }
 
@@ -1205,7 +1205,7 @@ struct BudgetDetailView: View {
             } label: {
                 Label(String(localized: "budgetDetail.deleteBudget.action", defaultValue: "Delete Budget", comment: "Menu action to delete the current budget."), systemImage: "trash")
             }
-            .tint(Color("OffshoreDepth"))
+            .offshoreAccentTint()
         } label: {
             Label(String(localized: "budgetDetail.actions", defaultValue: "Budget Actions", comment: "Accessibility label for budget actions menu."), systemImage: "ellipsis")
         }

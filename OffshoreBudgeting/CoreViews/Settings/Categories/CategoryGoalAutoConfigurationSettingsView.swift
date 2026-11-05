@@ -17,6 +17,7 @@ struct CategoryGoalAutoConfigurationSettingsView: View {
         Form {
             Section {
                 Toggle("Suggest Maximums", isOn: $settings.suggestMaximums)
+                    .offshoreAccentTint()
                     .accessibilityIdentifier("categoryGoals.settings.suggestMaximums")
                 Stepper(value: $settings.historyCount, in: 1...12) {
                     LabeledContent("Past Budgets", value: settings.historyCount.formatted())

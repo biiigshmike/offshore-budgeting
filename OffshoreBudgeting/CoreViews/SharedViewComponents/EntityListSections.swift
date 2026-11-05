@@ -67,7 +67,7 @@ struct WorkspaceListRows: View {
                     } label: {
                         Label("Delete", systemImage: "trash")
                     }
-                    .tint(Color("OffshoreDepth"))
+                    .offshoreAccentTint()
                 }
             }
 
@@ -182,18 +182,9 @@ struct CategoryListRows<Destination: View>: View {
                     } label: {
                         Label("Delete", systemImage: "trash")
                     }
-                    .tint(Color("OffshoreDepth"))
+                    .offshoreAccentTint()
                 }
                 .swipeActions(edge: .leading, allowsFullSwipe: false) {
-                    if let onUnarchive {
-                        Button {
-                            onUnarchive(category)
-                        } label: {
-                            Label("Unarchive", systemImage: "arrow.uturn.backward")
-                        }
-                        .tint(.green)
-                    }
-
                     Button {
                         onEdit(category)
                     } label: {
@@ -201,13 +192,22 @@ struct CategoryListRows<Destination: View>: View {
                     }
                     .offshoreAccentTint()
 
+                    if let onUnarchive {
+                        Button {
+                            onUnarchive(category)
+                        } label: {
+                            Label("Unarchive", systemImage: "arrow.uturn.backward")
+                        }
+                        .offshoreSecondaryAccentTint()
+                    }
+
                     if let onArchive {
                         Button {
                             onArchive(category)
                         } label: {
                             Label("Archive", systemImage: "archivebox")
                         }
-                        .tint(Color("OffshoreSand"))
+                        .offshoreSecondaryAccentTint()
                     }
                 }
             }

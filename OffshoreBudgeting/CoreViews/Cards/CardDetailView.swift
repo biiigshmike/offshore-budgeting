@@ -794,7 +794,7 @@ struct CardDetailView: View {
                     } label: {
                         Label("Edit Preset", systemImage: "list.bullet.rectangle")
                     }
-                    .tint(Color("OffshoreSand"))
+                    .offshoreSecondaryAccentTint()
                 }
             }
             .swipeActions(edge: .trailing, allowsFullSwipe: true) {
@@ -805,7 +805,7 @@ struct CardDetailView: View {
                 } label: {
                     Label("Delete", systemImage: "trash")
                 }
-                .tint(Color("OffshoreDepth"))
+                .offshoreAccentTint()
             }
     }
 
@@ -844,7 +844,7 @@ struct CardDetailView: View {
             } label: {
                 Label("Delete", systemImage: "trash")
             }
-            .tint(Color("OffshoreDepth"))
+            .offshoreAccentTint()
         }
     }
 
@@ -930,6 +930,7 @@ struct CardDetailView: View {
             } label: {
                 Label("Edit Card", systemImage: "pencil")
             }
+            .offshoreAccentTint()
 
             Divider()
 

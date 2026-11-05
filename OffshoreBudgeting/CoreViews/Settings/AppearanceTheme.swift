@@ -60,12 +60,18 @@ extension View {
     func offshoreAccentTint() -> some View {
         modifier(OffshoreAccentTint())
     }
+
+    /// A muted theme accent for secondary actions alongside a primary action.
+    func offshoreSecondaryAccentTint() -> some View {
+        modifier(OffshoreAccentTint(opacity: 0.55))
+    }
 }
 
 private struct OffshoreAccentTint: ViewModifier {
     @Environment(\.appearanceTheme) private var theme
+    var opacity: Double = 1
 
     func body(content: Content) -> some View {
-        content.tint(theme.accent)
+        content.tint(theme.accent.opacity(opacity))
     }
 }

@@ -330,25 +330,16 @@ struct HomeView: View {
         .navigationTitle(String(localized: "app.section.home", defaultValue: "Home", comment: "Main tab title for the Home section."))
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
-                let editWidgetsButton = Button {
+                Button {
                     isEditingWidgets = true
                 } label: {
-                    let label = Label(
+                    Label(
                         String(localized: "homeEdit.navigationTitle", defaultValue: "Edit", comment: "Navigation title for editing Home pinned items."),
                         systemImage: "widget.grid.2x1.rectangle"
                     )
-                    #if targetEnvironment(macCatalyst)
-                    label.foregroundStyle(theme.accent)
-                    #else
-                    label
-                    #endif
                 }
                 .labelStyle(.iconOnly)
-                #if targetEnvironment(macCatalyst)
-                editWidgetsButton.tint(nil)
-                #else
-                editWidgetsButton
-                #endif
+                .tint(theme.id == AppearanceTheme.offshoreDefault.id ? Color.primary : theme.accent)
             }
 
             ToolbarItemGroup(placement: .primaryAction) {

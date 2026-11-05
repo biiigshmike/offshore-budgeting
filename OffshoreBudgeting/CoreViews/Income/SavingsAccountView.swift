@@ -399,7 +399,7 @@ struct SavingsAccountView<TrailingToolbar: ToolbarContent>: View {
                                 } label: {
                                     Label("Delete", systemImage: "trash")
                                 }
-                                .tint(Color("OffshoreDepth"))
+                                .offshoreAccentTint()
                             }
                         } else {
                             SavingsLedgerRow(entry: entry)
