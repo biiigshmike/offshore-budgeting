@@ -15,16 +15,13 @@ struct ExcursionPreferencesView: View {
     var body: some View {
         Form {
             Section {
-                ForEach(ExcursionPOICategoryCatalog.groups) { group in
-                    categoryGroupButton(group)
-                }
                 NavigationLink {
                     ExcursionCategorySelectionView(store: store)
                 } label: {
                     LabeledContent {
                         Text("\(store.value.selectedSupportedCategoryIDs.count) selected")
                     } label: {
-                        Text("All Categories")
+                        Text("Categories")
                     }
                 }
                 .accessibilityIdentifier("excursionAllCategories")
@@ -35,7 +32,7 @@ struct ExcursionPreferencesView: View {
             } header: {
                 Text("Places to Include")
             } footer: {
-                Text("Use Edit in All Categories to select or deselect all categories. Include uncategorized places also allows places without a recognized Apple Maps category. A dash means part of a group is selected.")
+                Text("Use Edit in Categories to select or deselect all categories. Include uncategorized places also allows places without a recognized Apple Maps category.")
             }
 
             Section {
@@ -58,6 +55,7 @@ struct ExcursionPreferencesView: View {
                 Text("Preferences apply immediately to Excursion Mode on this device, across all workspaces.")
             }
         }
+        .offshoreAccentTint()
         .navigationTitle("Excursion Preferences")
         .onChange(of: includeUncategorized) { _, value in
             var next = store.value
@@ -75,25 +73,4 @@ struct ExcursionPreferencesView: View {
         }
     }
 
-    private func categoryGroupButton(_ group: ExcursionPOICategoryCatalog.Group) -> some View {
-        let selected = store.value.categoryIDs.intersection(group.categoryIDs).count
-        let symbol = selected == group.categoryIDs.count ? "checkmark.circle.fill" : (selected == 0 ? "circle" : "minus.circle.fill")
-        let removingLastSelection = selected == group.categoryIDs.count
-            && store.value.selectedSupportedCategoryIDs.subtracting(group.categoryIDs).isEmpty
-            && !store.value.includeUncategorized
-        return Button {
-            var next = store.value
-            if next.toggleCategories(group.categoryIDs) { store.update(next) }
-        } label: {
-            HStack {
-                Text(group.name)
-                Spacer()
-                Image(systemName: symbol).accessibilityHidden(true)
-            }
-        }
-        .disabled(removingLastSelection)
-        .accessibilityValue(selected == group.categoryIDs.count ? String(localized: "Selected")
-                            : (selected == 0 ? String(localized: "Not selected") : String(localized: "Partially selected")))
-        .accessibilityIdentifier("excursionGroup_\(group.id)")
-    }
 }

@@ -42,24 +42,6 @@ final class ExcursionPreferencesUITests: XCTestCase {
         add(screenshot)
     }
 
-    func testGroupsAndSearchShareSelectionAndPreventEmptyCustomMode() {
-        let app = launch()
-        openPreferences(app)
-        app.buttons["excursionGroup_food-drink"].tap()
-        app.buttons["excursionGroup_shopping"].tap()
-        app.buttons["excursionGroup_fuel-charging"].tap()
-        XCTAssertFalse(app.buttons["excursionGroup_groceries"].isEnabled)
-        app.buttons["excursionAllCategories"].tap()
-        XCTAssertTrue(app.navigationBars["All Categories"].waitForExistence(timeout: 5))
-        let search = app.searchFields.firstMatch
-        XCTAssertTrue(search.waitForExistence(timeout: 5))
-        search.tap()
-        search.typeText("Grocery")
-        let grocery = app.buttons.matching(NSPredicate(format: "label == %@", "Grocery Stores")).firstMatch
-        XCTAssertTrue(grocery.waitForExistence(timeout: 5))
-        XCTAssertFalse(grocery.isEnabled)
-    }
-
     func testSelectAllUncategorizedPersistenceAndRestoreDefaults() {
         let app = launch()
         openPreferences(app)
@@ -74,12 +56,12 @@ final class ExcursionPreferencesUITests: XCTestCase {
         XCTAssertTrue(app.buttons["excursionSaveCategories"].isEnabled)
         app.buttons["excursionSelectAllCategories"].tap()
         app.buttons["excursionSaveCategories"].tap()
-        app.navigationBars["All Categories"].buttons.firstMatch.tap()
+        app.navigationBars["Categories"].buttons.firstMatch.tap()
         let uncategorized = app.switches["excursionIncludeUncategorized"]
         reveal(uncategorized, in: app)
         uncategorized.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)).tap()
         XCTAssertEqual(uncategorized.value as? String, "1")
-        XCTAssertTrue(app.buttons["excursionGroup_food-drink"].exists)
+        XCTAssertFalse(app.descendants(matching: .any)["excursionGroup_food-drink"].firstMatch.exists)
         let timing = app.descendants(matching: .any)["excursionDwellTime"].firstMatch
         timing.tap()
         app.buttons["2 minutes"].tap()
@@ -94,29 +76,48 @@ final class ExcursionPreferencesUITests: XCTestCase {
         reveal(restore, in: app)
         restore.tap()
         XCTAssertEqual(app.switches["excursionIncludeUncategorized"].value as? String, "0")
-        XCTAssertTrue(app.buttons["excursionGroup_food-drink"].waitForExistence(timeout: 5))
-        XCTAssertEqual(app.buttons["excursionGroup_food-drink"].value as? String, "Selected")
+        let categories = app.buttons["excursionAllCategories"]
+        XCTAssertTrue(categories.exists)
+        XCTAssertTrue(categories.label.contains("12 selected"))
     }
 
-    func testIndividualCategoryUpdatesGroupPartialState() {
+    func testNativeCategorySelectionSavesMultipleRowsAndCancelDiscardsChanges() {
         let app = launch()
         openPreferences(app)
         app.buttons["excursionAllCategories"].tap()
-        let search = app.searchFields.firstMatch
-        XCTAssertTrue(search.waitForExistence(timeout: 5))
-        search.tap()
-        search.typeText("Restaurant")
-        let restaurant = app.buttons.matching(NSPredicate(format: "label == %@", "Restaurant")).firstMatch
-        XCTAssertTrue(restaurant.waitForExistence(timeout: 5))
-        restaurant.tap()
-        // Active search replaces the back button with Close on recent iOS.
-        let closeSearch = app.navigationBars["All Categories"].buttons["Close"]
-        if closeSearch.exists { closeSearch.tap() }
-        app.navigationBars["All Categories"].buttons.firstMatch.tap()
-        XCTAssertTrue(app.navigationBars["Excursion Preferences"].waitForExistence(timeout: 5))
-        XCTAssertEqual(app.buttons["excursionGroup_food-drink"].value as? String, "Partially selected")
-        app.buttons["excursionGroup_food-drink"].tap()
-        XCTAssertEqual(app.buttons["excursionGroup_food-drink"].value as? String, "Selected")
+        let readOnlyAirport = app.staticTexts["Airport"]
+        XCTAssertFalse(readOnlyAirport.isEnabled)
+        readOnlyAirport.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        XCTAssertEqual(readOnlyAirport.value as? String, "Not selected")
+        app.buttons["excursionEditCategories"].tap()
+        app.buttons["excursionDeselectAllCategories"].tap()
+        XCTAssertFalse(app.buttons["excursionSaveCategories"].isEnabled)
+
+        app.staticTexts["Airport"].tap()
+        app.staticTexts["Amusement Park"].tap()
+        let editingScreenshot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        editingScreenshot.name = "Native categories editing"
+        editingScreenshot.lifetime = .keepAlways
+        add(editingScreenshot)
+        XCTAssertTrue(app.buttons["excursionSaveCategories"].isEnabled)
+        app.buttons["excursionSaveCategories"].tap()
+        let airport = app.staticTexts.matching(NSPredicate(format: "label == %@", "Airport")).firstMatch
+        let amusementPark = app.staticTexts.matching(NSPredicate(format: "label == %@", "Amusement Park")).firstMatch
+        XCTAssertEqual(airport.value as? String, "Selected")
+        XCTAssertEqual(amusementPark.value as? String, "Selected")
+        XCTAssertFalse(airport.isEnabled)
+        airport.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        XCTAssertEqual(airport.value as? String, "Selected")
+        let savedScreenshot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        savedScreenshot.name = "Native categories saved"
+        savedScreenshot.lifetime = .keepAlways
+        add(savedScreenshot)
+
+        app.buttons["excursionEditCategories"].tap()
+        app.staticTexts["Airport"].tap()
+        app.buttons["excursionCancelCategories"].tap()
+        XCTAssertEqual(airport.value as? String, "Selected")
+        XCTAssertEqual(amusementPark.value as? String, "Selected")
     }
 
     private func launch() -> XCUIApplication {

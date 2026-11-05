@@ -6,8 +6,13 @@ struct ExcursionCategorySelectionView: View {
     @State private var isEditing = false
     @State private var draftCategoryIDs: Set<String> = []
 
-    private var selectedIDs: Set<String> {
-        isEditing ? draftCategoryIDs : store.value.categoryIDs
+    private var categorySelection: Binding<Set<String>> {
+        Binding {
+            isEditing ? draftCategoryIDs : store.value.categoryIDs
+        } set: { ids in
+            guard isEditing else { return }
+            draftCategoryIDs = ids
+        }
     }
 
     private var canSave: Bool {
@@ -22,16 +27,24 @@ struct ExcursionCategorySelectionView: View {
     }
 
     var body: some View {
-        List {
+        List(selection: categorySelection) {
             Section {
                 ForEach(filteredCategories) { category in
-                    categoryButton(category)
+                    Text(category.name)
+                        .tag(category.id)
+                        .disabled(!isEditing)
+                        .accessibilityValue(categorySelection.wrappedValue.contains(category.id)
+                                            ? String(localized: "Selected") : String(localized: "Not selected"))
+                        .accessibilityIdentifier("excursionCategory_\(category.id)")
                 }
             } footer: {
                 Text("Keep at least one category selected, or include uncategorized places. Categories are provided by Apple Maps and may vary with your OS version.")
             }
         }
-        .navigationTitle("All Categories")
+        .listStyle(.insetGrouped)
+        .environment(\.editMode, .constant(.active))
+        .offshoreAccentTint()
+        .navigationTitle("Categories")
         .navigationBarBackButtonHidden(isEditing)
         .toolbar(isEditing ? .hidden : .visible, for: .tabBar)
         .toolbar {
@@ -80,26 +93,4 @@ struct ExcursionCategorySelectionView: View {
         }
     }
 
-    private func categoryButton(_ category: ExcursionPOICategoryCatalog.Category) -> some View {
-        let selected = selectedIDs.contains(category.id)
-        return Button {
-            if isEditing {
-                if selected { draftCategoryIDs.remove(category.id) }
-                else { draftCategoryIDs.insert(category.id) }
-            } else {
-                var next = store.value
-                if next.toggleCategories([category.id]) { store.update(next) }
-            }
-        } label: {
-            HStack {
-                Text(category.name)
-                Spacer()
-                Image(systemName: selected ? "checkmark.circle.fill" : "circle")
-                    .accessibilityHidden(true)
-            }
-        }
-        .disabled(!isEditing && selected && store.value.selectedSupportedCategoryIDs.count == 1 && !store.value.includeUncategorized)
-        .accessibilityValue(selected ? String(localized: "Selected") : String(localized: "Not selected"))
-        .accessibilityIdentifier("excursionCategory_\(category.id)")
-    }
 }

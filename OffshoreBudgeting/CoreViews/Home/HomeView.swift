@@ -337,9 +337,10 @@ struct HomeView: View {
                         String(localized: "homeEdit.navigationTitle", defaultValue: "Edit", comment: "Navigation title for editing Home pinned items."),
                         systemImage: "widget.grid.2x1.rectangle"
                     )
+                    .foregroundStyle(theme.accent)
                 }
                 .labelStyle(.iconOnly)
-                .tint(theme.id == AppearanceTheme.offshoreDefault.id ? Color.primary : theme.accent)
+                .offshoreAccentTint()
             }
 
             ToolbarItemGroup(placement: .primaryAction) {
