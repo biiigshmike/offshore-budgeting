@@ -448,7 +448,7 @@ private struct WindowSceneRootView: View {
         .environment(\.appCommandHub, commandHub)
         .environment(postBoardingTipsStore)
         .environment(\.appearanceTheme, theme)
-        .tint(theme.id == AppearanceTheme.offshoreDefault.id ? nil : theme.accent)
+        .tint(theme.accent)
 
         if shouldUseFocusedSceneObject {
             root.focusedSceneObject(commandHub)

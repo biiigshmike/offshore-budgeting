@@ -67,7 +67,7 @@ struct ExcursionCategorySelectionView: View {
                         draftCategoryIDs = store.value.categoryIDs
                         isEditing = true
                     }
-                    .tint(.primary)
+                    .offshoreAccentTint()
                     .accessibilityIdentifier("excursionEditCategories")
                 }
             }

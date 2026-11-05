@@ -4,6 +4,44 @@ import XCTest
 final class ExcursionPreferencesUITests: XCTestCase {
     override func setUpWithError() throws { continueAfterFailure = false }
 
+    func testNavigationThemeAndNativeBack() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-uiTesting", "-uiTestingReset", "-uiTestScenarioWorkspaceProgress",
+                               "-appearance_theme", "heather",
+                               "-tips_seenKeys", "tip.home.v1,tip.budgets.v1,tip.cards.v1,tip.income.v1,tip.budgetdetail.v1",
+                               "-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
+        app.launch()
+        openPreferences(app)
+        let screenshot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        screenshot.name = "Themed native navigation"
+        screenshot.lifetime = .keepAlways
+        add(screenshot)
+        app.navigationBars["Excursion Preferences"].buttons.firstMatch.tap()
+        XCTAssertTrue(app.buttons["excursionPreferences"].waitForExistence(timeout: 5))
+    }
+
+    func testSidebarThemeRendering() throws {
+        XCUIDevice.shared.orientation = .landscapeLeft
+        defer { XCUIDevice.shared.orientation = .portrait }
+        let app = XCUIApplication()
+        app.launchArguments = ["-uiTesting", "-uiTestingReset", "-uiTestScenarioWorkspaceProgress",
+                               "-appearance_theme", "heather",
+                               "-tips_seenKeys", "tip.home.v1,tip.budgets.v1,tip.cards.v1,tip.income.v1,tip.budgetdetail.v1",
+                               "-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
+        app.launch()
+        try XCTSkipIf(app.tabBars.firstMatch.exists, "Sidebar rendering requires iPad or Mac Catalyst.")
+        let sidebar = app.buttons["navigation.sidebarToggle"]
+        XCTAssertTrue(sidebar.waitForExistence(timeout: 10))
+        sidebar.tap()
+        XCTAssertFalse(app.staticTexts["Quick Links"].isHittable)
+        sidebar.tap()
+        XCTAssertTrue(app.staticTexts["Quick Links"].isHittable)
+        let screenshot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        screenshot.name = "Themed native sidebar"
+        screenshot.lifetime = .keepAlways
+        add(screenshot)
+    }
+
     func testGroupsAndSearchShareSelectionAndPreventEmptyCustomMode() {
         let app = launch()
         openPreferences(app)

@@ -207,7 +207,7 @@ struct HomeEditPinnedCardsView: View {
                             editMode = .active
                         }
                     }
-                    .tint(.primary)
+                    .offshoreAccentTint()
                     .id("startEditing")
                 }
             }

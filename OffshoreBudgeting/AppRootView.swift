@@ -209,6 +209,7 @@ struct AppRootView: View {
 
     @Environment(\.appCommandHub) private var commandHub
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.appearanceTheme) private var theme
 
     private var isPhone: Bool {
         #if os(iOS)
@@ -444,6 +445,8 @@ struct AppRootView: View {
                     homeRootView
                 }
             }
+            .offshoreAccentTint()
+            .background { NavigationAccentAppearance().allowsHitTesting(false) }
             .tabItem { Label(AppSection.home.title, systemImage: AppSection.home.systemImage) }
             .tag(AppSection.home)
 
@@ -454,6 +457,8 @@ struct AppRootView: View {
             }
             .environment(\.appTabActivationContext, activationContext(for: .budgets))
             .environment(\.postBoardingTipPresenterIsActive, selectedSection == .budgets)
+            .offshoreAccentTint()
+            .background { NavigationAccentAppearance().allowsHitTesting(false) }
             .tabItem { Label(AppSection.budgets.title, systemImage: AppSection.budgets.systemImage) }
             .tag(AppSection.budgets)
 
@@ -462,6 +467,8 @@ struct AppRootView: View {
                     IncomeWorkspaceView(workspace: workspace)
                 }
             }
+            .offshoreAccentTint()
+            .background { NavigationAccentAppearance().allowsHitTesting(false) }
             .tabItem { Label(AppSection.income.title, systemImage: AppSection.income.systemImage) }
             .tag(AppSection.income)
 
@@ -474,6 +481,8 @@ struct AppRootView: View {
             // the root; placing it only inside the stack leaves them inactive.
             .environment(\.appTabActivationContext, activationContext(for: .cards))
             .environment(\.postBoardingTipPresenterIsActive, selectedSection == .cards)
+            .offshoreAccentTint()
+            .background { NavigationAccentAppearance().allowsHitTesting(false) }
             .tabItem { Label(AppSection.cards.title, systemImage: AppSection.cards.systemImage) }
             .tag(AppSection.cards)
 
@@ -486,6 +495,8 @@ struct AppRootView: View {
                     )
                 }
             }
+            .offshoreAccentTint()
+            .background { NavigationAccentAppearance().allowsHitTesting(false) }
             .tabItem { Label(AppSection.settings.title, systemImage: AppSection.settings.systemImage) }
             .tag(AppSection.settings)
         }
@@ -502,12 +513,20 @@ struct AppRootView: View {
         NavigationSplitView(columnVisibility: $splitViewVisibility) {
             List(selection: selectedSectionForSidebar) {
                 ForEach(AppSection.allCases) { section in
-                    Label(section.title, systemImage: section.systemImage)
+                    Label {
+                        Text(section.title).foregroundStyle(.primary)
+                    } icon: {
+                        Image(systemName: section.systemImage).foregroundStyle(.tint)
+                    }
                         .tag(SidebarSelection.section(section))
 
                     if section == .cards {
                         ForEach(AccountsView.Segment.allCases) { destination in
-                            Label(destination.title, systemImage: destination.symbolName)
+                            Label {
+                                Text(destination.title).foregroundStyle(.primary)
+                            } icon: {
+                                Image(systemName: destination.symbolName).foregroundStyle(.tint)
+                            }
                                 .font(.subheadline)
                                 .padding(.leading, 18)
                                 .tag(SidebarSelection.account(destination))
@@ -526,32 +545,37 @@ struct AppRootView: View {
                     Button {
                         activeQuickLinkSheet = .expense
                     } label: {
-                        Label(
-                            String(
+                        Label {
+                            Text(String(
                                 localized: "app.quickLinks.addExpense",
                                 defaultValue: "Add Expense",
                                 comment: "Sidebar quick link for adding an expense."
-                            ),
-                            systemImage: "plus"
-                        )
+                            ))
+                            .foregroundStyle(.primary)
+                        } icon: {
+                            Image(systemName: "plus").foregroundStyle(.tint)
+                        }
                     }
 
                     Button {
                         activeQuickLinkSheet = .income
                     } label: {
-                        Label(
-                            String(
+                        Label {
+                            Text(String(
                                 localized: "app.quickLinks.addIncome",
                                 defaultValue: "Add Income",
                                 comment: "Sidebar quick link for adding income."
-                            ),
-                            systemImage: "plus"
-                        )
+                            ))
+                            .foregroundStyle(.primary)
+                        } icon: {
+                            Image(systemName: "plus").foregroundStyle(.tint)
+                        }
                     }
                 }
             }
             .listStyle(.sidebar)
             .navigationTitle(workspace.name)
+            .toolbar(removing: .sidebarToggle)
         } detail: {
             let context = AppTabActivationContext(
                 sectionRawValue: selectedSection.rawValue,
@@ -560,12 +584,30 @@ struct AppRootView: View {
             )
             NavigationStack(path: selectedSectionPath) {
                 sectionRootView
+                    .toolbar {
+                        ToolbarItem(placement: .topBarLeading) {
+                            Button {
+                                withAnimation {
+                                    splitViewVisibility = splitViewVisibility == .detailOnly ? .all : .detailOnly
+                                }
+                            } label: {
+                                Label("Toggle Sidebar", systemImage: "sidebar.left")
+                                    .foregroundStyle(theme.accent)
+                            }
+                            .labelStyle(.iconOnly)
+                            .accessibilityIdentifier("navigation.sidebarToggle")
+                        }
+                    }
             }
+            .offshoreAccentTint()
             .rootActivationBodyReporter(root: selectedSection.rawValue.lowercased(), context: context)
             .environment(\.postBoardingTipPresenterIsActive, true)
             .environment(\.appTabActivationContext, context)
             .id(selectedSection)
         }
+        .toolbar(removing: .sidebarToggle)
+        .offshoreAccentTint()
+        .background { NavigationAccentAppearance().allowsHitTesting(false) }
         .background {
             MacWindowSceneTitleHost(title: macWindowSceneTitle)
         }
