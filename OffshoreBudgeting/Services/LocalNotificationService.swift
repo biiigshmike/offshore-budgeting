@@ -52,6 +52,7 @@ final class LocalNotificationService: ObservableObject {
         static let action = "offshore_action"
         static let notificationKind = "offshore_notification_kind"
         static let merchantName = "offshore_merchant_name"
+        static let excursionSuggestion = "offshore_excursion_suggestion"
     }
 
     // MARK: - Constants
@@ -243,32 +244,48 @@ final class LocalNotificationService: ObservableObject {
 
     @discardableResult
     func scheduleShoppingModeSuggestionNotification(
+        suggestion: ExcursionSuggestion,
+        isStillValid: @escaping @MainActor @Sendable () -> Bool = { true }
+    ) async throws -> String? {
+        guard !suggestion.candidates.isEmpty, let encoded = suggestion.encoded else { return nil }
+        let merchantName = suggestion.candidates.count == 1 ? suggestion.candidates.first?.name : nil
+        return try await scheduleExcursionNotification(merchantName: merchantName, encodedSuggestion: encoded, isStillValid: isStillValid)
+    }
+
+    // Kept for older callers and single-merchant notification compatibility.
+    func scheduleShoppingModeSuggestionNotification(
         merchantName: String,
         isStillValid: @escaping @MainActor @Sendable () -> Bool = { true }
     ) async throws -> String? {
-        guard isStillValid() else { throw CancellationError() }
-        let trimmed = merchantName.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return nil }
+        guard !merchantName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
+        return try await scheduleExcursionNotification(merchantName: merchantName, encodedSuggestion: nil, isStillValid: isStillValid)
+    }
 
+    private func scheduleExcursionNotification(
+        merchantName: String?,
+        encodedSuggestion: String?,
+        isStillValid: @escaping @MainActor @Sendable () -> Bool
+    ) async throws -> String? {
+        guard isStillValid() else { throw CancellationError() }
         let content = UNMutableNotificationContent()
         content.title = Self.localizedAppName
-        let bodyTemplate = String(
-            localized: "notification.shoppingModeSuggestion.body",
-            defaultValue: "Want to log your %@ purchase to keep your books tidy?",
-            comment: "Notification body asking user to log a nearby purchase. Placeholder is merchant name."
-        )
-        content.body = String(format: bodyTemplate, locale: .current, trimmed)
+        if let merchantName {
+            content.body = String(format: String(localized: "Near %@? Record an expense if you made a purchase."), locale: .current, merchantName)
+        } else {
+            content.body = String(localized: "Near a few places? Record an expense if you made a purchase.")
+        }
         content.sound = .default
+        content.interruptionLevel = .active
         content.categoryIdentifier = NotificationCategory.shoppingModeSuggestion
         content.userInfo = [
             UserInfoKey.notificationKind: NotificationKind.shoppingModeSuggestion.rawValue,
-            UserInfoKey.action: NotificationAction.openQuickAddExpenseFromShoppingMode.rawValue,
-            UserInfoKey.merchantName: trimmed
+            UserInfoKey.action: NotificationAction.openQuickAddExpenseFromShoppingMode.rawValue
         ]
-
-        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 1, repeats: false)
+        if let merchantName { content.userInfo[UserInfoKey.merchantName] = merchantName }
+        if let encodedSuggestion { content.userInfo[UserInfoKey.excursionSuggestion] = encodedSuggestion }
         let identifier = "\(NotificationID.shoppingModeSuggestion)_\(UUID().uuidString)"
-        let request = UNNotificationRequest(identifier: identifier, content: content, trigger: trigger)
+        let request = UNNotificationRequest(identifier: identifier, content: content,
+            trigger: UNTimeIntervalNotificationTrigger(timeInterval: 1, repeats: false))
         guard isStillValid() else { throw CancellationError() }
         try await addNotificationRequest(request)
         guard isStillValid() else {

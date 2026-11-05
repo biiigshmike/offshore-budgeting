@@ -9,8 +9,12 @@ nonisolated enum ExcursionLocationCapability: Equatable {
     case needsPermission
     case denied
     case restricted
+    case preciseLocationRequired
 
-    static func resolve(authorization: CLAuthorizationStatus, isForeground: Bool, isMacCatalyst: Bool = false) -> Self {
+    static func resolve(authorization: CLAuthorizationStatus, isForeground: Bool, isMacCatalyst: Bool = false, accuracy: CLAccuracyAuthorization = .fullAccuracy) -> Self {
+        if (authorization == .authorizedAlways || authorization == .authorizedWhenInUse), accuracy == .reducedAccuracy {
+            return .preciseLocationRequired
+        }
         switch authorization {
         case .authorizedAlways: return .background
         case .authorizedWhenInUse:
@@ -31,6 +35,7 @@ nonisolated enum ExcursionLocationCapability: Equatable {
         case .paused: return String(localized: "Open Offshore to get nearby reminders.")
         case .needsPermission: return String(localized: "Allow location access to get nearby reminders.")
         case .denied: return String(localized: "Location access is off. You can allow it in Settings.")
+        case .preciseLocationRequired: return String(localized: "Enable Precise Location in Settings for nearby reminders.")
         case .restricted: return String(localized: "Location access is restricted on this device.")
         }
     }

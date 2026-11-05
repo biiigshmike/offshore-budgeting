@@ -29,3 +29,6 @@ paystub.pdf
 
 # Tip Jar release setup.
 !Docs/TipJarSetup.md
+
+# Excursion location simulation instructions.
+!TestResources/ExcursionMode/README.md

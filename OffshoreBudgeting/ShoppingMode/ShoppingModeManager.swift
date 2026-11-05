@@ -348,13 +348,27 @@ final class ShoppingModeManager: ObservableObject {
 
 // MARK: - ShoppingModeMerchant
 
-struct ShoppingModeMerchant: Equatable {
+struct ShoppingModeMerchant: Equatable, Codable {
     let id: String
     let name: String
     let latitude: Double
     let longitude: Double
     let radiusMeters: Double
     let categoryHint: String
+    let poiCategoryID: String?
+
+    init(
+        id: String, name: String, latitude: Double, longitude: Double,
+        radiusMeters: Double, categoryHint: String, poiCategoryID: String? = nil
+    ) {
+        self.id = id
+        self.name = name
+        self.latitude = latitude
+        self.longitude = longitude
+        self.radiusMeters = radiusMeters
+        self.categoryHint = categoryHint
+        self.poiCategoryID = poiCategoryID
+    }
 }
 
 // MARK: - ShoppingModeMerchantCatalog
@@ -369,8 +383,4 @@ enum ShoppingModeMerchantCatalog {
 enum ShoppingModeTuning {
     static let maxMonitoredRegions = 20
     static let localSearchRadiusMeters: Double = 2_500
-    static let startupRouteSelectionMaxCandidates = 5
-    static let startupRouteLookupTimeoutSeconds: TimeInterval = 2
-    static let startupRouteOutlierCrowMultiplier: Double = 4
-    static let startupRouteOutlierExtraMeters: Double = 300
 }

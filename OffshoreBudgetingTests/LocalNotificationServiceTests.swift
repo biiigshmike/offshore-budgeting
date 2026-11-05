@@ -330,6 +330,20 @@ struct LocalNotificationServiceTests {
         var allowed = true
     }
 
+    @Test func excursionPayloadUsesNeutralCopyAndPreservesWorkspace() async throws {
+        let center = Center()
+        let service = LocalNotificationService(center: center)
+        let suggestion = ExcursionSuggestion(candidates: [.init(id: "a", name: "Store A"), .init(id: "b", name: "Store B")],
+                                             workspaceID: UUID(), sessionID: "session")
+        let id = try #require(try await service.scheduleShoppingModeSuggestionNotification(suggestion: suggestion))
+        let request = try #require(center.requests[id])
+        #expect(request.content.body.contains("if you made a purchase"))
+        #expect(!request.content.body.contains("Store A"))
+        #expect(request.content.interruptionLevel == .active)
+        let payload = try #require(request.content.userInfo[LocalNotificationService.UserInfoKey.excursionSuggestion] as? String)
+        #expect(ExcursionSuggestion.decode(payload) == suggestion)
+    }
+
     @Test func excursionDeliveryIsRemovedIfLocationAccessChangesDuringAdd() async throws {
         let center = Center()
         let service = LocalNotificationService(center: center)

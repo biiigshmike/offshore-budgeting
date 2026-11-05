@@ -7,6 +7,7 @@ import CoreLocation
 
 // MARK: - ShoppingModeSuggestionService
 
+@MainActor
 final class ShoppingModeSuggestionService {
     static let shared = ShoppingModeSuggestionService()
 
@@ -14,7 +15,6 @@ final class ShoppingModeSuggestionService {
         static let lastFiredByMerchant = "shoppingMode_lastFiredByMerchant"
         static let lastGlobalFireAt = "shoppingMode_lastGlobalFireAt"
         static let lastSessionID = "shoppingMode_lastSessionID"
-        static let startupNudgedSessionID = "shoppingMode_startupNudgedSessionID"
         static let lastDeliveredMerchantID = "shoppingMode_lastDeliveredMerchantID"
         static let lastDeliveredLatitude = "shoppingMode_lastDeliveredLatitude"
         static let lastDeliveredLongitude = "shoppingMode_lastDeliveredLongitude"
@@ -22,12 +22,35 @@ final class ShoppingModeSuggestionService {
         static let lastDeliveredStopLongitude = "shoppingMode_lastDeliveredStopLongitude"
     }
 
-    private let defaults = UserDefaults.standard
+    enum DeliveryResult: Equatable {
+        case scheduled(identifier: String)
+        case suppressed
+        case failed
+    }
+
+    private let defaults: UserDefaults
+    private let sessionIDProvider: () -> String?
+    private let schedule: (ExcursionSuggestion, @escaping @MainActor @Sendable () -> Bool) async throws -> String?
+    private let cancel: (String) -> Void
     private let policy = ExcursionDetectionPolicy()
     private var deliveryInFlight = false
     private var latestSuggestionID: String?
 
-    private init() {}
+    init(
+        defaults: UserDefaults = .standard,
+        sessionIDProvider: (() -> String?)? = nil,
+        schedule: @escaping (ExcursionSuggestion, @escaping @MainActor @Sendable () -> Bool) async throws -> String? = {
+            try await LocalNotificationService().scheduleShoppingModeSuggestionNotification(suggestion: $0, isStillValid: $1)
+        },
+        cancel: @escaping (String) -> Void = {
+            UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: [$0])
+        }
+    ) {
+        self.defaults = defaults
+        self.sessionIDProvider = sessionIDProvider ?? { SpendingSessionStore.sessionID() }
+        self.schedule = schedule
+        self.cancel = cancel
+    }
 
     func clearCooldownsIfSessionChanged(newSessionID: String?) {
         let previous = defaults.string(forKey: Key.lastSessionID)
@@ -36,7 +59,6 @@ final class ShoppingModeSuggestionService {
         defaults.set([String: Double](), forKey: Key.lastFiredByMerchant)
         defaults.removeObject(forKey: Key.lastGlobalFireAt)
         defaults.set(newSessionID, forKey: Key.lastSessionID)
-        defaults.removeObject(forKey: Key.startupNudgedSessionID)
         defaults.removeObject(forKey: Key.lastDeliveredMerchantID)
         defaults.removeObject(forKey: Key.lastDeliveredLatitude)
         defaults.removeObject(forKey: Key.lastDeliveredLongitude)
@@ -48,7 +70,6 @@ final class ShoppingModeSuggestionService {
         defaults.set([String: Double](), forKey: Key.lastFiredByMerchant)
         defaults.removeObject(forKey: Key.lastGlobalFireAt)
         defaults.removeObject(forKey: Key.lastSessionID)
-        defaults.removeObject(forKey: Key.startupNudgedSessionID)
         defaults.removeObject(forKey: Key.lastDeliveredMerchantID)
         defaults.removeObject(forKey: Key.lastDeliveredLatitude)
         defaults.removeObject(forKey: Key.lastDeliveredLongitude)
@@ -58,84 +79,44 @@ final class ShoppingModeSuggestionService {
 
     func cancelPendingSuggestion() {
         guard let latestSuggestionID else { return }
-        UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: [latestSuggestionID])
+        cancel(latestSuggestionID)
         self.latestSuggestionID = nil
     }
 
-    func handleRegionEntry(
-        merchant: ShoppingModeMerchant,
-        currentLocation: CLLocation? = nil,
+    func send(
+        suggestion: ExcursionSuggestion,
+        currentLocation: CLLocation?,
         now: Date = .now,
-        isStillValid: @escaping @MainActor @Sendable () -> Bool = { true },
-        onSuccessfulNotification: (@MainActor () -> Void)? = nil
-    ) {
-        guard SpendingSessionStore.isActive(now: now), isStillValid(), !deliveryInFlight else { return }
-        let sessionID = SpendingSessionStore.sessionID(now: now)
-        let decision = notificationDecision(
-            merchantID: merchant.id,
-            currentLocation: currentLocation,
-            now: now
-        )
+        isStillValid: @escaping @MainActor @Sendable () -> Bool
+    ) async -> DeliveryResult {
+        let canDeliver: @MainActor @Sendable () -> Bool = { [self] in
+            isStillValid() && sessionIDProvider() == suggestion.sessionID
+        }
+        guard canDeliver(), !deliveryInFlight, let merchant = suggestion.candidates.first else { return .suppressed }
+        clearCooldownsIfSessionChanged(newSessionID: suggestion.sessionID)
+        let decision = notificationDecision(merchantID: merchant.id, currentLocation: currentLocation, now: now)
         guard decision.isAllowed else {
             debugLogSuppressedSuggestion(for: merchant.name, decision: decision)
-            return
+            return .suppressed
         }
-
         deliveryInFlight = true
-        Task { @MainActor in
-            defer { self.deliveryInFlight = false }
-            let canDeliver: @MainActor @Sendable () -> Bool = {
-                isStillValid() && sessionID != nil && SpendingSessionStore.sessionID() == sessionID
+        defer { deliveryInFlight = false }
+        do {
+            guard let identifier = try await schedule(suggestion, canDeliver) else { return .suppressed }
+            guard canDeliver() else {
+                cancel(identifier)
+                return .suppressed
             }
-            guard canDeliver() else { return }
-            let service = LocalNotificationService()
-            do {
-                guard let identifier = try await service.scheduleShoppingModeSuggestionNotification(
-                    merchantName: merchant.name, isStillValid: canDeliver
-                ) else { return }
-                self.latestSuggestionID = identifier
-                guard canDeliver() else {
-                    self.cancelPendingSuggestion()
-                    return
-                }
-                self.recordSuccessfulFire(
-                    merchantID: merchant.id,
-                    currentLocation: currentLocation,
-                    now: now
-                )
-                onSuccessfulNotification?()
-            } catch {
-                debugLog("Suggestion scheduling failed for \(merchant.name): \(error.localizedDescription)")
-            }
+            latestSuggestionID = identifier
+            recordSuccessfulFire(merchantID: merchant.id, currentLocation: currentLocation, now: now)
+            return .scheduled(identifier: identifier)
+        } catch is CancellationError {
+            return .suppressed
+        } catch {
+            debugLog("Suggestion scheduling failed: \(error.localizedDescription)")
+            return .failed
         }
     }
-
-    #if canImport(CoreLocation)
-    @discardableResult
-    func sendStartupNudge(
-        merchant: ShoppingModeMerchant,
-        sessionID: String?,
-        currentLocation: CLLocation? = nil,
-        now: Date = .now,
-        isStillValid: @escaping @MainActor @Sendable () -> Bool = { true }
-    ) -> Bool {
-        guard let sessionID else { return false }
-        guard SpendingSessionStore.isActive(now: now), isStillValid() else { return false }
-
-        if defaults.string(forKey: Key.startupNudgedSessionID) == sessionID {
-            return false
-        }
-
-        handleRegionEntry(
-            merchant: merchant, currentLocation: currentLocation, now: now,
-            isStillValid: isStillValid,
-            onSuccessfulNotification: { [weak self] in
-                self?.defaults.set(sessionID, forKey: Key.startupNudgedSessionID)
-            }
-        )
-        return true
-    }
-    #endif
 
     func notificationDecision(
         merchantID: String,

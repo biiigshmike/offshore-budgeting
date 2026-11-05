@@ -41,38 +41,43 @@ struct ExcursionLocationSetupView: View {
         .onChange(of: locationService.authorizationStatus) { _, status in
             requestingInitialAccess = false
             if status == .notDetermined { upgradeRequested = false }
-            if status == .authorizedAlways && upgradeRequested { finish() }
+            if status == .authorizedAlways && upgradeRequested && locationService.capability.canMonitor { finish() }
         }
     }
 
     @ViewBuilder
     private var permissionChoices: some View {
-        switch locationService.authorizationStatus {
-        case .notDetermined:
-            Text("Allow location access to get started. You can then choose whether reminders work with Offshore closed.")
-            Button("Continue") {
-                requestingInitialAccess = true
-                locationService.requestAuthorizationForExcursionMode()
-            }
-            .disabled(requestingInitialAccess)
-            .accessibilityIdentifier("excursionInitialLocation")
-        case .authorizedWhenInUse:
-            #if targetEnvironment(macCatalyst)
-            Text("Location access is ready for nearby reminders.")
-            Button("Continue") { finish() }
-            #else
-            manualUpgradeChoices
-            #endif
-        case .authorizedAlways:
-            Text("Nearby reminders can work with Offshore closed.")
-            Button("Continue") { finish() }
-        case .denied:
-            Text("Location access is off. You can allow it in Settings, then come back here.")
+        if locationService.capability == .preciseLocationRequired {
+            Text("Enable Precise Location in Settings for nearby reminders.")
             openSettingsButton
-        case .restricted:
-            Text("Location access is restricted on this device.")
-        @unknown default:
-            Text("Location access is unavailable right now.")
+        } else {
+            switch locationService.authorizationStatus {
+            case .notDetermined:
+                Text("Allow location access to get started. You can then choose whether reminders work with Offshore closed.")
+                Button("Continue") {
+                    requestingInitialAccess = true
+                    locationService.requestAuthorizationForExcursionMode()
+                }
+                .disabled(requestingInitialAccess)
+                .accessibilityIdentifier("excursionInitialLocation")
+            case .authorizedWhenInUse:
+                #if targetEnvironment(macCatalyst)
+                Text("Location access is ready for nearby reminders.")
+                Button("Continue") { finish() }
+                #else
+                manualUpgradeChoices
+                #endif
+            case .authorizedAlways:
+                Text("Nearby reminders can work with Offshore closed.")
+                Button("Continue") { finish() }
+            case .denied:
+                Text("Location access is off. You can allow it in Settings, then come back here.")
+                openSettingsButton
+            case .restricted:
+                Text("Location access is restricted on this device.")
+            @unknown default:
+                Text("Location access is unavailable right now.")
+            }
         }
     }
 

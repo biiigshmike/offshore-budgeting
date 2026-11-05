@@ -20,6 +20,8 @@ struct CardsView: View {
     @AppStorage(AppShortcutNavigationStore.pendingImportCardIDKey) private var pendingImportCardID: String = ""
     @AppStorage(AppShortcutNavigationStore.pendingExpenseDescriptionKey) private var pendingExpenseDescription: String = ""
 
+    @State private var excursionSuggestion: ExcursionSuggestion?
+
     @State private var showingAddExpenseSheet: Bool = false
     @State private var showingImportExpensesSheet: Bool = false
     @State private var showingAddCard: Bool = false
@@ -146,6 +148,9 @@ struct CardsView: View {
                 AddCardView(workspace: workspace)
             }
         }
+        .appSheet(item: $excursionSuggestion) { suggestion in
+            ExcursionExpenseView(suggestion: suggestion)
+        }
         .appSheet(isPresented: $showingAddExpenseSheet) {
             NavigationStack {
                 AddExpenseView(
@@ -187,6 +192,9 @@ struct CardsView: View {
             }
         }
         .onAppear {
+            consumePendingShortcutActionIfNeeded()
+        }
+        .onChange(of: workspace.id) { _, _ in
             consumePendingShortcutActionIfNeeded()
         }
         .onChange(of: pendingShortcutActionRaw) { _, _ in
@@ -248,7 +256,13 @@ struct CardsView: View {
         let pending = pendingShortcutActionRaw.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !pending.isEmpty else { return }
 
-        if pending == AppShortcutNavigationStore.PendingAction.openQuickAddExpense.rawValue
+        if pending == AppShortcutNavigationStore.PendingAction.openQuickAddExpenseFromShoppingMode.rawValue,
+           let encoded = UserDefaults.standard.string(forKey: AppShortcutNavigationStore.pendingExcursionSuggestionKey) {
+            // A workspace switch can notify the outgoing view before it is replaced.
+            guard UserDefaults.standard.string(forKey: "selectedWorkspaceID") == workspace.id.uuidString else { return }
+            excursionSuggestion = ExcursionSuggestion.decode(encoded)
+            UserDefaults.standard.removeObject(forKey: AppShortcutNavigationStore.pendingExcursionSuggestionKey)
+        } else if pending == AppShortcutNavigationStore.PendingAction.openQuickAddExpense.rawValue
             || pending == AppShortcutNavigationStore.PendingAction.openQuickAddExpenseFromShoppingMode.rawValue {
             let prefill = pendingExpenseDescription.trimmingCharacters(in: .whitespacesAndNewlines)
             shortcutExpenseDescription = prefill.isEmpty ? nil : prefill

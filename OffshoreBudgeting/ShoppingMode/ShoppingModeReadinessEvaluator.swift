@@ -16,6 +16,7 @@ import ActivityKit
 // MARK: - ShoppingModeStartBlocker
 
 enum ShoppingModeStartBlocker: String, Equatable, CaseIterable {
+    case preciseLocationRequired
     case locationNotAuthorized
     case notificationsNotAuthorized
     case liveActivitiesDisabled
@@ -23,6 +24,8 @@ enum ShoppingModeStartBlocker: String, Equatable, CaseIterable {
 
     nonisolated var message: String {
         switch self {
+        case .preciseLocationRequired:
+            return "Enable Precise Location for Offshore in System Settings."
         case .locationNotAuthorized:
             return "Open Offshore to allow location access for nearby reminders."
         case .notificationsNotAuthorized:
@@ -56,6 +59,9 @@ final class ShoppingModeReadinessEvaluator {
         let location = ShoppingModeLocationService.shared.currentAuthorizationStatus()
         if location != .authorizedAlways && location != .authorizedWhenInUse {
             blockers.append(.locationNotAuthorized)
+        }
+        if ShoppingModeLocationService.shared.capability == .preciseLocationRequired {
+            blockers.append(.preciseLocationRequired)
         }
         #endif
 

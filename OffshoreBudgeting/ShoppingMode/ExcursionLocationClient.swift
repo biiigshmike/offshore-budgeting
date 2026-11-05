@@ -3,6 +3,8 @@ import CoreLocation
 @MainActor
 protocol ExcursionLocationClient: AnyObject {
     var delegate: (any CLLocationManagerDelegate)? { get set }
+    var accuracyAuthorization: CLAccuracyAuthorization { get }
+    var maximumRegionMonitoringDistance: CLLocationDistance { get }
     var authorizationStatus: CLAuthorizationStatus { get }
     var desiredAccuracy: CLLocationAccuracy { get set }
     var distanceFilter: CLLocationDistance { get set }

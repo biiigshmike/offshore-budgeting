@@ -194,16 +194,19 @@ final class NotificationsAppDelegate: NSObject, UIApplicationDelegate, UNUserNot
     }
 
     private static func routeToQuickAddExpense(userInfo: [AnyHashable: Any]) {
+        // Write payload before the action, which triggers navigation observers.
+        if let encoded = userInfo[LocalNotificationService.UserInfoKey.excursionSuggestion] as? String {
+            guard ExcursionSuggestion.decode(encoded) != nil else { return }
+            UserDefaults.standard.set(encoded, forKey: AppShortcutNavigationStore.pendingExcursionSuggestionKey)
+        } else {
+            UserDefaults.standard.removeObject(forKey: AppShortcutNavigationStore.pendingExcursionSuggestionKey)
+        }
         let merchantName = (userInfo[LocalNotificationService.UserInfoKey.merchantName] as? String)?
             .trimmingCharacters(in: .whitespacesAndNewlines)
 
         UserDefaults.standard.set(
             AppSection.cards.rawValue,
             forKey: AppShortcutNavigationStore.pendingSectionKey
-        )
-        UserDefaults.standard.set(
-            AppShortcutNavigationStore.PendingAction.openQuickAddExpenseFromShoppingMode.rawValue,
-            forKey: AppShortcutNavigationStore.pendingActionKey
         )
 
         if let merchantName, !merchantName.isEmpty {
@@ -214,6 +217,10 @@ final class NotificationsAppDelegate: NSObject, UIApplicationDelegate, UNUserNot
         } else {
             UserDefaults.standard.removeObject(forKey: AppShortcutNavigationStore.pendingExpenseDescriptionKey)
         }
+        UserDefaults.standard.set(
+            AppShortcutNavigationStore.PendingAction.openQuickAddExpenseFromShoppingMode.rawValue,
+            forKey: AppShortcutNavigationStore.pendingActionKey
+        )
     }
 
 }

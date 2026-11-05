@@ -22,8 +22,6 @@ final class ShoppingModePOIResolver {
     private struct Candidate {
         let merchant: ShoppingModeMerchant
         let distanceMeters: CLLocationDistance
-        let seedHits: Int
-        let categoryBonus: Double
     }
 
     private struct CandidateAccumulator {
@@ -32,6 +30,7 @@ final class ShoppingModePOIResolver {
         var coordinate: CLLocationCoordinate2D
         var radiusMeters: Double
         var categoryHint: String
+        var poiCategoryID: String?
         var matchedSeedQueries: Set<String>
     }
 
@@ -43,83 +42,112 @@ final class ShoppingModePOIResolver {
         SearchSeed(query: "restaurant", categoryHint: "Dining", radiusMeters: 150),
         SearchSeed(query: "pharmacy", categoryHint: "Health", radiusMeters: 150),
         SearchSeed(query: "department store", categoryHint: "Shopping", radiusMeters: 200),
-        SearchSeed(query: "target", categoryHint: "Shopping", radiusMeters: 200),
-        SearchSeed(query: "costco", categoryHint: "Groceries", radiusMeters: 220),
-        SearchSeed(query: "starbucks", categoryHint: "Coffee", radiusMeters: 120)
+        SearchSeed(query: "personal services", categoryHint: "General", radiusMeters: 140),
+        SearchSeed(query: "entertainment", categoryHint: "General", radiusMeters: 140)
     ]
 
     private let dedupeClusterMeters: CLLocationDistance = 35
+    private let searchOverride: ((String?, CLLocationCoordinate2D, Double) async -> [MKMapItem])?
+
+    init(search: ((String?, CLLocationCoordinate2D, Double) async -> [MKMapItem])? = nil) {
+        searchOverride = search
+    }
 
     func discoverNearbyMerchants(
         around center: CLLocationCoordinate2D,
         searchRadiusMeters: Double,
-        maxResults: Int
+        maxResults: Int,
+        preferences: ExcursionPreferences? = nil
     ) async -> [ShoppingModeMerchant] {
+        let preferences = preferences ?? .default
         var accumulators: [CandidateAccumulator] = []
 
-        for seed in seeds {
-            let response = await runLocalSearch(
-                query: seed.query,
-                center: center,
-                searchRadiusMeters: searchRadiusMeters
-            )
-            absorb(
-                responseItems: response,
-                into: &accumulators,
-                seedQuery: seed.query,
-                seedCategoryHint: seed.categoryHint,
-                seedRadiusMeters: seed.radiusMeters
-            )
-        }
-
-        // I add a generic POI sweep so we do not miss nearby places that seed terms fail to capture.
+        // Discover all nearby POI categories before supplementary category searches.
         let genericResponse = await runLocalSearch(
             query: nil,
             center: center,
-            searchRadiusMeters: searchRadiusMeters
+            searchRadiusMeters: searchRadiusMeters,
+            preferences: preferences
         )
         absorb(
             responseItems: genericResponse,
             into: &accumulators,
             seedQuery: nil,
             seedCategoryHint: "General",
-            seedRadiusMeters: 140
+            seedRadiusMeters: 140,
+            preferences: preferences
         )
+
+        for seed in seeds {
+            let response = await runLocalSearch(
+                query: seed.query,
+                center: center,
+                searchRadiusMeters: searchRadiusMeters,
+                preferences: preferences
+            )
+            absorb(
+                responseItems: response,
+                into: &accumulators,
+                seedQuery: seed.query,
+                seedCategoryHint: seed.categoryHint,
+                seedRadiusMeters: seed.radiusMeters,
+                preferences: preferences
+            )
+        }
 
         let candidates = accumulators.map { accumulator in
             makeCandidate(from: accumulator, center: center)
-        }
+        }.filter { $0.distanceMeters <= searchRadiusMeters }
 
         let sorted = sortCandidatesNearestFirst(candidates)
 
         for (index, candidate) in sorted.prefix(10).enumerated() {
             debugLog(
-                "Rank \(index + 1) -> \(candidate.merchant.name) distance=\(Int(candidate.distanceMeters))m seedHits=\(candidate.seedHits) categoryBonus=\(Int(candidate.categoryBonus))"
+                "Rank \(index + 1) -> \(candidate.merchant.name) distance=\(Int(candidate.distanceMeters))m"
             )
         }
 
-        return Array(sorted.prefix(maxResults).map(\.merchant))
+        return Array(sorted.prefix(max(0, min(maxResults, ShoppingModeTuning.maxMonitoredRegions))).map(\.merchant))
     }
 
     private func runLocalSearch(
         query: String?,
         center: CLLocationCoordinate2D,
-        searchRadiusMeters: Double
+        searchRadiusMeters: Double,
+        preferences: ExcursionPreferences
     ) async -> [MKMapItem] {
-        let request = MKLocalSearch.Request()
-        request.naturalLanguageQuery = query
-        request.resultTypes = .pointOfInterest
-        request.region = MKCoordinateRegion(
-            center: center,
-            latitudinalMeters: searchRadiusMeters,
-            longitudinalMeters: searchRadiusMeters
-        )
-
-        guard let response = try? await MKLocalSearch(request: request).start() else {
-            return []
+        if let searchOverride { return await searchOverride(query, center, searchRadiusMeters) }
+        let filter = pointOfInterestFilter(for: preferences)
+        let search: MKLocalSearch
+        if let query {
+            let request = MKLocalSearch.Request()
+            request.naturalLanguageQuery = query
+            request.resultTypes = .pointOfInterest
+            request.pointOfInterestFilter = filter
+            request.region = MKCoordinateRegion(
+                center: center,
+                latitudinalMeters: searchRadiusMeters * 2,
+                longitudinalMeters: searchRadiusMeters * 2
+            )
+            search = MKLocalSearch(request: request)
+        } else {
+            let request = MKLocalPointsOfInterestRequest(center: center, radius: searchRadiusMeters)
+            request.pointOfInterestFilter = filter
+            search = MKLocalSearch(request: request)
         }
+        guard let response = try? await search.start() else { return [] }
 
         return response.mapItems
+    }
+
+    private func pointOfInterestFilter(for preferences: ExcursionPreferences) -> MKPointOfInterestFilter {
+        // Including uncategorized places requires a broad request, followed by local category filtering.
+        if preferences.includeUncategorized { return .includingAll }
+        let categories = preferences.categoryIDs
+            .filter { preferences.allows(categoryID: $0) }
+            .sorted()
+            .map { MKPointOfInterestCategory(rawValue: $0) }
+        return MKPointOfInterestFilter(including: categories)
     }
 
     private func absorb(
@@ -127,9 +155,14 @@ final class ShoppingModePOIResolver {
         into accumulators: inout [CandidateAccumulator],
         seedQuery: String?,
         seedCategoryHint: String,
-        seedRadiusMeters: Double
+        seedRadiusMeters: Double,
+        preferences: ExcursionPreferences
     ) {
         for item in responseItems {
+            // Search categories are hints only. Filtering is based exclusively on MapKit metadata,
+            // before deduplication and the region limit, even when a server result ignores its filter.
+            let poiCategoryID = item.pointOfInterestCategory?.rawValue
+            guard preferences.allows(categoryID: poiCategoryID) else { continue }
             let name = item.name?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
             guard !name.isEmpty else { continue }
 
@@ -145,7 +178,14 @@ final class ShoppingModePOIResolver {
                 if let seedQuery {
                     accumulators[idx].matchedSeedQueries.insert(seedQuery)
                 }
-                accumulators[idx].radiusMeters = min(accumulators[idx].radiusMeters, seedRadiusMeters)
+                if accumulators[idx].poiCategoryID == nil {
+                    accumulators[idx].poiCategoryID = poiCategoryID
+                }
+                if accumulators[idx].matchedSeedQueries.count == 1, seedQuery != nil {
+                    accumulators[idx].radiusMeters = seedRadiusMeters
+                } else if seedQuery != nil {
+                    accumulators[idx].radiusMeters = min(accumulators[idx].radiusMeters, seedRadiusMeters)
+                }
                 accumulators[idx].categoryHint = preferredCategoryHint(
                     existing: accumulators[idx].categoryHint,
                     incoming: seedCategoryHint
@@ -163,6 +203,7 @@ final class ShoppingModePOIResolver {
                         coordinate: coordinate,
                         radiusMeters: seedRadiusMeters,
                         categoryHint: seedCategoryHint,
+                        poiCategoryID: poiCategoryID,
                         matchedSeedQueries: matches
                     )
                 )
@@ -175,13 +216,7 @@ final class ShoppingModePOIResolver {
             if lhs.distanceMeters != rhs.distanceMeters {
                 return lhs.distanceMeters < rhs.distanceMeters
             }
-            if lhs.seedHits != rhs.seedHits {
-                return lhs.seedHits > rhs.seedHits
-            }
-            if lhs.categoryBonus != rhs.categoryBonus {
-                return lhs.categoryBonus > rhs.categoryBonus
-            }
-            return lhs.merchant.name.localizedCaseInsensitiveCompare(rhs.merchant.name) == .orderedAscending
+            return lhs.merchant.id < rhs.merchant.id
         }
     }
 
@@ -199,17 +234,15 @@ final class ShoppingModePOIResolver {
             latitude: accumulator.coordinate.latitude,
             longitude: accumulator.coordinate.longitude,
             radiusMeters: accumulator.radiusMeters,
-            categoryHint: accumulator.categoryHint
+            categoryHint: accumulator.categoryHint,
+            poiCategoryID: accumulator.poiCategoryID
         )
 
         let distance = distanceMeters(from: center, to: merchant)
-        let categoryBonus = categoryRelevanceScore(for: accumulator.categoryHint)
 
         return Candidate(
             merchant: merchant,
-            distanceMeters: distance,
-            seedHits: accumulator.matchedSeedQueries.count,
-            categoryBonus: categoryBonus
+            distanceMeters: distance
         )
     }
 

@@ -45,6 +45,7 @@ struct ExcursionCandidateScorer {
                     categoryScore: categoryScore(for: merchant.categoryHint)
                 )
             }
+            .filter { $0.distanceMeters <= $0.merchant.radiusMeters }
             .sorted(by: sort)
     }
 
@@ -67,54 +68,13 @@ struct ExcursionCandidateScorer {
     }
 
     private func sort(_ lhs: ScoredCandidate, _ rhs: ScoredCandidate) -> Bool {
-        if lhs.isInsideRegion != rhs.isInsideRegion {
-            return lhs.isInsideRegion && !rhs.isInsideRegion
-        }
-
         if lhs.distanceMeters != rhs.distanceMeters {
             return lhs.distanceMeters < rhs.distanceMeters
         }
-
-        let lhsPriority = routePriority(lhs.routeStatus)
-        let rhsPriority = routePriority(rhs.routeStatus)
-        if lhsPriority != rhsPriority {
-            return lhsPriority < rhsPriority
-        }
-
-        if lhs.routeStatus == .valid, rhs.routeStatus == .valid {
-            let lhsDistance = lhs.routeDistanceMeters ?? .greatestFiniteMagnitude
-            let rhsDistance = rhs.routeDistanceMeters ?? .greatestFiniteMagnitude
-            if lhsDistance != rhsDistance {
-                return lhsDistance < rhsDistance
-            }
-        }
-
-        if lhs.categoryScore != rhs.categoryScore {
-            return lhs.categoryScore > rhs.categoryScore
-        }
-
-        return lhs.merchant.name.localizedCaseInsensitiveCompare(rhs.merchant.name) == .orderedAscending
+        let nameOrder = lhs.merchant.name.compare(rhs.merchant.name, options: [.caseInsensitive], locale: Locale(identifier: "en_US_POSIX"))
+        if nameOrder != .orderedSame { return nameOrder == .orderedAscending }
+        return lhs.merchant.id < rhs.merchant.id
     }
 
-    private func routePriority(_ status: RouteMetrics.Status?) -> Int {
-        switch status {
-        case .some(.valid):
-            return 0
-        case .some(.unavailable), .none:
-            return 1
-        case .some(.rejectedOutlier):
-            return 2
-        }
-    }
-
-    private func categoryScore(for categoryHint: String) -> Double {
-        switch categoryHint {
-        case "Dining", "Groceries", "Coffee", "Health", "Gas":
-            return 40
-        case "Shopping":
-            return 25
-        default:
-            return 10
-        }
-    }
+    private func categoryScore(for categoryHint: String) -> Double { 0 }
 }

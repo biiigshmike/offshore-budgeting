@@ -14,8 +14,6 @@ struct ExcursionDetectionPolicy {
         case rapidRepeat
         case globalCooldown
         case merchantCooldown
-        case sameStopCooldown
-        case insufficientMovement
         case missingLocation
     }
 
@@ -28,15 +26,6 @@ struct ExcursionDetectionPolicy {
         let distanceFromLastStopLocation: CLLocationDistance?
         let isSameStopCluster: Bool
     }
-
-    let startupDesiredAccuracyMeters: CLLocationAccuracy = 80
-    let startupLocationWindowSeconds: TimeInterval = 12
-    let startupMaximumSamples = 3
-    let startupMinimumStableSeconds: TimeInterval = 8
-    let startupRequiredConsecutiveSamples = 2
-
-    let recentFixMaximumAgeSeconds: TimeInterval = 60
-    let recentFixDesiredAccuracyMeters: CLLocationAccuracy = 80
 
     let walkingRefreshThreshold = MovementRefreshThreshold(
         distanceMeters: 60,
@@ -53,7 +42,6 @@ struct ExcursionDetectionPolicy {
     let rapidRepeatGuardSeconds: TimeInterval = 75
     let globalNotificationCooldownSeconds: TimeInterval = 2 * 60
     let perMerchantNotificationCooldownSeconds: TimeInterval = 8 * 60
-    let minimumMovementBetweenNotificationsMeters: CLLocationDistance = 60
     let sameStopClusterMeters: CLLocationDistance = 40
 
     func movementRefreshThreshold(for speed: CLLocationSpeed) -> MovementRefreshThreshold {
@@ -78,37 +66,6 @@ struct ExcursionDetectionPolicy {
     func retryDelay(forAttempt attempt: Int) -> TimeInterval? {
         guard attempt >= 1, attempt <= retryIntervalsSeconds.count else { return nil }
         return retryIntervalsSeconds[attempt - 1]
-    }
-
-    func shouldContinueStartupSampling(
-        startedAt: Date,
-        samplesCollected: Int,
-        now: Date = .now
-    ) -> Bool {
-        guard samplesCollected < startupMaximumSamples else { return false }
-        return now.timeIntervalSince(startedAt) < startupLocationWindowSeconds
-    }
-
-    func acceptsStartupCandidate(
-        accuracyMeters: CLLocationAccuracy,
-        stableDuration: TimeInterval,
-        consecutiveMatches: Int
-    ) -> Bool {
-        guard accuracyMeters > 0, accuracyMeters <= startupDesiredAccuracyMeters else { return false }
-        if consecutiveMatches >= startupRequiredConsecutiveSamples {
-            return true
-        }
-        return stableDuration >= startupMinimumStableSeconds
-    }
-
-    func hasRecentHighConfidenceFix(
-        timestamp: Date?,
-        accuracyMeters: CLLocationAccuracy,
-        now: Date = .now
-    ) -> Bool {
-        guard let timestamp else { return false }
-        guard accuracyMeters > 0, accuracyMeters <= recentFixDesiredAccuracyMeters else { return false }
-        return now.timeIntervalSince(timestamp) <= recentFixMaximumAgeSeconds
     }
 
     func notificationDecision(
@@ -153,12 +110,11 @@ struct ExcursionDetectionPolicy {
             )
         }
 
-        if isSameStopCluster,
-           let secondsSinceLastGlobalFire,
-           secondsSinceLastGlobalFire < perMerchantNotificationCooldownSeconds {
+        if let secondsSinceLastMerchantFire,
+           secondsSinceLastMerchantFire < perMerchantNotificationCooldownSeconds {
             return NotificationDecision(
                 isAllowed: false,
-                reason: .sameStopCooldown,
+                reason: .merchantCooldown,
                 secondsSinceLastGlobalFire: secondsSinceLastGlobalFire,
                 secondsSinceLastMerchantFire: secondsSinceLastMerchantFire,
                 distanceFromLastDeliveredLocation: distanceFromLastDeliveredLocation,
@@ -167,45 +123,16 @@ struct ExcursionDetectionPolicy {
             )
         }
 
-        if let lastDeliveredMerchantID,
-           lastDeliveredMerchantID == merchantID {
-            guard let currentLocation else {
-                return NotificationDecision(
-                    isAllowed: false,
-                    reason: .missingLocation,
-                    secondsSinceLastGlobalFire: secondsSinceLastGlobalFire,
-                    secondsSinceLastMerchantFire: secondsSinceLastMerchantFire,
-                    distanceFromLastDeliveredLocation: distanceFromLastDeliveredLocation,
-                    distanceFromLastStopLocation: distanceFromLastStopLocation,
-                    isSameStopCluster: isSameStopCluster
-                )
-            }
-
-            if let secondsSinceLastMerchantFire,
-               secondsSinceLastMerchantFire < perMerchantNotificationCooldownSeconds {
-                return NotificationDecision(
-                    isAllowed: false,
-                    reason: .merchantCooldown,
-                    secondsSinceLastGlobalFire: secondsSinceLastGlobalFire,
-                    secondsSinceLastMerchantFire: secondsSinceLastMerchantFire,
-                    distanceFromLastDeliveredLocation: distanceFromLastDeliveredLocation,
-                    distanceFromLastStopLocation: distanceFromLastStopLocation,
-                    isSameStopCluster: isSameStopCluster
-                )
-            }
-
-            if let lastDeliveredLocation,
-               currentLocation.distance(from: lastDeliveredLocation) < minimumMovementBetweenNotificationsMeters {
-                return NotificationDecision(
-                    isAllowed: false,
-                    reason: .insufficientMovement,
-                    secondsSinceLastGlobalFire: secondsSinceLastGlobalFire,
-                    secondsSinceLastMerchantFire: secondsSinceLastMerchantFire,
-                    distanceFromLastDeliveredLocation: distanceFromLastDeliveredLocation,
-                    distanceFromLastStopLocation: distanceFromLastStopLocation,
-                    isSameStopCluster: isSameStopCluster
-                )
-            }
+        if lastDeliveredMerchantID == merchantID, currentLocation == nil {
+            return NotificationDecision(
+                isAllowed: false,
+                reason: .missingLocation,
+                secondsSinceLastGlobalFire: secondsSinceLastGlobalFire,
+                secondsSinceLastMerchantFire: secondsSinceLastMerchantFire,
+                distanceFromLastDeliveredLocation: distanceFromLastDeliveredLocation,
+                distanceFromLastStopLocation: distanceFromLastStopLocation,
+                isSameStopCluster: isSameStopCluster
+            )
         }
 
         return NotificationDecision(

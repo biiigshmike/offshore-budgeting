@@ -149,6 +149,13 @@ struct SettingsNotificationsView: View {
 
             if isExcursionControlsAvailable {
                 Section("Excursion Mode") {
+                    NavigationLink {
+                        ExcursionPreferencesView()
+                    } label: {
+                        Label("Preferences", systemImage: "slider.horizontal.3")
+                    }
+                    .accessibilityIdentifier("excursionPreferences")
+
                     if shoppingModeManager.status.isActive, let expiresAt = shoppingModeManager.status.expiresAt {
                         LabeledContent("Status") {
                             Text(shoppingModeManager.locationCapability.canMonitor ? "Active" : "Paused")
@@ -193,7 +200,7 @@ struct SettingsNotificationsView: View {
                         switch shoppingModeManager.locationCapability {
                         case .foregroundOnly, .paused:
                             Button("Allow background reminders") { showLocationSetup() }
-                        case .needsPermission, .denied:
+                        case .needsPermission, .denied, .preciseLocationRequired:
                             Button("Set Up Location") { showLocationSetup() }
                         case .background, .restricted:
                             EmptyView()

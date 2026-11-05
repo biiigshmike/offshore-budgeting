@@ -1,5 +1,6 @@
 import Foundation
 import CoreLocation
+import MapKit
 import Testing
 @testable import Offshore
 
@@ -8,6 +9,8 @@ struct ExcursionLocationServiceTests {
     @MainActor
     private final class LocationClient: ExcursionLocationClient {
         var delegate: (any CLLocationManagerDelegate)?
+        var accuracyAuthorization: CLAccuracyAuthorization = .fullAccuracy
+        var maximumRegionMonitoringDistance: CLLocationDistance = 100_000
         var authorizationStatus: CLAuthorizationStatus = .authorizedWhenInUse
         var desiredAccuracy: CLLocationAccuracy = 0
         var distanceFilter: CLLocationDistance = 0
@@ -71,7 +74,8 @@ struct ExcursionLocationServiceTests {
         let service = ShoppingModeLocationService(
             locationManager: client, defaults: defaults, isForeground: foreground,
             isMacCatalyst: catalyst, sessionIDProvider: { session.id },
-            monitoringAvailable: { true }, discoverMerchants: discovery ?? { _ in [] }
+            monitoringAvailable: { true }, discoverMerchants: discovery ?? { _ in [] },
+            preferencesStore: ExcursionPreferencesStore(defaults: defaults)
         )
         defer { service.stopMonitoringAllRegions() }
         try await operation(service, client, session)
@@ -198,7 +202,10 @@ struct ExcursionLocationServiceTests {
         let discovery = Discovery()
         await withService(discovery: { _ in await discovery.search() }) { service, client, _ in
             service.startMonitoringIfPossible()
-            service.locationManager(CLLocationManager(), didUpdateLocations: [CLLocation(latitude: 37, longitude: -122)])
+            service.locationManager(CLLocationManager(), didUpdateLocations: [CLLocation(
+                coordinate: CLLocationCoordinate2D(latitude: 37, longitude: -122), altitude: 0,
+                horizontalAccuracy: 20, verticalAccuracy: 20, timestamp: .now
+            )])
             await discovery.waitUntilStarted()
             service.setApplicationInForeground(false)
             discovery.result?.resume(returning: [ShoppingModeMerchant(
@@ -210,4 +217,372 @@ struct ExcursionLocationServiceTests {
             #expect(client.locationRequests == 1)
         }
     }
+
+    @MainActor
+    private final class Replay {
+        let epoch = Date(timeIntervalSince1970: 1_800_000_000)
+        let workspaceID = UUID()
+        var selectedWorkspaceID = UUID()
+        var time: Date
+        var sessionID: String? = "replay-session"
+        var delivered: [ExcursionSuggestion] = []
+        var attempts = 0
+        var failsNextDelivery = false
+        var authorizationDuringDelivery: CLAuthorizationStatus?
+        var expireDuringDelivery = false
+        var suspendDelivery = false
+        var suspendedDelivery: CheckedContinuation<Void, Never>?
+
+        let preferencesStore: ExcursionPreferencesStore
+        init(defaults: UserDefaults) {
+            time = epoch
+            selectedWorkspaceID = workspaceID
+            preferencesStore = ExcursionPreferencesStore(defaults: defaults)
+            preferencesStore.update(ExcursionPreferences(mode: .all, categoryIDs: [], dwellSeconds: 120))
+        }
+    }
+
+    private func withReplay(
+        operation: (ShoppingModeLocationService, LocationClient, Replay) async -> Void
+    ) async {
+        let suite = "ExcursionReplay.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let replay = Replay(defaults: defaults)
+        let client = LocationClient()
+        client.authorizationStatus = .authorizedAlways
+        let near = ShoppingModeMerchant(id: "near", name: "Nearby Merchant", latitude: 37.00082,
+                                        longitude: -122, radiusMeters: 150, categoryHint: "Dining", poiCategoryID: MKPointOfInterestCategory.restaurant.rawValue)
+        let far = ShoppingModeMerchant(id: "far", name: "Farther Merchant", latitude: 37.0029,
+                                       longitude: -122, radiusMeters: 400, categoryHint: "Shopping", poiCategoryID: MKPointOfInterestCategory.store.rawValue)
+        let service = ShoppingModeLocationService(
+            locationManager: client, defaults: defaults, isForeground: true, isMacCatalyst: false,
+            sessionIDProvider: { replay.sessionID }, monitoringAvailable: { true },
+            discoverMerchants: { _ in [far, near] }, workspaceIDProvider: { replay.selectedWorkspaceID },
+            now: { replay.time }, sendSuggestion: { suggestion, _, validation in
+                replay.attempts += 1
+                if replay.expireDuringDelivery { replay.sessionID = nil }
+                if let authorization = replay.authorizationDuringDelivery { client.authorizationStatus = authorization }
+                if replay.suspendDelivery {
+                    await withCheckedContinuation { replay.suspendedDelivery = $0 }
+                }
+                await Task.yield()
+                guard validation() else { return .suppressed }
+                if replay.failsNextDelivery {
+                    replay.failsNextDelivery = false
+                    return .failed
+                }
+                replay.delivered.append(suggestion)
+                return .scheduled(identifier: "notification-\(replay.attempts)")
+            }, preferencesStore: replay.preferencesStore
+        )
+        defer { service.stopMonitoringAllRegions() }
+        service.startMonitoringIfPossible()
+        await operation(service, client, replay)
+    }
+
+    private func feed(_ seconds: Double, service: ShoppingModeLocationService, replay: Replay,
+                      latitude: Double = 37, accuracy: Double = 20) async {
+        replay.time = replay.epoch.addingTimeInterval(seconds)
+        service.locationManager(CLLocationManager(), didUpdateLocations: [CLLocation(
+            coordinate: CLLocationCoordinate2D(latitude: latitude, longitude: -122), altitude: 0,
+            horizontalAccuracy: accuracy, verticalAccuracy: 20, course: 0, speed: 0, timestamp: replay.time
+        )])
+        // Discovery and delivery run in main-actor tasks; allow those finite tasks to finish.
+        for _ in 0..<20 { await Task.yield() }
+    }
+
+    @Test(arguments: [false, true])
+    func dwellReplayIgnoresRegionCallbackOrder(_ reverse: Bool) async {
+        await withReplay { service, client, replay in
+            await feed(0, service: service, replay: replay)
+            let regions = client.monitoredRegions.sorted { $0.identifier < $1.identifier }
+            #expect(regions.count == 2)
+            #expect(regions.allSatisfy { ($0 as? CLCircularRegion)?.notifyOnExit == true })
+            for region in reverse ? Array(regions.reversed()) : regions {
+                service.locationManager(CLLocationManager(), didEnterRegion: region)
+                service.locationManager(CLLocationManager(), didDetermineState: .inside, for: region)
+            }
+            for time in [30.0, 60, 90] {
+                await feed(time, service: service, replay: replay)
+                #expect(replay.delivered.isEmpty)
+            }
+            await feed(120, service: service, replay: replay)
+            #expect(replay.delivered.count == 1)
+            #expect(replay.delivered.first?.candidates.first?.id == "near")
+            #expect(replay.delivered.first?.workspaceID == replay.workspaceID)
+            #expect(client.desiredAccuracy == kCLLocationAccuracyHundredMeters)
+        }
+    }
+
+    @Test func deliveredStopDoesNotRepeatAndFreshDepartureRearms() async {
+        await withReplay { service, _, replay in
+            for time in [0.0, 30, 60, 90, 120, 150] { await feed(time, service: service, replay: replay) }
+            #expect(replay.delivered.count == 1)
+            await feed(180, service: service, replay: replay, latitude: 37.01)
+            for time in [210.0, 240, 270, 300] { await feed(time, service: service, replay: replay) }
+            #expect(replay.delivered.count == 1)
+            await feed(330, service: service, replay: replay)
+            #expect(replay.delivered.count == 2)
+        }
+    }
+
+    @Test func failedSchedulingDoesNotConsumeStop() async {
+        await withReplay { service, _, replay in
+            replay.failsNextDelivery = true
+            for time in [0.0, 30, 60, 90, 120] { await feed(time, service: service, replay: replay) }
+            #expect(replay.attempts == 1)
+            #expect(replay.delivered.isEmpty)
+            await feed(130, service: service, replay: replay)
+            #expect(replay.attempts == 2)
+            #expect(replay.delivered.count == 1)
+        }
+    }
+
+    @Test(arguments: [false, true])
+    func sessionExpiryOrPermissionLossCancelsInFlightDelivery(_ expire: Bool) async {
+        await withReplay { service, client, replay in
+            for time in [0.0, 30, 60, 90] { await feed(time, service: service, replay: replay) }
+            replay.expireDuringDelivery = expire
+            replay.authorizationDuringDelivery = expire ? nil : .denied
+            await feed(120, service: service, replay: replay)
+            #expect(replay.attempts == 1 && replay.delivered.isEmpty)
+            #expect(!service.canProcessLocationEvents)
+            await feed(150, service: service, replay: replay)
+            #expect(client.monitoredRegions.isEmpty && !client.backgroundUpdates)
+        }
+    }
+
+    @Test func reducedAccuracyStopsActiveConfirmation() async {
+        await withReplay { service, client, replay in
+            await feed(0, service: service, replay: replay)
+            #expect(client.desiredAccuracy == kCLLocationAccuracyNearestTenMeters)
+            client.accuracyAuthorization = .reducedAccuracy
+            service.refreshAuthorizationState()
+            #expect(service.capability == .preciseLocationRequired)
+            #expect(!service.canProcessLocationEvents)
+            #expect(client.monitoredRegions.isEmpty && !client.backgroundUpdates)
+            await feed(120, service: service, replay: replay)
+            #expect(replay.attempts == 0)
+        }
+    }
+
+    @Test func selectedWorkspaceChangesDoNotRetargetActiveSession() async {
+        await withReplay { service, _, replay in
+            await feed(0, service: service, replay: replay)
+            replay.selectedWorkspaceID = UUID()
+            for time in [30.0, 60, 90, 120] { await feed(time, service: service, replay: replay) }
+            #expect(replay.delivered.first?.workspaceID == replay.workspaceID)
+            #expect(replay.delivered.first?.workspaceID != replay.selectedWorkspaceID)
+        }
+    }
+
+
+    @Test func incompleteDwellStopsAtThreeMinuteSamplingDeadline() async {
+        await withReplay { service, client, replay in
+            await feed(0, service: service, replay: replay)
+            await feed(60, service: service, replay: replay)
+            await feed(121, service: service, replay: replay) // Gap resets evidence.
+            #expect(client.desiredAccuracy == kCLLocationAccuracyNearestTenMeters)
+            await feed(180, service: service, replay: replay)
+            #expect(replay.attempts == 0)
+            #expect(client.desiredAccuracy == kCLLocationAccuracyHundredMeters)
+        }
+    }
+
+
+    @Test func departureIntoAnotherMerchantCancelsSuspendedSuggestion() async {
+        await withReplay { service, _, replay in
+            replay.suspendDelivery = true
+            for time in [0.0, 30, 60, 90, 120] { await feed(time, service: service, replay: replay) }
+            #expect(replay.attempts == 1)
+            #expect(replay.suspendedDelivery != nil)
+            // Outside the near merchant, but still within the farther merchant's region.
+            await feed(130, service: service, replay: replay, latitude: 37.004)
+            replay.suspendDelivery = false
+            replay.suspendedDelivery?.resume()
+            replay.suspendedDelivery = nil
+            for _ in 0..<20 { await Task.yield() }
+            #expect(replay.delivered.isEmpty)
+        }
+    }
+
+    @Test func coarseDiscoveryFixStartsAccurateSamplingWithoutCountingDwell() async {
+        await withReplay { service, client, replay in
+            await feed(0, service: service, replay: replay, accuracy: 100)
+            #expect(client.desiredAccuracy == kCLLocationAccuracyNearestTenMeters)
+            for time in [30.0, 60, 90, 120] { await feed(time, service: service, replay: replay) }
+            #expect(replay.delivered.isEmpty)
+            await feed(150, service: service, replay: replay)
+            #expect(replay.delivered.count == 1)
+        }
+    }
+
+    @Test func relaunchedSessionRetainsDeliveredStopAndOriginWorkspace() async {
+        let suite = "ExcursionRelaunch.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let replay = Replay(defaults: defaults)
+        let merchant = ShoppingModeMerchant(id: "shop", name: "Shop", latitude: 37,
+                                            longitude: -122, radiusMeters: 150, categoryHint: "Shopping")
+        func makeService() -> ShoppingModeLocationService {
+            let client = LocationClient()
+            client.authorizationStatus = .authorizedAlways
+            return ShoppingModeLocationService(
+                locationManager: client, defaults: defaults, isForeground: true, isMacCatalyst: false,
+                sessionIDProvider: { replay.sessionID }, monitoringAvailable: { true },
+                discoverMerchants: { _ in [merchant] }, workspaceIDProvider: { replay.selectedWorkspaceID },
+                now: { replay.time }, sendSuggestion: { suggestion, _, validation in
+                    guard validation() else { return .suppressed }
+                    replay.delivered.append(suggestion)
+                    return .scheduled(identifier: UUID().uuidString)
+                }, preferencesStore: replay.preferencesStore
+            )
+        }
+        let first = makeService()
+        first.startMonitoringIfPossible()
+        for time in [0.0, 30, 60, 90, 120] { await feed(time, service: first, replay: replay) }
+        #expect(replay.delivered.count == 1)
+        first.stopMonitoringAllRegions()
+        replay.selectedWorkspaceID = UUID()
+        let restored = makeService()
+        defer { restored.stopMonitoringAllRegions() }
+        restored.startMonitoringIfPossible()
+        for time in [150.0, 180, 210, 240, 270] { await feed(time, service: restored, replay: replay) }
+        #expect(replay.delivered.count == 1)
+        await feed(300, service: restored, replay: replay, latitude: 37.01)
+        for time in [330.0, 360, 390, 420, 450] { await feed(time, service: restored, replay: replay) }
+        #expect(replay.delivered.count == 2)
+        #expect(replay.delivered.last?.workspaceID == replay.workspaceID)
+    }
+
+    @Test func defaultPreferencesDeliverAtFortyFiveSeconds() async {
+        await withReplay { service, _, replay in
+            replay.preferencesStore.restoreDefaults()
+            for time in [0.0, 15, 30, 44] { await feed(time, service: service, replay: replay) }
+            #expect(replay.delivered.isEmpty)
+            await feed(45, service: service, replay: replay)
+            #expect(replay.delivered.count == 1)
+        }
+    }
+
+    @Test func changingTimingRestartsUnfinishedDwellWithoutChangingSession() async {
+        await withReplay { service, _, replay in
+            for time in [0.0, 30, 60] { await feed(time, service: service, replay: replay) }
+            let previousLease = service.deliveryValidation()
+            replay.preferencesStore.restoreDefaults()
+            #expect(!previousLease())
+            #expect(replay.sessionID == "replay-session")
+            for time in [60.0, 75, 90, 104] { await feed(time, service: service, replay: replay) }
+            #expect(replay.delivered.isEmpty)
+            await feed(105, service: service, replay: replay)
+            #expect(replay.delivered.first?.workspaceID == replay.workspaceID)
+            #expect(replay.delivered.count == 1)
+        }
+    }
+
+    @Test func changingCategoriesReplacesRegionsAndCandidatesImmediately() async {
+        await withReplay { service, client, replay in
+            await feed(0, service: service, replay: replay)
+            #expect(client.monitoredRegions.count == 2)
+            replay.preferencesStore.update(.init(mode: .custom,
+                categoryIDs: [MKPointOfInterestCategory.store.rawValue], dwellSeconds: 45))
+            #expect(client.monitoredRegions.isEmpty)
+            for time in [15.0, 30, 45, 60] { await feed(time, service: service, replay: replay) }
+            #expect(client.monitoredRegions.count == 1)
+            #expect(replay.delivered.first?.candidates.map(\.id) == ["far"])
+        }
+    }
+
+    @Test func noMatchingCategoriesCannotRestoreOldRegionsOrNotify() async {
+        await withReplay { service, client, replay in
+            await feed(0, service: service, replay: replay)
+            replay.preferencesStore.update(.init(mode: .custom,
+                categoryIDs: [MKPointOfInterestCategory.gasStation.rawValue], dwellSeconds: 45))
+            for time in [15.0, 30, 45, 60, 90, 120] { await feed(time, service: service, replay: replay) }
+            #expect(client.monitoredRegions.isEmpty)
+            #expect(replay.delivered.isEmpty)
+        }
+    }
+
+    @Test func preferencesDoNotRepeatAnAlreadyDeliveredStop() async {
+        await withReplay { service, _, replay in
+            for time in [0.0, 30, 60, 90, 120] { await feed(time, service: service, replay: replay) }
+            #expect(replay.delivered.count == 1)
+            replay.preferencesStore.update(.init(mode: .custom,
+                categoryIDs: [MKPointOfInterestCategory.store.rawValue], dwellSeconds: 45))
+            for time in [135.0, 150, 165, 180, 195] { await feed(time, service: service, replay: replay) }
+            #expect(replay.delivered.count == 1)
+            await feed(210, service: service, replay: replay, latitude: 37.01)
+            for time in [225.0, 240, 255, 270] { await feed(time, service: service, replay: replay) }
+            #expect(replay.delivered.count == 2)
+            #expect(replay.delivered.last?.candidates.map(\.id) == ["far"])
+        }
+    }
+
+    @Test func preferencesCancelAnInFlightSuggestion() async {
+        await withReplay { service, _, replay in
+            replay.suspendDelivery = true
+            for time in [0.0, 30, 60, 90, 120] { await feed(time, service: service, replay: replay) }
+            #expect(replay.suspendedDelivery != nil)
+            replay.preferencesStore.update(.init(mode: .custom,
+                categoryIDs: [MKPointOfInterestCategory.store.rawValue], dwellSeconds: 45))
+            replay.suspendDelivery = false
+            replay.suspendedDelivery?.resume()
+            replay.suspendedDelivery = nil
+            for time in [135.0, 150, 165] { await feed(time, service: service, replay: replay) }
+            #expect(replay.delivered.isEmpty)
+            await feed(180, service: service, replay: replay)
+            #expect(replay.delivered.count == 1)
+            #expect(replay.delivered.first?.candidates.map(\.id) == ["far"])
+        }
+    }
+
+    @Test(.timeLimit(.minutes(1)))
+    func preferencesInvalidateAnOutstandingDiscovery() async {
+        let suite = "ExcursionPreferencesDiscovery.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let replay = Replay(defaults: defaults)
+        let client = LocationClient()
+        client.authorizationStatus = .authorizedAlways
+        let discovery = Discovery()
+        var searches = 0
+        let shop = ShoppingModeMerchant(id: "shop", name: "Shop", latitude: 37, longitude: -122,
+            radiusMeters: 150, categoryHint: "Shopping", poiCategoryID: MKPointOfInterestCategory.store.rawValue)
+        let service = ShoppingModeLocationService(locationManager: client, defaults: defaults,
+            isForeground: true, sessionIDProvider: { replay.sessionID }, monitoringAvailable: { true },
+            discoverMerchants: { _ in
+                searches += 1
+                if searches == 1 { return await discovery.search() }
+                return [shop]
+            }, now: { replay.time }, preferencesStore: replay.preferencesStore)
+        defer { service.stopMonitoringAllRegions() }
+        service.startMonitoringIfPossible()
+        await feed(0, service: service, replay: replay)
+        await discovery.waitUntilStarted()
+        let stale = discovery.result
+        replay.preferencesStore.update(.init(mode: .custom,
+            categoryIDs: [MKPointOfInterestCategory.gasStation.rawValue], dwellSeconds: 45))
+        await feed(15, service: service, replay: replay)
+        stale?.resume(returning: [shop])
+        for _ in 0..<20 { await Task.yield() }
+        #expect(client.monitoredRegions.isEmpty)
+        #expect(searches == 2)
+    }
+
+    @Test func departureStillRearmsWhenFiltersFindNoMerchants() async {
+        await withReplay { service, _, replay in
+            for time in [0.0, 30, 60, 90, 120] { await feed(time, service: service, replay: replay) }
+            #expect(replay.delivered.count == 1)
+            replay.preferencesStore.update(.init(mode: .custom,
+                categoryIDs: [MKPointOfInterestCategory.gasStation.rawValue], dwellSeconds: 45))
+            await feed(135, service: service, replay: replay, latitude: 37.01)
+            await feed(150, service: service, replay: replay)
+            replay.preferencesStore.restoreDefaults()
+            for time in [165.0, 180, 195, 210] { await feed(time, service: service, replay: replay) }
+            #expect(replay.delivered.count == 2)
+        }
+    }
+
 }

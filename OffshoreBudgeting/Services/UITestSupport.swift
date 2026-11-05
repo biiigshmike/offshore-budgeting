@@ -48,6 +48,7 @@ enum UITestSupport {
         guard shouldResetOnLaunch else { return }
 
         let defaults = UserDefaults.standard
+        ExcursionPreferencesStore.shared.restoreDefaults()
 
         for key in [
             ReminderPreferences.Key.enabled, ReminderPreferences.Key.daily,
@@ -63,6 +64,13 @@ enum UITestSupport {
         defaults.set(false, forKey: "onboarding_didPressGetStarted")
         defaults.set(0, forKey: "onboarding_step")
         defaults.removeObject(forKey: WorkspaceProgressHandoffStore.pendingWorkspaceIDKey)
+        for key in [AppShortcutNavigationStore.pendingSectionKey,
+                    AppShortcutNavigationStore.pendingAccountsSegmentKey,
+                    AppShortcutNavigationStore.pendingActionKey,
+                    AppShortcutNavigationStore.pendingExcursionSuggestionKey,
+                    AppShortcutNavigationStore.pendingExpenseDescriptionKey] {
+            defaults.removeObject(forKey: key)
+        }
 
         defaults.set("", forKey: "selectedWorkspaceID")
         defaults.set(false, forKey: "didSeedDefaultWorkspaces")
@@ -231,6 +239,7 @@ enum UITestSupport {
             }
             defaults.set(false, forKey: WorkspaceProgressPreferences.hiddenKey(workspaceID: workspace.id))
             defaults.set(false, forKey: WorkspaceProgressPreferences.hiddenKey(workspaceID: other.id))
+            seedExcursionRouteIfRequested(context: context, workspace: workspace, other: other)
             if arguments.contains("-uiTestProgressHandoff") {
                 WorkspaceProgressHandoffStore(defaults: defaults).enqueue(workspaceID: workspace.id)
             } else {
@@ -280,6 +289,40 @@ enum UITestSupport {
         } catch {
             assertionFailure("UITestSupport failed to save seed data: \(error)")
         }
+    }
+
+    /// Exercises the same pending notification route without requesting notification
+    /// permission, waiting for GPS, or writing any expense records.
+    private static func seedExcursionRouteIfRequested(context: ModelContext, workspace: Workspace, other: Workspace) {
+        let arguments = ProcessInfo.processInfo.arguments
+        guard let flag = arguments.firstIndex(of: "-uiTestExcursionRoute"), arguments.indices.contains(flag + 1) else { return }
+        let mode = arguments[flag + 1]
+        let defaults = UserDefaults.standard
+        if mode == "legacy" {
+            defaults.removeObject(forKey: AppShortcutNavigationStore.pendingExcursionSuggestionKey)
+            defaults.set("Legacy Merchant", forKey: AppShortcutNavigationStore.pendingExpenseDescriptionKey)
+        } else {
+            let origin: UUID
+            if mode == "wrongWorkspace" {
+                origin = other.id
+                context.insert(Card(name: "Other Workspace Card", workspace: other))
+            } else if mode == "deletedWorkspace" {
+                origin = UUID(uuidString: "5AA29E56-BBDB-4CC9-A286-720F6F35B099")!
+            } else {
+                origin = workspace.id
+            }
+            let suggestion = ExcursionSuggestion(candidates: [
+                .init(id: "nearby-a", name: "Nearby Store A"),
+                .init(id: "nearby-b", name: "Nearby Store B")
+            ], workspaceID: origin, sessionID: "ui-test-session")
+            defaults.set(suggestion.encoded, forKey: AppShortcutNavigationStore.pendingExcursionSuggestionKey)
+            defaults.removeObject(forKey: AppShortcutNavigationStore.pendingExpenseDescriptionKey)
+        }
+        defaults.set(AppShortcutNavigationStore.PendingAccountsSegment.cards.rawValue,
+                     forKey: AppShortcutNavigationStore.pendingAccountsSegmentKey)
+        defaults.set(AppSection.cards.rawValue, forKey: AppShortcutNavigationStore.pendingSectionKey)
+        defaults.set(AppShortcutNavigationStore.PendingAction.openQuickAddExpenseFromShoppingMode.rawValue,
+                     forKey: AppShortcutNavigationStore.pendingActionKey)
     }
 
     private static func seedCategoryDetailHistory(

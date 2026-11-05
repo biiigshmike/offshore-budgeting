@@ -10,6 +10,8 @@ enum AppShortcutNavigationStore {
     static let pendingImportCardIDKey = "shortcuts_pendingImportCardID"
     static let pendingExpenseDescriptionKey = "shortcuts_pendingExpenseDescription"
 
+    static let pendingExcursionSuggestionKey = "shortcuts_pendingExcursionSuggestion"
+
     enum PendingAccountsSegment: String {
         case cards = "cards"
         case sharedBalances = "shared_balances"
