@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct SettingsHelpView: View {
+    var pagerHost: HelpTopicPagerHost?
     @State private var searchText: String = ""
     @State private var expandedTopicIDs: Set<String> = []
     private let faqEngine = HelpFAQEngine()
@@ -88,7 +89,8 @@ struct SettingsHelpView: View {
                                     expandedSnippet(for: result),
                                     queryTokens: queryTokens
                                 ),
-                                isExpanded: expansionBinding(for: result.topic.id)
+                                isExpanded: expansionBinding(for: result.topic.id),
+                                pagerHost: pagerHost
                             )
                         }
                     }
@@ -123,7 +125,7 @@ struct SettingsHelpView: View {
 
     private func destinationNavigationLink(_ destination: GeneratedHelpDestination) -> some View {
         NavigationLink {
-            HelpDestinationTopicsView(destination: destination)
+            HelpDestinationTopicsView(destination: destination, pagerHost: pagerHost)
         } label: {
             HelpRowLabel(
                 iconSystemName: destination.iconSystemName,
@@ -345,6 +347,7 @@ private struct HelpSearchResultDisclosureRow: View {
     let previewSnippet: AttributedString
     let expandedSnippet: AttributedString
     @Binding var isExpanded: Bool
+    let pagerHost: HelpTopicPagerHost?
 
     var body: some View {
         DisclosureGroup(isExpanded: $isExpanded) {
@@ -356,7 +359,7 @@ private struct HelpSearchResultDisclosureRow: View {
                 }
 
                 NavigationLink {
-                    HelpTopicDetailView(topic: topic)
+                    HelpTopicDetailView(topic: topic, pagerHost: pagerHost)
                 } label: {
                     Label(String(localized: "help.openTopic", defaultValue: "Open Topic", comment: "Action to open a help topic."), systemImage: "arrow.right.circle")
                         .font(.subheadline.weight(.semibold))
@@ -391,12 +394,13 @@ private struct HelpSearchResultDisclosureRow: View {
 
 private struct HelpDestinationTopicsView: View {
     let destination: GeneratedHelpDestination
+    let pagerHost: HelpTopicPagerHost?
 
     var body: some View {
         List {
             ForEach(GeneratedHelpContent.visibleLeafTopics(for: destination)) { topic in
                 NavigationLink {
-                    HelpTopicDetailView(topic: topic)
+                    HelpTopicDetailView(topic: topic, pagerHost: pagerHost)
                 } label: {
                     Text(topic.title)
                 }
@@ -416,11 +420,16 @@ struct HelpTopicDetailView: View {
     @State private var selectedMediaIDsBySectionID: [String: String] = [:]
     @State private var fullscreenPresentation: HelpFullscreenPresentation?
     @Environment(\.openURL) private var openURL
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    private let pagerHost: HelpTopicPagerHost?
+    @State private var pagerOwner = UUID()
+    @State private var isVisible = false
 
     private let topAnchorID: String = "help-topic-top-anchor"
 
-    init(topic: GeneratedHelpLeafTopic) {
+    init(topic: GeneratedHelpLeafTopic, pagerHost: HelpTopicPagerHost? = nil) {
         self.topic = topic
+        self.pagerHost = pagerHost
         _currentTopicID = State(initialValue: topic.id)
     }
 
@@ -467,14 +476,28 @@ struct HelpTopicDetailView: View {
             }
             .navigationTitle(currentTopic.title)
             .safeAreaInset(edge: .bottom, spacing: 0) {
-                HelpTopicPagerBar(
-                    previousTitle: previousTopic?.title,
-                    nextTitle: nextTopic?.title,
-                    onBack: goToPreviousTopic,
-                    onNext: goToNextTopic
-                )
+                if pagerHost == nil || dynamicTypeSize.isAccessibilitySize {
+                    HelpTopicPagerBar(
+                        previousTitle: previousTopic?.title,
+                        nextTitle: nextTopic?.title,
+                        onBack: goToPreviousTopic,
+                        onNext: goToNextTopic
+                    )
+                }
+            }
+            .onAppear {
+                isVisible = true
+                updateTabAccessory()
+            }
+            .onDisappear {
+                isVisible = false
+                pagerHost?.dismiss(owner: pagerOwner)
+            }
+            .onChange(of: fullscreenPresentation != nil) { _, _ in
+                updateTabAccessory()
             }
             .onChange(of: currentTopicID) { _, _ in
+                updateTabAccessory()
                 selectedMediaIDsBySectionID = [:]
                 fullscreenPresentation = nil
 
@@ -561,6 +584,29 @@ struct HelpTopicDetailView: View {
         }
     }
 
+    private func updateTabAccessory() {
+        guard let pagerHost else { return }
+        guard isVisible, fullscreenPresentation == nil else {
+            pagerHost.dismiss(owner: pagerOwner)
+            return
+        }
+
+        let selection = $currentTopicID
+        let previous = previousTopic
+        let next = nextTopic
+        pagerHost.presentation = HelpTopicPagerHost.Presentation(
+            owner: pagerOwner,
+            previousTitle: previous?.title,
+            nextTitle: next?.title,
+            onBack: {
+                if let previous { selection.wrappedValue = previous.id }
+            },
+            onNext: {
+                if let next { selection.wrappedValue = next.id }
+            }
+        )
+    }
+
     private func goToPreviousTopic() {
         guard let previousTopic else { return }
         currentTopicID = previousTopic.id
@@ -569,100 +615,6 @@ struct HelpTopicDetailView: View {
     private func goToNextTopic() {
         guard let nextTopic else { return }
         currentTopicID = nextTopic.id
-    }
-}
-
-private struct HelpTopicPagerBar: View {
-    @Environment(\.appearanceTheme) private var theme
-
-    let previousTitle: String?
-    let nextTitle: String?
-    let onBack: () -> Void
-    let onNext: () -> Void
-
-    private var isBackEnabled: Bool {
-        previousTitle != nil
-    }
-
-    private var isNextEnabled: Bool {
-        nextTitle != nil
-    }
-
-    private var backTint: Color {
-        isBackEnabled ? Color("OffshoreDepth") : Color("OffshoreWave")
-    }
-
-    private var nextTint: Color {
-        isNextEnabled ? theme.accent : Color("OffshoreWave")
-    }
-
-    private var previousDisplayTitle: String {
-        previousTitle ?? String(localized: "help.startOfSection", defaultValue: "Start of Section", comment: "Label shown when there is no previous help topic.")
-    }
-
-    private var nextDisplayTitle: String {
-        nextTitle ?? String(localized: "help.endOfSection", defaultValue: "End of Section", comment: "Label shown when there is no next help topic.")
-    }
-
-    var body: some View {
-        VStack(spacing: 0) {
-            Divider()
-
-            HStack(spacing: 10) {
-                styledPagerButton(
-                    action: onBack,
-                    isEnabled: isBackEnabled,
-                    tint: backTint
-                ) {
-                    VStack(spacing: 3) {
-                        Text(String(localized: "common.back", defaultValue: "Back", comment: "Back action label."))
-                            .font(.footnote.weight(.semibold))
-                        Text(previousDisplayTitle)
-                            .font(.body.weight(.semibold))
-                            .lineLimit(1)
-                    }
-                }
-
-                styledPagerButton(
-                    action: onNext,
-                    isEnabled: isNextEnabled,
-                    tint: nextTint
-                ) {
-                    VStack(spacing: 3) {
-                        Text(String(localized: "common.next", defaultValue: "Next", comment: "Next action label."))
-                            .font(.footnote.weight(.semibold))
-                        Text(nextDisplayTitle)
-                            .font(.body.weight(.semibold))
-                            .lineLimit(1)
-                    }
-                }
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 10)
-            .background(.ultraThinMaterial)
-        }
-    }
-
-    @ViewBuilder
-    private func styledPagerButton<Label: View>(
-        action: @escaping () -> Void,
-        isEnabled: Bool,
-        tint: Color,
-        @ViewBuilder label: () -> Label
-    ) -> some View {
-        let button = Button(action: action) {
-            label()
-                .multilineTextAlignment(.center)
-                .frame(maxWidth: .infinity, alignment: .center)
-        }
-        .tint(tint)
-        .disabled(!isEnabled)
-
-        if #available(iOS 26.0, macCatalyst 26.0, *) {
-            button.glassProminentButtonStyleCompat()
-        } else {
-            button.buttonStyle(.borderedProminent)
-        }
     }
 }
 

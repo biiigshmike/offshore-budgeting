@@ -50,7 +50,8 @@ struct WorkspaceExportService {
                 name: workspace.name,
                 hexColor: workspace.hexColor,
                 completedSetupSteps: exportedSteps,
-                categoryGoalAutoConfiguration: workspace.categoryGoalAutoConfiguration
+                categoryGoalAutoConfiguration: workspace.categoryGoalAutoConfiguration,
+                hideWorkspaceProgress: WorkspaceProgressPreferences.savedChoice(for: workspace)
             ),
             budgets: budgets.map {
                 BudgetPayload(

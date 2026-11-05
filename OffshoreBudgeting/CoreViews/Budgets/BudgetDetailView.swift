@@ -1214,6 +1214,18 @@ struct BudgetDetailView: View {
 
     @ViewBuilder
     private var budgetDisplayToolbarButton: some View {
+        let hasActiveExpenseFilters = if didApplyDefaultsOnAppear {
+            hideFuturePlannedExpensesInView
+                || excludeFuturePlannedExpensesFromCalculationsInView
+                || hideFutureVariableExpensesInView
+                || excludeFutureVariableExpensesFromCalculationsInView
+        } else {
+            hideFuturePlannedExpensesDefault
+                || excludeFuturePlannedExpensesFromCalculationsDefault
+                || hideFutureVariableExpensesDefault
+                || excludeFutureVariableExpensesFromCalculationsDefault
+        }
+
         Menu {
             Menu {
                 Toggle(String(localized: "expenseDisplay.hideFuturePlanned", defaultValue: "Hide Future Planned Expenses", comment: "Toggle label to hide future planned expenses."), isOn: $hideFuturePlannedExpensesInView)
@@ -1239,7 +1251,7 @@ struct BudgetDetailView: View {
                 Label(String(localized: "expenseDisplay.variable.title", defaultValue: "Variable Expense Display", comment: "Menu label for variable expense display options."), systemImage: "chart.xyaxis.line")
             }
         } label: {
-            Label(String(localized: "expense.display", defaultValue: "Expense Display", comment: "Accessibility label for expense display menu."), systemImage: "eye")
+            Label(String(localized: "expense.display", defaultValue: "Expense Display", comment: "Accessibility label for expense display menu."), systemImage: hasActiveExpenseFilters ? "eye.slash" : "eye")
         }
         .accessibilityLabel(String(localized: "expense.display", defaultValue: "Expense Display", comment: "Accessibility label for expense display menu."))
     }

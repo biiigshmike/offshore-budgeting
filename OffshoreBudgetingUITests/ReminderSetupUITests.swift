@@ -150,6 +150,12 @@ final class ReminderSetupUITests: XCTestCase {
         app.buttons["Cancel"].tap()
         XCTAssertTrue(app.buttons["Next"].waitForExistence(timeout: 5))
         app.buttons["Next"].tap()
-        XCTAssertTrue(app.staticTexts["Categories"].firstMatch.waitForExistence(timeout: 5))
+        let categoriesTitle: XCUIElement
+        if #available(iOS 26.0, macCatalyst 26.0, *) {
+            categoriesTitle = app.navigationBars["Categories"].firstMatch
+        } else {
+            categoriesTitle = app.staticTexts["Categories"].firstMatch
+        }
+        XCTAssertTrue(categoriesTitle.waitForExistence(timeout: 5))
     }
 }

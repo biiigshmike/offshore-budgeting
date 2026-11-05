@@ -11,16 +11,17 @@ import SwiftData
 struct SettingsView: View {
 
     let workspace: Workspace
+    private let helpTopicPagerHost: HelpTopicPagerHost?
     @Binding var selectedWorkspaceID: String
-    @AppStorage private var hideWorkspaceProgress: Bool
 
-    init(workspace: Workspace, selectedWorkspaceID: Binding<String>) {
+    init(
+        workspace: Workspace,
+        selectedWorkspaceID: Binding<String>,
+        helpTopicPagerHost: HelpTopicPagerHost? = nil
+    ) {
         self.workspace = workspace
+        self.helpTopicPagerHost = helpTopicPagerHost
         _selectedWorkspaceID = selectedWorkspaceID
-        _hideWorkspaceProgress = AppStorage(
-            wrappedValue: false,
-            WorkspaceProgressPreferences.hiddenKey(workspaceID: workspace.id)
-        )
     }
 
     @Query(sort: \Workspace.name, order: .forward)
@@ -78,6 +79,11 @@ struct SettingsView: View {
         Color(hex: workspace.hexColor) ?? Color(.systemBlue)
     }
 
+    private var isWorkspaceProgressHidden: Bool {
+        WorkspaceProgressPreferences.savedChoice(for: workspace) == true
+            && WorkspaceProgressService.canHideProgress(in: workspace)
+    }
+
     // MARK: - Body
 
     var body: some View {
@@ -85,7 +91,7 @@ struct SettingsView: View {
             ForEach(displayedSectionModels) { section in
                 Section {
                     ForEach(section.rows) { row in
-                        if row.id != .workspaceProgress || !hideWorkspaceProgress || !WorkspaceProgressService.canHideProgress(in: workspace) {
+                        if row.id != .workspaceProgress || !isWorkspaceProgressHidden {
                             settingsRow(for: row)
                         }
                     }
@@ -261,7 +267,7 @@ struct SettingsView: View {
         case .workspaceProgress:
             WorkspaceProgressView(workspace: workspace)
         case .help:
-            SettingsHelpView()
+            SettingsHelpView(pagerHost: helpTopicPagerHost)
         case .general:
             SettingsGeneralView(workspace: workspace)
         case .theme:

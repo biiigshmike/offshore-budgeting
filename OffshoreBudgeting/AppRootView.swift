@@ -192,6 +192,7 @@ struct AppRootView: View {
     @State private var splitViewVisibility: NavigationSplitViewVisibility = .automatic
 
     @State private var didApplyInitialSection: Bool = false
+    @State private var helpTopicPagerHost = HelpTopicPagerHost()
     @State private var showingHelpSheet: Bool = false
     @State private var activeQuickLinkSheet: QuickLinkSheet? = nil
     @State private var detailSnapshotCache = DetailViewSnapshotCache()
@@ -207,6 +208,7 @@ struct AppRootView: View {
     @State private var sharedInvalidationWaveScheduled: Bool = false
 
     @Environment(\.appCommandHub) private var commandHub
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     private var isPhone: Bool {
         #if os(iOS)
@@ -401,7 +403,40 @@ struct AppRootView: View {
 
     // MARK: - iPhone
 
+    @ViewBuilder
     private var phoneTabs: some View {
+        if #available(iOS 26.1, *) {
+            phoneTabView
+                .tabViewBottomAccessory(
+                    isEnabled: selectedSection == .settings
+                        && !dynamicTypeSize.isAccessibilitySize
+                        && helpTopicPagerHost.presentation != nil
+                ) {
+                    if let pager = helpTopicPagerHost.presentation {
+                        HelpTopicPagerBar(
+                            previousTitle: pager.previousTitle,
+                            nextTitle: pager.nextTitle,
+                            onBack: pager.onBack,
+                            onNext: pager.onNext,
+                            isTabAccessory: true
+                        )
+                        .accessibilityElement(children: .contain)
+                        .accessibilityIdentifier("helpTabAccessory")
+                    }
+                }
+        } else {
+            phoneTabView
+        }
+    }
+
+    private var settingsHelpPagerHost: HelpTopicPagerHost? {
+        if #available(iOS 26.1, *) {
+            return helpTopicPagerHost
+        }
+        return nil
+    }
+
+    private var phoneTabView: some View {
         TabView(selection: selectedSectionBinding) {
 
             NavigationStack(path: $homePath) {
@@ -417,6 +452,8 @@ struct AppRootView: View {
                     BudgetsView(workspace: workspace)
                 }
             }
+            .environment(\.appTabActivationContext, activationContext(for: .budgets))
+            .environment(\.postBoardingTipPresenterIsActive, selectedSection == .budgets)
             .tabItem { Label(AppSection.budgets.title, systemImage: AppSection.budgets.systemImage) }
             .tag(AppSection.budgets)
 
@@ -442,7 +479,11 @@ struct AppRootView: View {
 
             NavigationStack(path: $settingsPath) {
                 phoneSectionContent(.settings) {
-                    SettingsView(workspace: workspace, selectedWorkspaceID: $selectedWorkspaceID)
+                    SettingsView(
+                        workspace: workspace,
+                        selectedWorkspaceID: $selectedWorkspaceID,
+                        helpTopicPagerHost: settingsHelpPagerHost
+                    )
                 }
             }
             .tabItem { Label(AppSection.settings.title, systemImage: AppSection.settings.systemImage) }

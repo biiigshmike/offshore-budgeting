@@ -189,6 +189,35 @@ struct WorkspaceTransferServiceTests {
         #expect(entries.first { $0.note == "Coffee offset" }?.setAsideAsSavings == nil)
     }
 
+    @Test(arguments: [true, false, nil] as [Bool?])
+    func partialArchiveRoundTrip_preservesOptionalWorkspaceProgressChoice(choice: Bool?) throws {
+        let context = try makeContext()
+        let source = try seedTransferWorkspace(in: context)
+        source.workspace.hideWorkspaceProgress = choice
+        for step in WorkspaceProgressStep.allCases {
+            WorkspaceProgressService.markCompleted(step, in: source.workspace)
+        }
+
+        let archive = try WorkspaceExportService().exportArchive(
+            for: source.workspace,
+            sections: [.cards],
+            modelContext: context
+        )
+        let data = try WorkspaceArchiveCoding.encode(archive)
+        let decoded = try WorkspaceArchiveCoding.decode(data)
+        #expect(decoded.schemaVersion == 1)
+        #expect(decoded.workspace.hideWorkspaceProgress == choice)
+
+        let imported = try WorkspaceImportService().importArchive(
+            decoded,
+            existingWorkspaces: [source.workspace],
+            modelContext: context
+        )
+        #expect(imported.id != source.workspace.id)
+        #expect(imported.hideWorkspaceProgress == choice)
+        #expect(!WorkspaceProgressService.canHideProgress(in: imported))
+    }
+
     @Test func legacyVersionOneArchive_ignoresAliasesAndPreservesFinancialRecords() throws {
         let context = try makeContext()
         let source = try seedTransferWorkspace(in: context)

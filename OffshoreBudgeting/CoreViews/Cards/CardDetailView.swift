@@ -953,6 +953,18 @@ struct CardDetailView: View {
 
     @ViewBuilder
     private var cardDisplayToolbarButton: some View {
+        let hasActiveExpenseFilters = if didApplyDefaultsOnAppear {
+            hideFuturePlannedExpensesInView
+                || excludeFuturePlannedExpensesFromCalculationsInView
+                || hideFutureVariableExpensesInView
+                || excludeFutureVariableExpensesFromCalculationsInView
+        } else {
+            hideFuturePlannedExpensesDefault
+                || excludeFuturePlannedExpensesFromCalculationsDefault
+                || hideFutureVariableExpensesDefault
+                || excludeFutureVariableExpensesFromCalculationsDefault
+        }
+
         Menu {
             Menu {
                 Toggle("Hide Future Planned Expenses", isOn: $hideFuturePlannedExpensesInView)
@@ -978,7 +990,7 @@ struct CardDetailView: View {
                 Label("Variable Expense Display", systemImage: "chart.xyaxis.line")
             }
         } label: {
-            Image(systemName: "eye")
+            Image(systemName: hasActiveExpenseFilters ? "eye.slash" : "eye")
         }
         .accessibilityLabel("Expense Display")
     }

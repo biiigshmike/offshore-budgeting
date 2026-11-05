@@ -13,6 +13,9 @@ final class WorkspaceProgressHandoffUITests: XCTestCase {
 
         assertHandoff(in: app)
         assertProgress(80, completed: 4, in: app)
+        openAndCloseHelpGuide(in: app)
+        assertHandoff(in: app)
+        assertProgress(80, completed: 4, in: app)
         attachScreenshot("Onboarding hands off to Workspace Progress", app: app)
         let guidance = app.staticTexts["You can return to Workspace Progress in Settings."]
         reveal(guidance, in: app)
@@ -51,6 +54,7 @@ final class WorkspaceProgressHandoffUITests: XCTestCase {
         progressRow.tap()
         XCTAssertTrue(app.navigationBars["Workspace Progress"].waitForExistence(timeout: 5))
         XCTAssertFalse(app.buttons["workspaceProgressSkip"].exists)
+        XCTAssertFalse(app.buttons["Open Help Guide"].exists)
         XCTAssertFalse(guidance.exists)
         assertProgress(100, completed: 5, in: app)
     }
@@ -61,6 +65,25 @@ final class WorkspaceProgressHandoffUITests: XCTestCase {
         assertHome(in: app)
         XCTAssertFalse(app.buttons["workspaceProgressSkip"].waitForExistence(timeout: 2))
         XCTAssertFalse(app.navigationBars["Workspace Progress"].exists)
+    }
+
+    func testHandoffHelpGuideAtLargestAccessibilityTextSize() {
+        let app = makeApp(extraArguments: [
+            "-uiTestProgressHandoff",
+            "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"
+        ])
+        app.launch()
+
+        assertHandoff(in: app)
+        let link = app.buttons["Open Help Guide"]
+        reveal(link, in: app)
+        XCTAssertGreaterThanOrEqual(link.frame.height, 44)
+        attachScreenshot("Workspace Progress help link at largest text size", app: app)
+        link.tap()
+        let help = app.navigationBars["Help"]
+        XCTAssertTrue(help.waitForExistence(timeout: 5))
+        help.buttons["Done"].tap()
+        assertHandoff(in: app)
     }
 
     func testDelayedWorkspaceArrivalPreservesRequestedWorkspace() throws {
@@ -116,6 +139,13 @@ final class WorkspaceProgressHandoffUITests: XCTestCase {
         app.buttons["Continue"].firstMatch.tap()
         XCTAssertTrue(app.staticTexts["Dashboard"].waitForExistence(timeout: 10))
         XCTAssertFalse(app.navigationBars["Review Expenses"].exists)
+        let helpButton = app.buttons["Open Help Guide"]
+        let continueButton = app.buttons["Continue"].firstMatch
+        XCTAssertTrue(helpButton.isHittable)
+        XCTAssertLessThanOrEqual(helpButton.frame.maxY, continueButton.frame.minY)
+        openAndCloseHelpGuide(in: app)
+        XCTAssertTrue(helpButton.isHittable)
+        XCTAssertTrue(app.staticTexts["Dashboard"].exists)
         app.buttons["Continue"].firstMatch.tap()
         let review = app.navigationBars["Review Expenses"]
         XCTAssertTrue(review.waitForExistence(timeout: 10))
@@ -125,6 +155,7 @@ final class WorkspaceProgressHandoffUITests: XCTestCase {
         app.buttons["Skip"].tap()
         XCTAssertTrue(review.waitForNonExistence(timeout: 5))
         assertHome(in: app)
+        XCTAssertFalse(helpButton.exists)
     }
 
     func testSwipingHomeTipDoesNotReopenItWhenPresentationBecomesIdle() throws {
@@ -228,6 +259,20 @@ final class WorkspaceProgressHandoffUITests: XCTestCase {
             app.swipeUp()
         }
         XCTAssertTrue(element.exists && element.isHittable)
+    }
+
+    private func openAndCloseHelpGuide(in app: XCUIApplication) {
+        let link = app.buttons["Open Help Guide"]
+        reveal(link, in: app)
+        link.tap()
+        let help = app.navigationBars["Help"]
+        XCTAssertTrue(help.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Getting Started"].exists)
+        attachScreenshot("Help Guide opened", app: app)
+        let introduction = app.descendants(matching: .any).matching(identifier: "Introduction").firstMatch
+        XCTAssertTrue(introduction.waitForExistence(timeout: 5))
+        help.buttons["Done"].tap()
+        XCTAssertTrue(help.waitForNonExistence(timeout: 5))
     }
 
     private func attachScreenshot(_ name: String, app: XCUIApplication) {

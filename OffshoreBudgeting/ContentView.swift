@@ -41,6 +41,20 @@ struct ContentView: View {
         }
     }
 
+    private func migrateWorkspaceProgressPreferences() {
+        for workspace in workspaces {
+            do {
+                try WorkspaceProgressPreferences.migrateLegacyChoice(for: workspace) {
+                    try modelContext.save()
+                }
+            } catch {
+                #if DEBUG
+                print("Workspace progress preference migration failed: \(error)")
+                #endif
+            }
+        }
+    }
+
     // MARK: - Selection
 
     @AppStorage("selectedWorkspaceID") private var selectedWorkspaceID: String = ""
@@ -302,6 +316,7 @@ struct ContentView: View {
                     metadata: ["phase": debugScenePhase(newPhase)]
                 )
                 if newPhase == .active {
+                    migrateWorkspaceProgressPreferences()
                     backfillSelectedWorkspaceProgress()
                     TabFlickerDiagnostics.beginWatch(
                         reason: "sceneResume",
@@ -384,7 +399,8 @@ struct ContentView: View {
                 )
             }
         }
-        .onChange(of: workspaces.map(\.id)) { previousIDs, currentIDs in
+        .onChange(of: workspaces.map(\.id), initial: true) { previousIDs, currentIDs in
+            migrateWorkspaceProgressPreferences()
             let store = WorkspaceProgressHandoffStore()
             if let requestedID = store.pendingWorkspaceID,
                previousIDs.contains(requestedID), !currentIDs.contains(requestedID) {

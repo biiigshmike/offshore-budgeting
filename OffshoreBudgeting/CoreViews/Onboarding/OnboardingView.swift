@@ -101,23 +101,34 @@ struct OnboardingView: View {
                 dynamicTypeSize: dynamicTypeSize
             )
 
-            ZStack {
-                if onboardingStep == 0 {
-                    WaveBackdrop(isExiting: isExitingWelcome)
-                        .ignoresSafeArea()
-                }
-
-                VStack(spacing: 0) {
+            if #available(iOS 26.0, macCatalyst 26.0, *), Step.resolve(onboardingStep) != .welcome {
+                let usesFullWidthChrome = UIDevice.current.userInterfaceIdiom == .phone
+                NavigationStack {
                     stepBody
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .padding(.horizontal, layout.horizontalPadding)
-                    .padding(.top, 18)
+                        .padding(.horizontal, usesFullWidthChrome ? 0 : layout.horizontalPadding)
+                        .environment(\.onboardingHorizontalContentInset, usesFullWidthChrome ? layout.horizontalPadding : nil)
+                }
+            } else {
+                ZStack {
+                    if onboardingStep == 0 {
+                        WaveBackdrop(isExiting: isExitingWelcome)
+                            .ignoresSafeArea()
+                    }
 
-                    if onboardingStep != 0 {
-                        bottomNavBar
+                    VStack(spacing: 0) {
+                        stepBody
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
                             .padding(.horizontal, layout.horizontalPadding)
-                            .padding(.vertical, 14)
-                            .frame(maxWidth: .infinity)
+                            .padding(.top, 18)
+
+                        if #unavailable(iOS 26.0, macCatalyst 26.0) {
+                            if onboardingStep != 0 {
+                                navigationButtons
+                                    .padding(.horizontal, layout.horizontalPadding)
+                                    .frame(maxWidth: .infinity)
+                                    .background(Color(.systemBackground))
+                            }
+                        }
                     }
                 }
             }
@@ -278,7 +289,8 @@ struct OnboardingView: View {
             selectedWorkspaceID: $selectedWorkspaceID,
             usesICloud: activeUseICloud,
             discoveryPhase: workspaceDiscoveryPhase,
-            onCreate: createWorkspace(name:hexColor:)
+            onCreate: createWorkspace(name:hexColor:),
+            navigationButtons: navigationButtons
         )
     }
     
@@ -289,7 +301,8 @@ struct OnboardingView: View {
             requireBiometrics: $requireBiometrics,
             hasExistingDataInCurrentStore: !workspaces.isEmpty,
             workspaceID: currentWorkspace?.id,
-            notificationService: notificationService
+            notificationService: notificationService,
+            navigationButtons: navigationButtons
         )
     }
     
@@ -298,17 +311,9 @@ struct OnboardingView: View {
     private var categoriesStep: some View {
         Group {
             if let ws = currentWorkspace {
-                OnboardingCategoriesStep(workspace: ws)
+                OnboardingCategoriesStep(workspace: ws, navigationButtons: navigationButtons)
             } else {
-                if isICloudBootstrapping {
-                    iCloudRestorePlaceholder
-                } else {
-                    ContentUnavailableView(
-                        "No Workspace",
-                        systemImage: "person.fill",
-                        description: Text("Create a workspace first.")
-                    )
-                }
+                workspaceUnavailableStep(title: "Categories")
             }
         }
     }
@@ -318,17 +323,9 @@ struct OnboardingView: View {
     private var cardsStep: some View {
         Group {
             if let ws = currentWorkspace {
-                OnboardingCardsStep(workspace: ws)
+                OnboardingCardsStep(workspace: ws, navigationButtons: navigationButtons)
             } else {
-                if isICloudBootstrapping {
-                    iCloudRestorePlaceholder
-                } else {
-                    ContentUnavailableView(
-                        "No Workspace",
-                        systemImage: "person.fill",
-                        description: Text("Create a workspace first.")
-                    )
-                }
+                workspaceUnavailableStep(title: "Cards")
             }
         }
     }
@@ -338,10 +335,26 @@ struct OnboardingView: View {
     private var presetsStep: some View {
         Group {
             if let ws = currentWorkspace {
-                OnboardingPresetsStep(workspace: ws)
+                OnboardingPresetsStep(workspace: ws, navigationButtons: navigationButtons)
             } else {
+                workspaceUnavailableStep(title: "Presets")
+            }
+        }
+    }
+
+    private func workspaceUnavailableStep(title: String) -> some View {
+        VStack(spacing: 0) {
+            Group {
                 if isICloudBootstrapping {
-                    iCloudRestorePlaceholder
+                    VStack(spacing: 12) {
+                        ContentUnavailableView(
+                            "Setting Up iCloud Sync",
+                            systemImage: "icloud.and.arrow.down",
+                            description: Text("Looking for existing workspaces on this Apple ID.")
+                        )
+                        ProgressView()
+                    }
+                    .padding(.vertical, 10)
                 } else {
                     ContentUnavailableView(
                         "No Workspace",
@@ -350,71 +363,26 @@ struct OnboardingView: View {
                     )
                 }
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+            if #available(iOS 26.0, macCatalyst 26.0, *) {
+                navigationButtons
+            }
         }
+        .onboardingContentPadding()
+        .onboardingNavigationTitle(title)
     }
 
-    private var iCloudRestorePlaceholder: some View {
-        VStack(spacing: 12) {
-            ContentUnavailableView(
-                "Setting Up iCloud Sync",
-                systemImage: "icloud.and.arrow.down",
-                description: Text("Looking for existing workspaces on this Apple ID.")
-            )
-            ProgressView()
-        }
-        .padding(.vertical, 10)
-    }
-    
     // MARK: - Bottom Navigation
-    
-    private var bottomNavBar: some View {
-        HStack(spacing: 12) {
-            
-            if #available(iOS 26.0, *) {
-                Button {
-                    goBack()
-                } label: {
-                    Text("Back")
-                        .frame(maxWidth: .infinity, minHeight: 44)
-                }
-                .glassProminentButtonStyleCompat()
-                .tint(.gray)
-                .disabled(onboardingStep == 0)
-            } else {
-                Button {
-                    goBack()
-                } label: {
-                    Text("Back")
-                        .frame(maxWidth: .infinity, minHeight: 44)
-                }
-                .buttonStyle(.borderedProminent)
-                .tint(.gray)
-                .disabled(onboardingStep == 0)
-            }
-            
-            if #available(iOS 26.0, *) {
-                Button {
-                    primaryActionTapped()
-                } label: {
-                    Text(primaryButtonTitle)
-                        .frame(maxWidth: .infinity, minHeight: 44)
-                }
-                .glassProminentButtonStyleCompat()
-                .offshoreAccentTint()
-            } else {
-                Button {
-                    primaryActionTapped()
-                } label: {
-                    Text(primaryButtonTitle)
-                        .frame(maxWidth: .infinity, minHeight: 44)
-                }
-                .buttonStyle(.borderedProminent)
-                .offshoreAccentTint()
-            }
-        }
+
+    private var navigationButtons: OnboardingNavigationButtons {
+        OnboardingNavigationButtons(
+            primaryTitle: primaryButtonTitle,
+            onBack: goBack,
+            onAdvance: primaryActionTapped
+        )
     }
-    
-    
+
     private var primaryButtonTitle: String {
         onboardingStep >= finalStepValue ? "Done" : "Next"
     }
@@ -593,18 +561,19 @@ struct OnboardingView: View {
             // No-op for now, but this is where enhanced messaging would be handy for later.
         }
     }
-
 }
 
 // MARK: - Step: Workspace Setup
 
 private struct OnboardingWorkspaceStep: View {
 
+
     let workspaces: [Workspace]
     @Binding var selectedWorkspaceID: String
     let usesICloud: Bool
     let discoveryPhase: ICloudBootstrap.WorkspaceDiscoveryPhase
     let onCreate: (String, String) -> Void
+    let navigationButtons: OnboardingNavigationButtons
 
     @Environment(\.modelContext) private var modelContext
 
@@ -632,14 +601,21 @@ private struct OnboardingWorkspaceStep: View {
     @State private var pendingWorkspaceDelete: (() -> Void)? = nil
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        let header = OnboardingStepHeader(
+            title: "Workspaces",
+            subtitle: "A workspace keeps a complete set of finances separate. Use Personal for everyday budgeting or Work for business expenses."
+        )
 
-            header(
-                title: "Workspaces",
-                subtitle: "A workspace keeps a complete set of finances separate. Use Personal for everyday budgeting or Work for business expenses."
-            )
+        VStack(alignment: .leading, spacing: 14) {
+            if #unavailable(iOS 26.0, macCatalyst 26.0) {
+                header
+            }
 
             List {
+                if #available(iOS 26.0, macCatalyst 26.0, *) {
+                    header.subtitleRow
+                }
+
                 Section("Workspaces") {
                     WorkspaceListRows(
                         workspaces: workspaces,
@@ -683,18 +659,14 @@ private struct OnboardingWorkspaceStep: View {
             .listStyle(.insetGrouped)
             .scrollContentBackground(.hidden)
             .background(Color(.systemBackground))
-            .frame(minHeight: 340)
-
-            if #available(iOS 26.0, *) {
-                Button {
+            .onboardingNavigationTitle(header.title)
+            .onboardingGlassFooter(legacyMinHeight: 340) {
+                navigationButtons.addingButton("Add Workspace") {
                     sheetRoute = .add
-                } label: {
-                    Label("Add Workspace", systemImage: "plus")
-                        .frame(maxWidth: .infinity, minHeight: 44)
                 }
-                .glassProminentButtonStyleCompat()
-                .offshoreAccentTint()
-            } else {
+            }
+
+            if #unavailable(iOS 26.0, macCatalyst 26.0) {
                 Button {
                     sheetRoute = .add
                 } label: {
@@ -703,9 +675,9 @@ private struct OnboardingWorkspaceStep: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .offshoreAccentTint()
-            }
 
-            Spacer(minLength: 0)
+                Spacer(minLength: 0)
+            }
         }
         .onAppear {
             seedStartingWorkspacesIfNeeded()
@@ -796,21 +768,12 @@ private struct OnboardingWorkspaceStep: View {
             set: { defaultBudgetingPeriodRaw = $0.rawValue }
         )
     }
-
-    @ViewBuilder
-    private func header(title: String, subtitle: String) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(title)
-                .font(.title2.weight(.bold))
-            Text(subtitle)
-                .foregroundStyle(.secondary)
-        }
-    }
 }
 
 // MARK: - Step: Privacy + iCloud + Notifications
 
 private struct OnboardingPrivacySyncStep: View {
+
     
     @Binding var requireBiometrics: Bool
     let hasExistingDataInCurrentStore: Bool
@@ -819,6 +782,7 @@ private struct OnboardingPrivacySyncStep: View {
     @AppStorage("icloud_activeUseCloud") private var activeUseICloud: Bool = false
     
     @ObservedObject var notificationService: LocalNotificationService
+    let navigationButtons: OnboardingNavigationButtons
     
     @State private var biometricsInfo = LocalAuthenticationService.biometricAvailability()
     @State private var showingReminderSetup = false
@@ -840,18 +804,25 @@ private struct OnboardingPrivacySyncStep: View {
     }
     
     var body: some View {
+        let header = OnboardingStepHeader(
+            title: shouldShowICloudSyncSection
+                ? "Privacy, iCloud, and Notifications"
+                : "Privacy and Notifications",
+            subtitle: shouldShowICloudSyncSection
+                ? "Enable App Lock, iCloud sync, and set up notifications."
+                : "Enable App Lock and set up notifications."
+        )
+
         VStack(alignment: .leading, spacing: 14) {
-            
-            header(
-                title: shouldShowICloudSyncSection
-                    ? "Privacy, iCloud, and Notifications"
-                    : "Privacy and Notifications",
-                subtitle: shouldShowICloudSyncSection
-                    ? "Enable App Lock, iCloud sync, and set up notifications."
-                    : "Enable App Lock and set up notifications."
-            )
-            
+            if #unavailable(iOS 26.0, macCatalyst 26.0) {
+                header
+            }
+
             Form {
+                if #available(iOS 26.0, macCatalyst 26.0, *) {
+                    header.subtitleRow
+                }
+
                 Section("App Lock") {
                     Toggle(biometricsInfo.kind.displayName, isOn: $requireBiometrics)
                         .offshoreAccentTint()
@@ -890,8 +861,14 @@ private struct OnboardingPrivacySyncStep: View {
                 }
             }
             .scrollContentBackground(.hidden)
-            
-            Spacer(minLength: 0)
+            .onboardingNavigationTitle(String(localized: "Privacy"))
+            .onboardingGlassFooter {
+                navigationButtons
+            }
+
+            if #unavailable(iOS 26.0, macCatalyst 26.0) {
+                Spacer(minLength: 0)
+            }
         }
         .onAppear {
             biometricsInfo = LocalAuthenticationService.biometricAvailability()
@@ -1002,23 +979,15 @@ private struct OnboardingPrivacySyncStep: View {
             }
         }
     }
-
-    @ViewBuilder
-    private func header(title: String, subtitle: String) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(title)
-                .font(.title2.weight(.bold))
-            Text(subtitle)
-                .foregroundStyle(.secondary)
-        }
-    }
 }
 
 // MARK: - Step: Categories
 
 private struct OnboardingCategoriesStep: View {
+
     
     let workspace: Workspace
+    let navigationButtons: OnboardingNavigationButtons
     
     @Environment(\.modelContext) private var modelContext
     @AppStorage("general_confirmBeforeDeleting") private var confirmBeforeDeleting: Bool = true
@@ -1043,8 +1012,9 @@ private struct OnboardingCategoriesStep: View {
     @State private var showingCategoryDeleteConfirm: Bool = false
     @State private var pendingCategoryDelete: (() -> Void)? = nil
     
-    init(workspace: Workspace) {
+    init(workspace: Workspace, navigationButtons: OnboardingNavigationButtons) {
         self.workspace = workspace
+        self.navigationButtons = navigationButtons
         let workspaceID = workspace.id
         _categories = Query(
             filter: #Predicate<Category> { $0.workspace?.id == workspaceID && $0.isArchived == false },
@@ -1053,14 +1023,21 @@ private struct OnboardingCategoriesStep: View {
     }
     
     var body: some View {
+        let header = OnboardingStepHeader(
+            title: "Categories",
+            subtitle: "Categories help you understand where money goes, such as groceries, rent, fuel, and more."
+        )
+
         VStack(alignment: .leading, spacing: 14) {
-            
-            header(
-                title: "Categories",
-                subtitle: "Categories help you understand where money goes, such as groceries, rent, fuel, and more."
-            )
-            
+            if #unavailable(iOS 26.0, macCatalyst 26.0) {
+                header
+            }
+
             List {
+                if #available(iOS 26.0, macCatalyst 26.0, *) {
+                    header.subtitleRow
+                }
+
                 CategoryListRows(
                     categories: categories,
                     onEdit: { category in
@@ -1074,17 +1051,14 @@ private struct OnboardingCategoriesStep: View {
             .listStyle(.insetGrouped)
             .scrollContentBackground(.hidden)
             .background(Color(.systemBackground))
-            .frame(minHeight: 260)
-            if #available(iOS 26.0, *) {
-                Button {
+            .onboardingNavigationTitle(header.title)
+            .onboardingGlassFooter(legacyMinHeight: 260) {
+                navigationButtons.addingButton("Add Category") {
                     sheetRoute = .add
-                } label: {
-                    Label("Add Category", systemImage: "plus")
-                        .frame(maxWidth: .infinity, minHeight: 44)
                 }
-                .glassProminentButtonStyleCompat()
-                .offshoreAccentTint()
-            } else {
+            }
+
+            if #unavailable(iOS 26.0, macCatalyst 26.0) {
                 Button {
                     sheetRoute = .add
                 } label: {
@@ -1093,8 +1067,9 @@ private struct OnboardingCategoriesStep: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .offshoreAccentTint()
+
+                Spacer(minLength: 0)
             }
-            Spacer(minLength: 0)
         }
         .appSheet(item: $sheetRoute) { route in
             switch route {
@@ -1130,22 +1105,15 @@ private struct OnboardingCategoriesStep: View {
         }
     }
     
-    @ViewBuilder
-    private func header(title: String, subtitle: String) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(title)
-                .font(.title2.weight(.bold))
-            Text(subtitle)
-                .foregroundStyle(.secondary)
-        }
-    }
 }
 
 // MARK: - Step: Cards
 
 private struct OnboardingCardsStep: View {
+
     
     let workspace: Workspace
+    let navigationButtons: OnboardingNavigationButtons
     
     @Environment(\.modelContext) private var modelContext
     @AppStorage("general_confirmBeforeDeleting") private var confirmBeforeDeleting: Bool = true
@@ -1170,8 +1138,9 @@ private struct OnboardingCardsStep: View {
     @State private var showingCardDeleteConfirm: Bool = false
     @State private var pendingCardDelete: (() -> Void)? = nil
     
-    init(workspace: Workspace) {
+    init(workspace: Workspace, navigationButtons: OnboardingNavigationButtons) {
         self.workspace = workspace
+        self.navigationButtons = navigationButtons
         let workspaceID = workspace.id
         _cards = Query(
             filter: #Predicate<Card> { $0.workspace?.id == workspaceID },
@@ -1180,26 +1149,25 @@ private struct OnboardingCardsStep: View {
     }
     
     var body: some View {
+        let header = OnboardingStepHeader(
+            title: "Cards",
+            subtitle: "A card can represent a credit card, checking account, or cash. Name it whatever makes sense to you. No bank connection is needed."
+        )
+
         VStack(alignment: .leading, spacing: 14) {
+            if #unavailable(iOS 26.0, macCatalyst 26.0) {
+                header
+            }
 
-            header(
-                title: "Cards",
-                subtitle: "A card can represent a credit card, checking account, or cash. Name it whatever makes sense to you. No bank connection is needed."
-            )
-
-            cardsGrid
-                .frame(minHeight: 260)
-
-            if #available(iOS 26.0, *) {
-                Button {
-                    sheetRoute = .add
-                } label: {
-                    Label("Add Card", systemImage: "plus")
-                        .frame(maxWidth: .infinity, minHeight: 44)
+            cardsGrid(header: header)
+                .onboardingNavigationTitle(header.title)
+                .onboardingGlassFooter(legacyMinHeight: 260) {
+                    navigationButtons.addingButton("Add Card") {
+                        sheetRoute = .add
+                    }
                 }
-                .glassProminentButtonStyleCompat()
-                .offshoreAccentTint()
-            } else {
+
+            if #unavailable(iOS 26.0, macCatalyst 26.0) {
                 Button {
                     sheetRoute = .add
                 } label: {
@@ -1208,9 +1176,9 @@ private struct OnboardingCardsStep: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .offshoreAccentTint()
-            }
 
-            Spacer(minLength: 0)
+                Spacer(minLength: 0)
+            }
         }
         .appSheet(item: $sheetRoute) { route in
             switch route {
@@ -1241,8 +1209,14 @@ private struct OnboardingCardsStep: View {
         [GridItem(.adaptive(minimum: 260), spacing: 16)]
     }
 
-    private var cardsGrid: some View {
+    private func cardsGrid(header: OnboardingStepHeader) -> some View {
         ScrollView {
+            if #available(iOS 26.0, macCatalyst 26.0, *) {
+                header.descriptionText
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.bottom, 14)
+            }
+
             if cards.isEmpty {
                 ContentUnavailableView(
                     "No Cards Yet",
@@ -1334,23 +1308,15 @@ private struct OnboardingCardsStep: View {
         modelContext.delete(card)
         try? modelContext.save()
     }
-
-    @ViewBuilder
-    private func header(title: String, subtitle: String) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(title)
-                .font(.title2.weight(.bold))
-            Text(subtitle)
-                .foregroundStyle(.secondary)
-        }
-    }
 }
 
 // MARK: - Step: Presets
 
 private struct OnboardingPresetsStep: View {
+
     
     let workspace: Workspace
+    let navigationButtons: OnboardingNavigationButtons
     
     @Environment(\.modelContext) private var modelContext
     @AppStorage("general_confirmBeforeDeleting") private var confirmBeforeDeleting: Bool = true
@@ -1376,8 +1342,9 @@ private struct OnboardingPresetsStep: View {
     @State private var showingPresetDeleteConfirm: Bool = false
     @State private var pendingPresetDelete: (() -> Void)? = nil
     
-    init(workspace: Workspace) {
+    init(workspace: Workspace, navigationButtons: OnboardingNavigationButtons) {
         self.workspace = workspace
+        self.navigationButtons = navigationButtons
         let workspaceID = workspace.id
         _presets = Query(
             filter: #Predicate<Preset> { $0.workspace?.id == workspaceID },
@@ -1389,14 +1356,21 @@ private struct OnboardingPresetsStep: View {
     }
     
     var body: some View {
+        let header = OnboardingStepHeader(
+            title: "Presets",
+            subtitle: "Presets are reusable expense templates, such as rent or subscriptions. Include them in a budget to create its dated planned expenses."
+        )
+
         VStack(alignment: .leading, spacing: 14) {
-            
-            header(
-                title: "Presets",
-                subtitle: "Presets are reusable expense templates, such as rent or subscriptions. Include them in a budget to create its dated planned expenses."
-            )
-            
+            if #unavailable(iOS 26.0, macCatalyst 26.0) {
+                header
+            }
+
             List {
+                if #available(iOS 26.0, macCatalyst 26.0, *) {
+                    header.subtitleRow
+                }
+
                 if presets.isEmpty {
                     ContentUnavailableView(
                         "No Presets Yet",
@@ -1458,17 +1432,14 @@ private struct OnboardingPresetsStep: View {
             .listStyle(.insetGrouped)
             .scrollContentBackground(.hidden)
             .background(Color(.systemBackground))
-            .frame(minHeight: 260)
-            if #available(iOS 26.0, *) {
-                Button {
+            .onboardingNavigationTitle(header.title)
+            .onboardingGlassFooter(legacyMinHeight: 260) {
+                navigationButtons.addingButton("Add Preset") {
                     sheetRoute = .add
-                } label: {
-                    Label("Add Preset", systemImage: "plus")
-                        .frame(maxWidth: .infinity, minHeight: 44)
                 }
-                .glassProminentButtonStyleCompat()
-                .offshoreAccentTint()
-            } else {
+            }
+
+            if #unavailable(iOS 26.0, macCatalyst 26.0) {
                 Button {
                     sheetRoute = .add
                 } label: {
@@ -1477,9 +1448,9 @@ private struct OnboardingPresetsStep: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .offshoreAccentTint()
+
+                Spacer(minLength: 0)
             }
-            
-            Spacer(minLength: 0)
         }
         .appSheet(item: $sheetRoute) { route in
             switch route {
@@ -1548,21 +1519,10 @@ private struct OnboardingPresetsStep: View {
         }
     }
     
-    @ViewBuilder
-    private func header(title: String, subtitle: String) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(title)
-                .font(.title2.weight(.bold))
-            Text(subtitle)
-                .foregroundStyle(.secondary)
-        }
-    }
 }
 
 #Preview("Onboarding") {
     let container = PreviewSeed.makeContainer()
-    return NavigationStack {
-        OnboardingView()
-    }
-    .modelContainer(container)
+    return OnboardingView()
+        .modelContainer(container)
 }

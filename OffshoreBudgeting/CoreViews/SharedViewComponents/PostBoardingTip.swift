@@ -271,31 +271,27 @@ private struct TipSheet: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
 
-            if #available(iOS 26.0, *) {
-                Button {
-                    onContinue()
-                } label: {
-                    Text(buttonTitle)
-                        .frame(maxWidth: .infinity, minHeight: 52)
+            VStack(spacing: 4) {
+                HelpGuideButton()
+
+                if #available(iOS 26.0, *) {
+                    continueButton.glassProminentButtonStyleCompat()
+                } else {
+                    continueButton.buttonStyle(.borderedProminent)
                 }
-                .glassProminentButtonStyleCompat()
-                .offshoreAccentTint()
-                .padding(.horizontal, 22)
-                .padding(.bottom, 18)
-            } else {
-                Button {
-                    onContinue()
-                } label: {
-                    Text(buttonTitle)
-                        .frame(maxWidth: .infinity, minHeight: 52)
-                }
-                .buttonStyle(.borderedProminent)
-                .offshoreAccentTint()
-                .padding(.horizontal, 22)
-                .padding(.bottom, 18)
             }
+            .padding(.horizontal, 22)
+            .padding(.bottom, 18)
         }
         .presentationDetents([.large])
+    }
+
+    private var continueButton: some View {
+        Button(action: onContinue) {
+            Text(buttonTitle)
+                .frame(maxWidth: .infinity, minHeight: 52)
+        }
+        .offshoreAccentTint()
     }
 }
 

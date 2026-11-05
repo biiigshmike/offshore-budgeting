@@ -308,6 +308,8 @@ final class Workspace {
     var categoryGoalHistoryCount: Int = 3
     var categoryGoalCushionPercent: Double = 0
 
+    var hideWorkspaceProgress: Bool? = nil
+
     // Permanent setup milestones. Additive defaults preserve existing local and CloudKit stores.
     var setupHasCreatedCard: Bool = false
     var setupHasCreatedCategory: Bool = false

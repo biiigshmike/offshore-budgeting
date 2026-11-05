@@ -1285,7 +1285,12 @@ struct HomeView: View {
     // MARK: - Home Toolbar
 
     private var homeActionsToolbarButton: some View {
-        Menu {
+        let hasActiveExpenseFilters = hideFuturePlannedExpensesInView
+            || excludeFuturePlannedExpensesFromCalculationsInView
+            || hideFutureVariableExpensesInView
+            || excludeFutureVariableExpensesFromCalculationsInView
+
+        return Menu {
             Menu {
                 Toggle(String(localized: "expenseDisplay.hideFuturePlanned", defaultValue: "Hide Future Planned Expenses", comment: "Toggle label to hide future planned expenses."), isOn: $hideFuturePlannedExpensesInView)
                 Toggle(
@@ -1310,7 +1315,7 @@ struct HomeView: View {
                 Label(String(localized: "expenseDisplay.variable.title", defaultValue: "Variable Expense Display", comment: "Menu label for variable expense display options."), systemImage: "chart.xyaxis.line")
             }
         } label: {
-            Label(String(localized: "home.actions", defaultValue: "Expense Display", comment: "Accessibility label for home actions menu."), systemImage: "eye")
+            Label(String(localized: "home.actions", defaultValue: "Expense Display", comment: "Accessibility label for home actions menu."), systemImage: hasActiveExpenseFilters ? "eye.slash" : "eye")
         }
         .accessibilityLabel(String(localized: "home.actions", defaultValue: "Expense Display", comment: "Accessibility label for home actions menu."))
     }

@@ -302,6 +302,81 @@ struct WorkspaceProgressServiceTests {
         #expect(!defaults.bool(forKey: otherWorkspaceKey))
     }
 
+    @Test func legacyHideChoicesPersistPerWorkspaceAfterReopeningStore() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("WorkspaceProgressPreferences-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let suiteName = UUID().uuidString
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let schema = makeSchema()
+        let configuration = ModelConfiguration(
+            schema: schema,
+            url: directory.appendingPathComponent("Local.store"),
+            cloudKitDatabase: .none
+        )
+
+        do {
+            let container = try ModelContainer(for: schema, configurations: configuration)
+            let context = ModelContext(container)
+            for (name, legacyChoice) in [("Hidden", true), ("Visible", false), ("Unset", nil)] as [(String, Bool?)] {
+                let workspace = Workspace(name: name, hexColor: "#3B82F6")
+                context.insert(workspace)
+                if let legacyChoice {
+                    defaults.set(legacyChoice, forKey: WorkspaceProgressPreferences.hiddenKey(workspaceID: workspace.id))
+                }
+                try WorkspaceProgressPreferences.migrateLegacyChoice(for: workspace, defaults: defaults) {
+                    try context.save()
+                }
+            }
+            try context.save()
+        }
+
+        let container = try ModelContainer(for: schema, configurations: configuration)
+        let context = ModelContext(container)
+        let workspaces = try context.fetch(FetchDescriptor<Workspace>())
+        #expect(workspaces.first { $0.name == "Hidden" }?.hideWorkspaceProgress == true)
+        let visible = try #require(workspaces.first { $0.name == "Visible" })
+        #expect(visible.hideWorkspaceProgress == false)
+        let unset = try #require(workspaces.first { $0.name == "Unset" })
+        #expect(unset.hideWorkspaceProgress == nil)
+
+        defaults.set(true, forKey: WorkspaceProgressPreferences.hiddenKey(workspaceID: visible.id))
+        WorkspaceProgressPreferences.migrateLegacyChoice(for: visible, defaults: defaults) {
+            Issue.record("A persisted choice should prevent migration")
+        }
+        #expect(WorkspaceProgressPreferences.savedChoice(for: visible, defaults: defaults) == false)
+    }
+
+    @Test func failedChoiceSaveRestoresPriorValueAndCanRetryMigration() throws {
+        enum SaveError: Error { case unavailable }
+        let workspace = Workspace(name: "Personal", hexColor: "#3B82F6")
+        let suiteName = UUID().uuidString
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        defaults.set(true, forKey: WorkspaceProgressPreferences.hiddenKey(workspaceID: workspace.id))
+
+        #expect(throws: SaveError.unavailable) {
+            try WorkspaceProgressPreferences.migrateLegacyChoice(for: workspace, defaults: defaults) {
+                throw SaveError.unavailable
+            }
+        }
+        #expect(workspace.hideWorkspaceProgress == nil)
+        #expect(WorkspaceProgressPreferences.savedChoice(for: workspace, defaults: defaults) == true)
+
+        WorkspaceProgressPreferences.migrateLegacyChoice(for: workspace, defaults: defaults) {}
+        #expect(workspace.hideWorkspaceProgress == true)
+
+        #expect(throws: SaveError.unavailable) {
+            try WorkspaceProgressPreferences.saveChoice(false, for: workspace) {
+                throw SaveError.unavailable
+            }
+        }
+        #expect(workspace.hideWorkspaceProgress == true)
+    }
+
     private func insertCoreRecords(in workspace: Workspace, context: ModelContext) {
         let day = Date(timeIntervalSince1970: 1_790_000_000)
         context.insert(Card(name: "Visa", workspace: workspace))

@@ -266,7 +266,19 @@ struct CategoryDetailView: View, Equatable {
     }
 
     private var displayMenu: some View {
-        Menu("Expense Display", systemImage: "eye") {
+        let hasActiveExpenseFilters = if didInitialize {
+            hideFuturePlanned
+                || excludeFuturePlanned
+                || hideFutureVariable
+                || excludeFutureVariable
+        } else {
+            hideFuturePlannedDefault
+                || excludeFuturePlannedDefault
+                || hideFutureVariableDefault
+                || excludeFutureVariableDefault
+        }
+
+        return Menu("Expense Display", systemImage: hasActiveExpenseFilters ? "eye.slash" : "eye") {
             Menu("Planned Expense Display", systemImage: "calendar.badge.clock") {
                 Toggle("Hide Future Planned Expenses", isOn: $hideFuturePlanned)
                 Toggle("Exclude Future Planned Expenses from Totals", isOn: $excludeFuturePlanned)

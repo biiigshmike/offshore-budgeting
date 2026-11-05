@@ -142,6 +142,7 @@ struct WorkspacePayload: Codable, Equatable {
     var completedSetupSteps: [WorkspaceProgressStep]? = nil
     // Optional so archives predating automatic category maximums still decode.
     var categoryGoalAutoConfiguration: CategoryGoalAutoConfigurationSettings? = nil
+    var hideWorkspaceProgress: Bool? = nil
 }
 
 extension WorkspaceProgressStep {

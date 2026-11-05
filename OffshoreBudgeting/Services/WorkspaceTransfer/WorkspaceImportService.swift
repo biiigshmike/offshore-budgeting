@@ -70,6 +70,7 @@ struct WorkspaceImportService {
         )
         importedWorkspace.categoryGoalAutoConfiguration = archive.workspace.categoryGoalAutoConfiguration
             ?? CategoryGoalAutoConfigurationSettings()
+        importedWorkspace.hideWorkspaceProgress = archive.workspace.hideWorkspaceProgress
         modelContext.insert(importedWorkspace)
 
         do {

@@ -234,6 +234,7 @@ private enum ActiveAlert: Identifiable {
 
 private struct SettingsMaintenanceView: View {
     @Environment(\.appearanceTheme) private var theme
+    @Environment(\.modelContext) private var modelContext
 
 
     let workspace: Workspace
@@ -241,7 +242,6 @@ private struct SettingsMaintenanceView: View {
     let onRepeatOnboarding: () -> Void
     let onEraseContent: () -> Void
     @State private var activeMaintenanceAlert: MaintenanceAlert? = nil
-    @AppStorage private var hideWorkspaceProgress: Bool
 
     init(
         workspace: Workspace,
@@ -253,9 +253,20 @@ private struct SettingsMaintenanceView: View {
         self.onResetTipsConfirmed = onResetTipsConfirmed
         self.onRepeatOnboarding = onRepeatOnboarding
         self.onEraseContent = onEraseContent
-        _hideWorkspaceProgress = AppStorage(
-            wrappedValue: false,
-            WorkspaceProgressPreferences.hiddenKey(workspaceID: workspace.id)
+    }
+
+    private var hideWorkspaceProgress: Binding<Bool> {
+        Binding(
+            get: { WorkspaceProgressPreferences.savedChoice(for: workspace) ?? false },
+            set: { isHidden in
+                do {
+                    try WorkspaceProgressPreferences.saveChoice(isHidden, for: workspace) {
+                        try modelContext.save()
+                    }
+                } catch {
+                    activeMaintenanceAlert = .saveProgressPreferenceFailed
+                }
+            }
         )
     }
 
@@ -263,11 +274,11 @@ private struct SettingsMaintenanceView: View {
         List {
             if WorkspaceProgressService.canHideProgress(in: workspace) {
                 Section {
-                    Toggle("Hide Workspace Progress", isOn: $hideWorkspaceProgress)
+                    Toggle("Hide Workspace Progress", isOn: hideWorkspaceProgress)
                         .offshoreAccentTint()
                         .accessibilityIdentifier("hideWorkspaceProgress")
                 } footer: {
-                    Text("Hides the Workspace Progress row in Settings for \(workspace.name) on this device. Turn this off to show it again.")
+                    Text("This setting is saved with \(workspace.name). Turn it off to show the Workspace Progress row again.")
                 }
             }
 
@@ -317,6 +328,11 @@ private struct SettingsMaintenanceView: View {
                     message: Text("Tips and hints will be shown again."),
                     dismissButton: .default(Text("OK"))
                 )
+            case .saveProgressPreferenceFailed:
+                Alert(
+                    title: Text("Couldn’t Save Settings"),
+                    dismissButton: .default(Text("OK"))
+                )
             }
         }
     }
@@ -346,11 +362,13 @@ private struct SettingsMaintenanceView: View {
     private enum MaintenanceAlert: Identifiable {
         case resetConfirm
         case resetResult
+        case saveProgressPreferenceFailed
 
         var id: Int {
             switch self {
             case .resetConfirm: return 1
             case .resetResult: return 2
+            case .saveProgressPreferenceFailed: return 3
             }
         }
     }

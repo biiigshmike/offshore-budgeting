@@ -38,7 +38,7 @@ final class OffshoreBudgetingUITests: XCTestCase {
 
         app.buttons["Next"].tap()
 
-        let nextStepTitle = app.staticTexts["Privacy, iCloud, and Notifications"].firstMatch
+        let nextStepTitle = privacyStepTitle(in: app, usesICloud: true)
         XCTAssertTrue(nextStepTitle.waitForExistence(timeout: 5))
     }
 
@@ -77,7 +77,7 @@ final class OffshoreBudgetingUITests: XCTestCase {
 
         app.buttons["Next"].tap()
 
-        let nextStepTitle = app.staticTexts["Privacy, iCloud, and Notifications"].firstMatch
+        let nextStepTitle = privacyStepTitle(in: app, usesICloud: true)
         XCTAssertTrue(nextStepTitle.waitForExistence(timeout: 5))
     }
 
@@ -122,13 +122,13 @@ final class OffshoreBudgetingUITests: XCTestCase {
         XCTAssertFalse(app.staticTexts["No Workspaces Yet"].exists)
 
         app.buttons["Next"].tap()
-        XCTAssertTrue(app.staticTexts["Privacy and Notifications"].firstMatch.waitForExistence(timeout: 5))
+        XCTAssertTrue(privacyStepTitle(in: app, usesICloud: false).waitForExistence(timeout: 5))
 
         app.buttons["Next"].tap()
-        XCTAssertTrue(app.staticTexts["Categories"].firstMatch.waitForExistence(timeout: 5))
+        XCTAssertTrue(onboardingStepTitle("Categories", in: app).waitForExistence(timeout: 5))
 
         app.buttons["Next"].tap()
-        XCTAssertTrue(app.staticTexts["Cards"].firstMatch.waitForExistence(timeout: 5))
+        XCTAssertTrue(onboardingStepTitle("Cards", in: app).waitForExistence(timeout: 5))
         app.buttons["Next"].tap()
         XCTAssertTrue(app.alerts["Card Required"].waitForExistence(timeout: 5))
         app.alerts["Card Required"].buttons["OK"].tap()
@@ -142,13 +142,13 @@ final class OffshoreBudgetingUITests: XCTestCase {
         app.buttons["Save"].tap()
 
         app.buttons["Next"].tap()
-        XCTAssertTrue(app.staticTexts["Presets"].firstMatch.waitForExistence(timeout: 5))
+        XCTAssertTrue(onboardingStepTitle("Presets", in: app).waitForExistence(timeout: 5))
 
         XCTAssertTrue(app.buttons["Done"].firstMatch.waitForExistence(timeout: 5))
         app.buttons["Back"].tap()
-        XCTAssertTrue(app.staticTexts["Cards"].firstMatch.waitForExistence(timeout: 5))
+        XCTAssertTrue(onboardingStepTitle("Cards", in: app).waitForExistence(timeout: 5))
         app.buttons["Next"].tap()
-        XCTAssertTrue(app.staticTexts["Presets"].firstMatch.waitForExistence(timeout: 5))
+        XCTAssertTrue(onboardingStepTitle("Presets", in: app).waitForExistence(timeout: 5))
         app.buttons["Done"].tap()
 
         let budgetsTab = app.tabBars.buttons["Budgets"].firstMatch
@@ -189,6 +189,21 @@ final class OffshoreBudgetingUITests: XCTestCase {
         app.buttons["Back"].tap()
         XCTAssertEqual(app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Personal")).count, 1)
         XCTAssertEqual(app.buttons.matching(NSPredicate(format: "label CONTAINS %@ AND label != %@", "Work", "Add Workspace")).count, 1)
+    }
+
+    private func onboardingStepTitle(_ title: String, in app: XCUIApplication) -> XCUIElement {
+        if #available(iOS 26.0, macCatalyst 26.0, *) {
+            return app.navigationBars[title].firstMatch
+        }
+        return app.staticTexts[title].firstMatch
+    }
+
+    private func privacyStepTitle(in app: XCUIApplication, usesICloud: Bool) -> XCUIElement {
+        if #available(iOS 26.0, macCatalyst 26.0, *) {
+            return app.navigationBars["Privacy"].firstMatch
+        }
+        let title = usesICloud ? "Privacy, iCloud, and Notifications" : "Privacy and Notifications"
+        return app.staticTexts[title].firstMatch
     }
 
     private func makeAppForUITesting(scenario: String) -> XCUIApplication {

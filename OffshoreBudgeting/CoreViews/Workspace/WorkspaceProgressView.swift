@@ -72,6 +72,12 @@ struct WorkspaceProgressView: View {
                 }
             }
 
+            if showsHandoffGuidance {
+                Section {
+                    HelpGuideButton()
+                }
+            }
+
             Section("Checklist") {
                 ForEach(WorkspaceProgressStep.allCases) { step in
                     checklistRow(for: step)
