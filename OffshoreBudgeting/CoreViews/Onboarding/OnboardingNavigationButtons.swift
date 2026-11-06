@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct OnboardingNavigationButtons: View {
-    nonisolated fileprivate static let buttonSize = TintedGlassNavigationButton.minimumSize
+    nonisolated fileprivate static let glassButtonSize = TintedGlassNavigationButton.minimumGlassHeight
 
     let isFinalStep: Bool
     let onBack: () -> Void
@@ -22,7 +22,10 @@ struct OnboardingNavigationButtons: View {
                 Button(action: action) {
                     Label(title, systemImage: "plus")
                         .labelStyle(.iconOnly)
-                        .frame(minWidth: Self.buttonSize, minHeight: Self.buttonSize)
+                        .frame(
+                            minWidth: TintedGlassNavigationButton.minimumSize,
+                            minHeight: TintedGlassNavigationButton.minimumSize
+                        )
                 }
                 .buttonStyle(.bordered)
                 .buttonBorderShape(.circle)
@@ -88,7 +91,7 @@ struct OnboardingNavigationButtons: View {
                 .labelStyle(.iconOnly)
                 .font(.headline)
                 .foregroundStyle(.primary)
-                .frame(width: Self.buttonSize, height: Self.buttonSize)
+                .frame(width: Self.glassButtonSize, height: Self.glassButtonSize)
                 .contentShape(.circle)
                 .glassEffect(.regular.interactive(), in: .circle)
         }
@@ -150,7 +153,7 @@ private struct OnboardingSideControls: ViewModifier {
         let divisions = proxy.reservedRegions(kind: .division, options: .includeInactive, layoutDirectionBehavior: .fixed)
         guard !divisions.isEmpty else { return nil }
 
-        let buttonSize = OnboardingNavigationButtons.buttonSize
+        let buttonSize = OnboardingNavigationButtons.glassButtonSize
         let railWidth = buttonSize + 2 * edgePadding
         guard proxy.size.width >= railWidth else { return nil }
         let rail = CGRect(x: proxy.size.width - railWidth, y: 0, width: railWidth, height: proxy.size.height)

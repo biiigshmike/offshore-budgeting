@@ -6,8 +6,6 @@ struct HelpTopicPagerBar: View {
     let onBack: () -> Void
     let onNext: () -> Void
 
-    private static let verticalGlassInset: CGFloat = 4
-
     var body: some View {
         let back = String(localized: "common.back", defaultValue: "Back", comment: "Back action label.")
         let next = String(localized: "common.next", defaultValue: "Next", comment: "Next action label.")
@@ -16,14 +14,14 @@ struct HelpTopicPagerBar: View {
 
         HStack(spacing: 12) {
             TintedGlassNavigationButton(
-                title: Text(back), tint: .gray, verticalGlassInset: Self.verticalGlassInset, action: onBack
+                title: Text(back), tint: .gray, action: onBack
             )
                 .accessibilityLabel(Text(verbatim: "\(back), \(previousTopic)"))
                 .accessibilityIdentifier("helpPagerBack")
                 .disabled(previousTitle == nil)
 
             TintedGlassNavigationButton(
-                title: Text(next), tint: .accentColor, verticalGlassInset: Self.verticalGlassInset, action: onNext
+                title: Text(next), tint: .accentColor, action: onNext
             )
                 .accessibilityLabel(Text(verbatim: "\(next), \(nextTopic)"))
                 .accessibilityIdentifier("helpPagerNext")
