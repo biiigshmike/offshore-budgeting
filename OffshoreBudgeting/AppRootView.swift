@@ -192,7 +192,6 @@ struct AppRootView: View {
     @State private var splitViewVisibility: NavigationSplitViewVisibility = .automatic
 
     @State private var didApplyInitialSection: Bool = false
-    @State private var helpTopicPagerHost = HelpTopicPagerHost()
     @State private var showingHelpSheet: Bool = false
     @State private var activeQuickLinkSheet: QuickLinkSheet? = nil
     @State private var detailSnapshotCache = DetailViewSnapshotCache()
@@ -208,8 +207,6 @@ struct AppRootView: View {
     @State private var sharedInvalidationWaveScheduled: Bool = false
 
     @Environment(\.appCommandHub) private var commandHub
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-    @Environment(\.verticalSizeClass) private var verticalSizeClass
 
     private var isPhone: Bool {
         #if os(iOS)
@@ -404,43 +401,7 @@ struct AppRootView: View {
 
     // MARK: - iPhone
 
-    @ViewBuilder
     private var phoneTabs: some View {
-        if #available(iOS 26.1, *) {
-            phoneTabView
-                .tabViewBottomAccessory(
-                    isEnabled: selectedSection == .settings
-                        && HelpTopicPagerHost.supportsTabAccessory(
-                            verticalSizeClass: verticalSizeClass,
-                            dynamicTypeSize: dynamicTypeSize
-                        )
-                        && helpTopicPagerHost.presentation != nil
-                ) {
-                    if let pager = helpTopicPagerHost.presentation {
-                        HelpTopicPagerBar(
-                            previousTitle: pager.previousTitle,
-                            nextTitle: pager.nextTitle,
-                            onBack: pager.onBack,
-                            onNext: pager.onNext,
-                            presentation: .tabAccessory
-                        )
-                        .accessibilityElement(children: .contain)
-                        .accessibilityIdentifier("helpTabAccessory")
-                    }
-                }
-        } else {
-            phoneTabView
-        }
-    }
-
-    private var settingsHelpPagerHost: HelpTopicPagerHost? {
-        if #available(iOS 26.1, *) {
-            return helpTopicPagerHost
-        }
-        return nil
-    }
-
-    private var phoneTabView: some View {
         TabView(selection: selectedSectionBinding) {
 
             NavigationStack(path: $homePath) {
@@ -485,8 +446,7 @@ struct AppRootView: View {
                 phoneSectionContent(.settings) {
                     SettingsView(
                         workspace: workspace,
-                        selectedWorkspaceID: $selectedWorkspaceID,
-                        helpTopicPagerHost: settingsHelpPagerHost
+                        selectedWorkspaceID: $selectedWorkspaceID
                     )
                 }
             }

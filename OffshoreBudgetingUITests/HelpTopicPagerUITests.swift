@@ -2,10 +2,7 @@ import XCTest
 
 @MainActor
 final class HelpTopicPagerUITests: XCTestCase {
-    func testRotationMovesPagerOutOfTabBarWithoutLosingTopic() throws {
-        guard #available(iOS 26.1, *) else {
-            throw XCTSkip("The tab accessory requires iOS 26.1.")
-        }
+    func testPagerStaysSeparateFromTabsAndKeepsTopicAcrossRotation() throws {
         continueAfterFailure = false
         let device = XCUIDevice.shared
         device.orientation = .portrait
@@ -28,23 +25,28 @@ final class HelpTopicPagerUITests: XCTestCase {
             row.tap()
         }
 
-        let accessory = app.descendants(matching: .any).matching(identifier: "helpTabAccessory").firstMatch
-        XCTAssertTrue(accessory.waitForExistence(timeout: 5))
-        attachScreenshot("Help portrait accessory")
+        let back = app.buttons["helpPagerBack"]
+        let next = app.buttons["helpPagerNext"]
+        XCTAssertTrue(back.waitForExistence(timeout: 5))
+        XCTAssertTrue(next.isHittable)
+        XCTAssertFalse(app.tabBars.buttons["helpPagerNext"].exists)
+        attachScreenshot("Help portrait footer")
 
         device.orientation = .landscapeLeft
-        XCTAssertTrue(accessory.waitForNonExistence(timeout: 5))
         XCTAssertTrue(app.navigationBars["Planned Expenses"].exists)
         XCTAssertTrue(settingsTab.exists)
-        let next = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Next")).firstMatch
         XCTAssertTrue(next.waitForExistence(timeout: 5))
+        XCTAssertTrue(back.isHittable)
+        XCTAssertFalse(app.tabBars.buttons["helpPagerNext"].exists)
         attachScreenshot("Help landscape footer")
         next.tap()
         XCTAssertTrue(app.navigationBars["Variable Expenses"].waitForExistence(timeout: 5))
 
         device.orientation = .portrait
-        XCTAssertTrue(accessory.waitForExistence(timeout: 5))
+        XCTAssertTrue(back.waitForExistence(timeout: 5))
         XCTAssertTrue(app.navigationBars["Variable Expenses"].exists)
+        back.tap()
+        XCTAssertTrue(app.navigationBars["Planned Expenses"].waitForExistence(timeout: 5))
     }
 
     private func attachScreenshot(_ name: String) {

@@ -1,6 +1,8 @@
 import SwiftUI
 
 struct OnboardingNavigationButtons: View {
+    nonisolated fileprivate static let buttonSize = TintedGlassNavigationButton.minimumSize
+
     let isFinalStep: Bool
     let onBack: () -> Void
     let onAdvance: () -> Void
@@ -14,38 +16,33 @@ struct OnboardingNavigationButtons: View {
 
     func addingButton(_ title: LocalizedStringKey, action: @escaping () -> Void) -> some View {
         row {
-            Button(action: action) {
-                Image(systemName: "plus")
-                    .font(.headline)
-                    .foregroundStyle(.primary)
-                    .frame(minWidth: 44, minHeight: 44)
+            if #available(iOS 26.0, macCatalyst 26.0, *) {
+                symbolButton(title, symbol: "plus", action: action)
+            } else {
+                Button(action: action) {
+                    Label(title, systemImage: "plus")
+                        .labelStyle(.iconOnly)
+                        .frame(minWidth: Self.buttonSize, minHeight: Self.buttonSize)
+                }
+                .buttonStyle(.bordered)
+                .buttonBorderShape(.circle)
+                .tint(nil)
             }
-            .glassButtonStyleCompat(catalystShape: .circle)
-            .buttonBorderShape(.circle)
-            .tint(nil)
-            .accessibilityLabel(Text(title))
         }
     }
 
+    @ViewBuilder
     private func row<Center: View>(@ViewBuilder center: () -> Center) -> some View {
-        HStack(spacing: 12) {
-            Button(action: onBack) {
-                Text("Back")
-                    .frame(maxWidth: .infinity, minHeight: 44)
-            }
-            .glassProminentButtonStyleCompat()
-            .tint(.gray)
-
+        let buttons = HStack(spacing: 12) {
+            TintedGlassNavigationButton(title: Text("Back"), tint: .gray, action: onBack)
             center()
-
-            Button(action: onAdvance) {
-                Text(primaryTitle)
-                    .frame(maxWidth: .infinity, minHeight: 44)
-            }
-            .glassProminentButtonStyleCompat()
-            .tint(.accentColor)
+            TintedGlassNavigationButton(title: Text(primaryTitle), tint: .accentColor, action: onAdvance)
         }
-        .padding(.vertical, 14)
+        if #available(iOS 26.0, macCatalyst 26.0, *) {
+            buttons.padding(.vertical, 4)
+        } else {
+            buttons.padding(.vertical, 14)
+        }
     }
 
     @available(iOS 27.1, *)
@@ -71,17 +68,17 @@ struct OnboardingNavigationButtons: View {
         addSpacing: CGFloat
     ) -> some View {
         VStack(spacing: OnboardingSideControls.buttonSpacing) {
-            sideButton("Back", symbol: "chevron.backward", action: onBack)
-            sideButton(primaryTitle, symbol: primarySymbol, action: onAdvance)
+            symbolButton("Back", symbol: "chevron.backward", action: onBack)
+            symbolButton(primaryTitle, symbol: primarySymbol, action: onAdvance)
             if let addTitle, let onAdd {
-                sideButton(addTitle, symbol: "plus", action: onAdd)
+                symbolButton(addTitle, symbol: "plus", action: onAdd)
                     .padding(.top, addSpacing)
             }
         }
     }
 
-    @available(iOS 27.1, *)
-    private func sideButton(
+    @available(iOS 26.0, macCatalyst 26.0, *)
+    private func symbolButton(
         _ title: LocalizedStringKey,
         symbol: String,
         action: @escaping () -> Void
@@ -91,7 +88,7 @@ struct OnboardingNavigationButtons: View {
                 .labelStyle(.iconOnly)
                 .font(.headline)
                 .foregroundStyle(.primary)
-                .frame(width: OnboardingSideControls.buttonSize, height: OnboardingSideControls.buttonSize)
+                .frame(width: Self.buttonSize, height: Self.buttonSize)
                 .contentShape(.circle)
                 .glassEffect(.regular.interactive(), in: .circle)
         }
@@ -101,7 +98,6 @@ struct OnboardingNavigationButtons: View {
 
 @available(iOS 27.1, *)
 private struct OnboardingSideControls: ViewModifier {
-    nonisolated static let buttonSize: CGFloat = 44
     nonisolated static let buttonSpacing: CGFloat = 8
     nonisolated private static let edgePadding: CGFloat = 12
 
@@ -154,6 +150,7 @@ private struct OnboardingSideControls: ViewModifier {
         let divisions = proxy.reservedRegions(kind: .division, options: .includeInactive, layoutDirectionBehavior: .fixed)
         guard !divisions.isEmpty else { return nil }
 
+        let buttonSize = OnboardingNavigationButtons.buttonSize
         let railWidth = buttonSize + 2 * edgePadding
         guard proxy.size.width >= railWidth else { return nil }
         let rail = CGRect(x: proxy.size.width - railWidth, y: 0, width: railWidth, height: proxy.size.height)

@@ -11,16 +11,10 @@ import SwiftData
 struct SettingsView: View {
 
     let workspace: Workspace
-    private let helpTopicPagerHost: HelpTopicPagerHost?
     @Binding var selectedWorkspaceID: String
 
-    init(
-        workspace: Workspace,
-        selectedWorkspaceID: Binding<String>,
-        helpTopicPagerHost: HelpTopicPagerHost? = nil
-    ) {
+    init(workspace: Workspace, selectedWorkspaceID: Binding<String>) {
         self.workspace = workspace
-        self.helpTopicPagerHost = helpTopicPagerHost
         _selectedWorkspaceID = selectedWorkspaceID
     }
 
@@ -266,7 +260,7 @@ struct SettingsView: View {
         case .workspaceProgress:
             WorkspaceProgressView(workspace: workspace)
         case .help:
-            SettingsHelpView(pagerHost: helpTopicPagerHost)
+            SettingsHelpView()
         case .general:
             SettingsGeneralView(workspace: workspace)
         case .privacy:

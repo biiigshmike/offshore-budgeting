@@ -1,7 +1,6 @@
 import SwiftUI
 
 struct SettingsHelpView: View {
-    var pagerHost: HelpTopicPagerHost?
     @State private var searchText: String = ""
     @State private var expandedTopicIDs: Set<String> = []
     private let faqEngine = HelpFAQEngine()
@@ -89,8 +88,7 @@ struct SettingsHelpView: View {
                                     expandedSnippet(for: result),
                                     queryTokens: queryTokens
                                 ),
-                                isExpanded: expansionBinding(for: result.topic.id),
-                                pagerHost: pagerHost
+                                isExpanded: expansionBinding(for: result.topic.id)
                             )
                         }
                     }
@@ -125,7 +123,7 @@ struct SettingsHelpView: View {
 
     private func destinationNavigationLink(_ destination: GeneratedHelpDestination) -> some View {
         NavigationLink {
-            HelpDestinationTopicsView(destination: destination, pagerHost: pagerHost)
+            HelpDestinationTopicsView(destination: destination)
         } label: {
             HelpRowLabel(
                 iconSystemName: destination.iconSystemName,
@@ -347,7 +345,6 @@ private struct HelpSearchResultDisclosureRow: View {
     let previewSnippet: AttributedString
     let expandedSnippet: AttributedString
     @Binding var isExpanded: Bool
-    let pagerHost: HelpTopicPagerHost?
 
     var body: some View {
         DisclosureGroup(isExpanded: $isExpanded) {
@@ -359,7 +356,7 @@ private struct HelpSearchResultDisclosureRow: View {
                 }
 
                 NavigationLink {
-                    HelpTopicDetailView(topic: topic, pagerHost: pagerHost)
+                    HelpTopicDetailView(topic: topic)
                 } label: {
                     Label(String(localized: "help.openTopic", defaultValue: "Open Topic", comment: "Action to open a help topic."), systemImage: "arrow.right.circle")
                         .font(.subheadline.weight(.semibold))
@@ -394,13 +391,12 @@ private struct HelpSearchResultDisclosureRow: View {
 
 private struct HelpDestinationTopicsView: View {
     let destination: GeneratedHelpDestination
-    let pagerHost: HelpTopicPagerHost?
 
     var body: some View {
         List {
             ForEach(GeneratedHelpContent.visibleLeafTopics(for: destination)) { topic in
                 NavigationLink {
-                    HelpTopicDetailView(topic: topic, pagerHost: pagerHost)
+                    HelpTopicDetailView(topic: topic)
                 } label: {
                     Text(topic.title)
                 }
@@ -420,17 +416,11 @@ struct HelpTopicDetailView: View {
     @State private var selectedMediaIDsBySectionID: [String: String] = [:]
     @State private var fullscreenPresentation: HelpFullscreenPresentation?
     @Environment(\.openURL) private var openURL
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-    @Environment(\.verticalSizeClass) private var verticalSizeClass
-    private let pagerHost: HelpTopicPagerHost?
-    @State private var pagerOwner = UUID()
-    @State private var isVisible = false
 
     private let topAnchorID: String = "help-topic-top-anchor"
 
-    init(topic: GeneratedHelpLeafTopic, pagerHost: HelpTopicPagerHost? = nil) {
+    init(topic: GeneratedHelpLeafTopic) {
         self.topic = topic
-        self.pagerHost = pagerHost
         _currentTopicID = State(initialValue: topic.id)
     }
 
@@ -477,33 +467,14 @@ struct HelpTopicDetailView: View {
             }
             .navigationTitle(currentTopic.title)
             .safeAreaInset(edge: .bottom, spacing: 0) {
-                if pagerHost == nil || !HelpTopicPagerHost.supportsTabAccessory(
-                    verticalSizeClass: verticalSizeClass,
-                    dynamicTypeSize: dynamicTypeSize
-                ) {
-                    HelpTopicPagerBar(
-                        previousTitle: previousTopic?.title,
-                        nextTitle: nextTopic?.title,
-                        onBack: goToPreviousTopic,
-                        onNext: goToNextTopic,
-                        presentation: pagerHost != nil && verticalSizeClass == .compact && !dynamicTypeSize.isAccessibilitySize
-                            ? .compactFooter : .footer
-                    )
-                }
-            }
-            .onAppear {
-                isVisible = true
-                updateTabAccessory()
-            }
-            .onDisappear {
-                isVisible = false
-                pagerHost?.dismiss(owner: pagerOwner)
-            }
-            .onChange(of: fullscreenPresentation != nil) { _, _ in
-                updateTabAccessory()
+                HelpTopicPagerBar(
+                    previousTitle: previousTopic?.title,
+                    nextTitle: nextTopic?.title,
+                    onBack: goToPreviousTopic,
+                    onNext: goToNextTopic
+                )
             }
             .onChange(of: currentTopicID) { _, _ in
-                updateTabAccessory()
                 selectedMediaIDsBySectionID = [:]
                 fullscreenPresentation = nil
 
@@ -588,29 +559,6 @@ struct HelpTopicDetailView: View {
         } else {
             selectedMediaIDsBySectionID[section.id] = tappedItem.id
         }
-    }
-
-    private func updateTabAccessory() {
-        guard let pagerHost else { return }
-        guard isVisible, fullscreenPresentation == nil else {
-            pagerHost.dismiss(owner: pagerOwner)
-            return
-        }
-
-        let selection = $currentTopicID
-        let previous = previousTopic
-        let next = nextTopic
-        pagerHost.presentation = HelpTopicPagerHost.Presentation(
-            owner: pagerOwner,
-            previousTitle: previous?.title,
-            nextTitle: next?.title,
-            onBack: {
-                if let previous { selection.wrappedValue = previous.id }
-            },
-            onNext: {
-                if let next { selection.wrappedValue = next.id }
-            }
-        )
     }
 
     private func goToPreviousTopic() {
