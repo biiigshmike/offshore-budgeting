@@ -43,6 +43,37 @@ final class OffshoreBudgetingUITests: XCTestCase {
     }
 
     @MainActor
+    func testOnboarding_reselectingICloud_preservesWorkspaceAndCanAdvance() throws {
+        let app = makeAppForUITesting(scenario: "-uiTestScenarioICloudHasExistingWorkspace")
+        app.launch()
+
+        app.buttons["Get Started"].tap()
+        app.buttons["iCloud"].tap()
+        XCTAssertTrue(app.buttons["Existing iCloud Workspace"].firstMatch.waitForExistence(timeout: 5))
+
+        app.buttons["Add Workspace"].tap()
+        let nameField = app.textFields["Name"].firstMatch
+        XCTAssertTrue(nameField.waitForExistence(timeout: 5))
+        nameField.tap()
+        nameField.typeText("Retained Workspace")
+        app.buttons["Save"].tap()
+
+        let retainedWorkspace = app.buttons.matching(
+            NSPredicate(format: "label CONTAINS %@", "Retained Workspace")
+        ).firstMatch
+        XCTAssertTrue(retainedWorkspace.waitForExistence(timeout: 5))
+
+        app.buttons["Back"].tap()
+        XCTAssertTrue(app.staticTexts["onboarding.storageHeading"].waitForExistence(timeout: 5))
+        app.buttons["iCloud"].tap()
+
+        XCTAssertTrue(retainedWorkspace.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["Existing iCloud Workspace"].firstMatch.exists)
+        app.buttons["Next"].tap()
+        XCTAssertTrue(privacyStepTitle(in: app, usesICloud: true).waitForExistence(timeout: 5))
+    }
+
+    @MainActor
     func testLaunchPerformance() throws {
         // This measures how long it takes to launch your application.
         measure(metrics: [XCTApplicationLaunchMetric()]) {

@@ -16,16 +16,14 @@ private struct ContentViewCardDataSignature: Equatable {
 
 struct ContentView: View {
     let initialSectionOverride: AppSection?
-    let resumeState: ContentViewResumeState
+    @StateObject private var resumeState = ContentViewResumeState()
     private let widgetRefreshExecutor: ContentViewWidgetRefreshExecutor
 
     init(
         initialSectionOverride: AppSection? = nil,
-        resumeState: ContentViewResumeState,
         modelContainer: ModelContainer
     ) {
         self.initialSectionOverride = initialSectionOverride
-        self.resumeState = resumeState
         self.widgetRefreshExecutor = ContentViewWidgetRefreshExecutor(modelContainer: modelContainer)
     }
 
@@ -391,12 +389,14 @@ struct ContentView: View {
         .environment(\.appPresentationActivity, presentationActivity)
         .environment(\.automaticLaunchPromptsDeferred, defersAutomaticLaunchPrompts)
         .onChange(of: didCompleteOnboarding) { _, completed in
-            if !completed { progressHandoffWorkspace = nil }
             if completed {
                 scheduleDeferredResumeRefresh(
                     trigger: .settingsChanged,
-                    includesWidgets: false, includesSavings: false, includesNotifications: true
+                    includesWidgets: false, includesSavings: true, includesNotifications: true
                 )
+            } else {
+                progressHandoffWorkspace = nil
+                cancelDeferredResumeRefresh()
             }
         }
         .onChange(of: workspaces.map(\.id), initial: true) { previousIDs, currentIDs in
@@ -413,6 +413,7 @@ struct ContentView: View {
             }
         }
         .onDisappear {
+            cancelDeferredResumeRefresh()
             // Closing a window releases its process-wide claim; consumed requests stay consumed.
             finishProgressHandoff()
         }
@@ -515,7 +516,7 @@ struct ContentView: View {
         let plan = ContentViewDeferredRefreshPlanner.plan(
             trigger: trigger,
             widgetSignature: includesWidgets ? widgetRefreshSignature : nil,
-            savingsSignature: includesSavings ? savingsRefreshSignature : nil,
+            savingsSignature: includesSavings && didCompleteOnboarding ? savingsRefreshSignature : nil,
             notificationSignature: includesNotifications ? notificationRefreshSignature : nil,
             shouldRefreshWidgetsOnForeground: shouldRefreshWidgetsOnForeground,
             shouldRefreshSavingsOnForeground: shouldRefreshSavingsOnForeground
@@ -609,7 +610,7 @@ struct ContentView: View {
                 }
             }
 
-            guard request.savingsSignature != nil else { return }
+            guard let savingsSignature = request.savingsSignature else { return }
 
             try? await Task.sleep(nanoseconds: ResumeScheduling.savingsDelayNanos)
             guard Task.isCancelled == false else { return }
@@ -625,7 +626,11 @@ struct ContentView: View {
             guard shouldContinueSavings else { return }
 
             await MainActor.run {
-                runSavingsAutoCaptureIfPossible()
+                guard !Task.isCancelled,
+                      resumeState.coordinator.isCurrent(request),
+                      didCompleteOnboarding,
+                      UUID(uuidString: selectedWorkspaceID) == savingsSignature.workspaceID else { return }
+                runSavingsAutoCaptureIfPossible(workspaceID: savingsSignature.workspaceID)
                 resumeState.markSavingsRefreshCompleted(request)
                 traceResume("completed savings trigger=\(trigger.rawValue)")
                 TabFlickerDiagnostics.markEvent(
@@ -654,7 +659,7 @@ struct ContentView: View {
 
     @MainActor
     private func shouldRefreshSavingsOnForeground(now: Date = .now) -> Bool {
-        guard let workspace = selectedWorkspace else { return false }
+        guard didCompleteOnboarding, let workspace = selectedWorkspace else { return false }
         return SavingsAccountService.shouldRunForegroundAutoCapture(
             for: workspace,
             defaultBudgetingPeriodRaw: defaultBudgetingPeriodRaw,
@@ -848,18 +853,22 @@ struct ContentView: View {
     }
 
     @MainActor
-    private func runSavingsAutoCaptureIfPossible() {
+    private func runSavingsAutoCaptureIfPossible(workspaceID: UUID) {
         if DebugScreenshotFormDefaults.isEnabled {
             return
         }
 
-        guard let workspace = selectedWorkspace else { return }
+        // Resolve the workspace in the write context before assigning ledger relationships.
+        var workspaceDescriptor = FetchDescriptor<Workspace>(
+            predicate: #Predicate<Workspace> { $0.id == workspaceID }
+        )
+        workspaceDescriptor.fetchLimit = 1
+        guard let workspace = (try? modelContext.fetch(workspaceDescriptor))?.first else { return }
         let start = DispatchTime.now().uptimeNanoseconds
         TabFlickerDiagnostics.markEvent(
             "savingsAutoCaptureStarted",
             metadata: ["workspaceID": workspace.id.uuidString]
         )
-        let workspaceID = workspace.id
         _ = SavingsAccountService.normalizeSavingsData(for: workspace, modelContext: modelContext)
 
         let incomeDescriptor = FetchDescriptor<Income>(
