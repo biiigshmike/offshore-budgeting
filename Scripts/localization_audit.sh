@@ -335,10 +335,10 @@ equals_key_allowlist = {
 # Brand names and valid words shared with English are intentionally unchanged.
 equals_key_allowlist |= {"Offshore Savings"}
 equals_key_allowlist |= {
-    "es": {"Personal"},
-    "de": {"Optional", "Start"},
+    "es": {"Hospital", "Hotel", "Personal", "Spa"},
+    "de": {"Museum", "Optional", "Start"},
     "fr": {"Message"},
-    "pt-BR": {"Email"},
+    "pt-BR": {"Email", "Hospital", "Hotel", "Marina", "Spa"},
 }.get(target_locale, set())
 
 # Match complete printf tokens, including positional, precision and length forms.
