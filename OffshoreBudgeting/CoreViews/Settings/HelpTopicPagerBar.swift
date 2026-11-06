@@ -6,8 +6,6 @@ struct HelpTopicPagerBar: View {
     let onBack: () -> Void
     let onNext: () -> Void
 
-    // Match the five-tab landscape bar at standard text sizes.
-    private static let maxWidth: CGFloat = 488
     private static let verticalGlassInset: CGFloat = 4
 
     var body: some View {
@@ -31,7 +29,7 @@ struct HelpTopicPagerBar: View {
                 .accessibilityIdentifier("helpPagerNext")
                 .disabled(nextTitle == nil)
         }
-        .frame(maxWidth: Self.maxWidth)
+        .frame(maxWidth: .infinity)
         .padding(.horizontal, 20)
         .padding(.vertical, 4)
     }

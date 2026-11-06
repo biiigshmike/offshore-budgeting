@@ -79,7 +79,7 @@ struct SettingsReleaseLogsView: View {
     static let releaseSections: [ReleaseSection] = [
         ReleaseSection(
             version: "2.5.1",
-            build: "24",
+            build: "25",
             items: [
                 ReleaseItem(
                     systemImage: "ladybug.slash",
