@@ -12,12 +12,12 @@ final class CategoryDetailUITests: XCTestCase {
 
     override func setUpWithError() throws { continueAfterFailure = false }
 
-    private func launchCategories(extraArguments: [String] = []) -> XCUIApplication {
+    private func launchCategories(currencyCode: String = "USD", extraArguments: [String] = []) -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments = [
             "-uiTesting", "-uiTestingReset", "-uiTestScenarioBudgetMenus", "-uiTestCategoryDetailHistory",
             "-tips_seenKeys", "tip.home.v1,tip.categories.v1,tip.cards.v1,tip.carddetail.v1",
-            "-general_defaultBudgetingPeriod", "monthly", "-general_currencyCode", "USD",
+            "-general_defaultBudgetingPeriod", "monthly", "-general_currencyCode", currencyCode,
             "-general_confirmBeforeDeleting", "YES", "-AppleLanguages", "(en)", "-AppleLocale", "en_US"
         ] + extraArguments
         app.launch()
@@ -188,6 +188,57 @@ final class CategoryDetailUITests: XCTestCase {
         cancel.tap()
         XCTAssertTrue(app.navigationBars["Edit Expense"].waitForNonExistence(timeout: 5))
         XCTAssertTrue(app.navigationBars["Detail Dining"].exists)
+    }
+
+    func testSortSegmentsReverseAndResetAtLargestTextSize() {
+        let app = launchCategories(currencyCode: "EUR", extraArguments: [
+            "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"
+        ])
+        openDining(in: app)
+        XCTAssertTrue((row("categoryDetail.total", in: app).value as? String)?.contains("€") == true)
+
+        let name = app.buttons["Name"]
+        let amount = app.buttons["Amount"]
+        let date = app.buttons["Date"]
+        reveal(date, in: app)
+        for segment in [name, amount, date] {
+            XCTAssertTrue(segment.isHittable)
+            XCTAssertGreaterThanOrEqual(segment.frame.width, 44)
+            XCTAssertGreaterThanOrEqual(segment.frame.height, 44)
+        }
+
+        XCTAssertTrue(date.isSelected)
+        XCTAssertEqual(date.value as? String, "Newest first")
+        date.tap()
+        XCTAssertEqual(date.value as? String, "Oldest first")
+
+        name.tap()
+        XCTAssertTrue(name.isSelected)
+        XCTAssertEqual(name.value as? String, "A–Z")
+        name.tap()
+        XCTAssertEqual(name.value as? String, "Z–A")
+
+        amount.tap()
+        XCTAssertTrue(amount.isSelected)
+        XCTAssertEqual(amount.value as? String, "Lowest first")
+        amount.tap()
+        XCTAssertEqual(amount.value as? String, "Highest first")
+
+        date.tap()
+        XCTAssertTrue(date.isSelected)
+        XCTAssertEqual(date.value as? String, "Newest first")
+        name.tap()
+        XCTAssertEqual(name.value as? String, "A–Z")
+        amount.tap()
+        XCTAssertEqual(amount.value as? String, "Lowest first")
+
+        let scrollStart = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.78))
+        let scrollEnd = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.40))
+        scrollStart.press(forDuration: 0.05, thenDragTo: scrollEnd)
+        let screenshot = XCTAttachment(screenshot: app.screenshot())
+        screenshot.name = "Expense sort segments with euros at largest accessibility text size"
+        screenshot.lifetime = .keepAlways
+        add(screenshot)
     }
 
     func testExpenseEditsRefreshWithoutResettingScopeOrDates() {

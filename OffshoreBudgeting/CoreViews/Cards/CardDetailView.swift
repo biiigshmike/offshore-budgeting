@@ -722,17 +722,16 @@ struct CardDetailView: View {
             }
             .pickerStyle(.segmented)
 
-            Picker("Sort", selection: $sortMode) {
-                Text("A–Z").tag(SortMode.az)
-                Text("Z–A").tag(SortMode.za)
-                Text("\(CurrencyFormatter.currencySymbol)↑").tag(SortMode.amountAsc)
-                Text("\(CurrencyFormatter.currencySymbol)↓").tag(SortMode.amountDesc)
-                Text(String(localized: "sort.dateShort.asc", defaultValue: "D↑", comment: "Compact ascending date sort label for segmented controls.")).tag(SortMode.dateAsc)
-                Text(String(localized: "sort.dateShort.desc", defaultValue: "D↓", comment: "Compact descending date sort label for segmented controls.")).tag(SortMode.dateDesc)
-            }
-            .pickerStyle(.segmented)
+            ExpenseSortControl(
+                selection: $sortMode,
+                name: (.az, .za),
+                amount: (.amountAsc, .amountDesc),
+                date: (.dateAsc, .dateDesc)
+            )
         } header: {
             Text("Sort")
+        } footer: {
+            Text("Tap the selected sort option again to reverse the order.")
         }
     }
 

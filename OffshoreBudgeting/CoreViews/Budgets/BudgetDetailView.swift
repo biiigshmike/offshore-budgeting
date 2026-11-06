@@ -1018,17 +1018,16 @@ struct BudgetDetailView: View {
             }
             .pickerStyle(.segmented)
 
-            Picker(String(localized: "common.sort", defaultValue: "Sort", comment: "Label for sort actions."), selection: $sortMode) {
-                Text("A–Z").tag(BudgetSortMode.az)
-                Text("Z–A").tag(BudgetSortMode.za)
-                Text("\(CurrencyFormatter.currencySymbol)↑").tag(BudgetSortMode.amountAsc)
-                Text("\(CurrencyFormatter.currencySymbol)↓").tag(BudgetSortMode.amountDesc)
-                Text(String(localized: "sort.dateShort.asc", defaultValue: "D↑", comment: "Compact ascending date sort label for segmented controls.")).tag(BudgetSortMode.dateAsc)
-                Text(String(localized: "sort.dateShort.desc", defaultValue: "D↓", comment: "Compact descending date sort label for segmented controls.")).tag(BudgetSortMode.dateDesc)
-            }
-            .pickerStyle(.segmented)
+            ExpenseSortControl(
+                selection: $sortMode,
+                name: (.az, .za),
+                amount: (.amountAsc, .amountDesc),
+                date: (.dateAsc, .dateDesc)
+            )
         } header: {
             Text(String(localized: "common.sort", defaultValue: "Sort", comment: "Label for sort actions."))
+        } footer: {
+            Text("Tap the selected sort option again to reverse the order.")
         }
     }
 

@@ -177,20 +177,17 @@ struct CategoryDetailView: View, Equatable {
             .pickerStyle(.segmented)
             .accessibilityIdentifier("categoryDetail.scope")
 
-            Picker("Sort", selection: $sortMode) {
-                Text("A–Z").tag(CategoryDetailSortMode.az)
-                Text("Z–A").tag(CategoryDetailSortMode.za)
-                Text("\(CurrencyFormatter.currencySymbol)↑").tag(CategoryDetailSortMode.amountAsc)
-                Text("\(CurrencyFormatter.currencySymbol)↓").tag(CategoryDetailSortMode.amountDesc)
-                Text(String(localized: "sort.dateShort.asc", defaultValue: "D↑", comment: "Compact ascending date sort label for segmented controls."))
-                    .tag(CategoryDetailSortMode.dateAsc)
-                Text(String(localized: "sort.dateShort.desc", defaultValue: "D↓", comment: "Compact descending date sort label for segmented controls."))
-                    .tag(CategoryDetailSortMode.dateDesc)
-            }
-            .pickerStyle(.segmented)
+            ExpenseSortControl(
+                selection: $sortMode,
+                name: (.az, .za),
+                amount: (.amountAsc, .amountDesc),
+                date: (.dateAsc, .dateDesc)
+            )
             .accessibilityIdentifier("categoryDetail.sort")
         } header: {
             Text("Sort")
+        } footer: {
+            Text("Tap the selected sort option again to reverse the order.")
         }
     }
 
