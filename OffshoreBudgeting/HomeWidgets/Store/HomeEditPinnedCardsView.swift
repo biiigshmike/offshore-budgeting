@@ -192,19 +192,25 @@ struct HomeEditPinnedCardsView: View {
                         )
                     }
                     .labelStyle(.iconOnly)
+                    .glassProminentButtonStyleCompat()
+                    .tint(.accentColor)
                     .id("finishEditing")
                 } else {
-                    Button(
-                        String(
-                            localized: "common.edit",
-                            defaultValue: "Edit",
-                            comment: "Generic action label to start editing."
-                        )
-                    ) {
+                    Button {
                         withAnimation {
                             editMode = .active
                         }
+                    } label: {
+                        Text(
+                            String(
+                                localized: "common.edit",
+                                defaultValue: "Edit",
+                                comment: "Generic action label to start editing."
+                            )
+                        )
+                        .foregroundStyle(.primary)
                     }
+                    .tint(.primary)
                     .id("startEditing")
                 }
             }

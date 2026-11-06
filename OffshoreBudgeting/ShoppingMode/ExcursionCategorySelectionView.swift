@@ -88,11 +88,14 @@ struct ExcursionCategorySelectionView: View {
                     .tint(.accentColor)
                     .accessibilityIdentifier("excursionSaveCategories")
                 } else {
-                    Button("Edit") {
+                    Button {
                         draftCategoryIDs = store.value.categoryIDs
                         editMode = .active
+                    } label: {
+                        Text("Edit")
+                            .foregroundStyle(.primary)
                     }
-                    .tint(.accentColor)
+                    .tint(.primary)
                     .accessibilityIdentifier("excursionEditCategories")
                 }
             }

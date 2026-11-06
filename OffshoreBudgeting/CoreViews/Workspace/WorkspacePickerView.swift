@@ -494,6 +494,7 @@ private struct WorkspaceExportReviewView: View {
                     Toggle(isOn: binding(for: section)) {
                         Label(section.displayTitle, systemImage: section.systemImage)
                     }
+                    .tint(Color("AccentColor"))
                 }
             }
         }

@@ -47,6 +47,7 @@ struct CategoryGoalsEditorView: View {
                 if allowsPlannedMinimum {
                     Section {
                         Toggle("Auto-Configure", isOn: $autoConfigure)
+                            .tint(Color("AccentColor"))
                             .accessibilityIdentifier("categoryGoals.autoConfigure")
                             .onChange(of: autoConfigure) { _, enabled in
                                 configureGoals(enabled: enabled)
