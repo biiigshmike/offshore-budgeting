@@ -106,14 +106,14 @@ struct AddPresetView: View {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Save") { save() }
                         .disabled(!canSave)
-                        .offshoreAccentTint()
+                        .tint(.accentColor)
                         .glassProminentButtonStyleCompat()
                 }
             } else {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Save") { save() }
                         .disabled(!canSave)
-                        .offshoreAccentTint()
+                        .tint(.accentColor)
                         .buttonStyle(.plain)
                 }
             }

@@ -192,8 +192,6 @@ struct HomeEditPinnedCardsView: View {
                         )
                     }
                     .labelStyle(.iconOnly)
-                    .glassProminentButtonStyleCompat()
-                    .offshoreAccentTint()
                     .id("finishEditing")
                 } else {
                     Button(
@@ -207,7 +205,6 @@ struct HomeEditPinnedCardsView: View {
                             editMode = .active
                         }
                     }
-                    .offshoreAccentTint()
                     .id("startEditing")
                 }
             }
@@ -225,7 +222,7 @@ struct HomeEditPinnedCardsView: View {
 
         HStack(spacing: 10) {
             Text(title(for: item.wrappedValue))
-                .foregroundStyle(.tint)
+                .foregroundStyle(Color("AccentColor"))
 
             if showsTileSizePicker {
                 Spacer()

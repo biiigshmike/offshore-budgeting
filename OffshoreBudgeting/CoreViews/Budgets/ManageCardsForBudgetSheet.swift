@@ -61,7 +61,7 @@ struct ManageCardsForBudgetSheet: View {
                                 .foregroundStyle(.secondary)
                         }
                     }
-                    .offshoreAccentTint()
+                    .tint(Color("AccentColor"))
                     .disabled(!canLink(card))
                 }
             }

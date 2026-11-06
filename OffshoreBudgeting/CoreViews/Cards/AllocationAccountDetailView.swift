@@ -123,7 +123,6 @@ struct AllocationAccountDetailView: View {
                         } label: {
                             Label("Edit Reconciliation", systemImage: "pencil")
                         }
-                        .offshoreAccentTint()
 
                         Divider()
 
@@ -172,7 +171,6 @@ struct AllocationAccountDetailView: View {
                         } label: {
                             Label("Edit Reconciliation", systemImage: "pencil")
                         }
-                        .offshoreAccentTint()
 
                         Divider()
 
@@ -559,7 +557,7 @@ struct AllocationAccountDetailView: View {
                                 } label: {
                                     Label("Edit", systemImage: "pencil")
                                 }
-                                .offshoreAccentTint()
+                                .tint(Color("AccentColor"))
                             }
                             if isEditableChargeRow(row), !account.isArchived {
                                 Button {
@@ -572,7 +570,7 @@ struct AllocationAccountDetailView: View {
                                 } label: {
                                     Label("Edit", systemImage: "pencil")
                                 }
-                                .offshoreAccentTint()
+                                .tint(Color("AccentColor"))
                             }
                         }
                         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
@@ -1236,14 +1234,14 @@ private struct EditSharedBalanceEntryView: View {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Save") { save() }
                         .disabled(!canSave)
-                        .offshoreAccentTint()
+                        .tint(.accentColor)
                         .glassProminentButtonStyleCompat()
                 }
             } else {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Save") { save() }
                         .disabled(!canSave)
-                        .offshoreAccentTint()
+                        .tint(.accentColor)
                         .controlSize(.large)
                         .buttonStyle(.plain)
                 }
@@ -1631,14 +1629,14 @@ private struct AddAllocationSettlementView: View {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Save") { save() }
                         .disabled(!canSave)
-                        .offshoreAccentTint()
+                        .tint(.accentColor)
                         .glassProminentButtonStyleCompat()
                 }
             } else {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Save") { save() }
                         .disabled(!canSave)
-                        .offshoreAccentTint()
+                        .tint(.accentColor)
                         .controlSize(.large)
                         .buttonStyle(.plain)
                 }

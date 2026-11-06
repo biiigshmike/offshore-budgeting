@@ -232,11 +232,11 @@ struct CategoryDetailView: View, Equatable {
             SharedPlannedExpenseRow(expense: expense, showsCardName: true)
                 .swipeActions(edge: .leading, allowsFullSwipe: false) {
                     Button("Edit", systemImage: "pencil") { modal = .editPlanned(expense) }
-                        .offshoreAccentTint()
+                        .tint(Color("AccentColor"))
                     if let presetID = expense.sourcePresetID,
                        let preset = workspacePresets.first(where: { $0.id == presetID }) {
                         Button("Edit Preset", systemImage: "list.bullet.rectangle") { modal = .editPreset(preset) }
-                            .offshoreSecondaryAccentTint()
+                            .tint(Color("OffshoreSand"))
                     }
                 }
                 .swipeActions(edge: .trailing, allowsFullSwipe: true) { deleteButton(item) }
@@ -247,7 +247,7 @@ struct CategoryDetailView: View, Equatable {
             .buttonStyle(.plain)
             .swipeActions(edge: .leading, allowsFullSwipe: true) {
                 Button("Edit", systemImage: "pencil") { modal = .editVariable(expense) }
-                    .offshoreAccentTint()
+                    .tint(Color("AccentColor"))
             }
             .swipeActions(edge: .trailing, allowsFullSwipe: true) { deleteButton(item) }
         }
@@ -262,7 +262,7 @@ struct CategoryDetailView: View, Equatable {
                 delete(item)
             }
         }
-        .offshoreAccentTint()
+        .tint(Color("OffshoreDepth"))
     }
 
     private var displayMenu: some View {

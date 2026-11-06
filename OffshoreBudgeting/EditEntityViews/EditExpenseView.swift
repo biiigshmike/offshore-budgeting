@@ -135,14 +135,14 @@ struct EditExpenseView: View {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Save") { save() }
                         .disabled(!canSave)
-                        .offshoreAccentTint()
+                        .tint(.accentColor)
                         .glassProminentButtonStyleCompat()
                 }
             } else {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Save") { save() }
                         .disabled(!canSave)
-                        .offshoreAccentTint()
+                        .tint(.accentColor)
                         .controlSize(.large)
                         .buttonStyle(.plain)
                 }

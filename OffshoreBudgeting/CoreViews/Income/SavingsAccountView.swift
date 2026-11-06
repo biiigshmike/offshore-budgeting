@@ -391,7 +391,7 @@ struct SavingsAccountView<TrailingToolbar: ToolbarContent>: View {
                                 } label: {
                                     Label("Edit", systemImage: "pencil")
                                 }
-                                .offshoreAccentTint()
+                                .tint(Color("AccentColor"))
                             }
                             .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                                 Button(role: .destructive) {
@@ -399,7 +399,7 @@ struct SavingsAccountView<TrailingToolbar: ToolbarContent>: View {
                                 } label: {
                                     Label("Delete", systemImage: "trash")
                                 }
-                                .offshoreAccentTint()
+                                .tint(Color("OffshoreDepth"))
                             }
                         } else {
                             SavingsLedgerRow(entry: entry)

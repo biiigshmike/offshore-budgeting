@@ -26,7 +26,7 @@ struct ExcursionPreferencesView: View {
                 }
                 .accessibilityIdentifier("excursionAllCategories")
                 Toggle("Include uncategorized places", isOn: $includeUncategorized)
-                    .offshoreAccentTint()
+                    .tint(.accentColor)
                     .disabled(store.value.selectedSupportedCategoryIDs.isEmpty)
                     .accessibilityIdentifier("excursionIncludeUncategorized")
             } header: {
@@ -55,7 +55,7 @@ struct ExcursionPreferencesView: View {
                 Text("Preferences apply immediately to Excursion Mode on this device, across all workspaces.")
             }
         }
-        .offshoreAccentTint()
+        .tint(.accentColor)
         .navigationTitle("Excursion Preferences")
         .onChange(of: includeUncategorized) { _, value in
             var next = store.value

@@ -65,7 +65,7 @@ struct RestartRequiredView: View {
                                 .frame(maxWidth: .infinity, minHeight: 44)
                         }
                         .glassProminentButtonStyleCompat()
-                        .offshoreAccentTint()
+                        .tint(.accentColor)
                     } else {
                         Button {
                             onPrimary()
@@ -74,7 +74,7 @@ struct RestartRequiredView: View {
                                 .frame(maxWidth: .infinity, minHeight: 44)
                         }
                         .buttonStyle(.borderedProminent)
-                        .offshoreAccentTint()
+                        .tint(.accentColor)
                     }
                 }
             } else {
@@ -86,7 +86,7 @@ struct RestartRequiredView: View {
                             .frame(maxWidth: .infinity, minHeight: 44)
                     }
                     .glassProminentButtonStyleCompat()
-                    .offshoreAccentTint()
+                    .tint(.accentColor)
                 } else {
                     Button {
                         onPrimary()
@@ -95,7 +95,7 @@ struct RestartRequiredView: View {
                             .frame(maxWidth: .infinity, minHeight: 44)
                     }
                     .buttonStyle(.borderedProminent)
-                    .offshoreAccentTint()
+                    .tint(.accentColor)
                 }
             }
 

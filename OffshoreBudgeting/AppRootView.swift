@@ -444,8 +444,6 @@ struct AppRootView: View {
                     homeRootView
                 }
             }
-            .offshoreAccentTint()
-            .background { NavigationAccentAppearance().allowsHitTesting(false) }
             .tabItem { Label(AppSection.home.title, systemImage: AppSection.home.systemImage) }
             .tag(AppSection.home)
 
@@ -456,8 +454,6 @@ struct AppRootView: View {
             }
             .environment(\.appTabActivationContext, activationContext(for: .budgets))
             .environment(\.postBoardingTipPresenterIsActive, selectedSection == .budgets)
-            .offshoreAccentTint()
-            .background { NavigationAccentAppearance().allowsHitTesting(false) }
             .tabItem { Label(AppSection.budgets.title, systemImage: AppSection.budgets.systemImage) }
             .tag(AppSection.budgets)
 
@@ -466,8 +462,6 @@ struct AppRootView: View {
                     IncomeWorkspaceView(workspace: workspace)
                 }
             }
-            .offshoreAccentTint()
-            .background { NavigationAccentAppearance().allowsHitTesting(false) }
             .tabItem { Label(AppSection.income.title, systemImage: AppSection.income.systemImage) }
             .tag(AppSection.income)
 
@@ -480,8 +474,6 @@ struct AppRootView: View {
             // the root; placing it only inside the stack leaves them inactive.
             .environment(\.appTabActivationContext, activationContext(for: .cards))
             .environment(\.postBoardingTipPresenterIsActive, selectedSection == .cards)
-            .offshoreAccentTint()
-            .background { NavigationAccentAppearance().allowsHitTesting(false) }
             .tabItem { Label(AppSection.cards.title, systemImage: AppSection.cards.systemImage) }
             .tag(AppSection.cards)
 
@@ -494,8 +486,6 @@ struct AppRootView: View {
                     )
                 }
             }
-            .offshoreAccentTint()
-            .background { NavigationAccentAppearance().allowsHitTesting(false) }
             .tabItem { Label(AppSection.settings.title, systemImage: AppSection.settings.systemImage) }
             .tag(AppSection.settings)
         }
@@ -508,29 +498,16 @@ struct AppRootView: View {
 
     // MARK: - iPad + Mac
 
-    @ViewBuilder
-    private func sidebarLabel(_ title: String, systemImage: String) -> some View {
-        #if targetEnvironment(macCatalyst) || os(macOS)
-        Label(title, systemImage: systemImage)
-        #else
-        Label {
-            Text(title).foregroundStyle(.primary)
-        } icon: {
-            Image(systemName: systemImage).foregroundStyle(.tint)
-        }
-        #endif
-    }
-
     private var splitView: some View {
         NavigationSplitView(columnVisibility: $splitViewVisibility) {
             List(selection: selectedSectionForSidebar) {
                 ForEach(AppSection.allCases) { section in
-                    sidebarLabel(section.title, systemImage: section.systemImage)
+                    Label(section.title, systemImage: section.systemImage)
                         .tag(SidebarSelection.section(section))
 
                     if section == .cards {
                         ForEach(AccountsView.Segment.allCases) { destination in
-                            sidebarLabel(destination.title, systemImage: destination.symbolName)
+                            Label(destination.title, systemImage: destination.symbolName)
                                 .font(.subheadline)
                                 .padding(.leading, 18)
                                 .tag(SidebarSelection.account(destination))
@@ -549,31 +526,27 @@ struct AppRootView: View {
                     Button {
                         activeQuickLinkSheet = .expense
                     } label: {
-                        Label {
-                            Text(String(
+                        Label(
+                            String(
                                 localized: "app.quickLinks.addExpense",
                                 defaultValue: "Add Expense",
                                 comment: "Sidebar quick link for adding an expense."
-                            ))
-                            .foregroundStyle(.primary)
-                        } icon: {
-                            Image(systemName: "plus").foregroundStyle(.tint)
-                        }
+                            ),
+                            systemImage: "plus"
+                        )
                     }
 
                     Button {
                         activeQuickLinkSheet = .income
                     } label: {
-                        Label {
-                            Text(String(
+                        Label(
+                            String(
                                 localized: "app.quickLinks.addIncome",
                                 defaultValue: "Add Income",
                                 comment: "Sidebar quick link for adding income."
-                            ))
-                            .foregroundStyle(.primary)
-                        } icon: {
-                            Image(systemName: "plus").foregroundStyle(.tint)
-                        }
+                            ),
+                            systemImage: "plus"
+                        )
                     }
                 }
             }
@@ -588,14 +561,11 @@ struct AppRootView: View {
             NavigationStack(path: selectedSectionPath) {
                 sectionRootView
             }
-            .offshoreAccentTint()
             .rootActivationBodyReporter(root: selectedSection.rawValue.lowercased(), context: context)
             .environment(\.postBoardingTipPresenterIsActive, true)
             .environment(\.appTabActivationContext, context)
             .id(selectedSection)
         }
-        .offshoreAccentTint()
-        .background { NavigationAccentAppearance().allowsHitTesting(false) }
         .background {
             MacWindowSceneTitleHost(title: macWindowSceneTitle)
         }

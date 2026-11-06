@@ -84,7 +84,7 @@ struct IncomeFormView: View {
                         
                     case .monthly:
                         Toggle("Last Day of Month", isOn: $monthlyIsLastDay)
-                            .offshoreAccentTint()
+                            .tint(Color("AccentColor"))
                         
                         if !monthlyIsLastDay {
                             Stepper("Day \(localizedInt(monthlyDayOfMonth))", value: $monthlyDayOfMonth, in: 1...31)

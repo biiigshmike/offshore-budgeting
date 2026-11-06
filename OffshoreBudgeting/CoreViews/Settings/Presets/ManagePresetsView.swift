@@ -151,14 +151,14 @@ struct ManagePresetsView: View {
                             } label: {
                                 Label("Edit", systemImage: "pencil")
                             }
-                            .offshoreAccentTint()
+                            .tint(Color("AccentColor"))
 
                             Button {
                                 archive(pinned)
                             } label: {
                                 Label("Archive", systemImage: "archivebox")
                             }
-                            .offshoreSecondaryAccentTint()
+                            .tint(Color("OffshoreSand"))
                         }
                         .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                             Button(role: .destructive) {
@@ -166,7 +166,7 @@ struct ManagePresetsView: View {
                             } label: {
                                 Label("Delete", systemImage: "trash")
                             }
-                            .offshoreAccentTint()
+                            .tint(Color("OffshoreDepth"))
                         }
                     }
                 }
@@ -195,14 +195,14 @@ struct ManagePresetsView: View {
                             } label: {
                                 Label("Edit", systemImage: "pencil")
                             }
-                            .offshoreAccentTint()
+                            .tint(Color("AccentColor"))
 
                             Button {
                                 archive(preset)
                             } label: {
                                 Label("Archive", systemImage: "archivebox")
                             }
-                            .offshoreSecondaryAccentTint()
+                            .tint(Color("OffshoreSand"))
                         }
                         .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                             Button(role: .destructive) {
@@ -210,7 +210,7 @@ struct ManagePresetsView: View {
                             } label: {
                                 Label("Delete", systemImage: "trash")
                             }
-                            .offshoreAccentTint()
+                            .tint(Color("OffshoreDepth"))
                         }
                     }
                 }
@@ -236,18 +236,18 @@ struct ManagePresetsView: View {
                             }
                             .swipeActions(edge: .leading, allowsFullSwipe: false) {
                                 Button {
-                                    sheetRoute = .edit(preset)
-                                } label: {
-                                    Label("Edit", systemImage: "pencil")
-                                }
-                                .offshoreAccentTint()
-
-                                Button {
                                     unarchive(preset)
                                 } label: {
                                     Label("Unarchive", systemImage: "arrow.uturn.backward")
                                 }
-                                .offshoreSecondaryAccentTint()
+                                .tint(.green)
+
+                                Button {
+                                    sheetRoute = .edit(preset)
+                                } label: {
+                                    Label("Edit", systemImage: "pencil")
+                                }
+                                .tint(Color("AccentColor"))
                             }
                             .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                                 Button(role: .destructive) {
@@ -255,7 +255,7 @@ struct ManagePresetsView: View {
                                 } label: {
                                     Label("Delete", systemImage: "trash")
                                 }
-                                .offshoreAccentTint()
+                                .tint(Color("OffshoreDepth"))
                             }
                         }
                     }

@@ -40,7 +40,7 @@ struct OnboardingNavigationButtons: View {
                     .frame(maxWidth: .infinity, minHeight: 44)
             }
             .glassProminentButtonStyleCompat()
-            .offshoreAccentTint()
+            .tint(.accentColor)
         }
         .padding(.vertical, 14)
     }

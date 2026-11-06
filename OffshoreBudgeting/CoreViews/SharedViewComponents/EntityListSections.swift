@@ -59,7 +59,7 @@ struct WorkspaceListRows: View {
                     } label: {
                         Label("Edit", systemImage: "pencil")
                     }
-                    .offshoreAccentTint()
+                    .tint(Color("AccentColor"))
                 }
                 .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                     Button(role: .destructive) {
@@ -67,7 +67,7 @@ struct WorkspaceListRows: View {
                     } label: {
                         Label("Delete", systemImage: "trash")
                     }
-                    .offshoreAccentTint()
+                    .tint(Color("OffshoreDepth"))
                 }
             }
 
@@ -182,24 +182,24 @@ struct CategoryListRows<Destination: View>: View {
                     } label: {
                         Label("Delete", systemImage: "trash")
                     }
-                    .offshoreAccentTint()
+                    .tint(Color("OffshoreDepth"))
                 }
                 .swipeActions(edge: .leading, allowsFullSwipe: false) {
-                    Button {
-                        onEdit(category)
-                    } label: {
-                        Label("Edit", systemImage: "pencil")
-                    }
-                    .offshoreAccentTint()
-
                     if let onUnarchive {
                         Button {
                             onUnarchive(category)
                         } label: {
                             Label("Unarchive", systemImage: "arrow.uturn.backward")
                         }
-                        .offshoreSecondaryAccentTint()
+                        .tint(.green)
                     }
+
+                    Button {
+                        onEdit(category)
+                    } label: {
+                        Label("Edit", systemImage: "pencil")
+                    }
+                    .tint(Color("AccentColor"))
 
                     if let onArchive {
                         Button {
@@ -207,7 +207,7 @@ struct CategoryListRows<Destination: View>: View {
                         } label: {
                             Label("Archive", systemImage: "archivebox")
                         }
-                        .offshoreSecondaryAccentTint()
+                        .tint(Color("OffshoreSand"))
                     }
                 }
             }

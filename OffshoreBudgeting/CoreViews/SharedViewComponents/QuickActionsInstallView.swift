@@ -90,7 +90,7 @@ struct QuickActionsInstallView: View {
                 } label: {
                     Text("Setup Guide for Installing Automation Shortcuts")
                         .font(.footnote.weight(.semibold))
-                        .foregroundStyle(.tint)
+                        .foregroundStyle(Color("AccentColor"))
                 }
             }
         }
@@ -157,7 +157,7 @@ private struct ShortcutLinkVariantCard: View {
                 HStack(alignment: .top, spacing: 8) {
                     Image(systemName: variant.systemImageName)
                         .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(.tint)
+                        .foregroundStyle(Color("AccentColor"))
                 }
 
                 Text(variant.title)

@@ -160,7 +160,7 @@ struct PillDatePickerField: View {
                         Button("Done") {
                             isPresented = false
                         }
-                        .offshoreAccentTint()
+                        .tint(.accentColor)
                         .controlSize(.large)
                         .glassProminentButtonStyleCompat()
                         .buttonBorderShape(.automatic)
@@ -170,7 +170,7 @@ struct PillDatePickerField: View {
                         Button("Done") {
                             isPresented = false
                         }
-                        .offshoreAccentTint()
+                        .tint(.accentColor)
                         .controlSize(.large)
                         .buttonStyle(.plain)
                     }
@@ -348,7 +348,7 @@ struct PillTimePickerField: View {
                         Button("Done") {
                             isPresented = false
                         }
-                        .offshoreAccentTint()
+                        .tint(.accentColor)
                         .controlSize(.large)
                         .glassProminentButtonStyleCompat()
                         .buttonBorderShape(.automatic)
@@ -358,7 +358,7 @@ struct PillTimePickerField: View {
                         Button("Done") {
                             isPresented = false
                         }
-                        .offshoreAccentTint()
+                        .tint(.accentColor)
                         .controlSize(.large)
                         .buttonStyle(.plain)
                     }

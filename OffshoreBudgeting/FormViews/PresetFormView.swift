@@ -115,7 +115,7 @@ struct PresetFormView: View {
             
         case .monthly:
             Toggle("Last Day of Month", isOn: $monthlyIsLastDay)
-                .offshoreAccentTint()
+                .tint(Color("AccentColor"))
             
             if !monthlyIsLastDay {
                 Picker("Day of Month", selection: $monthlyDayOfMonth) {

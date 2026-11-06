@@ -260,7 +260,7 @@ struct OnboardingView: View {
                         .frame(maxWidth: .infinity, minHeight: 52)
                 }
                 .glassProminentButtonStyleCompat()
-                .offshoreAccentTint()
+                .tint(.accentColor)
                 .disabled(isCheckingICloudForGetStarted)
 
                 Spacer(minLength: 18)
@@ -272,7 +272,7 @@ struct OnboardingView: View {
                         .frame(maxWidth: .infinity, minHeight: 52)
                 }
                 .buttonStyle(.borderedProminent)
-                .offshoreAccentTint()
+                .tint(.accentColor)
                 .disabled(isCheckingICloudForGetStarted)
 
                 Spacer(minLength: 18)
@@ -651,7 +651,7 @@ private struct OnboardingWorkspaceStep: View {
 
                 Section {
                     Toggle("Confirm Before Deleting", isOn: $confirmBeforeDeleting)
-                        .offshoreAccentTint()
+                        .tint(Color("AccentColor"))
                 } footer: {
                     Text("You can change these later in Settings.")
                 }
@@ -674,7 +674,7 @@ private struct OnboardingWorkspaceStep: View {
                         .frame(maxWidth: .infinity, minHeight: 44)
                 }
                 .buttonStyle(.borderedProminent)
-                .offshoreAccentTint()
+                .tint(.accentColor)
 
                 Spacer(minLength: 0)
             }
@@ -825,7 +825,7 @@ private struct OnboardingPrivacySyncStep: View {
 
                 Section("App Lock") {
                     Toggle(biometricsInfo.kind.displayName, isOn: $requireBiometrics)
-                        .offshoreAccentTint()
+                        .tint(Color("AccentColor"))
                         .disabled(!biometricsInfo.isAvailable)
                     
                     
@@ -847,7 +847,7 @@ private struct OnboardingPrivacySyncStep: View {
                             set: { wantsEnabled in
                                 handleICloudToggleChanged(wantsEnabled: wantsEnabled)
                             }
-                        )).offshoreAccentTint()
+                        )).tint(Color("AccentColor"))
 
                         
                         Text("Use iCloud to sync your workspaces and budgets across your devices signed into this Apple ID.")
@@ -1066,7 +1066,7 @@ private struct OnboardingCategoriesStep: View {
                         .frame(maxWidth: .infinity, minHeight: 44)
                 }
                 .buttonStyle(.borderedProminent)
-                .offshoreAccentTint()
+                .tint(.accentColor)
 
                 Spacer(minLength: 0)
             }
@@ -1175,7 +1175,7 @@ private struct OnboardingCardsStep: View {
                         .frame(maxWidth: .infinity, minHeight: 44)
                 }
                 .buttonStyle(.borderedProminent)
-                .offshoreAccentTint()
+                .tint(.accentColor)
 
                 Spacer(minLength: 0)
             }
@@ -1250,14 +1250,14 @@ private struct OnboardingCardsStep: View {
             } label: {
                 Label("Edit", systemImage: "pencil")
             }
-            .offshoreAccentTint()
+            .tint(Color("AccentColor"))
 
             Button(role: .destructive) {
                 deleteCardWithOptionalConfirm(card)
             } label: {
                 Label("Delete", systemImage: "trash")
             }
-            .offshoreAccentTint()
+            .tint(Color("OffshoreDepth"))
         }
     }
 
@@ -1398,7 +1398,7 @@ private struct OnboardingPresetsStep: View {
                             } label: {
                                 Label("Edit", systemImage: "pencil")
                             }
-                            .offshoreAccentTint()
+                            .tint(Color("AccentColor"))
 
                             if preset.isArchived {
                                 Button {
@@ -1407,7 +1407,7 @@ private struct OnboardingPresetsStep: View {
                                 } label: {
                                     Label("Unarchive", systemImage: "arrow.uturn.backward")
                                 }
-                                .offshoreSecondaryAccentTint()
+                                .tint(.green)
                             } else {
                                 Button {
                                     preset.isArchived = true
@@ -1415,7 +1415,7 @@ private struct OnboardingPresetsStep: View {
                                 } label: {
                                     Label("Archive", systemImage: "archivebox")
                                 }
-                                .offshoreSecondaryAccentTint()
+                                .tint(Color("OffshoreSand"))
                             }
                         }
                         .swipeActions(edge: .trailing, allowsFullSwipe: true) {
@@ -1424,7 +1424,7 @@ private struct OnboardingPresetsStep: View {
                             } label: {
                                 Label("Delete", systemImage: "trash")
                             }
-                            .offshoreAccentTint()
+                            .tint(Color("OffshoreDepth"))
                         }
                     }
                 }
@@ -1447,7 +1447,7 @@ private struct OnboardingPresetsStep: View {
                         .frame(maxWidth: .infinity, minHeight: 44)
                 }
                 .buttonStyle(.borderedProminent)
-                .offshoreAccentTint()
+                .tint(.accentColor)
 
                 Spacer(minLength: 0)
             }

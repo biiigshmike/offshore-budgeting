@@ -291,7 +291,7 @@ private struct TipSheet: View {
             Text(buttonTitle)
                 .frame(maxWidth: .infinity, minHeight: 52)
         }
-        .offshoreAccentTint()
+        .tint(.accentColor)
     }
 }
 

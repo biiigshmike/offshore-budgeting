@@ -1,7 +1,6 @@
 import SwiftUI
 
 struct HelpTopicPagerBar: View {
-    @Environment(\.appearanceTheme) private var theme
 
     let previousTitle: String?
     let nextTitle: String?
@@ -22,7 +21,7 @@ struct HelpTopicPagerBar: View {
     }
 
     private var nextTint: Color {
-        isNextEnabled ? theme.accent : Color("OffshoreWave")
+        isNextEnabled ? Color("AccentColor") : Color("OffshoreWave")
     }
 
     private var backActionTitle: String {
@@ -93,7 +92,7 @@ struct HelpTopicPagerBar: View {
                         Text(nextActionTitle)
                         if isTabAccessory {
                             Image(systemName: "chevron.forward")
-                                .foregroundStyle(isNextEnabled ? theme.accent : Color.secondary)
+                                .foregroundStyle(isNextEnabled ? Color("AccentColor") : Color.secondary)
                                 .accessibilityHidden(true)
                         }
                     }

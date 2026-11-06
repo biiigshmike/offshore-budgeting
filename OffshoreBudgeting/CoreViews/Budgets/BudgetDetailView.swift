@@ -1107,7 +1107,7 @@ struct BudgetDetailView: View {
                 } label: {
                     Label("Edit", systemImage: "pencil")
                 }
-                .offshoreAccentTint()
+                .tint(Color("AccentColor"))
 
                 if let presetID = expense.sourcePresetID, let preset = presetBySourceID[presetID] {
                     Button {
@@ -1115,7 +1115,7 @@ struct BudgetDetailView: View {
                     } label: {
                         Label("Edit Preset", systemImage: "list.bullet.rectangle")
                     }
-                    .offshoreSecondaryAccentTint()
+                    .tint(Color("OffshoreSand"))
                 }
             }
             .swipeActions(edge: .trailing, allowsFullSwipe: true) {
@@ -1124,7 +1124,7 @@ struct BudgetDetailView: View {
                 } label: {
                     Label("Delete", systemImage: "trash")
                 }
-                .offshoreAccentTint()
+                .tint(Color("OffshoreDepth"))
             }
     }
 
@@ -1141,7 +1141,7 @@ struct BudgetDetailView: View {
             } label: {
                 Label("Edit", systemImage: "pencil")
             }
-            .offshoreAccentTint()
+            .tint(Color("AccentColor"))
         }
         .swipeActions(edge: .trailing, allowsFullSwipe: true) {
             Button {
@@ -1149,7 +1149,7 @@ struct BudgetDetailView: View {
             } label: {
                 Label("Delete", systemImage: "trash")
             }
-            .offshoreAccentTint()
+            .tint(Color("OffshoreDepth"))
         }
     }
 
@@ -1199,13 +1199,13 @@ struct BudgetDetailView: View {
             } label: {
                 Label(String(localized: "budgetDetail.editBudget", defaultValue: "Edit Budget", comment: "Menu action to edit the current budget."), systemImage: "pencil")
             }
-            .offshoreAccentTint()
+            .tint(Color("AccentColor"))
             Button(role: .destructive) {
                 handleDeleteBudgetTapped()
             } label: {
                 Label(String(localized: "budgetDetail.deleteBudget.action", defaultValue: "Delete Budget", comment: "Menu action to delete the current budget."), systemImage: "trash")
             }
-            .offshoreAccentTint()
+            .tint(Color("OffshoreDepth"))
         } label: {
             Label(String(localized: "budgetDetail.actions", defaultValue: "Budget Actions", comment: "Accessibility label for budget actions menu."), systemImage: "ellipsis")
         }

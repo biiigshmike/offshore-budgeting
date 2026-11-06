@@ -92,7 +92,7 @@ struct SettingsPrivacyView: View {
 
             Section {
                 Toggle(biometricToggleTitle, isOn: $requireBiometricsToggle)
-                    .offshoreAccentTint()
+                    .tint(Color("AccentColor"))
                     .disabled(!biometricsToggleIsEnabled)
 
                 if !biometricsToggleIsEnabled {

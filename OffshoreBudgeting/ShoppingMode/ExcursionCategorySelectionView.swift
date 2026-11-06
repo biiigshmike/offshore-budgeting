@@ -52,7 +52,7 @@ struct ExcursionCategorySelectionView: View {
         }
         .listStyle(.insetGrouped)
         .environment(\.editMode, $editMode)
-        .offshoreAccentTint()
+        .tint(.accentColor)
         .navigationTitle("Categories")
         .navigationBarBackButtonHidden(isEditing)
         .toolbar(isEditing ? .hidden : .visible, for: .tabBar)
@@ -85,14 +85,14 @@ struct ExcursionCategorySelectionView: View {
                     .labelStyle(.iconOnly)
                     .disabled(!canSave)
                     .glassProminentButtonStyleCompat()
-                    .offshoreAccentTint()
+                    .tint(.accentColor)
                     .accessibilityIdentifier("excursionSaveCategories")
                 } else {
                     Button("Edit") {
                         draftCategoryIDs = store.value.categoryIDs
                         editMode = .active
                     }
-                    .offshoreAccentTint()
+                    .tint(.accentColor)
                     .accessibilityIdentifier("excursionEditCategories")
                 }
             }

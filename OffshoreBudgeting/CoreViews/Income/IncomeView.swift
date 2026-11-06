@@ -627,7 +627,7 @@ struct IncomeView: View {
             } label: {
                 Label("Delete", systemImage: "trash")
             }
-            .offshoreAccentTint()
+            .tint(Color("OffshoreDepth"))
         }
         .swipeActions(edge: .leading) {
             Button {
@@ -636,7 +636,7 @@ struct IncomeView: View {
             } label: {
                 Label("Edit", systemImage: "pencil")
             }
-            .offshoreAccentTint()
+            .tint(Color("AccentColor"))
         }
     }
 

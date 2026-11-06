@@ -81,7 +81,7 @@ struct BudgetRecordedPlannedExpensesReviewView: View {
                             } label: {
                                 Label("Delete", systemImage: "trash")
                             }
-                            .offshoreAccentTint()
+                            .tint(Color("OffshoreDepth"))
                         }
                     }
                 }

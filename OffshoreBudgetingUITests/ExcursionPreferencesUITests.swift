@@ -4,7 +4,7 @@ import XCTest
 final class ExcursionPreferencesUITests: XCTestCase {
     override func setUpWithError() throws { continueAfterFailure = false }
 
-    func testNavigationThemeAndNativeBack() {
+    func testLegacyThemePreferencePreservesNativeBack() {
         let app = XCUIApplication()
         app.launchArguments = ["-uiTesting", "-uiTestingReset", "-uiTestScenarioWorkspaceProgress",
                                "-appearance_theme", "heather",
@@ -13,14 +13,14 @@ final class ExcursionPreferencesUITests: XCTestCase {
         app.launch()
         openPreferences(app)
         let screenshot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
-        screenshot.name = "Themed native navigation"
+        screenshot.name = "Default navigation with legacy theme preference"
         screenshot.lifetime = .keepAlways
         add(screenshot)
         app.navigationBars["Excursion Preferences"].buttons.firstMatch.tap()
         XCTAssertTrue(app.buttons["excursionPreferences"].waitForExistence(timeout: 5))
     }
 
-    func testSidebarThemeRendering() throws {
+    func testSidebarIgnoresLegacyThemePreference() throws {
         try verifyNativeSidebar(theme: "heather")
     }
 
@@ -161,13 +161,13 @@ final class ExcursionPreferencesUITests: XCTestCase {
         XCTAssertEqual(amusementPark.value as? String, "Selected")
     }
 
-    func testBotanicalCategoryAppearance() {
+    func testLegacyThemePreferencePreservesCategoryEditing() {
         let app = launch(theme: "heather")
         openPreferences(app)
         app.buttons["excursionAllCategories"].tap()
-        attachScreenshot("Botanical categories read-only")
+        attachScreenshot("Default categories with legacy theme preference read-only")
         app.buttons["excursionEditCategories"].tap()
-        attachScreenshot("Botanical categories editing")
+        attachScreenshot("Default categories with legacy theme preference editing")
         app.buttons["excursionCancelCategories"].tap()
         XCTAssertTrue(app.buttons["excursionEditCategories"].exists)
     }

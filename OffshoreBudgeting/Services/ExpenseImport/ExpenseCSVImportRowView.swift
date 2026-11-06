@@ -362,7 +362,7 @@ struct ExpenseCSVImportRowView: View {
                 Text("Save for Future Imports")
             }
             .labelsHidden()
-            .offshoreAccentTint()
+            .tint(Color("AccentColor"))
         }
     }
 

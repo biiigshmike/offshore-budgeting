@@ -786,7 +786,7 @@ struct CardDetailView: View {
                 } label: {
                     Label("Edit", systemImage: "pencil")
                 }
-                .offshoreAccentTint()
+                .tint(Color("AccentColor"))
 
                 if let presetID = expense.sourcePresetID, let preset = presetBySourceID[presetID] {
                     Button {
@@ -794,7 +794,7 @@ struct CardDetailView: View {
                     } label: {
                         Label("Edit Preset", systemImage: "list.bullet.rectangle")
                     }
-                    .offshoreSecondaryAccentTint()
+                    .tint(Color("OffshoreSand"))
                 }
             }
             .swipeActions(edge: .trailing, allowsFullSwipe: true) {
@@ -805,7 +805,7 @@ struct CardDetailView: View {
                 } label: {
                     Label("Delete", systemImage: "trash")
                 }
-                .offshoreAccentTint()
+                .tint(Color("OffshoreDepth"))
             }
     }
 
@@ -834,7 +834,7 @@ struct CardDetailView: View {
             } label: {
                 Label("Edit", systemImage: "pencil")
             }
-            .offshoreAccentTint()
+            .tint(Color("AccentColor"))
         }
         .swipeActions(edge: .trailing, allowsFullSwipe: true) {
             Button(role: .destructive) {
@@ -844,7 +844,7 @@ struct CardDetailView: View {
             } label: {
                 Label("Delete", systemImage: "trash")
             }
-            .offshoreAccentTint()
+            .tint(Color("OffshoreDepth"))
         }
     }
 
@@ -930,7 +930,6 @@ struct CardDetailView: View {
             } label: {
                 Label("Edit Card", systemImage: "pencil")
             }
-            .offshoreAccentTint()
 
             Divider()
 

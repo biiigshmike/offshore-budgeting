@@ -78,7 +78,7 @@ struct ManagePresetsForBudgetSheet: View {
                                 }
                             }
                         }
-                        .offshoreAccentTint()
+                        .tint(Color("AccentColor"))
                         .disabled(!canLink(preset) || (preset.isArchived && !isLinked(preset)) || (linkedCardIDs.isEmpty && !isLinked(preset)))
                     }
                 }

@@ -610,7 +610,7 @@ struct WhatIfScenarioPlannerView: View {
             } label: {
                 Label(String(localized: "common.rename", defaultValue: "Rename", comment: "Common action label for renaming."), systemImage: "pencil")
             }
-            .offshoreAccentTint()
+            .tint(Color("AccentColor"))
             .disabled(selectedScenarioID == nil)
 
             Button(role: .destructive) {
@@ -618,7 +618,7 @@ struct WhatIfScenarioPlannerView: View {
             } label: {
                 Label(String(localized: "common.delete", defaultValue: "Delete", comment: "Common action label for deleting."), systemImage: "trash")
             }
-            .offshoreAccentTint()
+            .tint(Color("OffshoreDepth"))
             .disabled(scenarios.count <= 1 || selectedScenarioID == nil)
 
         } label: {
