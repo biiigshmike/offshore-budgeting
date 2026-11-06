@@ -12,6 +12,10 @@ final class HelpTopicPagerHost {
 
     var presentation: Presentation?
 
+    static func supportsTabAccessory(verticalSizeClass: UserInterfaceSizeClass?, dynamicTypeSize: DynamicTypeSize) -> Bool {
+        verticalSizeClass != .compact && !dynamicTypeSize.isAccessibilitySize
+    }
+
     func dismiss(owner: UUID) {
         if presentation?.owner == owner {
             presentation = nil

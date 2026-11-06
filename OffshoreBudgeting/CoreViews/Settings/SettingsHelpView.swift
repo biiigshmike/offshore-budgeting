@@ -421,6 +421,7 @@ struct HelpTopicDetailView: View {
     @State private var fullscreenPresentation: HelpFullscreenPresentation?
     @Environment(\.openURL) private var openURL
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
     private let pagerHost: HelpTopicPagerHost?
     @State private var pagerOwner = UUID()
     @State private var isVisible = false
@@ -476,12 +477,17 @@ struct HelpTopicDetailView: View {
             }
             .navigationTitle(currentTopic.title)
             .safeAreaInset(edge: .bottom, spacing: 0) {
-                if pagerHost == nil || dynamicTypeSize.isAccessibilitySize {
+                if pagerHost == nil || !HelpTopicPagerHost.supportsTabAccessory(
+                    verticalSizeClass: verticalSizeClass,
+                    dynamicTypeSize: dynamicTypeSize
+                ) {
                     HelpTopicPagerBar(
                         previousTitle: previousTopic?.title,
                         nextTitle: nextTopic?.title,
                         onBack: goToPreviousTopic,
-                        onNext: goToNextTopic
+                        onNext: goToNextTopic,
+                        presentation: pagerHost != nil && verticalSizeClass == .compact && !dynamicTypeSize.isAccessibilitySize
+                            ? .compactFooter : .footer
                     )
                 }
             }

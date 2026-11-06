@@ -101,9 +101,9 @@ struct OnboardingNavigationButtons: View {
 
 @available(iOS 27.1, *)
 private struct OnboardingSideControls: ViewModifier {
-    static let buttonSize: CGFloat = 44
-    static let buttonSpacing: CGFloat = 8
-    private static let edgePadding: CGFloat = 12
+    nonisolated static let buttonSize: CGFloat = 44
+    nonisolated static let buttonSpacing: CGFloat = 8
+    nonisolated private static let edgePadding: CGFloat = 12
 
     let buttons: OnboardingNavigationButtons
     let addTitle: LocalizedStringKey?

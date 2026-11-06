@@ -209,6 +209,7 @@ struct AppRootView: View {
 
     @Environment(\.appCommandHub) private var commandHub
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
 
     private var isPhone: Bool {
         #if os(iOS)
@@ -409,7 +410,10 @@ struct AppRootView: View {
             phoneTabView
                 .tabViewBottomAccessory(
                     isEnabled: selectedSection == .settings
-                        && !dynamicTypeSize.isAccessibilitySize
+                        && HelpTopicPagerHost.supportsTabAccessory(
+                            verticalSizeClass: verticalSizeClass,
+                            dynamicTypeSize: dynamicTypeSize
+                        )
                         && helpTopicPagerHost.presentation != nil
                 ) {
                     if let pager = helpTopicPagerHost.presentation {
@@ -418,7 +422,7 @@ struct AppRootView: View {
                             nextTitle: pager.nextTitle,
                             onBack: pager.onBack,
                             onNext: pager.onNext,
-                            isTabAccessory: true
+                            presentation: .tabAccessory
                         )
                         .accessibilityElement(children: .contain)
                         .accessibilityIdentifier("helpTabAccessory")
