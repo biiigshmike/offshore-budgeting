@@ -21,23 +21,50 @@ final class ExcursionPreferencesUITests: XCTestCase {
     }
 
     func testSidebarThemeRendering() throws {
+        try verifyNativeSidebar(theme: "heather")
+    }
+
+    func testSidebarDefaultRendering() throws {
+        try verifyNativeSidebar(theme: "offshore-default")
+    }
+
+    private func verifyNativeSidebar(theme: String) throws {
+        #if os(iOS) && !targetEnvironment(macCatalyst)
         XCUIDevice.shared.orientation = .landscapeLeft
         defer { XCUIDevice.shared.orientation = .portrait }
+        #endif
         let app = XCUIApplication()
         app.launchArguments = ["-uiTesting", "-uiTestingReset", "-uiTestScenarioWorkspaceProgress",
-                               "-appearance_theme", "heather",
+                               "-appearance_theme", theme,
                                "-tips_seenKeys", "tip.home.v1,tip.budgets.v1,tip.cards.v1,tip.income.v1,tip.budgetdetail.v1",
                                "-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
         app.launch()
         try XCTSkipIf(app.tabBars.firstMatch.exists, "Sidebar rendering requires iPad or Mac Catalyst.")
-        let sidebar = app.buttons["navigation.sidebarToggle"]
+        XCTAssertFalse(app.buttons["navigation.sidebarToggle"].exists)
+        let sidebar = app.buttons.matching(NSPredicate(format: "label CONTAINS[c] %@", "sidebar")).firstMatch
         XCTAssertTrue(sidebar.waitForExistence(timeout: 10))
+        if !app.staticTexts["Quick Links"].isHittable { sidebar.tap() }
+        XCTAssertTrue(app.staticTexts["Quick Links"].isHittable)
+        XCTAssertLessThan(sidebar.frame.midX, app.windows.firstMatch.frame.midX)
+        let visibleToggles = app.buttons.matching(NSPredicate(format: "label CONTAINS[c] %@", "sidebar")).allElementsBoundByIndex.filter(\.isHittable)
+        XCTAssertEqual(visibleToggles.count, 1)
+        attachScreenshot("Native sidebar expanded - \(theme)")
+        sidebar.tap()
+        XCTAssertFalse(app.staticTexts["Quick Links"].isHittable)
+        attachScreenshot("Native sidebar collapsed - \(theme)")
+        sidebar.tap()
+        XCTAssertTrue(app.staticTexts["Quick Links"].isHittable)
+        app.staticTexts["Settings"].firstMatch.tap()
+        XCTAssertTrue(sidebar.waitForExistence(timeout: 5))
         sidebar.tap()
         XCTAssertFalse(app.staticTexts["Quick Links"].isHittable)
         sidebar.tap()
         XCTAssertTrue(app.staticTexts["Quick Links"].isHittable)
+    }
+
+    private func attachScreenshot(_ name: String) {
         let screenshot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
-        screenshot.name = "Themed native sidebar"
+        screenshot.name = name
         screenshot.lifetime = .keepAlways
         add(screenshot)
     }
@@ -86,7 +113,7 @@ final class ExcursionPreferencesUITests: XCTestCase {
         openPreferences(app)
         app.buttons["excursionAllCategories"].tap()
         let readOnlyAirport = app.staticTexts["Airport"]
-        XCTAssertFalse(readOnlyAirport.isEnabled)
+        XCTAssertFalse(app.buttons.matching(NSPredicate(format: "label == %@", "Airport")).firstMatch.exists)
         readOnlyAirport.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
         XCTAssertEqual(readOnlyAirport.value as? String, "Not selected")
         app.buttons["excursionEditCategories"].tap()
@@ -94,7 +121,14 @@ final class ExcursionPreferencesUITests: XCTestCase {
         XCTAssertFalse(app.buttons["excursionSaveCategories"].isEnabled)
 
         app.staticTexts["Airport"].tap()
+        let search = app.searchFields.firstMatch
+        search.tap()
+        search.typeText("Amusement")
+        XCTAssertFalse(app.staticTexts["Airport"].exists)
         app.staticTexts["Amusement Park"].tap()
+        search.buttons["Clear text"].tap()
+        let closeSearch = app.navigationBars["Categories"].buttons["Close"]
+        if closeSearch.exists { closeSearch.tap() }
         let editingScreenshot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
         editingScreenshot.name = "Native categories editing"
         editingScreenshot.lifetime = .keepAlways
@@ -105,7 +139,7 @@ final class ExcursionPreferencesUITests: XCTestCase {
         let amusementPark = app.staticTexts.matching(NSPredicate(format: "label == %@", "Amusement Park")).firstMatch
         XCTAssertEqual(airport.value as? String, "Selected")
         XCTAssertEqual(amusementPark.value as? String, "Selected")
-        XCTAssertFalse(airport.isEnabled)
+        XCTAssertFalse(app.buttons.matching(NSPredicate(format: "label == %@", "Airport")).firstMatch.exists)
         airport.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
         XCTAssertEqual(airport.value as? String, "Selected")
         let savedScreenshot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
@@ -118,12 +152,31 @@ final class ExcursionPreferencesUITests: XCTestCase {
         app.buttons["excursionCancelCategories"].tap()
         XCTAssertEqual(airport.value as? String, "Selected")
         XCTAssertEqual(amusementPark.value as? String, "Selected")
+        airport.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        XCTAssertEqual(airport.value as? String, "Selected")
+        app.navigationBars["Categories"].buttons.firstMatch.tap()
+        XCTAssertTrue(app.buttons["excursionAllCategories"].label.contains("2 selected"))
+        app.buttons["excursionAllCategories"].tap()
+        XCTAssertEqual(airport.value as? String, "Selected")
+        XCTAssertEqual(amusementPark.value as? String, "Selected")
     }
 
-    private func launch() -> XCUIApplication {
+    func testBotanicalCategoryAppearance() {
+        let app = launch(theme: "heather")
+        openPreferences(app)
+        app.buttons["excursionAllCategories"].tap()
+        attachScreenshot("Botanical categories read-only")
+        app.buttons["excursionEditCategories"].tap()
+        attachScreenshot("Botanical categories editing")
+        app.buttons["excursionCancelCategories"].tap()
+        XCTAssertTrue(app.buttons["excursionEditCategories"].exists)
+    }
+
+    private func launch(theme: String = "offshore-default") -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments = [
             "-uiTesting", "-uiTestingReset", "-uiTestScenarioWorkspaceProgress",
+            "-appearance_theme", theme,
             "-tips_seenKeys", "tip.home.v1,tip.budgets.v1,tip.cards.v1,tip.income.v1,tip.budgetdetail.v1",
             "-tips_resetToken", "0", "-tips_seen_lastResetToken", "0",
             "-AppleLanguages", "(en)", "-AppleLocale", "en_US"

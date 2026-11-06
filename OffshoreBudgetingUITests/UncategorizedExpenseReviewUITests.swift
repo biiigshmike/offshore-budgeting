@@ -15,7 +15,11 @@ final class UncategorizedExpenseReviewUITests: XCTestCase {
     }
 
     private func returnFromBackground(_ app: XCUIApplication) {
+        #if os(macOS) || targetEnvironment(macCatalyst)
+        XCUIApplication(bundleIdentifier: "com.apple.finder").activate()
+        #else
         XCUIDevice.shared.press(.home)
+        #endif
         app.activate()
     }
 

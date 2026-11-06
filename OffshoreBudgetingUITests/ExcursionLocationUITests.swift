@@ -56,7 +56,11 @@ final class ExcursionLocationUITests: XCTestCase {
             format: "label CONTAINS %@", "Works while Offshore is open."
         )).firstMatch.exists)
 
+        #if os(macOS) || targetEnvironment(macCatalyst)
+        XCUIApplication(bundleIdentifier: "com.apple.finder").activate()
+        #else
         XCUIDevice.shared.press(.home)
+        #endif
         app.activate()
         XCTAssertTrue(stop.waitForExistence(timeout: 5))
         reveal(stop, app: app)

@@ -209,7 +209,6 @@ struct AppRootView: View {
 
     @Environment(\.appCommandHub) private var commandHub
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-    @Environment(\.appearanceTheme) private var theme
 
     private var isPhone: Bool {
         #if os(iOS)
@@ -509,24 +508,29 @@ struct AppRootView: View {
 
     // MARK: - iPad + Mac
 
+    @ViewBuilder
+    private func sidebarLabel(_ title: String, systemImage: String) -> some View {
+        #if targetEnvironment(macCatalyst) || os(macOS)
+        Label(title, systemImage: systemImage)
+        #else
+        Label {
+            Text(title).foregroundStyle(.primary)
+        } icon: {
+            Image(systemName: systemImage).foregroundStyle(.tint)
+        }
+        #endif
+    }
+
     private var splitView: some View {
         NavigationSplitView(columnVisibility: $splitViewVisibility) {
             List(selection: selectedSectionForSidebar) {
                 ForEach(AppSection.allCases) { section in
-                    Label {
-                        Text(section.title).foregroundStyle(.primary)
-                    } icon: {
-                        Image(systemName: section.systemImage).foregroundStyle(.tint)
-                    }
+                    sidebarLabel(section.title, systemImage: section.systemImage)
                         .tag(SidebarSelection.section(section))
 
                     if section == .cards {
                         ForEach(AccountsView.Segment.allCases) { destination in
-                            Label {
-                                Text(destination.title).foregroundStyle(.primary)
-                            } icon: {
-                                Image(systemName: destination.symbolName).foregroundStyle(.tint)
-                            }
+                            sidebarLabel(destination.title, systemImage: destination.symbolName)
                                 .font(.subheadline)
                                 .padding(.leading, 18)
                                 .tag(SidebarSelection.account(destination))
@@ -575,7 +579,6 @@ struct AppRootView: View {
             }
             .listStyle(.sidebar)
             .navigationTitle(workspace.name)
-            .toolbar(removing: .sidebarToggle)
         } detail: {
             let context = AppTabActivationContext(
                 sectionRawValue: selectedSection.rawValue,
@@ -584,20 +587,6 @@ struct AppRootView: View {
             )
             NavigationStack(path: selectedSectionPath) {
                 sectionRootView
-                    .toolbar {
-                        ToolbarItem(placement: .topBarLeading) {
-                            Button {
-                                withAnimation {
-                                    splitViewVisibility = splitViewVisibility == .detailOnly ? .all : .detailOnly
-                                }
-                            } label: {
-                                Label("Toggle Sidebar", systemImage: "sidebar.left")
-                                    .foregroundStyle(theme.accent)
-                            }
-                            .labelStyle(.iconOnly)
-                            .accessibilityIdentifier("navigation.sidebarToggle")
-                        }
-                    }
             }
             .offshoreAccentTint()
             .rootActivationBodyReporter(root: selectedSection.rawValue.lowercased(), context: context)
@@ -605,7 +594,6 @@ struct AppRootView: View {
             .environment(\.appTabActivationContext, context)
             .id(selectedSection)
         }
-        .toolbar(removing: .sidebarToggle)
         .offshoreAccentTint()
         .background { NavigationAccentAppearance().allowsHitTesting(false) }
         .background {

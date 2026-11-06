@@ -3,17 +3,10 @@ import SwiftUI
 struct ExcursionCategorySelectionView: View {
     @ObservedObject var store: ExcursionPreferencesStore
     @State private var searchText = ""
-    @State private var isEditing = false
+    @State private var editMode: EditMode = .inactive
     @State private var draftCategoryIDs: Set<String> = []
 
-    private var categorySelection: Binding<Set<String>> {
-        Binding {
-            isEditing ? draftCategoryIDs : store.value.categoryIDs
-        } set: { ids in
-            guard isEditing else { return }
-            draftCategoryIDs = ids
-        }
-    }
+    private var isEditing: Bool { editMode.isEditing }
 
     private var canSave: Bool {
         store.value.includeUncategorized || !draftCategoryIDs.isDisjoint(with: ExcursionPOICategoryCatalog.supportedIDs)
@@ -27,22 +20,38 @@ struct ExcursionCategorySelectionView: View {
     }
 
     var body: some View {
-        List(selection: categorySelection) {
+        List(selection: isEditing ? $draftCategoryIDs : nil) {
             Section {
                 ForEach(filteredCategories) { category in
-                    Text(category.name)
-                        .tag(category.id)
-                        .disabled(!isEditing)
-                        .accessibilityValue(categorySelection.wrappedValue.contains(category.id)
+                    if isEditing {
+                        Text(category.name)
+                            .tag(category.id)
+                            .accessibilityValue(draftCategoryIDs.contains(category.id)
+                                                ? String(localized: "Selected") : String(localized: "Not selected"))
+                            .accessibilityIdentifier("excursionCategory_\(category.id)")
+                    } else {
+                        HStack {
+                            Text(category.name)
+                            Spacer()
+                            if store.value.categoryIDs.contains(category.id) {
+                                Image(systemName: "checkmark")
+                                    .foregroundStyle(.tint)
+                                    .accessibilityHidden(true)
+                            }
+                        }
+                        .foregroundStyle(.primary)
+                        .accessibilityElement(children: .combine)
+                        .accessibilityValue(store.value.categoryIDs.contains(category.id)
                                             ? String(localized: "Selected") : String(localized: "Not selected"))
                         .accessibilityIdentifier("excursionCategory_\(category.id)")
+                    }
                 }
             } footer: {
                 Text("Keep at least one category selected, or include uncategorized places. Categories are provided by Apple Maps and may vary with your OS version.")
             }
         }
         .listStyle(.insetGrouped)
-        .environment(\.editMode, .constant(.active))
+        .environment(\.editMode, $editMode)
         .offshoreAccentTint()
         .navigationTitle("Categories")
         .navigationBarBackButtonHidden(isEditing)
@@ -50,7 +59,10 @@ struct ExcursionCategorySelectionView: View {
         .toolbar {
             if isEditing {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { isEditing = false }
+                    Button("Cancel") {
+                        draftCategoryIDs = []
+                        editMode = .inactive
+                    }
                         .accessibilityIdentifier("excursionCancelCategories")
                 }
                 ToolbarItemGroup(placement: .bottomBar) {
@@ -68,7 +80,7 @@ struct ExcursionCategorySelectionView: View {
                     Button("Done", systemImage: "checkmark") {
                         var next = store.value
                         next.categoryIDs = draftCategoryIDs
-                        if store.update(next) { isEditing = false }
+                        if store.update(next) { editMode = .inactive }
                     }
                     .labelStyle(.iconOnly)
                     .disabled(!canSave)
@@ -78,7 +90,7 @@ struct ExcursionCategorySelectionView: View {
                 } else {
                     Button("Edit") {
                         draftCategoryIDs = store.value.categoryIDs
-                        isEditing = true
+                        editMode = .active
                     }
                     .offshoreAccentTint()
                     .accessibilityIdentifier("excursionEditCategories")
