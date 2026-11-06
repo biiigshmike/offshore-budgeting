@@ -365,28 +365,22 @@ struct OnboardingView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-            if #available(iOS 26.0, macCatalyst 26.0, *) {
-                navigationButtons
-            }
         }
         .onboardingContentPadding()
         .onboardingNavigationTitle(title)
+        .onboardingControls(navigationButtons)
     }
 
     // MARK: - Bottom Navigation
 
     private var navigationButtons: OnboardingNavigationButtons {
         OnboardingNavigationButtons(
-            primaryTitle: primaryButtonTitle,
+            isFinalStep: onboardingStep >= finalStepValue,
             onBack: goBack,
             onAdvance: primaryActionTapped
         )
     }
 
-    private var primaryButtonTitle: String {
-        onboardingStep >= finalStepValue ? "Done" : "Next"
-    }
-    
     private func primaryActionTapped() {
         // Step-specific gating
         switch onboardingStep {
@@ -660,10 +654,8 @@ private struct OnboardingWorkspaceStep: View {
             .scrollContentBackground(.hidden)
             .background(Color(.systemBackground))
             .onboardingNavigationTitle(header.title)
-            .onboardingGlassFooter(legacyMinHeight: 340) {
-                navigationButtons.addingButton("Add Workspace") {
-                    sheetRoute = .add
-                }
+            .onboardingControls(navigationButtons, legacyMinHeight: 340, addTitle: "Add Workspace") {
+                sheetRoute = .add
             }
 
             if #unavailable(iOS 26.0, macCatalyst 26.0) {
@@ -862,9 +854,7 @@ private struct OnboardingPrivacySyncStep: View {
             }
             .scrollContentBackground(.hidden)
             .onboardingNavigationTitle(String(localized: "Privacy"))
-            .onboardingGlassFooter {
-                navigationButtons
-            }
+            .onboardingControls(navigationButtons)
 
             if #unavailable(iOS 26.0, macCatalyst 26.0) {
                 Spacer(minLength: 0)
@@ -1052,10 +1042,8 @@ private struct OnboardingCategoriesStep: View {
             .scrollContentBackground(.hidden)
             .background(Color(.systemBackground))
             .onboardingNavigationTitle(header.title)
-            .onboardingGlassFooter(legacyMinHeight: 260) {
-                navigationButtons.addingButton("Add Category") {
-                    sheetRoute = .add
-                }
+            .onboardingControls(navigationButtons, legacyMinHeight: 260, addTitle: "Add Category") {
+                sheetRoute = .add
             }
 
             if #unavailable(iOS 26.0, macCatalyst 26.0) {
@@ -1161,10 +1149,8 @@ private struct OnboardingCardsStep: View {
 
             cardsGrid(header: header)
                 .onboardingNavigationTitle(header.title)
-                .onboardingGlassFooter(legacyMinHeight: 260) {
-                    navigationButtons.addingButton("Add Card") {
-                        sheetRoute = .add
-                    }
+                .onboardingControls(navigationButtons, legacyMinHeight: 260, addTitle: "Add Card") {
+                    sheetRoute = .add
                 }
 
             if #unavailable(iOS 26.0, macCatalyst 26.0) {
@@ -1433,10 +1419,8 @@ private struct OnboardingPresetsStep: View {
             .scrollContentBackground(.hidden)
             .background(Color(.systemBackground))
             .onboardingNavigationTitle(header.title)
-            .onboardingGlassFooter(legacyMinHeight: 260) {
-                navigationButtons.addingButton("Add Preset") {
-                    sheetRoute = .add
-                }
+            .onboardingControls(navigationButtons, legacyMinHeight: 260, addTitle: "Add Preset") {
+                sheetRoute = .add
             }
 
             if #unavailable(iOS 26.0, macCatalyst 26.0) {
