@@ -50,10 +50,6 @@
 
 /* Begin PBXFileReference section */
 		4C198A392F298962005D2D0D /* OffshoreBudgetingWidgetsExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = OffshoreBudgetingWidgetsExtension.entitlements; sourceTree = "<group>"; };
-		4C3F2563309D2A3200354A80 /* SouthBayVillage-ApproachDwellDeparture.gpx */ = {isa = PBXFileReference; lastKnownFileType = text.xml; name = "SouthBayVillage-ApproachDwellDeparture.gpx"; path = "TestResources/ExcursionMode/SouthBayVillage-ApproachDwellDeparture.gpx"; sourceTree = "<group>"; };
-		4C3F2564309D2B0C00354A80 /* SouthBayVillage-AdjacentStops.gpx */ = {isa = PBXFileReference; lastKnownFileType = text.xml; name = "SouthBayVillage-AdjacentStops.gpx"; path = "TestResources/ExcursionMode/SouthBayVillage-AdjacentStops.gpx"; sourceTree = "<group>"; };
-		4C3F2565309D2B1500354A80 /* SouthBayVillage-DriveBy.gpx */ = {isa = PBXFileReference; lastKnownFileType = text.xml; name = "SouthBayVillage-DriveBy.gpx"; path = "TestResources/ExcursionMode/SouthBayVillage-DriveBy.gpx"; sourceTree = "<group>"; };
-		4C3F2566309D2B1D00354A80 /* SouthBayVillage-InitialDwell.gpx */ = {isa = PBXFileReference; lastKnownFileType = text.xml; name = "SouthBayVillage-InitialDwell.gpx"; path = "TestResources/ExcursionMode/SouthBayVillage-InitialDwell.gpx"; sourceTree = "<group>"; };
 		4C8C82152F247DA50024DBD0 /* OffshoreBudgeting.xctestplan */ = {isa = PBXFileReference; lastKnownFileType = text; path = OffshoreBudgeting.xctestplan; sourceTree = "<group>"; };
 		4C96F8512F20523700541774 /* Offshore.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Offshore.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		4C96F85E2F20523900541774 /* OffshoreBudgetingTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = OffshoreBudgetingTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -165,10 +161,6 @@
 		4C96F8482F20523700541774 = {
 			isa = PBXGroup;
 			children = (
-				4C3F2566309D2B1D00354A80 /* SouthBayVillage-InitialDwell.gpx */,
-				4C3F2565309D2B1500354A80 /* SouthBayVillage-DriveBy.gpx */,
-				4C3F2564309D2B0C00354A80 /* SouthBayVillage-AdjacentStops.gpx */,
-				4C3F2563309D2A3200354A80 /* SouthBayVillage-ApproachDwellDeparture.gpx */,
 				4C198A392F298962005D2D0D /* OffshoreBudgetingWidgetsExtension.entitlements */,
 				4C8C82152F247DA50024DBD0 /* OffshoreBudgeting.xctestplan */,
 				4C96F8532F20523700541774 /* OffshoreBudgeting */,
