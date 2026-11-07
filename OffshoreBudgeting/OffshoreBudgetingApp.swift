@@ -438,7 +438,6 @@ private struct WindowSceneRootView: View {
             modelContainer: $modelContainer,
             initialSectionOverride: initialSectionOverride
         )
-        .toggleStyle(.switch)
         .environment(\.appCommandHub, commandHub)
         .environment(postBoardingTipsStore)
 
