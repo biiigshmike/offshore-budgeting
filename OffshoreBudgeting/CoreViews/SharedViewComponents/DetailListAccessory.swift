@@ -158,6 +158,7 @@ struct DetailListAccessory<SortMode: Hashable>: View {
             } label: {
                 categoriesLabel(selection: selection, compact: compact)
             }
+            .toggleStyle(.automatic)
             .menuOrder(.fixed)
             #endif
         }
