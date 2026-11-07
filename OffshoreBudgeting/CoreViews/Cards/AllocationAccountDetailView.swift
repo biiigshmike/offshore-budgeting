@@ -66,7 +66,7 @@ struct AllocationAccountDetailView: View {
     var body: some View {
         let derived = derivedState
         List {
-            balanceSection(derived)
+            spendingSection(derived)
             ledgerSection(derived)
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
@@ -483,17 +483,21 @@ struct AllocationAccountDetailView: View {
         return Calendar.current.date(byAdding: DateComponents(day: 1, second: -1), to: start) ?? date
     }
 
-    private func balanceSection(_ derived: ReconciliationDetailDerivedState) -> some View {
+    private func spendingSection(_ derived: ReconciliationDetailDerivedState) -> some View {
         Section {
-            ReconciliationBalanceStatementRow(
-                total: balance,
+            ReconciliationSpendingStatementRow(
+                total: derived.filteredAmountValue,
                 heatMapStops: derived.heatMapStops
             )
             .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
+
+            LabeledContent("Outstanding Balance") {
+                Text(balance, format: CurrencyFormatter.currencyStyle())
+            }
         } header: {
-            Text("Balance")
+            Text("Total Spent")
         } footer: {
-            Text("Current outstanding reconciliation balance across all history.")
+            Text("Total Spent shows charges matching the current filters. Outstanding Balance includes charges and settlements across all history.")
         }
     }
 
@@ -551,9 +555,7 @@ struct AllocationAccountDetailView: View {
                 }
             }
         } header: {
-            Text("Period Activity • \(derived.filteredAmountValue, format: CurrencyFormatter.currencyStyle())")
-        } footer: {
-            Text("Shows filtered charge activity for the selected date range and categories.")
+            Text("Period Activity")
         }
     }
 
@@ -865,7 +867,7 @@ private struct ReconciliationHeatMapBar: View {
     }
 }
 
-private struct ReconciliationBalanceStatementRow: View {
+private struct ReconciliationSpendingStatementRow: View {
     let total: Double
     let heatMapStops: [Gradient.Stop]
 
@@ -890,7 +892,7 @@ private struct ReconciliationBalanceStatementRow: View {
         .frame(minHeight: 72)
         .contentShape(RoundedRectangle(cornerRadius: cornerRadius))
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Balance")
+        .accessibilityLabel("Total Spent")
         .accessibilityValue(Text(total, format: CurrencyFormatter.currencyStyle()))
     }
 }

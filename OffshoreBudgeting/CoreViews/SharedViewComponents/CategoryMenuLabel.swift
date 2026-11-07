@@ -2,6 +2,7 @@ import SwiftUI
 
 struct CategoryMenuLabel: View {
     let category: Category?
+    var isSelected: Bool? = nil
 
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.displayScale) private var displayScale
@@ -17,7 +18,8 @@ struct CategoryMenuLabel: View {
             if let image = EntityMenuImageCache.category(
                 hexColor: category?.hexColor,
                 colorScheme: colorScheme,
-                scale: displayScale
+                scale: displayScale,
+                isSelected: isSelected
             ) {
                 Image(uiImage: image)
                     .renderingMode(.original)

@@ -133,14 +133,7 @@ struct DetailListAccessory<SortMode: Hashable>: View {
         let selection = selectedCategories
         return Group {
             #if targetEnvironment(macCatalyst)
-            Button {
-                showingCategoryPopover = true
-            } label: {
-                categoriesLabel(selection: selection, compact: compact)
-            }
-            .popover(isPresented: $showingCategoryPopover, arrowEdge: .bottom) {
-                categoryPopover
-            }
+            categoryPopoverButton(selection: selection, compact: compact)
             #else
             Menu {
                 categoryBulkAction
@@ -149,11 +142,25 @@ struct DetailListAccessory<SortMode: Hashable>: View {
                 Divider()
 
                 ForEach(categories, id: \.id) { category in
-                    Toggle(isOn: categorySelection(category.id)) {
-                        CategoryMenuLabel(category: category)
+                    if #available(iOS 27.2, *) {
+                        // Native menu toggles ignore taps on iOS 27.2.
+                        let selection = categorySelection(category.id)
+                        Button {
+                            selection.wrappedValue.toggle()
+                        } label: {
+                            CategoryMenuLabel(category: category, isSelected: selection.wrappedValue)
+                                .labelStyle(.titleAndIcon)
+                        }
+                        .accessibilityLabel(Text(category.name))
+                        .accessibilityAddTraits(selection.wrappedValue ? .isSelected : [])
+                        .menuActionDismissBehavior(.disabled)
+                    } else {
+                        Toggle(isOn: categorySelection(category.id)) {
+                            CategoryMenuLabel(category: category)
+                        }
+                        .accessibilityLabel(Text(category.name))
+                        .menuActionDismissBehavior(.disabled)
                     }
-                    .accessibilityLabel(Text(category.name))
-                    .menuActionDismissBehavior(.disabled)
                 }
             } label: {
                 categoriesLabel(selection: selection, compact: compact)
@@ -205,6 +212,17 @@ struct DetailListAccessory<SortMode: Hashable>: View {
     }
 
     #if targetEnvironment(macCatalyst)
+    private func categoryPopoverButton(selection: [Category], compact: Bool) -> some View {
+        Button {
+            showingCategoryPopover = true
+        } label: {
+            categoriesLabel(selection: selection, compact: compact)
+        }
+        .popover(isPresented: $showingCategoryPopover, arrowEdge: .bottom) {
+            categoryPopover
+        }
+    }
+
     private var categoryPopover: some View {
         VStack(alignment: .leading, spacing: 8) {
             categoryBulkAction
@@ -219,12 +237,12 @@ struct DetailListAccessory<SortMode: Hashable>: View {
                             selection.wrappedValue.toggle()
                         } label: {
                             HStack {
-                                CategoryMenuLabel(category: category)
-                                    .labelStyle(.titleAndIcon)
-                                Spacer()
                                 Image(systemName: "checkmark")
                                     .opacity(selection.wrappedValue ? 1 : 0)
                                     .accessibilityHidden(true)
+                                CategoryMenuLabel(category: category)
+                                    .labelStyle(.titleAndIcon)
+                                Spacer()
                             }
                             .padding(.horizontal, 8)
                             .frame(minHeight: 36)
