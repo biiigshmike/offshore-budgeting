@@ -30,18 +30,17 @@ struct ExcursionCategorySelectionView: View {
                                                 ? String(localized: "Selected") : String(localized: "Not selected"))
                             .accessibilityIdentifier("excursionCategory_\(category.id)")
                     } else {
+                        let isSelected = store.value.categoryIDs.contains(category.id)
                         HStack {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundStyle(.tint)
+                                .opacity(isSelected ? 1 : 0)
+                                .accessibilityHidden(true)
                             Text(category.name)
-                            Spacer()
-                            if store.value.categoryIDs.contains(category.id) {
-                                Image(systemName: "checkmark")
-                                    .foregroundStyle(.tint)
-                                    .accessibilityHidden(true)
-                            }
                         }
                         .foregroundStyle(.primary)
                         .accessibilityElement(children: .combine)
-                        .accessibilityValue(store.value.categoryIDs.contains(category.id)
+                        .accessibilityValue(isSelected
                                             ? String(localized: "Selected") : String(localized: "Not selected"))
                         .accessibilityIdentifier("excursionCategory_\(category.id)")
                     }

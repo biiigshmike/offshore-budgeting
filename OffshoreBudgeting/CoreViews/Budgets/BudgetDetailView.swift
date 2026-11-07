@@ -161,12 +161,12 @@ struct BudgetDetailView: View {
         PostBoardingTipItem(
             systemImage: "tag",
             title: "Categories",
-            detail: "Tap one or more categories to filter expenses. Tap a selected category again to clear just that selection."
+            detail: "Open Categories in the floating bar and select one or more categories to filter expenses."
         ),
         PostBoardingTipItem(
             systemImage: "slider.horizontal.3",
             title: "Goals",
-            detail: "Set optional minimum and maximum spending goals for each category. Tap Goals to edit them, or press and hold a category."
+            detail: "Open Category Goals from the ellipsis menu to set optional minimum and maximum spending goals for each category."
         ),
         PostBoardingTipItem(
             systemImage: "ellipsis",
@@ -241,12 +241,6 @@ struct BudgetDetailView: View {
         )
     }
 
-    private struct CategoryLimitEditorInput {
-        let category: Category
-        let plannedContribution: Double
-        let variableContribution: Double
-    }
-
     private enum BudgetDetailModalRoute: Identifiable {
         case addExpense
         case managePresets
@@ -255,7 +249,6 @@ struct BudgetDetailView: View {
         case editExpense(VariableExpense)
         case editPlannedExpense(PlannedExpense)
         case editPreset(Preset)
-        case editCategoryLimit(CategoryLimitEditorInput)
         case categoryGoals
         case calculations
         case reviewRecordedPlannedExpenses
@@ -276,8 +269,6 @@ struct BudgetDetailView: View {
                 return "edit-planned-expense-\(expense.id.uuidString)"
             case .editPreset(let preset):
                 return "edit-preset-\(preset.id.uuidString)"
-            case .editCategoryLimit(let input):
-                return "edit-category-limit-\(input.category.id.uuidString)"
             case .categoryGoals:
                 return "category-goals"
             case .calculations:
@@ -618,6 +609,17 @@ struct BudgetDetailView: View {
 
     private func mainContent(derived: BudgetDetailDerivedState) -> some View {
         budgetDetailList(derived: derived)
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            DetailListAccessory(
+                categories: derived.categoriesInBudget,
+                selectedCategoryIDs: $selectedCategoryIDs,
+                expenseScope: $expenseScope,
+                sortMode: $sortMode,
+                name: (.az, .za),
+                amount: (.amountAsc, .amountDesc),
+                date: (.dateAsc, .dateDesc)
+            )
+        }
         .postBoardingTip(
             key: "tip.budgetdetail.v1",
             title: "Budget Detail Overview",
@@ -742,13 +744,6 @@ struct BudgetDetailView: View {
                 NavigationStack {
                     EditPresetView(workspace: workspace, preset: preset)
                 }
-            case .editCategoryLimit(let input):
-                EditCategoryLimitView(
-                    budget: budget,
-                    category: input.category,
-                    plannedContribution: input.plannedContribution,
-                    variableContribution: input.variableContribution
-                )
             case .categoryGoals:
                 CategoryGoalsEditorView(
                     categories: derived.categoriesInBudget,
@@ -825,8 +820,6 @@ struct BudgetDetailView: View {
     private func budgetDetailList(derived: BudgetDetailDerivedState) -> some View {
         List {
             summarySection(derived)
-            categorySection(derived)
-            typeAndSortSection
             expenseListSection(derived)
         }
     }
@@ -966,69 +959,6 @@ struct BudgetDetailView: View {
             ), at: 2)
         }
         return sections
-    }
-
-    private func categorySection(_ derived: BudgetDetailDerivedState) -> some View {
-        Section {
-            if !derived.categoriesInBudget.isEmpty {
-                BudgetCategoryChipsRow(
-                    categories: derived.categoriesInBudget,
-                    selectedIDs: $selectedCategoryIDs,
-                    onLongPressCategory: { category in
-                        let input = CategoryLimitEditorInput(
-                            category: category,
-                            plannedContribution: plannedContribution(for: category, derived: derived),
-                            variableContribution: variableContribution(for: category, derived: derived)
-                        )
-                        activeModal = .editCategoryLimit(input)
-                    }
-                )
-            } else {
-                Text("Create a category in Settings to set spending goals.")
-                    .foregroundStyle(.secondary)
-            }
-        } header: {
-            HStack {
-                Text(String(localized: "categories.title", defaultValue: "Categories", comment: "Title for categories section."))
-                Spacer()
-                if !selectedCategoryIDs.isEmpty {
-                    Button(String(localized: "common.clear", defaultValue: "Clear", comment: "Action to clear a selection.")) {
-                        selectedCategoryIDs.removeAll()
-                    }
-                    .buttonStyle(.plain)
-                }
-                Button("Goals", systemImage: "slider.horizontal.3") {
-                    activeModal = .categoryGoals
-                }
-                .buttonStyle(.borderless)
-                .textCase(nil)
-            }
-        } footer: {
-            Text("Set optional minimum and maximum spending goals for each category. Tap Goals to edit them, or press and hold a category.")
-            Text("Maximums also power Savings at Goal Maximums in Budget Detail and Category Goals on Home.")
-        }
-    }
-
-    private var typeAndSortSection: some View {
-        Section {
-            Picker(String(localized: "common.type", defaultValue: "Type", comment: "Label for type picker."), selection: $expenseScope) {
-                Text(String(localized: "expenseScope.planned", defaultValue: "Planned", comment: "Expense scope option for planned expenses.")).tag(ExpenseScope.planned)
-                Text(String(localized: "expenseScope.unified", defaultValue: "Combined", comment: "Expense scope option for combined expenses.")).tag(ExpenseScope.unified)
-                Text(String(localized: "expenseScope.variable", defaultValue: "Variable", comment: "Expense scope option for variable expenses.")).tag(ExpenseScope.variable)
-            }
-            .pickerStyle(.segmented)
-
-            ExpenseSortControl(
-                selection: $sortMode,
-                name: (.az, .za),
-                amount: (.amountAsc, .amountDesc),
-                date: (.dateAsc, .dateDesc)
-            )
-        } header: {
-            Text(String(localized: "common.sort", defaultValue: "Sort", comment: "Label for sort actions."))
-        } footer: {
-            Text("Tap the selected sort option again to reverse the order.")
-        }
     }
 
     private func expenseListSection(_ derived: BudgetDetailDerivedState) -> some View {
@@ -1189,6 +1119,12 @@ struct BudgetDetailView: View {
                 activeModal = .manageCards
             } label: {
                 Label(String(localized: "budgetDetail.manageCards", defaultValue: "Manage Cards", comment: "Menu action to manage linked cards."), systemImage: "creditcard")
+            }
+
+            Button {
+                activeModal = .categoryGoals
+            } label: {
+                Label("Category Goals", systemImage: "tag.fill")
             }
 
             Divider()
@@ -1697,121 +1633,6 @@ private struct BudgetSummaryBucketCard: View {
             Text(valueText)
                 .font(.subheadline.weight(.semibold))
         }
-    }
-}
-
-// MARK: - Category Chips
-
-private struct BudgetCategoryChipsRow: View {
-    let categories: [Category]
-    @Binding var selectedIDs: Set<UUID>
-    var onLongPressCategory: ((Category) -> Void)? = nil
-
-    var body: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 10) {
-                ForEach(categories, id: \.id) { category in
-                    BudgetChip(
-                        title: category.name,
-                        dotHex: category.hexColor,
-                        isSelected: selectedIDs.contains(category.id)
-                    ) {
-                        toggle(category.id)
-                    } onLongPress: {
-                        onLongPressCategory?(category)
-                    }
-                }
-            }
-            .padding(.vertical, 2)
-        }
-    }
-
-    private func toggle(_ id: UUID) {
-        if selectedIDs.contains(id) {
-            selectedIDs.remove(id)
-        } else {
-            selectedIDs.insert(id)
-        }
-    }
-}
-
-private struct BudgetChip: View {
-    let title: String
-    let dotHex: String?
-    let isSelected: Bool
-    let action: () -> Void
-    var onLongPress: (() -> Void)? = nil
-
-    private var baseColor: Color {
-        if let dotHex, let color = Color(hex: dotHex) {
-            return color
-        }
-        return Color.secondary.opacity(0.60)
-    }
-
-    private var backgroundColor: Color {
-        if isSelected {
-            baseColor.opacity(0.20)
-        } else {
-            Color.secondary.opacity(0.12)
-        }
-    }
-
-    private var foregroundColor: Color {
-        if isSelected {
-            baseColor
-        } else {
-            Color.primary
-        }
-    }
-
-    var body: some View {
-        Group {
-            if #available(iOS 26.0, *) {
-                HStack(spacing: 8) {
-                    Circle()
-                        .fill(baseColor)
-                        .frame(width: 8, height: 8)
-
-                    Text(title)
-                        .font(.footnote.weight(.medium))
-                        .lineLimit(1)
-                        .foregroundStyle(foregroundColor)
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .background(
-                    Capsule()
-                        .fill(backgroundColor)
-                )
-                .contentShape(Capsule())
-            } else {
-                HStack(spacing: 8) {
-                    Circle()
-                        .fill(baseColor)
-                        .frame(width: 8, height: 8)
-
-                    Text(title)
-                        .font(.footnote.weight(.medium))
-                        .lineLimit(1)
-                        .foregroundStyle(foregroundColor)
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .background(
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(backgroundColor)
-                )
-                .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-            }
-        }
-        .onTapGesture {
-            action()
-        }
-        .onLongPressGesture(minimumDuration: 0.45) {
-            onLongPress?()
-        }
-        .accessibilityAddTraits(.isButton)
     }
 }
 

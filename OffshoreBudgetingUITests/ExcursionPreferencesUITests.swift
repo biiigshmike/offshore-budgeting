@@ -112,7 +112,9 @@ final class ExcursionPreferencesUITests: XCTestCase {
         let app = launch()
         openPreferences(app)
         app.buttons["excursionAllCategories"].tap()
-        let readOnlyAirport = app.staticTexts["Airport"]
+        let readOnlyAirport = app.staticTexts["excursionCategory_MKPOICategoryAirport"]
+        XCTAssertTrue(app.buttons["excursionEditCategories"].exists)
+        XCTAssertFalse(app.buttons["excursionDeselectAllCategories"].exists)
         XCTAssertFalse(app.buttons.matching(NSPredicate(format: "label == %@", "Airport")).firstMatch.exists)
         readOnlyAirport.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
         XCTAssertEqual(readOnlyAirport.value as? String, "Not selected")
@@ -159,6 +161,18 @@ final class ExcursionPreferencesUITests: XCTestCase {
         app.buttons["excursionAllCategories"].tap()
         XCTAssertEqual(airport.value as? String, "Selected")
         XCTAssertEqual(amusementPark.value as? String, "Selected")
+
+        app.buttons["excursionEditCategories"].tap()
+        app.buttons["excursionDeselectAllCategories"].tap()
+        let terminal = app.staticTexts["Airport Terminal"].firstMatch
+        let nextCategory = terminal.exists ? terminal : amusementPark
+        let origin = app.coordinate(withNormalizedOffset: .zero)
+        let selectionColumnX: CGFloat = 40
+        let start = origin.withOffset(CGVector(dx: selectionColumnX, dy: airport.frame.midY))
+        let end = origin.withOffset(CGVector(dx: selectionColumnX, dy: nextCategory.frame.midY))
+        start.press(forDuration: 0.05, thenDragTo: end, withVelocity: .slow, thenHoldForDuration: 0.05)
+        XCTAssertEqual(airport.value as? String, "Selected")
+        XCTAssertEqual(nextCategory.value as? String, "Selected")
     }
 
     func testLegacyThemePreferencePreservesCategoryEditing() {

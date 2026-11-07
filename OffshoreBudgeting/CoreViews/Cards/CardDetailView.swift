@@ -114,7 +114,7 @@ struct CardDetailView: View {
         PostBoardingTipItem(
             systemImage: "tag",
             title: "Categories",
-            detail: "Tap one or more categories to filter expenses. Tap a selected category again to clear just that selection."
+            detail: "Open Categories in the floating bar and select one or more categories to filter expenses."
         ),
         PostBoardingTipItem(
             systemImage: "tray.and.arrow.down.fill",
@@ -141,7 +141,7 @@ struct CardDetailView: View {
     }
 
     private struct CardDetailDerivedState {
-        let availableCategoriesForChips: [Category]
+        let availableCategories: [Category]
         let hiddenFutureVariableExpenseCount: Int
         let hiddenFuturePlannedExpenseCount: Int
         let variableExpensesFiltered: [VariableExpense]
@@ -155,7 +155,7 @@ struct CardDetailView: View {
         let presetBySourceID: [UUID: Preset]
 
         static let empty = CardDetailDerivedState(
-            availableCategoriesForChips: [],
+            availableCategories: [],
             hiddenFutureVariableExpenseCount: 0,
             hiddenFuturePlannedExpenseCount: 0,
             variableExpensesFiltered: [],
@@ -214,7 +214,7 @@ struct CardDetailView: View {
                 categoriesByID[category.id] = category
             }
         }
-        let availableCategoriesForChips = categoriesByID.values.sorted {
+        let availableCategories = categoriesByID.values.sorted {
             $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
         }
 
@@ -339,7 +339,7 @@ struct CardDetailView: View {
         let heatMapStops = gradientStops(from: slices)
 
         return CardDetailDerivedState(
-            availableCategoriesForChips: availableCategoriesForChips,
+            availableCategories: availableCategories,
             hiddenFutureVariableExpenseCount: hiddenFutureVariableExpenseCount,
             hiddenFuturePlannedExpenseCount: hiddenFuturePlannedExpenseCount,
             variableExpensesFiltered: variableExpensesFiltered,
@@ -494,7 +494,19 @@ struct CardDetailView: View {
     // MARK: - Body
 
     var body: some View {
-        listContent(derived: derivedState)
+        let derived = derivedState
+        listContent(derived: derived)
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                DetailListAccessory(
+                    categories: derived.availableCategories,
+                    selectedCategoryIDs: $selectedCategoryIDs,
+                    expenseScope: $expenseScope,
+                    sortMode: $sortMode,
+                    name: (.az, .za),
+                    amount: (.amountAsc, .amountDesc),
+                    date: (.dateAsc, .dateDesc)
+                )
+            }
             .postBoardingTip(
                 key: "tip.carddetail.v1",
                 title: "Card Detail Overview",
@@ -605,12 +617,6 @@ struct CardDetailView: View {
         List {
             heroSection
             totalSpentSection(derived)
-
-            if !derived.availableCategoriesForChips.isEmpty {
-                categorySection(derived)
-            }
-
-            sortSection
             expensesSection(derived)
         }
     }
@@ -685,54 +691,6 @@ struct CardDetailView: View {
                 rows: [.init(id: "displayed", title: "Total Spent", amount: derived.displayTotal, isTotal: true)]
             )
         ]
-    }
-
-    private func categorySection(_ derived: CardDetailDerivedState) -> some View {
-        Section {
-            CategoryChipsRow(
-                categories: derived.availableCategoriesForChips,
-                selectedIDs: $selectedCategoryIDs
-            )
-        } header: {
-            HStack {
-                Text("Categories")
-                Spacer()
-                if !selectedCategoryIDs.isEmpty {
-                    Button("Clear") {
-                        selectedCategoryIDs.removeAll()
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-        } footer: {
-            Text(
-                selectedCategoryIDs.isEmpty
-                ? "Single-press categories to filter expenses."
-                : "Tap selected chips to clear one at a time, or use Clear to reset all."
-            )
-        }
-    }
-
-    private var sortSection: some View {
-        Section {
-            Picker("Scope", selection: $expenseScope) {
-                Text("Planned").tag(ExpenseScope.planned)
-                Text("Combined").tag(ExpenseScope.unified)
-                Text("Variable").tag(ExpenseScope.variable)
-            }
-            .pickerStyle(.segmented)
-
-            ExpenseSortControl(
-                selection: $sortMode,
-                name: (.az, .za),
-                amount: (.amountAsc, .amountDesc),
-                date: (.dateAsc, .dateDesc)
-            )
-        } header: {
-            Text("Sort")
-        } footer: {
-            Text("Tap the selected sort option again to reverse the order.")
-        }
     }
 
     private func expensesSection(_ derived: CardDetailDerivedState) -> some View {
@@ -1407,108 +1365,6 @@ private struct DatePillButton: View {
         }
         .buttonStyle(.plain)
     } 
-}
-
-// MARK: - Category Chips Row
-
-private struct CategoryChipsRow: View {
-    let categories: [Category]
-    @Binding var selectedIDs: Set<UUID>
-
-    var body: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 10) {
-                ForEach(categories, id: \.id) { category in
-                    Chip(
-                        title: category.name,
-                        dotHex: category.hexColor,
-                        isSelected: selectedIDs.contains(category.id)
-                    ) {
-                        toggle(category.id)
-                    }
-                }
-            }
-            .padding(.vertical, 2)
-        }
-    }
-
-    private func toggle(_ id: UUID) {
-        if selectedIDs.contains(id) {
-            selectedIDs.remove(id)
-        } else {
-            selectedIDs.insert(id)
-        }
-    }
-}
-
-private struct Chip: View {
-    let title: String
-    let dotHex: String
-    let isSelected: Bool
-    let action: () -> Void
-
-    private var baseColor: Color {
-        Color(hex: dotHex) ?? Color.secondary.opacity(0.35)
-    }
-
-    private var backgroundColor: Color {
-        if isSelected {
-            baseColor.opacity(0.20)
-        } else {
-            Color.secondary.opacity(0.12)
-        }
-    }
-
-    private var foregroundColor: Color {
-        if isSelected {
-            baseColor
-        } else {
-            Color.primary
-        }
-    }
-
-    var body: some View {
-        Button(action: action) {
-            Group {
-                if #available(iOS 26.0, *) {
-                    HStack(spacing: 8) {
-                        Circle()
-                            .fill(baseColor)
-                            .frame(width: 8, height: 8)
-
-                        Text(title)
-                            .font(.footnote.weight(.medium))
-                            .lineLimit(1)
-                            .foregroundStyle(foregroundColor)
-                    }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                    .background(
-                        Capsule()
-                            .fill(backgroundColor)
-                    )
-                } else {
-                    HStack(spacing: 8) {
-                        Circle()
-                            .fill(baseColor)
-                            .frame(width: 8, height: 8)
-
-                        Text(title)
-                            .font(.footnote.weight(.medium))
-                            .lineLimit(1)
-                            .foregroundStyle(foregroundColor)
-                    }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                    .background(
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .fill(backgroundColor)
-                    )
-                }
-            }
-        }
-        .buttonStyle(.plain)
-    }
 }
 
 // MARK: - Preview

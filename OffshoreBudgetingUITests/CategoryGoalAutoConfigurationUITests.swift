@@ -81,12 +81,10 @@ final class CategoryGoalAutoConfigurationUITests: XCTestCase {
         let savedBudget = app.staticTexts[savedBudgetName].firstMatch
         XCTAssertTrue(savedBudget.waitForExistence(timeout: 5))
         savedBudget.tap()
-        let goals = app.buttons["Goals"]
-        for _ in 0..<3 {
-            if goals.isHittable { break }
-            app.swipeUp()
-        }
-        goals.tap()
+        app.buttons["Budget Actions"].tap()
+        let categoryGoals = app.buttons["Category Goals"].firstMatch
+        XCTAssertTrue(categoryGoals.waitForExistence(timeout: 5))
+        categoryGoals.tap()
         app.staticTexts["Bills"].firstMatch.tap()
         XCTAssertEqual(app.textFields["Maximum"].value as? String, "1,400.00")
     }
@@ -128,9 +126,10 @@ final class CategoryGoalAutoConfigurationUITests: XCTestCase {
         let app = launchApp()
         app.tabBars.buttons["Budgets"].tap()
         app.staticTexts["Existing Menu Budget"].firstMatch.tap()
-        let goals = app.buttons["Goals"]
-        if !goals.isHittable { app.swipeUp() }
-        goals.tap()
+        app.buttons["Budget Actions"].tap()
+        let categoryGoals = app.buttons["Category Goals"].firstMatch
+        XCTAssertTrue(categoryGoals.waitForExistence(timeout: 5))
+        categoryGoals.tap()
         toggleAutoConfigure(in: app)
         app.staticTexts["Bills"].firstMatch.tap()
         XCTAssertEqual(app.textFields["Minimum"].value as? String, "60.00")

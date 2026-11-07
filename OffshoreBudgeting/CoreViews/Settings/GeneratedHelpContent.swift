@@ -806,12 +806,12 @@ enum GeneratedHelpContent {
                 mediaSection(
                     id: "budgets-details-spending-limits",
                     header: "Category Goals",
-                    body: "Set optional minimum and maximum spending goals for each category. Tap Goals beside Categories to edit them, or press and hold a category. A minimum is a target you want to reach; a maximum is a ceiling. Goals guide your review without blocking expense entry.\n\nCategory Goals belong to this budget. You can set them while creating a budget or edit them later. The Goals list includes categories with no spending yet, so you can plan ahead. Leave either amount blank when you do not need that goal.",
+                    body: "Set optional minimum and maximum spending goals for each category. Open Category Goals from the Budget Detail ellipsis menu to edit them. A minimum is a target you want to reach; a maximum is a ceiling. Goals guide your review without blocking expense entry.\n\nCategory Goals belong to this budget. You can set them while creating a budget or edit them later. The Goals list includes categories with no spending yet, so you can plan ahead. Leave either amount blank when you do not need that goal.",
                     media: [
                         mediaItem(
                             id: "budgets-details-spending-limits-1",
                             assetName: "Help/CoreScreens/Budgets/Budget Details/spending-limits",
-                            bodyText: "Open Goals beside Categories, or press and hold a category, to set its minimum and maximum spending goals for this budget. Review recent spending before changing a goal. Minimums are targets; maximums are ceilings; either can be left blank.",
+                            bodyText: "Open Category Goals from the Budget Detail ellipsis menu to set its minimum and maximum spending goals for this budget. Review recent spending before changing a goal. Minimums are targets; maximums are ceilings; either can be left blank.",
                             fullscreenCaptionText: "Set category goals to surface budget pressure before it compounds."
                         )
                     ]
@@ -831,7 +831,7 @@ enum GeneratedHelpContent {
                 textSection(
                     id: "budgets-category-goals-editing",
                     header: "Set Minimum and Maximum Goals",
-                    body: "Set optional minimum and maximum spending goals for each category. Tap Goals to edit them, or press and hold a category. A minimum is a spending target you want to reach; a maximum is a ceiling you want to stay within. Either can be left blank.\n\nGoals belong to one budget, so Groceries can have a different maximum in a weekly budget and a monthly budget. They guide your review without preventing you from recording expenses. All categories in the workspace are available, including ones with no spending yet."
+                    body: "Set optional minimum and maximum spending goals for each category. Open Category Goals from the Budget Detail ellipsis menu to edit them. A minimum is a spending target you want to reach; a maximum is a ceiling you want to stay within. Either can be left blank.\n\nGoals belong to one budget, so Groceries can have a different maximum in a weekly budget and a monthly budget. They guide your review without preventing you from recording expenses. All categories in the workspace are available, including ones with no spending yet."
                 ),
                 textSection(
                     id: "budgets-category-goals-creation",

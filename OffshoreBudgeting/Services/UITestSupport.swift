@@ -339,9 +339,17 @@ enum UITestSupport {
         context.insert(archived)
         context.insert(other)
         let date = Calendar.current.date(byAdding: .hour, value: 12, to: monthStart)!
-        context.insert(VariableExpense(id: UUID(uuidString: "D1000000-0000-0000-0000-000000000001")!,
+        let lunch = VariableExpense(id: UUID(uuidString: "D1000000-0000-0000-0000-000000000001")!,
             descriptionText: "Lunch Ruby", amount: 25, transactionDate: date,
-            workspace: workspace, card: cardA, category: dining))
+            workspace: workspace, card: cardA, category: dining)
+        context.insert(lunch)
+        if ProcessInfo.processInfo.arguments.contains("-uiTestDetailListReconciliation") {
+            let account = AllocationAccount(name: "Shared Lunch", workspace: workspace)
+            context.insert(account)
+            context.insert(ExpenseAllocation(
+                allocatedAmount: 5, preservesGrossAmount: true, workspace: workspace, account: account, expense: lunch
+            ))
+        }
         context.insert(VariableExpense(id: UUID(uuidString: "D1000000-0000-0000-0000-000000000002")!,
             descriptionText: "Coffee Ocean", amount: 5, transactionDate: date,
             workspace: workspace, card: cardB, category: dining))

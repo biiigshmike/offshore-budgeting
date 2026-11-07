@@ -1,0 +1,267 @@
+import SwiftUI
+
+struct DetailListAccessory<SortMode: Hashable>: View {
+    let categories: [Category]
+    @Binding var selectedCategoryIDs: Set<UUID>
+    var expenseScope: Binding<ExpenseScope>? = nil
+    @Binding var sortMode: SortMode
+    let name: (ascending: SortMode, descending: SortMode)
+    let amount: (ascending: SortMode, descending: SortMode)
+    let date: (ascending: SortMode, descending: SortMode)
+
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @State private var showingCategories = false
+
+    private var categoriesTitle: String {
+        String(localized: "categories.title", defaultValue: "Categories", comment: "Title for categories section.")
+    }
+
+    private var selectedCategories: [Category] {
+        categories.filter { selectedCategoryIDs.contains($0.id) }
+    }
+
+    private var sortOptions: [(mode: SortMode, title: Text, shortTitle: Text)] {
+        [
+            (date.descending, Text("Newest first"), Text("Newest")),
+            (date.ascending, Text("Oldest first"), Text("Oldest")),
+            (amount.descending, Text("Highest amount first"), Text("Highest amount")),
+            (amount.ascending, Text("Lowest amount first"), Text("Lowest amount")),
+            (name.ascending, Text("Name A–Z"), Text("A–Z")),
+            (name.descending, Text("Name Z–A"), Text("Z–A"))
+        ]
+    }
+
+    var body: some View {
+        glassBar
+//            .frame(maxWidth: 500)
+            .frame(maxWidth: .infinity)
+            .padding(.horizontal, 20)
+            .padding(.vertical, 4)
+            .onChange(of: categories.map(\.id), initial: true) { _, categoryIDs in
+                let validSelection = selectedCategoryIDs.intersection(categoryIDs)
+                if validSelection != selectedCategoryIDs {
+                    selectedCategoryIDs = validSelection
+                }
+            }
+            .appSheet(isPresented: $showingCategories) {
+                DetailCategoryPicker(
+                    title: categoriesTitle,
+                    categories: categories,
+                    selectedIDs: $selectedCategoryIDs
+                )
+            }
+    }
+
+    private var glassBar: some View {
+        bar.background {
+            if #available(iOS 26.0, macCatalyst 26.0, *) {
+                Color.clear
+                    .glassEffect(.regular.interactive(), in: .capsule)
+                    .allowsHitTesting(false)
+            } else {
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(.regularMaterial)
+                    .allowsHitTesting(false)
+            }
+        }
+    }
+
+    private var bar: some View {
+        ViewThatFits(in: .horizontal) {
+            if !dynamicTypeSize.isAccessibilitySize {
+                controls(compact: false)
+            }
+            controls(compact: true)
+        }
+        .font(.subheadline.weight(.medium))
+        .buttonStyle(.plain)
+        .menuIndicator(.hidden)
+        .foregroundStyle(.primary)
+        .padding(.horizontal, 4)
+    }
+
+    private func controls(compact: Bool) -> some View {
+        HStack(spacing: 0) {
+            if let expenseScope {
+                scopeMenu(expenseScope, compact: compact)
+                separator
+            }
+            categoriesButton(compact: compact)
+            separator
+            sortMenu(compact: compact)
+        }
+    }
+
+    private var separator: some View {
+        Divider().frame(height: 20).accessibilityHidden(true)
+    }
+
+    private func scopeMenu(_ selection: Binding<ExpenseScope>, compact: Bool) -> some View {
+        let typeTitle = String(localized: "common.type", defaultValue: "Type", comment: "Label for type picker.")
+        let current = scopeTitle(selection.wrappedValue)
+        return Menu {
+            Picker(typeTitle, selection: selection) {
+                Text(scopeTitle(.planned)).tag(ExpenseScope.planned)
+                Text(scopeTitle(.unified)).tag(ExpenseScope.unified)
+                Text(scopeTitle(.variable)).tag(ExpenseScope.variable)
+            }
+            .pickerStyle(.inline)
+        } label: {
+            controlLabel(Text(current), symbol: "square.stack", compact: compact)
+        }
+        .accessibilityLabel(Text(typeTitle))
+        .accessibilityValue(Text(current))
+        .accessibilityIdentifier("detailList.expenseType")
+    }
+
+    private func sortMenu(compact: Bool) -> some View {
+        let sortTitle = String(localized: "common.sort", defaultValue: "Sort", comment: "Label for sort actions.")
+        let options = sortOptions
+        let current = options.first { $0.mode == sortMode }
+        return Menu {
+            Picker(sortTitle, selection: $sortMode) {
+                ForEach(options.indices, id: \.self) { index in
+                    options[index].title.tag(options[index].mode)
+                }
+            }
+            .pickerStyle(.inline)
+        } label: {
+            controlLabel(current?.shortTitle ?? Text(sortTitle),
+                         symbol: "arrow.up.arrow.down", compact: compact)
+        }
+        .accessibilityLabel(Text(sortTitle))
+        .accessibilityValue(current?.title ?? Text(""))
+        .accessibilityIdentifier("detailList.sort")
+    }
+
+    private func categoriesButton(compact: Bool) -> some View {
+        let selection = selectedCategories
+        return Button {
+            showingCategories = true
+        } label: {
+            if selection.isEmpty {
+                controlLabel(Text(categoriesTitle), symbol: "line.3.horizontal.decrease", compact: compact)
+                    .frame(maxWidth: .infinity)
+                    .contentShape(Rectangle())
+            } else {
+                DetailCategoryDots(categories: selection)
+                    .padding(.horizontal, 4)
+                    .frame(minWidth: 52)
+                    .contentShape(Rectangle())
+            }
+        }
+        .disabled(categories.isEmpty)
+        .accessibilityLabel(Text(categoriesTitle))
+        .accessibilityValue(selection.isEmpty
+            ? Text("All categories")
+            : Text(verbatim: selection.map(\.name).formatted(.list(type: .and))))
+        .accessibilityIdentifier("detailList.categories")
+    }
+
+    private func controlLabel(_ title: Text, symbol: String, compact: Bool) -> some View {
+        HStack(spacing: 6) {
+            if compact {
+                Image(systemName: symbol)
+                    .font(.system(size: 20, weight: .medium))
+            } else {
+                Image(systemName: symbol)
+                title
+            }
+        }
+        .fixedSize()
+        .padding(.horizontal, compact ? 6 : 12)
+        .frame(minWidth: TintedGlassNavigationButton.minimumSize,
+               minHeight: TintedGlassNavigationButton.minimumGlassHeight)
+        .contentShape(Rectangle())
+    }
+
+    private func scopeTitle(_ scope: ExpenseScope) -> String {
+        switch scope {
+        case .planned:
+            String(localized: "expenseScope.planned", defaultValue: "Planned", comment: "Expense scope option for planned expenses.")
+        case .unified:
+            String(localized: "expenseScope.unified", defaultValue: "Combined", comment: "Expense scope option for combined expenses.")
+        case .variable:
+            String(localized: "expenseScope.variable", defaultValue: "Variable", comment: "Expense scope option for variable expenses.")
+        }
+    }
+}
+
+private struct DetailCategoryDots: View {
+    let categories: [Category]
+    private let dotSize: CGFloat = 8
+    private let spacing: CGFloat = 4
+    @ScaledMetric(relativeTo: .footnote) private var overflowLineHeight: CGFloat = 18
+
+    var body: some View {
+        GeometryReader { proxy in
+            let capacity = Int((proxy.size.width + spacing) / (dotSize + spacing))
+            let maximumDots = min(capacity, categories.count)
+            ViewThatFits(in: .horizontal) {
+                ForEach(Array((0...maximumDots).reversed()), id: \.self) { visibleCount in
+                    HStack(spacing: spacing) {
+                        ForEach(categories.prefix(visibleCount), id: \.id) { category in
+                            categoryDot(category)
+                        }
+                        if visibleCount < categories.count {
+                            Text("+\(categories.count - visibleCount)")
+                                .font(.footnote.monospacedDigit())
+                        }
+                    }
+                    .fixedSize()
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+        .frame(height: max(overflowLineHeight + 8, TintedGlassNavigationButton.minimumGlassHeight))
+        .accessibilityHidden(true)
+    }
+}
+
+private struct DetailCategoryPicker: View {
+    let title: String
+    let categories: [Category]
+    @Binding var selectedIDs: Set<UUID>
+    @Environment(\.dismiss) private var dismiss
+
+    private var allCategoryIDs: Set<UUID> {
+        Set(categories.map(\.id))
+    }
+
+    var body: some View {
+        NavigationStack {
+            List(categories, id: \.id, selection: $selectedIDs) { category in
+                HStack(spacing: 8) {
+                    categoryDot(category)
+                    Text(category.name)
+                }
+            }
+            .environment(\.editMode, .constant(.active))
+            .navigationTitle(title)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItemGroup(placement: .bottomBar) {
+                    Button("Select All") {
+                        selectedIDs = allCategoryIDs
+                    }
+                    .disabled(allCategoryIDs.isSubset(of: selectedIDs))
+                    Spacer()
+                    Button("Deselect All") { selectedIDs.removeAll() }
+                    .disabled(selectedIDs.isEmpty)
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(String(localized: "common.done", defaultValue: "Done", comment: "Action to finish and dismiss a view.")) {
+                        dismiss()
+                    }
+                }
+            }
+        }
+    }
+}
+
+private func categoryDot(_ category: Category) -> some View {
+    Circle()
+        .fill(Color(hex: category.hexColor) ?? Color.secondary.opacity(0.35))
+        .frame(width: 8, height: 8)
+        .accessibilityHidden(true)
+}

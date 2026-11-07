@@ -13,23 +13,28 @@ final class CategoryGoalSavingsUITests: XCTestCase {
 
         // Selecting Bills hides expenses in the other seeded categories, but must not
         // change the full-budget scenario.
-        let bills = app.buttons["Bills"].firstMatch
-        revealBelow(bills, in: app)
-        bills.tap()
+        let categories = app.buttons["detailList.categories"]
+        categories.tap()
+        let categoryPicker = app.navigationBars["Categories"]
+        XCTAssertTrue(categoryPicker.waitForExistence(timeout: 5))
+        app.descendants(matching: .any).matching(identifier: "Bills").firstMatch.tap()
+        categoryPicker.buttons["Done"].tap()
         XCTAssertEqual(showScenario(in: app).label, fullBudgetLabel)
 
-        let clearCategories = app.buttons["Clear"].firstMatch
-        revealBelow(clearCategories, in: app)
-        clearCategories.tap()
-        let variable = app.segmentedControls.buttons["Variable"].firstMatch
-        revealBelow(variable, in: app)
-        variable.tap()
+        categories.tap()
+        XCTAssertTrue(categoryPicker.waitForExistence(timeout: 5))
+        app.buttons["Deselect All"].tap()
+        categoryPicker.buttons["Done"].tap()
+        app.buttons["detailList.expenseType"].tap()
+        app.buttons["Variable"].tap()
         XCTAssertEqual(showScenario(in: app).label, fullBudgetLabel)
 
         let search = app.searchFields.firstMatch
         revealAbove(search, in: app)
         search.tap()
-        search.typeText("No matching expense for this scenario")
+        let query = "No matching expense for this scenario"
+        search.typeText(query + XCUIKeyboardKey.return.rawValue)
+        XCTAssertEqual(search.value as? String, query)
         XCTAssertEqual(showScenario(in: app).label, fullBudgetLabel)
     }
 
@@ -63,6 +68,15 @@ final class CategoryGoalSavingsUITests: XCTestCase {
         XCTAssertTrue(scenario.isHittable)
         XCTAssertGreaterThanOrEqual(scenario.frame.minX, app.frame.minX)
         XCTAssertLessThanOrEqual(scenario.frame.maxX, app.frame.maxX + 1)
+        XCTAssertTrue(app.buttons["detailList.categories"].isHittable)
+        app.buttons["detailList.expenseType"].tap()
+        let combined = app.buttons["Combined"]
+        XCTAssertTrue(combined.waitForExistence(timeout: 5))
+        combined.tap()
+        app.buttons["detailList.sort"].tap()
+        let newest = app.buttons["Newest first"]
+        XCTAssertTrue(newest.waitForExistence(timeout: 5))
+        newest.tap()
         attachScreenshot("Savings at goal maximums at largest accessibility text size", in: app)
 
         let footnote = app.staticTexts[scenarioFootnote]
@@ -92,9 +106,16 @@ final class CategoryGoalSavingsUITests: XCTestCase {
     }
 
     private func editBillsMaximum(_ amount: String, in app: XCUIApplication) {
-        let goals = app.buttons["Goals"].firstMatch
-        revealBelow(goals, in: app)
-        goals.tap()
+        let budgetActions = app.buttons["Budget Actions"]
+        let categoryGoals = app.buttons["Category Goals"].firstMatch
+        if !budgetActions.isHittable {
+            app.navigationBars["Existing Menu Budget"].buttons["More"].tap()
+        }
+        if !categoryGoals.exists {
+            budgetActions.tap()
+        }
+        XCTAssertTrue(categoryGoals.waitForExistence(timeout: 5))
+        categoryGoals.tap()
         XCTAssertTrue(app.navigationBars["Category Goals"].waitForExistence(timeout: 5))
         let bills = app.staticTexts["Bills"].firstMatch
         revealBelow(bills, in: app)
@@ -119,12 +140,11 @@ final class CategoryGoalSavingsUITests: XCTestCase {
 
     @discardableResult
     private func showScenario(in app: XCUIApplication) -> XCUIElement {
-        // The overview is above the category controls; query again after scrolling
-        // because List may only expose the visible accessibility children.
+        // The goals menu opens above the list, so the overview may be below the fold.
         for _ in 0..<10 {
             let row = scenarioRow(in: app)
             if row.exists && row.isHittable { return row }
-            app.swipeDown()
+            app.swipeUp()
         }
         let row = scenarioRow(in: app)
         XCTAssertTrue(row.waitForExistence(timeout: 5))
@@ -133,8 +153,9 @@ final class CategoryGoalSavingsUITests: XCTestCase {
     }
 
     private func revealBelow(_ element: XCUIElement, in app: XCUIApplication) {
+        let bottom = app.frame.maxY - 24
         for _ in 0..<12 {
-            if element.exists && element.isHittable { return }
+            if element.exists && element.isHittable && element.frame.midY < bottom { return }
             app.swipeUp()
         }
         XCTAssertTrue(element.isHittable)

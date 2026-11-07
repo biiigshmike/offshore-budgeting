@@ -42,9 +42,10 @@ final class CategoryGoalsWidgetUITests: XCTestCase {
         app.tabBars.buttons["Budgets"].tap()
         app.staticTexts["Existing Menu Budget"].firstMatch.tap()
         XCTAssertTrue(app.navigationBars["Existing Menu Budget"].waitForExistence(timeout: 5))
-        let goals = app.buttons["Goals"].firstMatch
-        reveal(goals, in: app)
-        goals.tap()
+        app.buttons["Budget Actions"].tap()
+        let categoryGoals = app.buttons["Category Goals"].firstMatch
+        XCTAssertTrue(categoryGoals.waitForExistence(timeout: 5))
+        categoryGoals.tap()
         XCTAssertTrue(app.navigationBars["Category Goals"].waitForExistence(timeout: 5))
         app.staticTexts["Detail Dining"].firstMatch.tap()
         XCTAssertTrue(app.navigationBars["Detail Dining"].waitForExistence(timeout: 5))

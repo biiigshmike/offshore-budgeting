@@ -64,15 +64,20 @@ struct AllocationAccountDetailView: View {
     }
 
     var body: some View {
+        let derived = derivedState
         List {
-            balanceSection(derivedState)
-
-            if !derivedState.availableCategoriesForChips.isEmpty {
-                categorySection(derivedState)
-            }
-
-            sortSection
-            ledgerSection(derivedState)
+            balanceSection(derived)
+            ledgerSection(derived)
+        }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            DetailListAccessory(
+                categories: derived.availableCategories,
+                selectedCategoryIDs: $selectedCategoryIDs,
+                sortMode: $sortMode,
+                name: (.az, .za),
+                amount: (.amountAsc, .amountDesc),
+                date: (.dateAsc, .dateDesc)
+            )
         }
         .listStyle(.insetGrouped)
         .navigationTitle(account.name)
@@ -291,7 +296,7 @@ struct AllocationAccountDetailView: View {
                 categoriesByID[category.id] = category
             }
         }
-        let availableCategoriesForChips = categoriesByID.values.sorted {
+        let availableCategories = categoriesByID.values.sorted {
             $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
         }
 
@@ -330,7 +335,7 @@ struct AllocationAccountDetailView: View {
         let slices = categoryHeatSlices(for: searchedRows, limit: 10)
 
         return ReconciliationDetailDerivedState(
-            availableCategoriesForChips: availableCategoriesForChips,
+            availableCategories: availableCategories,
             filteredLedgerRows: sortedRows,
             filteredAmountValue: CurrencyFormatter.normalizedCurrencyDisplayValue(
                 AllocationLedgerService.chargeActivity(in: searchedRows)
@@ -493,48 +498,6 @@ struct AllocationAccountDetailView: View {
             Text("Balance")
         } footer: {
             Text("Current outstanding reconciliation balance across all history.")
-        }
-    }
-
-    private func categorySection(_ derived: ReconciliationDetailDerivedState) -> some View {
-        Section {
-            ReconciliationCategoryChipsRow(
-                categories: derived.availableCategoriesForChips,
-                selectedIDs: $selectedCategoryIDs
-            )
-        } header: {
-            HStack {
-                Text("Categories")
-                Spacer()
-                if !selectedCategoryIDs.isEmpty {
-                    Button("Clear") {
-                        selectedCategoryIDs.removeAll()
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-        } footer: {
-            Text(
-                selectedCategoryIDs.isEmpty
-                ? "Single-press categories to filter ledger entries."
-                : "Tap selected chips to clear one at a time, or use Clear to reset all."
-            )
-        }
-    }
-
-    private var sortSection: some View {
-        Section {
-            Picker("Sort", selection: $sortMode) {
-                Text("A-Z").tag(ReconciliationDetailSortMode.az)
-                Text("Z-A").tag(ReconciliationDetailSortMode.za)
-                Text("\(CurrencyFormatter.currencySymbol)↑").tag(ReconciliationDetailSortMode.amountAsc)
-                Text("\(CurrencyFormatter.currencySymbol)↓").tag(ReconciliationDetailSortMode.amountDesc)
-                Text(String(localized: "sort.dateShort.asc", defaultValue: "D↑", comment: "Compact ascending date sort label for segmented controls.")).tag(ReconciliationDetailSortMode.dateAsc)
-                Text(String(localized: "sort.dateShort.desc", defaultValue: "D↓", comment: "Compact descending date sort label for segmented controls.")).tag(ReconciliationDetailSortMode.dateDesc)
-            }
-            .pickerStyle(.segmented)
-        } header: {
-            Text("Sort")
         }
     }
 
@@ -804,7 +767,7 @@ struct AllocationAccountDetailView: View {
 }
 
 private struct ReconciliationDetailDerivedState {
-    let availableCategoriesForChips: [Category]
+    let availableCategories: [Category]
     let filteredLedgerRows: [AllocationLedgerService.LedgerRow]
     let filteredAmountValue: Double
     let heatMapStops: [Gradient.Stop]
@@ -933,77 +896,6 @@ private struct ReconciliationBalanceStatementRow: View {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Balance")
         .accessibilityValue(Text(total, format: CurrencyFormatter.currencyStyle()))
-    }
-}
-
-private struct ReconciliationCategoryChipsRow: View {
-    let categories: [Category]
-    @Binding var selectedIDs: Set<UUID>
-
-    var body: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 10) {
-                ForEach(categories, id: \.id) { category in
-                    ReconciliationChip(
-                        title: category.name,
-                        dotHex: category.hexColor,
-                        isSelected: selectedIDs.contains(category.id)
-                    ) {
-                        toggle(category.id)
-                    }
-                }
-            }
-            .padding(.vertical, 2)
-        }
-    }
-
-    private func toggle(_ id: UUID) {
-        if selectedIDs.contains(id) {
-            selectedIDs.remove(id)
-        } else {
-            selectedIDs.insert(id)
-        }
-    }
-}
-
-private struct ReconciliationChip: View {
-    let title: String
-    let dotHex: String
-    let isSelected: Bool
-    let action: () -> Void
-
-    private var baseColor: Color {
-        Color(hex: dotHex) ?? Color.secondary.opacity(0.35)
-    }
-
-    private var backgroundColor: Color {
-        isSelected ? baseColor.opacity(0.20) : Color.secondary.opacity(0.12)
-    }
-
-    private var foregroundColor: Color {
-        isSelected ? baseColor : .primary
-    }
-
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: 8) {
-                Circle()
-                    .fill(baseColor)
-                    .frame(width: 8, height: 8)
-
-                Text(title)
-                    .font(.subheadline.weight(.medium))
-                    .lineLimit(1)
-            }
-            .foregroundStyle(foregroundColor)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .background(
-                Capsule()
-                    .fill(backgroundColor)
-            )
-        }
-        .buttonStyle(.plain)
     }
 }
 
