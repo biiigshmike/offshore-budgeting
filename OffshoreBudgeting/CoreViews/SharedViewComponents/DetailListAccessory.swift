@@ -1,4 +1,7 @@
 import SwiftUI
+#if !targetEnvironment(macCatalyst)
+import UIKit
+#endif
 
 struct DetailListAccessory<SortMode: Hashable>: View {
     let categories: [Category]
@@ -13,6 +16,9 @@ struct DetailListAccessory<SortMode: Hashable>: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     #if targetEnvironment(macCatalyst)
     @State private var showingCategoryPopover = false
+    #else
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.displayScale) private var displayScale
     #endif
 
     private var categoriesTitle: String {
@@ -24,14 +30,14 @@ struct DetailListAccessory<SortMode: Hashable>: View {
         return categories.filter { selectedCategoryIDs.contains($0.id) }
     }
 
-    private var sortOptions: [(mode: SortMode, title: Text, shortTitle: Text)] {
+    private var sortOptions: [(mode: SortMode, title: LocalizedStringResource, shortTitle: LocalizedStringResource)] {
         [
-            (date.descending, Text("Newest first"), Text("Newest")),
-            (date.ascending, Text("Oldest first"), Text("Oldest")),
-            (amount.descending, Text("Highest amount first"), Text("Highest")),
-            (amount.ascending, Text("Lowest amount first"), Text("Lowest")),
-            (name.ascending, Text("Name A–Z"), Text("A–Z")),
-            (name.descending, Text("Name Z–A"), Text("Z–A"))
+            (date.descending, "Newest first", "Newest"),
+            (date.ascending, "Oldest first", "Oldest"),
+            (amount.descending, "Highest amount first", "Highest"),
+            (amount.ascending, "Lowest amount first", "Lowest"),
+            (name.ascending, "Name A–Z", "A–Z"),
+            (name.descending, "Name Z–A", "Z–A")
         ]
     }
 
@@ -54,7 +60,7 @@ struct DetailListAccessory<SortMode: Hashable>: View {
         bar.background {
             if #available(iOS 26.0, macCatalyst 26.0, *) {
                 Color.clear
-                    .glassEffect(.regular.interactive(), in: .capsule)
+                    .glassEffect(.regular, in: .capsule)
                     .allowsHitTesting(false)
             } else {
                 RoundedRectangle(cornerRadius: 8)
@@ -62,6 +68,7 @@ struct DetailListAccessory<SortMode: Hashable>: View {
                     .allowsHitTesting(false)
             }
         }
+        .contentShape(.contextMenuPreview, Capsule())
     }
 
     private var bar: some View {
@@ -99,6 +106,7 @@ struct DetailListAccessory<SortMode: Hashable>: View {
     private func scopeMenu(_ selection: Binding<ExpenseScope>, compact: Bool, equalWidths: Bool) -> some View {
         let typeTitle = String(localized: "common.type", defaultValue: "Type", comment: "Label for type picker.")
         let current = scopeTitle(selection.wrappedValue)
+        #if targetEnvironment(macCatalyst)
         return Menu {
             Picker(typeTitle, selection: selection) {
                 Text(scopeTitle(.planned)).tag(ExpenseScope.planned)
@@ -112,72 +120,103 @@ struct DetailListAccessory<SortMode: Hashable>: View {
         .accessibilityLabel(Text(typeTitle))
         .accessibilityValue(Text(current))
         .accessibilityIdentifier("detailList.expenseType")
+        #else
+        return controlLabel(Text(current), symbol: "square.stack", compact: compact, equalWidths: equalWidths)
+            .nativeDetailMenu(label: typeTitle, value: current, identifier: "detailList.expenseType") {
+                UIMenu(children: [ExpenseScope.planned, .unified, .variable].map { scope in
+                    UIAction(title: scopeTitle(scope), state: scope == selection.wrappedValue ? .on : .off) { _ in
+                        selection.wrappedValue = scope
+                    }
+                })
+            }
+        #endif
     }
 
     private func sortMenu(compact: Bool, equalWidths: Bool) -> some View {
         let sortTitle = String(localized: "common.sort", defaultValue: "Sort", comment: "Label for sort actions.")
         let options = sortOptions
         let current = options.first { $0.mode == sortMode }
+        let label = current.map { Text($0.shortTitle) } ?? Text(sortTitle)
+        #if targetEnvironment(macCatalyst)
         return Menu {
             Picker(sortTitle, selection: $sortMode) {
                 ForEach(options.indices, id: \.self) { index in
-                    options[index].title.tag(options[index].mode)
+                    Text(options[index].title).tag(options[index].mode)
                 }
             }
             .pickerStyle(.inline)
         } label: {
-            controlLabel(current?.shortTitle ?? Text(sortTitle),
+            controlLabel(label,
                          symbol: "arrow.up.arrow.down", compact: compact, equalWidths: equalWidths)
         }
         .accessibilityLabel(Text(sortTitle))
-        .accessibilityValue(current?.title ?? Text(""))
+        .accessibilityValue(current.map { Text($0.title) } ?? Text(""))
         .accessibilityIdentifier("detailList.sort")
+        #else
+        return controlLabel(label, symbol: "arrow.up.arrow.down", compact: compact, equalWidths: equalWidths)
+            .nativeDetailMenu(label: sortTitle, value: current.map { String(localized: $0.title) },
+                              identifier: "detailList.sort") {
+                UIMenu(children: options.map { option in
+                    UIAction(title: String(localized: option.title), state: option.mode == sortMode ? .on : .off) { _ in
+                        sortMode = option.mode
+                    }
+                })
+            }
+        #endif
     }
 
     private var categoriesMenu: some View {
         let selection = selectedCategories
         let isFiltered = selectedCategoryIDs != nil
-        return Group {
-            #if targetEnvironment(macCatalyst)
-            Button {
-                showingCategoryPopover = true
-            } label: {
-                categoriesLabel(categories: selection, isFiltered: isFiltered)
-            }
-            .popover(isPresented: $showingCategoryPopover, arrowEdge: .bottom) {
-                categoryPopover
-            }
-            #else
-            Menu {
-                categoryBulkAction
-                    .menuActionDismissBehavior(.disabled)
-
-                Divider()
-
-                ForEach(categories, id: \.id) { category in
-                    Toggle(isOn: categorySelection(category.id)) {
-                        CategoryMenuLabel(category: category)
-                    }
-                    .accessibilityLabel(Text(category.name))
-                    .menuActionDismissBehavior(.disabled)
-                }
-            } label: {
-                categoriesLabel(categories: selection, isFiltered: isFiltered)
-            }
-            .toggleStyle(.automatic)
-            .menuOrder(.fixed)
-            #endif
+        let value = categoryAccessibilityValue(selection)
+        #if targetEnvironment(macCatalyst)
+        return Button {
+            showingCategoryPopover = true
+        } label: {
+            categoriesLabel(categories: selection, isFiltered: isFiltered)
+        }
+        .popover(isPresented: $showingCategoryPopover, arrowEdge: .bottom) {
+            categoryPopover
         }
         .disabled(categories.isEmpty)
         .accessibilityLabel(Text(categoriesTitle))
-        .accessibilityValue(categoryAccessibilityValue(selection))
+        .accessibilityValue(Text(value))
         .accessibilityIdentifier("detailList.categories")
+        #else
+        return categoriesLabel(categories: selection, isFiltered: isFiltered)
+            .nativeDetailMenu(label: categoriesTitle, value: value, identifier: "detailList.categories",
+                              isEnabled: !categories.isEmpty, refreshWhileOpen: true) {
+                let categoryIDs = Set(categories.map(\.id))
+                let allSelected = selectedCategoryIDs.map { categoryIDs.isSubset(of: $0) } ?? true
+                let bulkAction = UIAction(
+                    title: allSelected ? String(localized: "Deselect All") : String(localized: "Select All"),
+                    identifier: UIAction.Identifier("detailList.categories.bulk"),
+                    attributes: .keepsMenuPresented
+                ) { _ in
+                    selectedCategoryIDs = allSelected ? [] : categoryIDs
+                }
+                let rows = categories.map { category in
+                    let selection = categorySelection(category.id)
+                    return UIAction(
+                        title: category.name,
+                        image: EntityMenuImageCache.category(hexColor: category.hexColor, colorScheme: colorScheme,
+                                                            scale: displayScale),
+                        identifier: UIAction.Identifier(category.id.uuidString),
+                        attributes: .keepsMenuPresented,
+                        state: selection.wrappedValue ? .on : .off
+                    ) { _ in
+                        selection.wrappedValue.toggle()
+                    }
+                }
+                return UIMenu(children: [UIMenu(options: .displayInline, children: [bulkAction])] + rows)
+            }
+        #endif
     }
 
-    private func categoryAccessibilityValue(_ selection: [Category]) -> Text {
-        guard selectedCategoryIDs != nil else { return Text("No category filter") }
-        guard !selection.isEmpty else { return Text("No categories selected") }
-        return Text(verbatim: selection.map(\.name).formatted(.list(type: .and)))
+    private func categoryAccessibilityValue(_ selection: [Category]) -> String {
+        guard selectedCategoryIDs != nil else { return String(localized: "No category filter") }
+        guard !selection.isEmpty else { return String(localized: "No categories selected") }
+        return selection.map(\.name).formatted(.list(type: .and))
     }
 
     private func categoriesLabel(categories: [Category], isFiltered: Bool) -> some View {
@@ -185,7 +224,8 @@ struct DetailListAccessory<SortMode: Hashable>: View {
             .frame(idealWidth: 0)
             .padding(.horizontal, 8)
             .frame(minWidth: 52, maxWidth: .infinity)
-            .contentShape(Rectangle())
+            .contentShape(.interaction, Capsule())
+            .contentShape(.contextMenuPreview, Capsule())
     }
 
     private var categoryBulkAction: some View {
@@ -266,7 +306,8 @@ struct DetailListAccessory<SortMode: Hashable>: View {
         .frame(minWidth: TintedGlassNavigationButton.minimumSize,
                maxWidth: equalWidths ? .infinity : nil,
                minHeight: TintedGlassNavigationButton.minimumGlassHeight)
-        .contentShape(Rectangle())
+        .contentShape(.interaction, Capsule())
+        .contentShape(.contextMenuPreview, Capsule())
     }
 
     private func scopeTitle(_ scope: ExpenseScope) -> String {
