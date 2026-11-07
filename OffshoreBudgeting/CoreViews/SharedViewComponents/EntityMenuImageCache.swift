@@ -39,26 +39,15 @@ enum EntityMenuImageCache {
         return image
     }
 
-    static func category(hexColor: String?, colorScheme: ColorScheme, scale: CGFloat, isSelected: Bool? = nil) -> UIImage? {
-        let selectionKey = isSelected.map { $0 ? "selected" : "unselected" } ?? "dot"
-        let key = "category:\(hexColor?.uppercased() ?? "none"):\(appearanceKey(colorScheme)):\(scale):\(selectionKey)" as NSString
+    static func category(hexColor: String?, colorScheme: ColorScheme, scale: CGFloat) -> UIImage? {
+        let key = "category:\(hexColor?.uppercased() ?? "none"):\(appearanceKey(colorScheme)):\(scale)" as NSString
         if let image = images.object(forKey: key) { return image }
 
-        let artwork = HStack(spacing: 6) {
-            if let isSelected {
-                Image(systemName: "checkmark")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(Color.primary)
-                    .frame(width: 12, height: 12)
-                    .opacity(isSelected ? 1 : 0)
-            }
-
-            Circle()
-                .fill(hexColor.flatMap(Color.init(hex:)) ?? .secondary)
-                .frame(width: 12, height: 12)
-        }
-        .padding(2)
-        .environment(\.colorScheme, colorScheme)
+        let artwork = Circle()
+            .fill(hexColor.flatMap(Color.init(hex:)) ?? .secondary)
+            .frame(width: 12, height: 12)
+            .padding(2)
+            .environment(\.colorScheme, colorScheme)
         let renderer = ImageRenderer(content: artwork)
         renderer.scale = scale
         guard let image = renderer.uiImage?.withRenderingMode(.alwaysOriginal) else { return nil }
