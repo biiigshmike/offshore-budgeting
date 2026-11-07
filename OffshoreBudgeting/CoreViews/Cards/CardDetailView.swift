@@ -943,6 +943,7 @@ struct CardDetailView: View {
                 Label("Variable Expense Display", systemImage: "chart.xyaxis.line")
             }
         }
+        .toggleStyle(.automatic)
         .labelStyle(.iconOnly)
     }
 

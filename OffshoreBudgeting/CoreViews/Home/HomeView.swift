@@ -1306,6 +1306,7 @@ struct HomeView: View {
         } label: {
             Label(String(localized: "home.actions", defaultValue: "Expense Display", comment: "Accessibility label for home actions menu."), systemImage: hasActiveExpenseFilters ? "eye.slash" : "eye")
         }
+        .toggleStyle(.automatic)
         .accessibilityLabel(String(localized: "home.actions", defaultValue: "Expense Display", comment: "Accessibility label for home actions menu."))
     }
 

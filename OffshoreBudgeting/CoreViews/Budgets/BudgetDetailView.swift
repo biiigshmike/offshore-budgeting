@@ -1188,6 +1188,7 @@ struct BudgetDetailView: View {
         } label: {
             Label(String(localized: "expense.display", defaultValue: "Expense Display", comment: "Accessibility label for expense display menu."), systemImage: hasActiveExpenseFilters ? "eye.slash" : "eye")
         }
+        .toggleStyle(.automatic)
         .accessibilityLabel(String(localized: "expense.display", defaultValue: "Expense Display", comment: "Accessibility label for expense display menu."))
     }
 

@@ -285,6 +285,7 @@ struct CategoryDetailView: View, Equatable {
                 Toggle("Exclude Future Variable Expenses from Totals", isOn: $excludeFutureVariable)
             }
         }
+        .toggleStyle(.automatic)
         .labelStyle(.iconOnly)
     }
 
