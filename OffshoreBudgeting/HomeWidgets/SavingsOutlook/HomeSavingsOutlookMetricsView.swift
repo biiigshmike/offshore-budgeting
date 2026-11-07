@@ -274,6 +274,38 @@ struct HomeSavingsOutlookMetricsView: View {
                     }
                 }
                 .frame(height: 240)
+                .chartLegend(.hidden)
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Label {
+                        Text("Projected Savings")
+                    } icon: {
+                        Circle()
+                            .fill(accent.opacity(0.75))
+                            .frame(width: 8, height: 8)
+                    }
+
+                    if points.contains(where: { $0.actualRunning != 0 }) {
+                        Label {
+                            Text("Actual Savings")
+                        } icon: {
+                            HStack(spacing: 4) {
+                                if points.contains(where: { $0.actualRunning > 0 }) {
+                                    Circle()
+                                        .fill(Color.green.opacity(0.85))
+                                        .frame(width: 8, height: 8)
+                                }
+                                if points.contains(where: { $0.actualRunning < 0 }) {
+                                    Circle()
+                                        .fill(Color.red.opacity(0.85))
+                                        .frame(width: 8, height: 8)
+                                }
+                            }
+                        }
+                    }
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
             }
         }
         .padding(14)
