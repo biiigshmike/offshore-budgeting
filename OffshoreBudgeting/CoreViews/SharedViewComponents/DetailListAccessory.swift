@@ -2,7 +2,8 @@ import SwiftUI
 
 struct DetailListAccessory<SortMode: Hashable>: View {
     let categories: [Category]
-    @Binding var selectedCategoryIDs: Set<UUID>
+    // nil is the initial unfiltered state. An empty set matches no categories.
+    @Binding var selectedCategoryIDs: Set<UUID>?
     var expenseScope: Binding<ExpenseScope>? = nil
     @Binding var sortMode: SortMode
     let name: (ascending: SortMode, descending: SortMode)
@@ -19,7 +20,8 @@ struct DetailListAccessory<SortMode: Hashable>: View {
     }
 
     private var selectedCategories: [Category] {
-        categories.filter { selectedCategoryIDs.contains($0.id) }
+        guard let selectedCategoryIDs else { return categories }
+        return categories.filter { selectedCategoryIDs.contains($0.id) }
     }
 
     private var sortOptions: [(mode: SortMode, title: Text, shortTitle: Text)] {
@@ -40,9 +42,10 @@ struct DetailListAccessory<SortMode: Hashable>: View {
             .padding(.horizontal, 20)
             .padding(.vertical, 4)
             .onChange(of: categories.map(\.id), initial: true) { _, categoryIDs in
+                guard let selectedCategoryIDs else { return }
                 let validSelection = selectedCategoryIDs.intersection(categoryIDs)
                 if validSelection != selectedCategoryIDs {
-                    selectedCategoryIDs = validSelection
+                    self.selectedCategoryIDs = validSelection
                 }
             }
     }
@@ -64,6 +67,7 @@ struct DetailListAccessory<SortMode: Hashable>: View {
     private var bar: some View {
         ViewThatFits(in: .horizontal) {
             if !dynamicTypeSize.isAccessibilitySize {
+                controls(compact: false, equalWidths: true)
                 controls(compact: false)
             }
             controls(compact: true)
@@ -75,23 +79,24 @@ struct DetailListAccessory<SortMode: Hashable>: View {
         .padding(.horizontal, 4)
     }
 
-    private func controls(compact: Bool) -> some View {
-        HStack(spacing: 0) {
+    private func controls(compact: Bool, equalWidths: Bool = false) -> some View {
+        let layout = equalWidths ? AnyLayout(EqualDetailControlLayout()) : AnyLayout(HStackLayout(spacing: 0))
+        return layout {
             if let expenseScope {
-                scopeMenu(expenseScope, compact: compact)
+                scopeMenu(expenseScope, compact: compact, equalWidths: equalWidths)
                 separator
             }
-            categoriesMenu(compact: compact)
+            categoriesMenu
             separator
-            sortMenu(compact: compact)
+            sortMenu(compact: compact, equalWidths: equalWidths)
         }
     }
 
     private var separator: some View {
-        Divider().frame(height: 20).accessibilityHidden(true)
+        Divider().frame(width: 1, height: 20).accessibilityHidden(true)
     }
 
-    private func scopeMenu(_ selection: Binding<ExpenseScope>, compact: Bool) -> some View {
+    private func scopeMenu(_ selection: Binding<ExpenseScope>, compact: Bool, equalWidths: Bool) -> some View {
         let typeTitle = String(localized: "common.type", defaultValue: "Type", comment: "Label for type picker.")
         let current = scopeTitle(selection.wrappedValue)
         return Menu {
@@ -102,14 +107,14 @@ struct DetailListAccessory<SortMode: Hashable>: View {
             }
             .pickerStyle(.inline)
         } label: {
-            controlLabel(Text(current), symbol: "square.stack", compact: compact)
+            controlLabel(Text(current), symbol: "square.stack", compact: compact, equalWidths: equalWidths)
         }
         .accessibilityLabel(Text(typeTitle))
         .accessibilityValue(Text(current))
         .accessibilityIdentifier("detailList.expenseType")
     }
 
-    private func sortMenu(compact: Bool) -> some View {
+    private func sortMenu(compact: Bool, equalWidths: Bool) -> some View {
         let sortTitle = String(localized: "common.sort", defaultValue: "Sort", comment: "Label for sort actions.")
         let options = sortOptions
         let current = options.first { $0.mode == sortMode }
@@ -122,21 +127,22 @@ struct DetailListAccessory<SortMode: Hashable>: View {
             .pickerStyle(.inline)
         } label: {
             controlLabel(current?.shortTitle ?? Text(sortTitle),
-                         symbol: "arrow.up.arrow.down", compact: compact)
+                         symbol: "arrow.up.arrow.down", compact: compact, equalWidths: equalWidths)
         }
         .accessibilityLabel(Text(sortTitle))
         .accessibilityValue(current?.title ?? Text(""))
         .accessibilityIdentifier("detailList.sort")
     }
 
-    private func categoriesMenu(compact: Bool) -> some View {
+    private var categoriesMenu: some View {
         let selection = selectedCategories
+        let isFiltered = selectedCategoryIDs != nil
         return Group {
             #if targetEnvironment(macCatalyst)
             Button {
                 showingCategoryPopover = true
             } label: {
-                categoriesLabel(selection: selection, compact: compact)
+                categoriesLabel(categories: selection, isFiltered: isFiltered)
             }
             .popover(isPresented: $showingCategoryPopover, arrowEdge: .bottom) {
                 categoryPopover
@@ -156,7 +162,7 @@ struct DetailListAccessory<SortMode: Hashable>: View {
                     .menuActionDismissBehavior(.disabled)
                 }
             } label: {
-                categoriesLabel(selection: selection, compact: compact)
+                categoriesLabel(categories: selection, isFiltered: isFiltered)
             }
             .toggleStyle(.automatic)
             .menuOrder(.fixed)
@@ -164,29 +170,27 @@ struct DetailListAccessory<SortMode: Hashable>: View {
         }
         .disabled(categories.isEmpty)
         .accessibilityLabel(Text(categoriesTitle))
-        .accessibilityValue(selection.isEmpty
-            ? Text("All categories")
-            : Text(verbatim: selection.map(\.name).formatted(.list(type: .and))))
+        .accessibilityValue(categoryAccessibilityValue(selection))
         .accessibilityIdentifier("detailList.categories")
     }
 
-    private func categoriesLabel(selection: [Category], compact: Bool) -> some View {
-        ZStack {
-            controlLabel(Text(categoriesTitle), symbol: "line.3.horizontal.decrease", compact: compact)
-                .opacity(selection.isEmpty ? 1 : 0)
+    private func categoryAccessibilityValue(_ selection: [Category]) -> Text {
+        guard selectedCategoryIDs != nil else { return Text("No category filter") }
+        guard !selection.isEmpty else { return Text("No categories selected") }
+        return Text(verbatim: selection.map(\.name).formatted(.list(type: .and)))
+    }
 
-            if !selection.isEmpty {
-                DetailCategoryDots(categories: selection)
-                    .padding(.horizontal, 4)
-            }
-        }
-        .frame(minWidth: 52, maxWidth: .infinity)
-        .contentShape(Rectangle())
+    private func categoriesLabel(categories: [Category], isFiltered: Bool) -> some View {
+        DetailCategoryAccessoryLabel(categories: categories, isFiltered: isFiltered, title: categoriesTitle)
+            .frame(idealWidth: 0)
+            .padding(.horizontal, 8)
+            .frame(minWidth: 52, maxWidth: .infinity)
+            .contentShape(Rectangle())
     }
 
     private var categoryBulkAction: some View {
         let categoryIDs = Set(categories.map(\.id))
-        let allSelected = categoryIDs.isSubset(of: selectedCategoryIDs)
+        let allSelected = selectedCategoryIDs.map { categoryIDs.isSubset(of: $0) } ?? true
         return Button(allSelected ? LocalizedStringKey("Deselect All") : LocalizedStringKey("Select All")) {
             selectedCategoryIDs = allSelected ? [] : categoryIDs
         }
@@ -194,13 +198,15 @@ struct DetailListAccessory<SortMode: Hashable>: View {
 
     private func categorySelection(_ id: UUID) -> Binding<Bool> {
         Binding(
-            get: { selectedCategoryIDs.contains(id) },
+            get: { selectedCategoryIDs?.contains(id) ?? true },
             set: { isSelected in
+                var updatedSelection = selectedCategoryIDs ?? Set(categories.map(\.id))
                 if isSelected {
-                    selectedCategoryIDs.insert(id)
+                    updatedSelection.insert(id)
                 } else {
-                    selectedCategoryIDs.remove(id)
+                    updatedSelection.remove(id)
                 }
+                selectedCategoryIDs = updatedSelection
             }
         )
     }
@@ -245,7 +251,7 @@ struct DetailListAccessory<SortMode: Hashable>: View {
     }
     #endif
 
-    private func controlLabel(_ title: Text, symbol: String, compact: Bool) -> some View {
+    private func controlLabel(_ title: Text, symbol: String, compact: Bool, equalWidths: Bool) -> some View {
         HStack(spacing: 6) {
             if compact {
                 Image(systemName: symbol)
@@ -258,6 +264,7 @@ struct DetailListAccessory<SortMode: Hashable>: View {
         .fixedSize()
         .padding(.horizontal, compact ? 6 : 12)
         .frame(minWidth: TintedGlassNavigationButton.minimumSize,
+               maxWidth: equalWidths ? .infinity : nil,
                minHeight: TintedGlassNavigationButton.minimumGlassHeight)
         .contentShape(Rectangle())
     }
@@ -274,19 +281,69 @@ struct DetailListAccessory<SortMode: Hashable>: View {
     }
 }
 
-private struct DetailCategoryDots: View {
+private struct EqualDetailControlLayout: Layout {
+    static var layoutProperties: LayoutProperties {
+        var properties = LayoutProperties()
+        properties.stackOrientation = .horizontal
+        return properties
+    }
+
+    // Controls and one-point dividers alternate.
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let controlCount = (subviews.count + 1) / 2
+        let idealWidth = subviews.indices
+            .filter { $0.isMultiple(of: 2) }
+            .map { subviews[$0].sizeThatFits(.unspecified).width }
+            .max() ?? 0
+        let minimumWidth = CGFloat(controlCount) * idealWidth + CGFloat(controlCount - 1)
+        let height = subviews.map { $0.sizeThatFits(.unspecified).height }.max() ?? 0
+        return CGSize(width: max(proposal.width ?? minimumWidth, minimumWidth), height: height)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        let controlCount = (subviews.count + 1) / 2
+        let controlWidth = (bounds.width - CGFloat(controlCount - 1)) / CGFloat(controlCount)
+        var x = bounds.minX
+        for index in subviews.indices {
+            let width = index.isMultiple(of: 2) ? controlWidth : 1
+            subviews[index].place(at: CGPoint(x: x + width / 2, y: bounds.midY),
+                                  anchor: .center, proposal: ProposedViewSize(width: width, height: nil))
+            x += width
+        }
+    }
+}
+
+private struct DetailCategoryAccessoryLabel: View {
     let categories: [Category]
+    let isFiltered: Bool
+    let title: String
+    private let iconWidth: CGFloat = 20
     private let dotSize: CGFloat = 8
     private let spacing: CGFloat = 4
     @ScaledMetric(relativeTo: .footnote) private var overflowLineHeight: CGFloat = 18
 
+    private var filterIcon: some View {
+        Image(systemName: isFiltered ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
+            .font(.system(size: iconWidth, weight: .medium))
+            .frame(width: iconWidth)
+    }
+
     var body: some View {
         GeometryReader { proxy in
-            let capacity = Int((proxy.size.width + spacing) / (dotSize + spacing))
+            let capacity = Int(max(0, proxy.size.width - iconWidth) / (dotSize + spacing))
             let maximumDots = min(capacity, categories.count)
             ViewThatFits(in: .horizontal) {
+                if categories.isEmpty {
+                    HStack(spacing: spacing) {
+                        filterIcon
+                        Text(title)
+                    }
+                    .fixedSize()
+                }
+
                 ForEach(Array((0...maximumDots).reversed()), id: \.self) { visibleCount in
                     HStack(spacing: spacing) {
+                        filterIcon
                         ForEach(categories.prefix(visibleCount), id: \.id) { category in
                             categoryDot(category)
                         }
@@ -297,6 +354,8 @@ private struct DetailCategoryDots: View {
                     }
                     .fixedSize()
                 }
+
+                filterIcon
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }

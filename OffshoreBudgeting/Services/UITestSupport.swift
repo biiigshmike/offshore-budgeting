@@ -351,6 +351,12 @@ enum UITestSupport {
             descriptionText: "Lunch Ruby", amount: 25, transactionDate: date,
             workspace: workspace, card: cardA, category: dining)
         context.insert(lunch)
+        if ProcessInfo.processInfo.arguments.contains("-uiTestDetailListUncategorized") {
+            context.insert(VariableExpense(
+                descriptionText: "Uncategorized Purchase", amount: 5, transactionDate: date.addingTimeInterval(-60),
+                workspace: workspace, card: cardA
+            ))
+        }
         if ProcessInfo.processInfo.arguments.contains("-uiTestDetailListReconciliation") {
             let account = AllocationAccount(name: "Shared Lunch", workspace: workspace)
             context.insert(account)

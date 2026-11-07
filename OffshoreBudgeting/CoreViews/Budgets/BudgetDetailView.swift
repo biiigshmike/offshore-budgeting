@@ -105,7 +105,7 @@ struct BudgetDetailView: View {
     
     // MARK: - UI State
     
-    @State private var selectedCategoryIDs: Set<UUID> = []
+    @State private var selectedCategoryIDs: Set<UUID>?
     @State private var expenseScope: ExpenseScope = .unified
     @State private var sortMode: BudgetSortMode = .dateDesc
     @State private var hideFuturePlannedExpensesInView: Bool = false
@@ -360,24 +360,24 @@ struct BudgetDetailView: View {
         }
 
         let plannedCategoryFiltered: [PlannedExpense]
-        if selectedCategoryIDs.isEmpty {
-            plannedCategoryFiltered = plannedExpensesInBudget
-        } else {
+        if let selectedCategoryIDs {
             plannedCategoryFiltered = plannedExpensesInBudget.filter {
                 guard let categoryID = $0.category?.id else { return false }
                 return selectedCategoryIDs.contains(categoryID)
             }
+        } else {
+            plannedCategoryFiltered = plannedExpensesInBudget
         }
         let plannedFilteredForCurrentControls = plannedCategoryFiltered.filter { matchesSearch($0) }
 
         let variableCategoryFiltered: [VariableExpense]
-        if selectedCategoryIDs.isEmpty {
-            variableCategoryFiltered = variableExpensesInBudget
-        } else {
+        if let selectedCategoryIDs {
             variableCategoryFiltered = variableExpensesInBudget.filter {
                 guard let categoryID = $0.category?.id else { return false }
                 return selectedCategoryIDs.contains(categoryID)
             }
+        } else {
+            variableCategoryFiltered = variableExpensesInBudget
         }
         let variableFilteredForCurrentControls = variableCategoryFiltered.filter { matchesSearch($0) }
 
@@ -1218,6 +1218,7 @@ struct BudgetDetailView: View {
     }
 
     private func plannedEmptyMessage(_ derived: BudgetDetailDerivedState) -> String {
+        if selectedCategoryIDs?.isEmpty == true { return String(localized: "No categories selected") }
         if derived.hiddenFuturePlannedExpenseCount > 0 {
             return "No visible planned expenses"
         }
@@ -1225,6 +1226,7 @@ struct BudgetDetailView: View {
     }
 
     private func variableEmptyMessage(_ derived: BudgetDetailDerivedState) -> String {
+        if selectedCategoryIDs?.isEmpty == true { return String(localized: "No categories selected") }
         if derived.hiddenFutureVariableExpenseCount > 0 {
             return "No visible variable expenses"
         }
@@ -1232,6 +1234,7 @@ struct BudgetDetailView: View {
     }
 
     private func unifiedEmptyMessage(_ derived: BudgetDetailDerivedState) -> String {
+        if selectedCategoryIDs?.isEmpty == true { return String(localized: "No categories selected") }
         if derived.hiddenFuturePlannedExpenseCount > 0 || derived.hiddenFutureVariableExpenseCount > 0 {
             return "No visible expenses"
         }

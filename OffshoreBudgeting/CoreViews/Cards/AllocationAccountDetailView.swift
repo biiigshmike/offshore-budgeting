@@ -33,7 +33,7 @@ struct AllocationAccountDetailView: View {
     @State private var appliedStartDate: Date = .now
     @State private var appliedEndDate: Date = .now
     @State private var isApplyingQuickRange: Bool = false
-    @State private var selectedCategoryIDs: Set<UUID> = []
+    @State private var selectedCategoryIDs: Set<UUID>?
     @State private var sortMode: ReconciliationDetailSortMode = .dateDesc
     @State private var searchText: String = ""
     @FocusState private var searchFocused: Bool
@@ -305,13 +305,13 @@ struct AllocationAccountDetailView: View {
         }
 
         let categoryFiltered: [AllocationLedgerService.LedgerRow]
-        if selectedCategoryIDs.isEmpty {
-            categoryFiltered = dateFiltered
-        } else {
+        if let selectedCategoryIDs {
             categoryFiltered = dateFiltered.filter { row in
                 guard let categoryID = category(for: row)?.id else { return false }
                 return selectedCategoryIDs.contains(categoryID)
             }
+        } else {
+            categoryFiltered = dateFiltered
         }
 
         let searchedRows: [AllocationLedgerService.LedgerRow]
@@ -558,15 +558,16 @@ struct AllocationAccountDetailView: View {
     }
 
     private var emptyLedgerMessage: String {
+        if selectedCategoryIDs?.isEmpty == true { return String(localized: "No categories selected") }
         if isSearching {
             return ReconciliationDetailEmptyState.message(
                 hasHistory: hasHistory,
                 isSearching: true,
-                selectedCategoryCount: selectedCategoryIDs.count
+                selectedCategoryCount: selectedCategoryIDs?.count ?? 0
             )
         }
 
-        if !selectedCategoryIDs.isEmpty {
+        if let selectedCategoryIDs {
             return ReconciliationDetailEmptyState.message(
                 hasHistory: hasHistory,
                 isSearching: false,

@@ -15,6 +15,7 @@ final class CategoryGoalSavingsUITests: XCTestCase {
         // change the full-budget scenario.
         let categories = app.buttons["detailList.categories"]
         categories.tap()
+        app.buttons["Deselect All"].tap()
         let bills = app.buttons["Bills"]
         XCTAssertTrue(bills.waitForExistence(timeout: 5))
         bills.tap()

@@ -17,6 +17,7 @@ final class DetailListAccessoryUITests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments = [
             "-uiTesting", "-uiTestingReset", "-uiTestScenarioBudgetMenus", "-uiTestCategoryDetailHistory",
+            "-uiTestDetailListUncategorized",
             "-tips_seenKeys", "tip.home.v1,tip.budgets.v1,tip.budgetdetail.v1",
             "-AppleLanguages", "(en)", "-AppleLocale", "en_US"
         ]
@@ -37,17 +38,17 @@ final class DetailListAccessoryUITests: XCTestCase {
 
         let categories = app.buttons["detailList.categories"]
         XCTAssertTrue(categories.waitForExistence(timeout: 5))
-        XCTAssertEqual(categories.value as? String, "All categories")
+        XCTAssertEqual(categories.value as? String, "No category filter")
         app.swipeUp()
         categories.tap()
 
         let selectAll = app.buttons["Select All"]
         let deselectAll = app.buttons["Deselect All"]
-        XCTAssertTrue(selectAll.waitForExistence(timeout: 5))
-        XCTAssertFalse(deselectAll.exists)
-        app.buttons["Bills"].tap()
+        XCTAssertTrue(deselectAll.waitForExistence(timeout: 5))
+        XCTAssertFalse(selectAll.exists)
+        app.buttons["Archived Dining"].tap()
         XCTAssertTrue(selectAll.exists)
-        app.buttons["Detail Dining"].tap()
+        app.buttons["Other Detail Category"].tap()
         XCTAssertTrue(selectAll.exists)
         app.navigationBars.firstMatch.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
         XCTAssertEqual(categories.value as? String, "Bills and Detail Dining")
@@ -76,6 +77,7 @@ final class DetailListAccessoryUITests: XCTestCase {
         XCTAssertFalse(selectAll.exists)
         app.navigationBars.firstMatch.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
         XCTAssertTrue((categories.value as? String)?.contains("Other Detail Category") == true)
+        XCTAssertFalse(app.staticTexts["Uncategorized Purchase"].exists)
 
         categories.tap()
         XCTAssertTrue(deselectAll.waitForExistence(timeout: 5))
@@ -83,7 +85,11 @@ final class DetailListAccessoryUITests: XCTestCase {
         XCTAssertTrue(selectAll.waitForExistence(timeout: 5))
         XCTAssertFalse(deselectAll.exists)
         app.navigationBars.firstMatch.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
-        XCTAssertEqual(categories.value as? String, "All categories")
+        XCTAssertEqual(categories.value as? String, "No categories selected")
+        XCTAssertTrue(app.staticTexts["No categories selected"].exists)
+        XCTAssertFalse(app.staticTexts["Lunch Ruby"].exists)
+        XCTAssertFalse(app.staticTexts["Other Category Purchase"].exists)
+        XCTAssertFalse(app.staticTexts["Uncategorized Purchase"].exists)
     }
 
     func testCardAndReconciliationHaveTheirOwnCategoryAndSortControls() throws {
@@ -108,6 +114,7 @@ final class DetailListAccessoryUITests: XCTestCase {
         XCTAssertTrue(app.buttons["detailList.expenseType"].exists)
         XCTAssertTrue(app.buttons["detailList.sort"].exists)
         categories.tap()
+        app.buttons["Deselect All"].tap()
         let dining = app.buttons["Detail Dining"]
         XCTAssertTrue(dining.waitForExistence(timeout: 5))
         dining.tap()
@@ -121,9 +128,10 @@ final class DetailListAccessoryUITests: XCTestCase {
         XCTAssertTrue(account.waitForExistence(timeout: 5))
         account.tap()
         XCTAssertTrue(categories.waitForExistence(timeout: 5))
-        XCTAssertEqual(categories.value as? String, "All categories")
+        XCTAssertEqual(categories.value as? String, "No category filter")
         XCTAssertFalse(app.buttons["detailList.expenseType"].exists)
         categories.tap()
+        app.buttons["Deselect All"].tap()
         XCTAssertTrue(dining.waitForExistence(timeout: 5))
         dining.tap()
         app.navigationBars.firstMatch.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()

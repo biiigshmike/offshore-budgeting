@@ -81,7 +81,7 @@ struct CardDetailView: View {
     @State private var appliedEndDate: Date = .now
     @State private var isApplyingQuickRange: Bool = false
 
-    @State private var selectedCategoryIDs: Set<UUID> = []
+    @State private var selectedCategoryIDs: Set<UUID>?
 
     @State private var expenseScope: ExpenseScope = .unified
     @State private var sortMode: SortMode = .dateDesc
@@ -227,13 +227,13 @@ struct CardDetailView: View {
             return d >= start && d <= end
         }
         let variableCategoryFiltered: [VariableExpense]
-        if selectedCategoryIDs.isEmpty {
-            variableCategoryFiltered = variableDateFiltered
-        } else {
+        if let selectedCategoryIDs {
             variableCategoryFiltered = variableDateFiltered.filter { expense in
                 guard let categoryID = expense.category?.id else { return false }
                 return selectedCategoryIDs.contains(categoryID)
             }
+        } else {
+            variableCategoryFiltered = variableDateFiltered
         }
         let variableFilteredForCurrentControls: [VariableExpense]
         if query.isEmpty {
@@ -272,13 +272,13 @@ struct CardDetailView: View {
             return d >= start && d <= end
         }
         let plannedCategoryFiltered: [PlannedExpense]
-        if selectedCategoryIDs.isEmpty {
-            plannedCategoryFiltered = plannedDateFiltered
-        } else {
+        if let selectedCategoryIDs {
             plannedCategoryFiltered = plannedDateFiltered.filter { expense in
                 guard let categoryID = expense.category?.id else { return false }
                 return selectedCategoryIDs.contains(categoryID)
             }
+        } else {
+            plannedCategoryFiltered = plannedDateFiltered
         }
         let plannedFilteredForCurrentControls: [PlannedExpense]
         if query.isEmpty {
@@ -950,6 +950,7 @@ struct CardDetailView: View {
     // MARK: - Empty State
 
     private func emptyMessage(_ derived: CardDetailDerivedState) -> String {
+        if selectedCategoryIDs?.isEmpty == true { return String(localized: "No categories selected") }
         if expenseScope == .planned && derived.hiddenFuturePlannedExpenseCount > 0 {
             return "No visible expenses. Future planned expenses are hidden."
         }
@@ -965,7 +966,7 @@ struct CardDetailView: View {
             }
             return "No visible expenses. Future variable expenses are hidden."
         }
-        if !selectedCategoryIDs.isEmpty {
+        if let selectedCategoryIDs {
             if selectedCategoryIDs.count == 1 {
                 return "No expenses match the selected category in this date range."
             }
