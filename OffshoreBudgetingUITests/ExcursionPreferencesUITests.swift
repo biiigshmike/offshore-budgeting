@@ -4,6 +4,21 @@ import XCTest
 final class ExcursionPreferencesUITests: XCTestCase {
     override func setUpWithError() throws { continueAfterFailure = false }
 
+    func testExcursionControlsAtLargestDynamicTypeSize() {
+        let app = launch(additionalArguments: [
+            "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"
+        ])
+        openExcursionMode(app)
+
+        XCTAssertEqual(app.staticTexts["excursionStatus"].label, "Inactive")
+        XCTAssertFalse(app.segmentedControls.firstMatch.exists)
+        let durationChoices = app.descendants(matching: .any)
+        reveal(durationChoices["1 hour"].firstMatch, in: app)
+        reveal(durationChoices["4 hours"].firstMatch, in: app)
+        reveal(app.buttons["Start Excursion Mode"], in: app)
+        reveal(app.buttons["excursionPreferences"], in: app)
+    }
+
     func testLegacyThemePreferencePreservesNativeBack() {
         let app = XCUIApplication()
         app.launchArguments = ["-uiTesting", "-uiTestingReset", "-uiTestScenarioWorkspaceProgress",
@@ -186,7 +201,7 @@ final class ExcursionPreferencesUITests: XCTestCase {
         XCTAssertTrue(app.buttons["excursionEditCategories"].exists)
     }
 
-    private func launch(theme: String = "offshore-default") -> XCUIApplication {
+    private func launch(theme: String = "offshore-default", additionalArguments: [String] = []) -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments = [
             "-uiTesting", "-uiTestingReset", "-uiTestScenarioWorkspaceProgress",
@@ -194,21 +209,26 @@ final class ExcursionPreferencesUITests: XCTestCase {
             "-tips_seenKeys", "tip.home.v1,tip.budgets.v1,tip.cards.v1,tip.income.v1,tip.budgetdetail.v1",
             "-tips_resetToken", "0", "-tips_seen_lastResetToken", "0",
             "-AppleLanguages", "(en)", "-AppleLocale", "en_US"
-        ]
+        ] + additionalArguments
         app.launch()
         return app
     }
 
     private func openPreferences(_ app: XCUIApplication) {
-        XCTAssertTrue(app.tabBars.buttons["Settings"].waitForExistence(timeout: 10))
-        app.tabBars.buttons["Settings"].tap()
-        let notifications = app.buttons["Notifications"].firstMatch
-        reveal(notifications, in: app)
-        notifications.tap()
+        openExcursionMode(app)
         let preferences = app.buttons["excursionPreferences"]
         reveal(preferences, in: app)
         preferences.tap()
         XCTAssertTrue(app.navigationBars["Excursion Preferences"].waitForExistence(timeout: 5))
+    }
+
+    private func openExcursionMode(_ app: XCUIApplication) {
+        XCTAssertTrue(app.tabBars.buttons["Settings"].waitForExistence(timeout: 10))
+        app.tabBars.buttons["Settings"].tap()
+        let excursion = app.buttons["settings_excursionMode"]
+        reveal(excursion, in: app)
+        excursion.tap()
+        XCTAssertTrue(app.navigationBars["Excursion Mode"].waitForExistence(timeout: 5))
     }
 
     private func reveal(_ element: XCUIElement, in app: XCUIApplication) {
@@ -216,6 +236,6 @@ final class ExcursionPreferencesUITests: XCTestCase {
             if element.exists && element.isHittable { return }
             app.swipeUp()
         }
-        XCTAssertTrue(element.exists && element.isHittable)
+        XCTAssertTrue(element.exists && element.isHittable, String(app.debugDescription.prefix(5_000)))
     }
 }

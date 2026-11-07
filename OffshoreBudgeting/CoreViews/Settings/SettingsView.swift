@@ -35,6 +35,9 @@ struct SettingsView: View {
         case general
         case privacy
         case notifications
+        #if !targetEnvironment(macCatalyst)
+        case excursionMode
+        #endif
         case iCloud
         case quickActions
         case manageCategories
@@ -267,6 +270,10 @@ struct SettingsView: View {
             SettingsPrivacyView()
         case .notifications:
             SettingsNotificationsView(workspaceID: workspace.id)
+        #if !targetEnvironment(macCatalyst)
+        case .excursionMode:
+            SettingsExcursionModeView()
+        #endif
         case .iCloud:
             SettingsiCloudView()
         case .quickActions:
@@ -288,7 +295,7 @@ struct SettingsView: View {
     }
 
     private func buildSectionModels() -> [SettingsSectionModel] {
-        let sections = [
+        var sections = [
             SettingsSectionModel(
                 id: "about",
                 rows: [
@@ -310,7 +317,19 @@ struct SettingsView: View {
                     SettingsRowModel(id: .notifications, title: String(localized: "settings.notifications", defaultValue: "Notifications", comment: "Title for notifications settings."), systemImage: "bell.badge", tint: Color(.systemRed)),
                     SettingsRowModel(id: .iCloud, title: String(localized: "settings.icloud", defaultValue: "iCloud", comment: "Title for iCloud settings."), systemImage: "icloud", tint: Color(.systemBlue))
                 ]
-            ),
+            )
+        ]
+        #if !targetEnvironment(macCatalyst)
+        sections.append(
+            SettingsSectionModel(
+                id: "excursion-mode",
+                rows: [
+                    SettingsRowModel(id: .excursionMode, title: String(localized: "Excursion Mode"), systemImage: "sailboat.fill", tint: .teal)
+                ]
+            )
+        )
+        #endif
+        sections += [
             SettingsSectionModel(
                 id: "quick-actions",
                 rows: [

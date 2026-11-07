@@ -89,7 +89,7 @@ struct SettingsReleaseLogsView: View {
                 ReleaseItem(
                     systemImage: "sailboat.fill",
                     title: "Excursion Mode",
-                    description: "Refined Excursion Mode to be more precise. Choose which places trigger nearby spending reminders and how long to wait before being reminded. Configure this to your liking in Settings > Notifications > Excursion Mode"
+                    description: "Refined Excursion Mode to be more precise. Choose which places trigger nearby spending reminders and how long to wait before being reminded. Configure this to your liking in Settings > Excursion Mode > Preferences"
                 ),
                 ReleaseItem(
                     systemImage: "sparkles",
