@@ -40,6 +40,12 @@ final class NotificationsAppDelegate: NSObject, UIApplicationDelegate, UNUserNot
         willPresent notification: UNNotification,
         withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
     ) {
+        #if DEBUG
+        let identifier = notification.request.identifier
+        if notification.request.content.userInfo[LocalNotificationService.UserInfoKey.excursionSuggestion] != nil {
+            Task { @MainActor in ExcursionUITestDiagnostics.shared.delivered(identifier) }
+        }
+        #endif
         completionHandler([.banner, .sound, .badge])
     }
 

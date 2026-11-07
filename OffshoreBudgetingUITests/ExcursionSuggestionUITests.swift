@@ -4,6 +4,19 @@ import XCTest
 final class ExcursionSuggestionUITests: XCTestCase {
     override func setUpWithError() throws { continueAfterFailure = false }
 
+    override func tearDownWithError() throws {
+        if let testRun, testRun.failureCount > 0 {
+            let app = XCUIApplication()
+            let hierarchy = XCTAttachment(string: app.debugDescription)
+            hierarchy.name = "Excursion suggestion navigation failure"
+            hierarchy.lifetime = .keepAlways
+            add(hierarchy)
+            let screenshot = XCTAttachment(screenshot: app.screenshot())
+            screenshot.lifetime = .keepAlways
+            add(screenshot)
+        }
+    }
+
     func testChoosingMerchantOpensEditableQuickAdd() {
         let app = launch(mode: "multiple")
         XCTAssertTrue(app.navigationBars["Nearby Places"].waitForExistence(timeout: 10))
@@ -66,6 +79,8 @@ final class ExcursionSuggestionUITests: XCTestCase {
         app.launchArguments = [
             "-uiTesting", "-uiTestingReset", "-uiTestScenarioWorkspaceProgress",
             "-uiTestExcursionRoute", mode,
+            "-debug_tabFlickerDiagnosticsEnabled", "YES",
+            "-debug_tabFlickerVerboseEventsEnabled", "YES",
             "-tips_seenKeys", "tip.home.v1,tip.budgets.v1,tip.cards.v1,tip.income.v1,tip.budgetdetail.v1",
             "-tips_resetToken", "0", "-tips_seen_lastResetToken", "0",
             "-AppleLanguages", "(en)", "-AppleLocale", "en_US"

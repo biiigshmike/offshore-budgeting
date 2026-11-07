@@ -715,6 +715,9 @@ struct AppRootView: View {
     }
 
     private func consumePendingShortcutSectionIfNeeded() {
+        // Initial selection must read the launch request before observers clear it.
+        // Otherwise onAppear can resolve an already-consumed request back to Home.
+        guard didApplyInitialSection else { return }
         let pending = pendingShortcutSectionRaw.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !pending.isEmpty else { return }
 
@@ -734,6 +737,7 @@ struct AppRootView: View {
     /// Segment requests can arrive just before their section request. Keep that
     /// destination queued until the section is consumed, even after clearing the store key.
     private func consumePendingAccountsDestinationIfNeeded() {
+        guard didApplyInitialSection else { return }
         let raw = pendingAccountsSegmentRaw.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !raw.isEmpty else { return }
         if let destination = AccountsView.Segment(pendingSegmentRaw: raw) {

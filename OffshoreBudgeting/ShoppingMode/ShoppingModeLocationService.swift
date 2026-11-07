@@ -96,7 +96,12 @@ final class ShoppingModeLocationService: NSObject, ObservableObject, CLLocationM
         else {
             let resolver = ShoppingModePOIResolver()
             self.discoverMerchants = { location, preferences in
-                await resolver.discoverNearbyMerchants(
+                #if DEBUG
+                if ExcursionUITestDiagnostics.isEnabled {
+                    return ExcursionUITestDiagnostics.merchants
+                }
+                #endif
+                return await resolver.discoverNearbyMerchants(
                     around: location.coordinate,
                     searchRadiusMeters: ShoppingModeMerchantCatalog.searchRadiusMeters,
                     maxResults: ShoppingModeMerchantCatalog.maxMonitoredRegions,
@@ -443,6 +448,9 @@ final class ShoppingModeLocationService: NSObject, ObservableObject, CLLocationM
             candidates: candidates.map { .init(id: $0.id, name: $0.name) },
             workspaceID: workspaceID, sessionID: session
         )
+        #if DEBUG
+        ExcursionUITestDiagnostics.shared.candidates(suggestion)
+        #endif
         Task { [weak self] in
             guard let self else { return }
             let result = await self.sendSuggestion(suggestion, location, validation)
@@ -451,7 +459,10 @@ final class ShoppingModeLocationService: NSObject, ObservableObject, CLLocationM
             self.pendingDeliveryCandidates = []
             guard validation() else { return }
             switch result {
-            case .scheduled:
+            case .scheduled(let identifier):
+                #if DEBUG
+                ExcursionUITestDiagnostics.shared.scheduled(identifier)
+                #endif
                 self.dwell.markDelivered(merchants: candidates)
                 self.persist(candidates, key: Key.delivered)
                 self.endConfirmation(resetDwell: false)
@@ -470,6 +481,9 @@ final class ShoppingModeLocationService: NSObject, ObservableObject, CLLocationM
             return
         }
         guard let latest = locations.max(by: { $0.timestamp < $1.timestamp }) else { return }
+        #if DEBUG
+        ExcursionUITestDiagnostics.shared.received(latest)
+        #endif
         // Discovery may use a coarser fresh fix; it must never establish dwell.
         let age = now().timeIntervalSince(latest.timestamp)
         guard latest.horizontalAccuracy > 0, age >= 0, age <= 30 else { return }
@@ -513,6 +527,7 @@ final class ShoppingModeLocationService: NSObject, ObservableObject, CLLocationM
 
     private func trace(_ message: String) {
         #if DEBUG
+        ExcursionUITestDiagnostics.shared.record(message)
         let key = "debug_excursionDetectionTrace"
         var entries = defaults.stringArray(forKey: key) ?? []
         entries.append("\(now().ISO8601Format()) \(message)")

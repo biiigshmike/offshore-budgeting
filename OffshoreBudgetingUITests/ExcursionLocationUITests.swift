@@ -80,45 +80,30 @@ final class ExcursionLocationUITests: XCTestCase {
     }
     #endif
 
-    private func openExcursionWithNotificationConsent() -> (XCUIApplication, XCUIApplication) {
+    func testExistingReminderChoicesReachInactiveExcursionMode() {
+        let (app, _) = openExcursionWithNotificationConsent(additionalArguments: [
+            "-notifications_dailyExpenseReminderEnabled", "YES",
+            "-notifications_remindersConfigured", "YES"
+        ])
+        XCTAssertEqual(app.staticTexts["excursionStatus"].label, "Inactive")
+        XCTAssertTrue(app.buttons["Start Excursion Mode"].exists)
+    }
+
+    private func openExcursionWithNotificationConsent(additionalArguments: [String] = []) -> (XCUIApplication, XCUIApplication) {
         let app = XCUIApplication()
         app.launchArguments = [
             "-uiTesting", "-uiTestingReset", "-uiTestScenarioWorkspaceProgress",
             "-tips_seenKeys", "tip.home.v1,tip.budgets.v1,tip.cards.v1,tip.income.v1,tip.budgetdetail.v1",
             "-tips_resetToken", "0", "-tips_seen_lastResetToken", "0",
             "-AppleLanguages", "(en)", "-AppleLocale", "en_US"
-        ]
+        ] + additionalArguments
         app.resetAuthorizationStatus(for: .location)
         app.launch()
-        XCTAssertTrue(app.tabBars.buttons["Settings"].waitForExistence(timeout: 10))
-        app.tabBars.buttons["Settings"].tap()
-        let notifications = app.buttons["Notifications"].firstMatch
-        reveal(notifications, app: app)
-        notifications.tap()
-        XCTAssertTrue(app.navigationBars["Notifications"].waitForExistence(timeout: 5))
-
-        // Excursion Mode requires system notification consent.
-        app.buttons["Set Up Reminders"].tap()
-        app.buttons["reminderSetupContinue"].tap()
-        let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
-        let allowNotifications = springboard.alerts.buttons["Allow"]
-        if allowNotifications.waitForExistence(timeout: 5) { allowNotifications.tap() }
-        XCTAssertTrue(app.navigationBars["Notifications"].waitForExistence(timeout: 5))
-        app.navigationBars["Notifications"].buttons.firstMatch.tap()
-
-        let excursion = app.buttons["settings_excursionMode"]
-        reveal(excursion, app: app)
-        excursion.tap()
-        XCTAssertTrue(app.navigationBars["Excursion Mode"].waitForExistence(timeout: 5))
+        let springboard = ExcursionUITestNavigation.allowNotificationsAndOpenExcursion(app)
         return (app, springboard)
     }
 
     private func reveal(_ element: XCUIElement, app: XCUIApplication) {
-        for _ in 0..<8 {
-            if element.exists && element.isHittable { return }
-            let form = app.collectionViews.firstMatch
-            if form.exists { form.swipeUp() } else { app.swipeUp() }
-        }
-        XCTAssertTrue(element.exists && element.isHittable)
+        ExcursionUITestNavigation.reveal(element, in: app)
     }
 }

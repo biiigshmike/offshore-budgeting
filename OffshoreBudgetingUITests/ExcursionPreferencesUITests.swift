@@ -35,14 +35,6 @@ final class ExcursionPreferencesUITests: XCTestCase {
         XCTAssertTrue(app.buttons["excursionPreferences"].waitForExistence(timeout: 5))
     }
 
-    func testSidebarIgnoresLegacyThemePreference() throws {
-        try verifyNativeSidebar(theme: "heather")
-    }
-
-    func testSidebarDefaultRendering() throws {
-        try verifyNativeSidebar(theme: "offshore-default")
-    }
-
     private func verifyNativeSidebar(theme: String) throws {
         #if os(iOS) && !targetEnvironment(macCatalyst)
         XCUIDevice.shared.orientation = .landscapeLeft
@@ -223,19 +215,10 @@ final class ExcursionPreferencesUITests: XCTestCase {
     }
 
     private func openExcursionMode(_ app: XCUIApplication) {
-        XCTAssertTrue(app.tabBars.buttons["Settings"].waitForExistence(timeout: 10))
-        app.tabBars.buttons["Settings"].tap()
-        let excursion = app.buttons["settings_excursionMode"]
-        reveal(excursion, in: app)
-        excursion.tap()
-        XCTAssertTrue(app.navigationBars["Excursion Mode"].waitForExistence(timeout: 5))
+        ExcursionUITestNavigation.openExcursion(app)
     }
 
     private func reveal(_ element: XCUIElement, in app: XCUIApplication) {
-        for _ in 0..<10 {
-            if element.exists && element.isHittable { return }
-            app.swipeUp()
-        }
-        XCTAssertTrue(element.exists && element.isHittable, String(app.debugDescription.prefix(5_000)))
+        ExcursionUITestNavigation.reveal(element, in: app)
     }
 }

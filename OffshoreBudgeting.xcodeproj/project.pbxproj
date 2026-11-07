@@ -50,6 +50,7 @@
 
 /* Begin PBXFileReference section */
 		4C198A392F298962005D2D0D /* OffshoreBudgetingWidgetsExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = OffshoreBudgetingWidgetsExtension.entitlements; sourceTree = "<group>"; };
+		4C6CC1F1309F9E0600ECE30B /* ExcursionMode.xctestplan */ = {isa = PBXFileReference; lastKnownFileType = text; path = ExcursionMode.xctestplan; sourceTree = "<group>"; };
 		4C8C82152F247DA50024DBD0 /* OffshoreBudgeting.xctestplan */ = {isa = PBXFileReference; lastKnownFileType = text; path = OffshoreBudgeting.xctestplan; sourceTree = "<group>"; };
 		4C96F8512F20523700541774 /* Offshore.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Offshore.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		4C96F85E2F20523900541774 /* OffshoreBudgetingTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = OffshoreBudgetingTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -161,6 +162,7 @@
 		4C96F8482F20523700541774 = {
 			isa = PBXGroup;
 			children = (
+				4C6CC1F1309F9E0600ECE30B /* ExcursionMode.xctestplan */,
 				4C198A392F298962005D2D0D /* OffshoreBudgetingWidgetsExtension.entitlements */,
 				4C8C82152F247DA50024DBD0 /* OffshoreBudgeting.xctestplan */,
 				4C96F8532F20523700541774 /* OffshoreBudgeting */,

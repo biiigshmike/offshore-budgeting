@@ -4,6 +4,9 @@ import SwiftUI
 struct ExcursionStatusHero: View {
     let status: ShoppingModeStatus
     let locationCapability: ExcursionLocationCapability
+    #if DEBUG
+    @ObservedObject private var testDiagnostics = ExcursionUITestDiagnostics.shared
+    #endif
 
     private var statusTitle: LocalizedStringKey {
         if !status.isActive { return "Inactive" }
@@ -21,6 +24,9 @@ struct ExcursionStatusHero: View {
                 .font(.title2.bold())
                 .accessibilityAddTraits(.isHeader)
                 .accessibilityIdentifier("excursionStatus")
+                #if DEBUG
+                .accessibilityValue(UITestSupport.isEnabled ? testDiagnostics.encoded : "")
+                #endif
 
             if status.isActive, let expiresAt = status.expiresAt {
                 let startsAt = min(status.startedAt ?? .now, expiresAt)

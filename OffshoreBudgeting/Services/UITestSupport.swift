@@ -48,6 +48,14 @@ enum UITestSupport {
         guard shouldResetOnLaunch else { return }
 
         let defaults = UserDefaults.standard
+        // Clear legacy values before ending the app-group session so migration
+        // cannot resurrect a session left by another UI test or an interrupted run.
+        for key in ["spendingSession_expiresAt", "spendingSession_startedAt", "spendingSession_sessionID"] {
+            defaults.removeObject(forKey: key)
+        }
+        SpendingSessionStore.end()
+        ShoppingModeSuggestionService.shared.resetAllCooldowns()
+        _ = WidgetActionRequestStore.consumePendingURL()
         ExcursionPreferencesStore.shared.restoreDefaults()
 
         for key in [
