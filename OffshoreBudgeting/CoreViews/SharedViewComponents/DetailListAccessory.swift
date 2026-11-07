@@ -10,7 +10,6 @@ struct DetailListAccessory<SortMode: Hashable>: View {
     let date: (ascending: SortMode, descending: SortMode)
 
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-    @State private var showingCategories = false
 
     private var categoriesTitle: String {
         String(localized: "categories.title", defaultValue: "Categories", comment: "Title for categories section.")
@@ -24,8 +23,8 @@ struct DetailListAccessory<SortMode: Hashable>: View {
         [
             (date.descending, Text("Newest first"), Text("Newest")),
             (date.ascending, Text("Oldest first"), Text("Oldest")),
-            (amount.descending, Text("Highest amount first"), Text("Highest amount")),
-            (amount.ascending, Text("Lowest amount first"), Text("Lowest amount")),
+            (amount.descending, Text("Highest amount first"), Text("Highest")),
+            (amount.ascending, Text("Lowest amount first"), Text("Lowest")),
             (name.ascending, Text("Name A–Z"), Text("A–Z")),
             (name.descending, Text("Name Z–A"), Text("Z–A"))
         ]
@@ -42,13 +41,6 @@ struct DetailListAccessory<SortMode: Hashable>: View {
                 if validSelection != selectedCategoryIDs {
                     selectedCategoryIDs = validSelection
                 }
-            }
-            .appSheet(isPresented: $showingCategories) {
-                DetailCategoryPicker(
-                    title: categoriesTitle,
-                    categories: categories,
-                    selectedIDs: $selectedCategoryIDs
-                )
             }
     }
 
@@ -86,7 +78,7 @@ struct DetailListAccessory<SortMode: Hashable>: View {
                 scopeMenu(expenseScope, compact: compact)
                 separator
             }
-            categoriesButton(compact: compact)
+            categoriesMenu(compact: compact)
             separator
             sortMenu(compact: compact)
         }
@@ -134,22 +126,48 @@ struct DetailListAccessory<SortMode: Hashable>: View {
         .accessibilityIdentifier("detailList.sort")
     }
 
-    private func categoriesButton(compact: Bool) -> some View {
+    private func categoriesMenu(compact: Bool) -> some View {
         let selection = selectedCategories
-        return Button {
-            showingCategories = true
-        } label: {
-            if selection.isEmpty {
-                controlLabel(Text(categoriesTitle), symbol: "line.3.horizontal.decrease", compact: compact)
-                    .frame(maxWidth: .infinity)
-                    .contentShape(Rectangle())
-            } else {
-                DetailCategoryDots(categories: selection)
-                    .padding(.horizontal, 4)
-                    .frame(minWidth: 52)
-                    .contentShape(Rectangle())
+        let categoryIDs = Set(categories.map(\.id))
+        let allSelected = categoryIDs.isSubset(of: selectedCategoryIDs)
+        return Menu {
+            Button(allSelected ? LocalizedStringKey("Deselect All") : LocalizedStringKey("Select All")) {
+                selectedCategoryIDs = allSelected ? [] : categoryIDs
             }
+            .menuActionDismissBehavior(.disabled)
+
+            Divider()
+
+            ForEach(categories, id: \.id) { category in
+                Toggle(isOn: Binding(
+                    get: { selectedCategoryIDs.contains(category.id) },
+                    set: { isSelected in
+                        if isSelected {
+                            selectedCategoryIDs.insert(category.id)
+                        } else {
+                            selectedCategoryIDs.remove(category.id)
+                        }
+                    }
+                )) {
+                    CategoryMenuLabel(category: category)
+                }
+                .accessibilityLabel(Text(category.name))
+                .menuActionDismissBehavior(.disabled)
+            }
+        } label: {
+            ZStack {
+                controlLabel(Text(categoriesTitle), symbol: "line.3.horizontal.decrease", compact: compact)
+                    .opacity(selection.isEmpty ? 1 : 0)
+
+                if !selection.isEmpty {
+                    DetailCategoryDots(categories: selection)
+                        .padding(.horizontal, 4)
+                }
+            }
+            .frame(minWidth: 52, maxWidth: .infinity)
+            .contentShape(Rectangle())
         }
+        .menuOrder(.fixed)
         .disabled(categories.isEmpty)
         .accessibilityLabel(Text(categoriesTitle))
         .accessibilityValue(selection.isEmpty
@@ -215,47 +233,6 @@ private struct DetailCategoryDots: View {
         }
         .frame(height: max(overflowLineHeight + 8, TintedGlassNavigationButton.minimumGlassHeight))
         .accessibilityHidden(true)
-    }
-}
-
-private struct DetailCategoryPicker: View {
-    let title: String
-    let categories: [Category]
-    @Binding var selectedIDs: Set<UUID>
-    @Environment(\.dismiss) private var dismiss
-
-    private var allCategoryIDs: Set<UUID> {
-        Set(categories.map(\.id))
-    }
-
-    var body: some View {
-        NavigationStack {
-            List(categories, id: \.id, selection: $selectedIDs) { category in
-                HStack(spacing: 8) {
-                    categoryDot(category)
-                    Text(category.name)
-                }
-            }
-            .environment(\.editMode, .constant(.active))
-            .navigationTitle(title)
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItemGroup(placement: .bottomBar) {
-                    Button("Select All") {
-                        selectedIDs = allCategoryIDs
-                    }
-                    .disabled(allCategoryIDs.isSubset(of: selectedIDs))
-                    Spacer()
-                    Button("Deselect All") { selectedIDs.removeAll() }
-                    .disabled(selectedIDs.isEmpty)
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button(String(localized: "common.done", defaultValue: "Done", comment: "Action to finish and dismiss a view.")) {
-                        dismiss()
-                    }
-                }
-            }
-        }
     }
 }
 

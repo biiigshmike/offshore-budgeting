@@ -15,16 +15,17 @@ final class CategoryGoalSavingsUITests: XCTestCase {
         // change the full-budget scenario.
         let categories = app.buttons["detailList.categories"]
         categories.tap()
-        let categoryPicker = app.navigationBars["Categories"]
-        XCTAssertTrue(categoryPicker.waitForExistence(timeout: 5))
-        app.descendants(matching: .any).matching(identifier: "Bills").firstMatch.tap()
-        categoryPicker.buttons["Done"].tap()
+        let bills = app.buttons["Bills"]
+        XCTAssertTrue(bills.waitForExistence(timeout: 5))
+        bills.tap()
+        let dismissMenu = app.navigationBars.firstMatch.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+        dismissMenu.tap()
         XCTAssertEqual(showScenario(in: app).label, fullBudgetLabel)
 
         categories.tap()
-        XCTAssertTrue(categoryPicker.waitForExistence(timeout: 5))
-        app.buttons["Deselect All"].tap()
-        categoryPicker.buttons["Done"].tap()
+        XCTAssertTrue(bills.waitForExistence(timeout: 5))
+        bills.tap()
+        dismissMenu.tap()
         app.buttons["detailList.expenseType"].tap()
         app.buttons["Variable"].tap()
         XCTAssertEqual(showScenario(in: app).label, fullBudgetLabel)

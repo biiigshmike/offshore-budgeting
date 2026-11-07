@@ -39,26 +39,20 @@ final class DetailListAccessoryUITests: XCTestCase {
         XCTAssertTrue(categories.waitForExistence(timeout: 5))
         XCTAssertEqual(categories.value as? String, "All categories")
         app.swipeUp()
-        XCTAssertTrue(categories.isHittable)
         categories.tap()
 
-        let picker = app.navigationBars["Categories"]
-        XCTAssertTrue(picker.waitForExistence(timeout: 5))
-        let bills = app.staticTexts["Bills"].firstMatch
-        let dining = app.staticTexts["Detail Dining"].firstMatch
-        if phoneBudgets.exists {
-            let origin = app.coordinate(withNormalizedOffset: .zero)
-            let selectionColumnX: CGFloat = 40
-            let start = origin.withOffset(CGVector(dx: selectionColumnX, dy: bills.frame.midY))
-            let end = origin.withOffset(CGVector(dx: selectionColumnX, dy: dining.frame.midY))
-            start.press(forDuration: 0.05, thenDragTo: end, withVelocity: .slow, thenHoldForDuration: 0.05)
-        } else {
-            bills.tap()
-            dining.tap()
-        }
-        picker.buttons["Done"].tap()
-        XCTAssertTrue(picker.waitForNonExistence(timeout: 5))
+        let selectAll = app.buttons["Select All"]
+        let deselectAll = app.buttons["Deselect All"]
+        XCTAssertTrue(selectAll.waitForExistence(timeout: 5))
+        XCTAssertFalse(deselectAll.exists)
+        app.buttons["Bills"].tap()
+        XCTAssertTrue(selectAll.exists)
+        app.buttons["Detail Dining"].tap()
+        XCTAssertTrue(selectAll.exists)
+        app.navigationBars.firstMatch.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
         XCTAssertEqual(categories.value as? String, "Bills and Detail Dining")
+        XCTAssertTrue(app.staticTexts["Lunch Ruby"].exists)
+        XCTAssertFalse(app.staticTexts["Other Category Purchase"].exists)
         let screenshot = XCTAttachment(screenshot: app.screenshot())
         screenshot.name = "Budget accessory with selected category colors"
         screenshot.lifetime = .keepAlways
@@ -76,17 +70,19 @@ final class DetailListAccessoryUITests: XCTestCase {
         XCTAssertEqual(categories.value as? String, "Bills and Detail Dining")
 
         categories.tap()
-        XCTAssertTrue(picker.waitForExistence(timeout: 5))
-        let selectAll = app.buttons["Select All"]
+        XCTAssertTrue(selectAll.waitForExistence(timeout: 5))
         selectAll.tap()
-        XCTAssertFalse(selectAll.isEnabled)
-        picker.buttons["Done"].tap()
+        XCTAssertTrue(deselectAll.waitForExistence(timeout: 5))
+        XCTAssertFalse(selectAll.exists)
+        app.navigationBars.firstMatch.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
         XCTAssertTrue((categories.value as? String)?.contains("Other Detail Category") == true)
 
         categories.tap()
-        XCTAssertTrue(picker.waitForExistence(timeout: 5))
-        app.buttons["Deselect All"].tap()
-        picker.buttons["Done"].tap()
+        XCTAssertTrue(deselectAll.waitForExistence(timeout: 5))
+        deselectAll.tap()
+        XCTAssertTrue(selectAll.waitForExistence(timeout: 5))
+        XCTAssertFalse(deselectAll.exists)
+        app.navigationBars.firstMatch.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
         XCTAssertEqual(categories.value as? String, "All categories")
     }
 
@@ -112,11 +108,10 @@ final class DetailListAccessoryUITests: XCTestCase {
         XCTAssertTrue(app.buttons["detailList.expenseType"].exists)
         XCTAssertTrue(app.buttons["detailList.sort"].exists)
         categories.tap()
-        let picker = app.navigationBars["Categories"]
-        XCTAssertTrue(picker.waitForExistence(timeout: 5))
-        app.descendants(matching: .any).matching(identifier: "Detail Dining").firstMatch.tap()
-        picker.buttons["Done"].tap()
-        XCTAssertTrue(picker.waitForNonExistence(timeout: 5))
+        let dining = app.buttons["Detail Dining"]
+        XCTAssertTrue(dining.waitForExistence(timeout: 5))
+        dining.tap()
+        app.navigationBars.firstMatch.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
         XCTAssertEqual(categories.value as? String, "Detail Dining")
 
         app.navigationBars["Ruby Card"].buttons["Cards"].tap()
@@ -129,10 +124,9 @@ final class DetailListAccessoryUITests: XCTestCase {
         XCTAssertEqual(categories.value as? String, "All categories")
         XCTAssertFalse(app.buttons["detailList.expenseType"].exists)
         categories.tap()
-        XCTAssertTrue(picker.waitForExistence(timeout: 5))
-        app.descendants(matching: .any).matching(identifier: "Detail Dining").firstMatch.tap()
-        picker.buttons["Done"].tap()
-        XCTAssertTrue(picker.waitForNonExistence(timeout: 5))
+        XCTAssertTrue(dining.waitForExistence(timeout: 5))
+        dining.tap()
+        app.navigationBars.firstMatch.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
         XCTAssertEqual(categories.value as? String, "Detail Dining")
 
         let sort = app.buttons["detailList.sort"]

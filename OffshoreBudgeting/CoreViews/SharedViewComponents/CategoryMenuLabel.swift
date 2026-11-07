@@ -21,11 +21,9 @@ struct CategoryMenuLabel: View {
             ) {
                 Image(uiImage: image)
                     .renderingMode(.original)
-                    .accessibilityHidden(true)
             } else {
                 Image(systemName: "circle.fill")
                     .foregroundStyle(.secondary)
-                    .accessibilityHidden(true)
             }
         }
     }
