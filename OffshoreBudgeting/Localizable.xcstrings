@@ -27226,42 +27226,42 @@
         }
       }
     },
-    "Fixed an issue where Set Aside as Savings could push Actual Savings further into the negative. Setting money aside now reduces your available Offshore Savings balance and leaves Actual Savings unchanged." : {
+    "Fixed an issue where Set Aside as Savings incorrectly reduced a budget’s Actual Savings. Setting money aside now reduces only your available Offshore Savings balance." : {
       "localizations" : {
         "ar" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "أصلحنا مشكلة كان فيها خيار «تخصيص كادخار» قد يجعل الادخار الفعلي أكثر سلبية. يقلل تخصيص المال الآن رصيد Offshore Savings المتاح ويُبقي الادخار الفعلي كما هو."
+            "value" : "أصلحنا مشكلة كان فيها خيار «تخصيص كادخار» يقلل الادخار الفعلي للميزانية بشكل غير صحيح. يقلل تخصيص المال الآن رصيد Offshore Savings المتاح فقط."
           }
         },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ein Fehler wurde behoben, durch den „Als Ersparnis zurücklegen“ die tatsächlichen Ersparnisse weiter ins Minus treiben konnte. Das Zurücklegen verringert jetzt den verfügbaren Saldo von Offshore Savings und lässt die tatsächlichen Ersparnisse unverändert."
+            "value" : "Ein Fehler wurde behoben, durch den „Als Ersparnis zurücklegen“ die tatsächlichen Ersparnisse eines Budgets fälschlicherweise verringerte. Das Zurücklegen reduziert jetzt nur den verfügbaren Saldo von Offshore Savings."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Se corrigió un problema por el que Apartar como ahorro podía hacer que el ahorro real fuera aún más negativo. Apartar dinero ahora reduce el saldo disponible de Offshore Savings y deja el ahorro real sin cambios."
+            "value" : "Se corrigió un problema por el que Apartar como ahorro reducía incorrectamente el ahorro real de un presupuesto. Apartar dinero ahora reduce solo el saldo disponible de Offshore Savings."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Correction d’un problème où Mettre de côté en épargne pouvait creuser le déficit de l’épargne réelle. Mettre de l’argent de côté réduit désormais le solde disponible d’Offshore Savings et laisse l’épargne réelle inchangée."
+            "value" : "Correction d’un problème où Mettre de côté en épargne réduisait à tort l’épargne réelle d’un budget. Mettre de l’argent de côté réduit désormais uniquement le solde disponible d’Offshore Savings."
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Corrigimos um problema em que Separar como poupança podia deixar a poupança real ainda mais negativa. Separar dinheiro agora reduz o saldo disponível do Offshore Savings e mantém a poupança real inalterada."
+            "value" : "Corrigimos um problema em que Separar como poupança reduzia incorretamente a poupança real de um orçamento. Separar dinheiro agora reduz apenas o saldo disponível do Offshore Savings."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "修复了“留作储蓄”可能导致实际储蓄负值进一步扩大的问题。现在，留出资金会减少 Offshore Savings 的可用余额，实际储蓄保持不变。"
+            "value" : "修复了“留作储蓄”错误减少预算实际储蓄的问题。现在，留出资金只会减少 Offshore Savings 的可用余额。"
           }
         }
       }

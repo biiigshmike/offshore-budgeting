@@ -79,6 +79,7 @@ struct SettingsHelpView: View {
                         ForEach(displayedSearchResults) { result in
                             HelpSearchResultDisclosureRow(
                                 topic: result.topic,
+                                matchedSectionID: result.matchedSectionID,
                                 sectionTitle: sectionTitle(for: result),
                                 previewSnippet: highlightedSnippet(
                                     collapsedSnippet(for: result),
@@ -341,6 +342,7 @@ private struct HelpSearchResult: Identifiable {
 
 private struct HelpSearchResultDisclosureRow: View {
     let topic: GeneratedHelpLeafTopic
+    let matchedSectionID: String?
     let sectionTitle: String?
     let previewSnippet: AttributedString
     let expandedSnippet: AttributedString
@@ -356,11 +358,12 @@ private struct HelpSearchResultDisclosureRow: View {
                 }
 
                 NavigationLink {
-                    HelpTopicDetailView(topic: topic)
+                    HelpTopicDetailView(topic: topic, initialSectionID: matchedSectionID)
                 } label: {
                     Label(String(localized: "help.openTopic", defaultValue: "Open Topic", comment: "Action to open a help topic."), systemImage: "arrow.right.circle")
                         .font(.subheadline.weight(.semibold))
                 }
+                .accessibilityIdentifier("helpOpenTopic.\(topic.id)")
             }
             .padding(.top, 6)
         } label: {
@@ -411,16 +414,19 @@ private struct HelpDestinationTopicsView: View {
 
 struct HelpTopicDetailView: View {
     let topic: GeneratedHelpLeafTopic
+    let initialSectionID: String?
 
     @State private var currentTopicID: String
+    @State private var hasAppliedInitialScroll = false
     @State private var selectedMediaIDsBySectionID: [String: String] = [:]
     @State private var fullscreenPresentation: HelpFullscreenPresentation?
     @Environment(\.openURL) private var openURL
 
     private let topAnchorID: String = "help-topic-top-anchor"
 
-    init(topic: GeneratedHelpLeafTopic) {
+    init(topic: GeneratedHelpLeafTopic, initialSectionID: String? = nil) {
         self.topic = topic
+        self.initialSectionID = initialSectionID
         _currentTopicID = State(initialValue: topic.id)
     }
 
@@ -460,12 +466,24 @@ struct HelpTopicDetailView: View {
                         .id(topAnchorID)
 
                     ForEach(currentTopic.sections) { section in
-                        sectionContent(section)
+                        VStack(alignment: .leading, spacing: 18) {
+                            sectionContent(section)
+                        }
+                        .id(section.id)
                     }
                 }
                 .padding()
             }
             .navigationTitle(currentTopic.title)
+            .task {
+                guard !hasAppliedInitialScroll else { return }
+                // Let the section anchors lay out before applying the initial search destination.
+                await Task.yield()
+                guard !Task.isCancelled else { return }
+                hasAppliedInitialScroll = true
+                let targetID = currentTopic.sections.first { $0.id == initialSectionID }?.id
+                proxy.scrollTo(targetID ?? topAnchorID, anchor: .top)
+            }
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 HelpTopicPagerBar(
                     previousTitle: previousTopic?.title,
@@ -496,11 +514,17 @@ struct HelpTopicDetailView: View {
         let mediaItems = currentTopic.mediaItems(for: section)
         let linkItems = currentTopic.linkItems(for: section)
         let selectedItem = selectedMediaItem(for: section, from: mediaItems)
-        let sectionTitle = selectedItem?.displayTitle ?? section.header
 
-        if let header = sectionTitle {
+        if let header = section.header, !header.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             Text(header)
                 .font(.title3.weight(.semibold))
+                .accessibilityAddTraits(.isHeader)
+                .accessibilityIdentifier("helpSectionHeading.\(section.id)")
+        }
+
+        if !section.bodyText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            HelpSectionBodyCard(text: section.bodyText)
+                .accessibilityIdentifier("helpSectionBody.\(section.id)")
         }
 
         if linkItems.isEmpty == false {
@@ -508,13 +532,14 @@ struct HelpTopicDetailView: View {
                 linkItems: linkItems,
                 openURL: openURL
             )
-
-            if section.bodyText.isEmpty == false {
-                HelpSectionBodyCard(text: section.bodyText)
-            }
-        } else if mediaItems.isEmpty {
-            HelpSectionBodyCard(text: section.bodyText)
         } else if let selectedItem {
+            if let title = selectedItem.displayTitle,
+               !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+               title != section.header {
+                Text(title)
+                    .font(.headline)
+            }
+
             HelpSectionMediaStrip(
                 mediaItems: mediaItems,
                 selectedMediaID: selectedItem.id
@@ -522,7 +547,10 @@ struct HelpTopicDetailView: View {
                 handleMediaTap(tappedItem, section: section, allItems: mediaItems)
             }
 
-            HelpSectionBodyCard(text: selectedItem.bodyText)
+            if !selectedItem.bodyText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                HelpSectionBodyCard(text: selectedItem.bodyText)
+                    .accessibilityIdentifier("helpMediaCaption.\(section.id)")
+            }
         }
     }
 
@@ -599,6 +627,7 @@ private struct HelpSectionMediaStrip: View {
                         )
                     }
                     .buttonStyle(.plain)
+                    .accessibilityIdentifier("helpMedia.\(item.id)")
                 }
             }
             .padding(.vertical, 4)

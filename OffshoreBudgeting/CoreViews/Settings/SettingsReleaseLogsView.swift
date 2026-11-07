@@ -84,7 +84,7 @@ struct SettingsReleaseLogsView: View {
                 ReleaseItem(
                     systemImage: "ladybug.slash",
                     title: "Set Aside as Savings",
-                    description: "Fixed an issue where Set Aside as Savings could push Actual Savings further into the negative. Setting money aside now reduces your available Offshore Savings balance and leaves Actual Savings unchanged."
+                    description: "Fixed an issue where Set Aside as Savings incorrectly reduced a budget’s Actual Savings. Setting money aside now reduces only your available Offshore Savings balance."
                 ),
                 ReleaseItem(
                     systemImage: "sailboat.fill",
