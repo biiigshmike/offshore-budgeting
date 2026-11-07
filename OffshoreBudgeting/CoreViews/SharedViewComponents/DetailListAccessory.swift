@@ -10,6 +10,9 @@ struct DetailListAccessory<SortMode: Hashable>: View {
     let date: (ascending: SortMode, descending: SortMode)
 
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    #if targetEnvironment(macCatalyst)
+    @State private var showingCategoryPopover = false
+    #endif
 
     private var categoriesTitle: String {
         String(localized: "categories.title", defaultValue: "Categories", comment: "Title for categories section.")
@@ -128,46 +131,36 @@ struct DetailListAccessory<SortMode: Hashable>: View {
 
     private func categoriesMenu(compact: Bool) -> some View {
         let selection = selectedCategories
-        let categoryIDs = Set(categories.map(\.id))
-        let allSelected = categoryIDs.isSubset(of: selectedCategoryIDs)
-        return Menu {
-            Button(allSelected ? LocalizedStringKey("Deselect All") : LocalizedStringKey("Select All")) {
-                selectedCategoryIDs = allSelected ? [] : categoryIDs
+        return Group {
+            #if targetEnvironment(macCatalyst)
+            Button {
+                showingCategoryPopover = true
+            } label: {
+                categoriesLabel(selection: selection, compact: compact)
             }
-            .menuActionDismissBehavior(.disabled)
+            .popover(isPresented: $showingCategoryPopover, arrowEdge: .bottom) {
+                categoryPopover
+            }
+            #else
+            Menu {
+                categoryBulkAction
+                    .menuActionDismissBehavior(.disabled)
 
-            Divider()
+                Divider()
 
-            ForEach(categories, id: \.id) { category in
-                Toggle(isOn: Binding(
-                    get: { selectedCategoryIDs.contains(category.id) },
-                    set: { isSelected in
-                        if isSelected {
-                            selectedCategoryIDs.insert(category.id)
-                        } else {
-                            selectedCategoryIDs.remove(category.id)
-                        }
+                ForEach(categories, id: \.id) { category in
+                    Toggle(isOn: categorySelection(category.id)) {
+                        CategoryMenuLabel(category: category)
                     }
-                )) {
-                    CategoryMenuLabel(category: category)
+                    .accessibilityLabel(Text(category.name))
+                    .menuActionDismissBehavior(.disabled)
                 }
-                .accessibilityLabel(Text(category.name))
-                .menuActionDismissBehavior(.disabled)
+            } label: {
+                categoriesLabel(selection: selection, compact: compact)
             }
-        } label: {
-            ZStack {
-                controlLabel(Text(categoriesTitle), symbol: "line.3.horizontal.decrease", compact: compact)
-                    .opacity(selection.isEmpty ? 1 : 0)
-
-                if !selection.isEmpty {
-                    DetailCategoryDots(categories: selection)
-                        .padding(.horizontal, 4)
-                }
-            }
-            .frame(minWidth: 52, maxWidth: .infinity)
-            .contentShape(Rectangle())
+            .menuOrder(.fixed)
+            #endif
         }
-        .menuOrder(.fixed)
         .disabled(categories.isEmpty)
         .accessibilityLabel(Text(categoriesTitle))
         .accessibilityValue(selection.isEmpty
@@ -175,6 +168,80 @@ struct DetailListAccessory<SortMode: Hashable>: View {
             : Text(verbatim: selection.map(\.name).formatted(.list(type: .and))))
         .accessibilityIdentifier("detailList.categories")
     }
+
+    private func categoriesLabel(selection: [Category], compact: Bool) -> some View {
+        ZStack {
+            controlLabel(Text(categoriesTitle), symbol: "line.3.horizontal.decrease", compact: compact)
+                .opacity(selection.isEmpty ? 1 : 0)
+
+            if !selection.isEmpty {
+                DetailCategoryDots(categories: selection)
+                    .padding(.horizontal, 4)
+            }
+        }
+        .frame(minWidth: 52, maxWidth: .infinity)
+        .contentShape(Rectangle())
+    }
+
+    private var categoryBulkAction: some View {
+        let categoryIDs = Set(categories.map(\.id))
+        let allSelected = categoryIDs.isSubset(of: selectedCategoryIDs)
+        return Button(allSelected ? LocalizedStringKey("Deselect All") : LocalizedStringKey("Select All")) {
+            selectedCategoryIDs = allSelected ? [] : categoryIDs
+        }
+    }
+
+    private func categorySelection(_ id: UUID) -> Binding<Bool> {
+        Binding(
+            get: { selectedCategoryIDs.contains(id) },
+            set: { isSelected in
+                if isSelected {
+                    selectedCategoryIDs.insert(id)
+                } else {
+                    selectedCategoryIDs.remove(id)
+                }
+            }
+        )
+    }
+
+    #if targetEnvironment(macCatalyst)
+    private var categoryPopover: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            categoryBulkAction
+                .padding(.horizontal, 8)
+            Divider()
+            ScrollView {
+                LazyVStack(spacing: 0) {
+                    ForEach(categories, id: \.id) { category in
+                        let selection = categorySelection(category.id)
+                        Button {
+                            selection.wrappedValue.toggle()
+                        } label: {
+                            HStack {
+                                CategoryMenuLabel(category: category)
+                                    .labelStyle(.titleAndIcon)
+                                Spacer()
+                                Image(systemName: "checkmark")
+                                    .opacity(selection.wrappedValue ? 1 : 0)
+                                    .accessibilityHidden(true)
+                            }
+                            .padding(.horizontal, 8)
+                            .frame(minHeight: 36)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(Text(category.name))
+                        .accessibilityAddTraits(selection.wrappedValue ? .isSelected : [])
+                    }
+                }
+            }
+            .frame(height: min(CGFloat(categories.count) * 36, 320))
+            .scrollBounceBehavior(.basedOnSize)
+        }
+        .padding(12)
+        .frame(width: 280)
+    }
+    #endif
 
     private func controlLabel(_ title: Text, symbol: String, compact: Bool) -> some View {
         HStack(spacing: 6) {
