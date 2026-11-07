@@ -208,6 +208,7 @@ struct DetailListAccessory<SortMode: Hashable>: View {
     private var categoryPopover: some View {
         VStack(alignment: .leading, spacing: 8) {
             categoryBulkAction
+                .buttonStyle(.plain)
                 .padding(.horizontal, 8)
             Divider()
             ScrollView {
