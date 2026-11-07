@@ -861,7 +861,7 @@ struct CardDetailView: View {
 
     @ViewBuilder
     private var addToolbarButton: some View {
-        Menu {
+        Menu("Add", systemImage: "plus") {
             Button {
                 activeModal = .addExpense
             } label: {
@@ -873,15 +873,13 @@ struct CardDetailView: View {
             } label: {
                 Label("Import Expenses", systemImage: "tray.and.arrow.down")
             }
-        } label: {
-            Image(systemName: "plus")
         }
-        .accessibilityLabel("Add")
+        .labelStyle(.iconOnly)
     }
 
     @ViewBuilder
     private var cardActionsToolbarButton: some View {
-        Menu {
+        Menu("Card Actions", systemImage: "ellipsis") {
             Button {
                 activeModal = .editCard
             } label: {
@@ -902,10 +900,8 @@ struct CardDetailView: View {
             } label: {
                 Label("Delete Card", systemImage: "trash")
             }
-        } label: {
-            Image(systemName: "ellipsis")
         }
-        .accessibilityLabel("Card Actions")
+        .labelStyle(.iconOnly)
     }
 
     @ViewBuilder
@@ -922,7 +918,7 @@ struct CardDetailView: View {
                 || excludeFutureVariableExpensesFromCalculationsDefault
         }
 
-        Menu {
+        Menu("Expense Display", systemImage: hasActiveExpenseFilters ? "eye.slash" : "eye") {
             Menu {
                 Toggle("Hide Future Planned Expenses", isOn: $hideFuturePlannedExpensesInView)
                 Toggle(
@@ -946,10 +942,8 @@ struct CardDetailView: View {
             } label: {
                 Label("Variable Expense Display", systemImage: "chart.xyaxis.line")
             }
-        } label: {
-            Image(systemName: hasActiveExpenseFilters ? "eye.slash" : "eye")
         }
-        .accessibilityLabel("Expense Display")
+        .labelStyle(.iconOnly)
     }
 
     // MARK: - Empty State

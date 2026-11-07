@@ -122,7 +122,7 @@ struct AllocationAccountDetailView: View {
                 }
             } else if #available(iOS 26.0, *) {
                 ToolbarItemGroup(placement: .primaryAction) {
-                    Menu {
+                    Menu("Reconciliation Actions", systemImage: "ellipsis") {
                         Button {
                             showingEditAccountSheet = true
                         } label: {
@@ -152,10 +152,8 @@ struct AllocationAccountDetailView: View {
                                 Label("Delete", systemImage: "trash")
                             }
                         }
-                    } label: {
-                        Image(systemName: "ellipsis")
                     }
-                    .accessibilityLabel("Reconciliation Actions")
+                    .labelStyle(.iconOnly)
                 }
 
                 ToolbarSpacer(.flexible, placement: .primaryAction)
@@ -170,7 +168,7 @@ struct AllocationAccountDetailView: View {
                 }
             } else {
                 ToolbarItemGroup(placement: .topBarTrailing) {
-                    Menu {
+                    Menu("Reconciliation Actions", systemImage: "ellipsis") {
                         Button {
                             showingEditAccountSheet = true
                         } label: {
@@ -200,10 +198,8 @@ struct AllocationAccountDetailView: View {
                                 Label("Delete", systemImage: "trash")
                             }
                         }
-                    } label: {
-                        Image(systemName: "ellipsis")
                     }
-                    .accessibilityLabel("Reconciliation Actions")
+                    .labelStyle(.iconOnly)
 
                     Button {
                         showingAddSettlementSheet = true
