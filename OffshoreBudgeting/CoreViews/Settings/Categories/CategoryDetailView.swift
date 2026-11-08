@@ -93,21 +93,34 @@ struct CategoryDetailView: View, Equatable {
         let derived = result
         List {
             totalSection(derived)
-            sortSection
             expensesSection(derived)
+        }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            DetailListAccessory(
+                expenseScope: $scope,
+                sortMode: $sortMode,
+                name: (.az, .za),
+                amount: (.amountAsc, .amountDesc),
+                date: (.dateAsc, .dateDesc)
+            )
         }
         .listStyle(.insetGrouped)
         .navigationTitle(category.name)
         .searchable(text: $searchText, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search")
         .toolbar {
-            ToolbarItemGroup(placement: .primaryAction) {
-                DateRangeToolbarControls(
-                    startDate: startDate, endDate: endDate,
-                    isEnabled: !isApplyingQuickRange,
-                    onApply: applyDates,
-                    onSelectQuickRange: applyQuickRange
-                )
-                displayMenu
+            if #available(iOS 26.0, macCatalyst 26.0, *) {
+                ToolbarItemGroup(placement: .primaryAction) {
+                    dateRangeToolbarControls
+                }
+                ToolbarSpacer(.flexible, placement: .primaryAction)
+                ToolbarItem(placement: .primaryAction) {
+                    displayMenu
+                }
+            } else {
+                ToolbarItemGroup(placement: .primaryAction) {
+                    dateRangeToolbarControls
+                    displayMenu
+                }
             }
         }
         .appSheet(item: $modal) { route in
@@ -167,35 +180,10 @@ struct CategoryDetailView: View, Equatable {
         }
     }
 
-    private var sortSection: some View {
-        Section {
-            Picker("Scope", selection: $scope) {
-                Text("Planned").tag(ExpenseScope.planned)
-                Text("Combined").tag(ExpenseScope.unified)
-                Text("Variable").tag(ExpenseScope.variable)
-            }
-            .pickerStyle(.segmented)
-            .accessibilityIdentifier("categoryDetail.scope")
-
-            ExpenseSortControl(
-                selection: $sortMode,
-                name: (.az, .za),
-                amount: (.amountAsc, .amountDesc),
-                date: (.dateAsc, .dateDesc)
-            )
-            .accessibilityIdentifier("categoryDetail.sort")
-        } header: {
-            Text("Sort")
-        } footer: {
-            Text("Tap the selected sort option again to reverse the order.")
-        }
-    }
-
     private func expensesSection(_ derived: CategoryDetailCalculator.Result) -> some View {
         Section {
             if derived.items.isEmpty {
-                Text(emptyMessage(derived))
-                    .foregroundStyle(.secondary)
+                DetailListEmptyRow(message: emptyMessage(derived))
             } else {
                 ForEach(derived.items) { item in
                     expenseRow(item)
@@ -301,6 +289,15 @@ struct CategoryDetailView: View, Equatable {
         if hiddenPlanned { return String(localized: "No visible expenses. Future planned expenses are hidden.") }
         if hiddenVariable { return String(localized: "No visible expenses. Future variable expenses are hidden.") }
         return String(localized: "No expenses for this category in this date range.")
+    }
+
+    private var dateRangeToolbarControls: DateRangeToolbarControls {
+        DateRangeToolbarControls(
+            startDate: startDate, endDate: endDate,
+            isEnabled: !isApplyingQuickRange,
+            onApply: applyDates,
+            onSelectQuickRange: applyQuickRange
+        )
     }
 
     private func applyDefaultPeriod() {

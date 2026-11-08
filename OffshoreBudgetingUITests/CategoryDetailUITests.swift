@@ -115,8 +115,9 @@ final class CategoryDetailUITests: XCTestCase {
         openDining(in: app)
         let total = row("categoryDetail.total", in: app)
         XCTAssertTrue((total.value as? String)?.contains("70.00") == true)
-        let scope = app.segmentedControls["categoryDetail.scope"]
-        scope.buttons["Variable"].tap()
+        let scope = app.buttons["detailList.expenseType"]
+        scope.tap()
+        app.buttons["Variable"].tap()
         XCTAssertTrue((total.value as? String)?.contains("30.00") == true)
 
         let lunch = row("categoryDetail.expense.\(lunchID)", in: app)
@@ -190,53 +191,35 @@ final class CategoryDetailUITests: XCTestCase {
         XCTAssertTrue(app.navigationBars["Detail Dining"].exists)
     }
 
-    func testSortSegmentsReverseAndResetAtLargestTextSize() {
+    func testFloatingSortMenuSupportsEveryDirectionAtLargestTextSize() {
         let app = launchCategories(currencyCode: "EUR", extraArguments: [
             "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"
         ])
         openDining(in: app)
         XCTAssertTrue((row("categoryDetail.total", in: app).value as? String)?.contains("€") == true)
 
-        let name = app.buttons["Name"]
-        let amount = app.buttons["Amount"]
-        let date = app.buttons["Date"]
-        reveal(date, in: app)
-        for segment in [name, amount, date] {
-            XCTAssertTrue(segment.isHittable)
-            XCTAssertGreaterThanOrEqual(segment.frame.width, 44)
-            XCTAssertGreaterThanOrEqual(segment.frame.height, 44)
+        let sort = app.buttons["detailList.sort"]
+        let scope = app.buttons["detailList.expenseType"]
+        for control in [sort, scope] {
+            XCTAssertTrue(control.isHittable)
+            XCTAssertGreaterThanOrEqual(control.frame.width, 44)
+            XCTAssertGreaterThanOrEqual(control.frame.height, 44)
         }
+        XCTAssertFalse(app.buttons["detailList.categories"].exists)
+        XCTAssertEqual(sort.value as? String, "Newest first")
 
-        XCTAssertTrue(date.isSelected)
-        XCTAssertEqual(date.value as? String, "Newest first")
-        date.tap()
-        XCTAssertEqual(date.value as? String, "Oldest first")
-
-        name.tap()
-        XCTAssertTrue(name.isSelected)
-        XCTAssertEqual(name.value as? String, "A–Z")
-        name.tap()
-        XCTAssertEqual(name.value as? String, "Z–A")
-
-        amount.tap()
-        XCTAssertTrue(amount.isSelected)
-        XCTAssertEqual(amount.value as? String, "Lowest first")
-        amount.tap()
-        XCTAssertEqual(amount.value as? String, "Highest first")
-
-        date.tap()
-        XCTAssertTrue(date.isSelected)
-        XCTAssertEqual(date.value as? String, "Newest first")
-        name.tap()
-        XCTAssertEqual(name.value as? String, "A–Z")
-        amount.tap()
-        XCTAssertEqual(amount.value as? String, "Lowest first")
+        for title in ["Oldest first", "Name A–Z", "Name Z–A",
+                      "Lowest amount first", "Highest amount first", "Newest first"] {
+            sort.tap()
+            app.buttons[title].tap()
+            XCTAssertEqual(sort.value as? String, title)
+        }
 
         let scrollStart = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.78))
         let scrollEnd = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.40))
         scrollStart.press(forDuration: 0.05, thenDragTo: scrollEnd)
         let screenshot = XCTAttachment(screenshot: app.screenshot())
-        screenshot.name = "Expense sort segments with euros at largest accessibility text size"
+        screenshot.name = "Floating expense sort with euros at largest accessibility text size"
         screenshot.lifetime = .keepAlways
         add(screenshot)
     }
@@ -246,8 +229,9 @@ final class CategoryDetailUITests: XCTestCase {
         openDining(in: app)
         chooseQuickRange("Current Year", in: app)
         let datesBeforeEdit = app.buttons["dateRange.editor"].value as? String
-        let scope = app.segmentedControls["categoryDetail.scope"]
-        scope.buttons["Variable"].tap()
+        let scope = app.buttons["detailList.expenseType"]
+        scope.tap()
+        app.buttons["Variable"].tap()
         let lunch = row("categoryDetail.expense.\(lunchID)", in: app)
         reveal(lunch, in: app)
         lunch.tap()
@@ -263,7 +247,7 @@ final class CategoryDetailUITests: XCTestCase {
         afterEdit.name = "Category detail after editing preserves variable scope"
         afterEdit.lifetime = .keepAlways
         add(afterEdit)
-        XCTAssertTrue(scope.buttons["Variable"].isSelected)
+        XCTAssertEqual(scope.value as? String, "Variable")
         XCTAssertEqual(app.buttons["dateRange.editor"].value as? String, datesBeforeEdit)
         XCTAssertTrue(lunch.waitForExistence(timeout: 5))
         XCTAssertTrue(lunch.label.contains("Edited Ruby Lunch"))

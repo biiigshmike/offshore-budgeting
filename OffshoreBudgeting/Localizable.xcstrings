@@ -15994,6 +15994,7 @@
       }
     },
     "Combined" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -56498,6 +56499,7 @@
       }
     },
     "Scope" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -62883,6 +62885,7 @@
       }
     },
     "Tap the selected sort option again to reverse the order." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {

@@ -4,9 +4,9 @@ import UIKit
 #endif
 
 struct DetailListAccessory<SortMode: Hashable>: View {
-    let categories: [Category]
+    var categories: [Category] = []
     // nil is the initial unfiltered state. An empty set matches no categories.
-    @Binding var selectedCategoryIDs: Set<UUID>?
+    var selectedCategoryIDs: Binding<Set<UUID>?>? = nil
     var expenseScope: Binding<ExpenseScope>? = nil
     @Binding var sortMode: SortMode
     let name: (ascending: SortMode, descending: SortMode)
@@ -25,9 +25,14 @@ struct DetailListAccessory<SortMode: Hashable>: View {
         String(localized: "categories.title", defaultValue: "Categories", comment: "Title for categories section.")
     }
 
+    private var categorySelectionIDs: Set<UUID>? {
+        get { selectedCategoryIDs?.wrappedValue }
+        nonmutating set { selectedCategoryIDs?.wrappedValue = newValue }
+    }
+
     private var selectedCategories: [Category] {
-        guard let selectedCategoryIDs else { return categories }
-        return categories.filter { selectedCategoryIDs.contains($0.id) }
+        guard let categorySelectionIDs else { return categories }
+        return categories.filter { categorySelectionIDs.contains($0.id) }
     }
 
     private var sortOptions: [(mode: SortMode, title: LocalizedStringResource, shortTitle: LocalizedStringResource)] {
@@ -48,10 +53,10 @@ struct DetailListAccessory<SortMode: Hashable>: View {
             .padding(.horizontal, 20)
             .padding(.vertical, 4)
             .onChange(of: categories.map(\.id), initial: true) { _, categoryIDs in
-                guard let selectedCategoryIDs else { return }
-                let validSelection = selectedCategoryIDs.intersection(categoryIDs)
-                if validSelection != selectedCategoryIDs {
-                    self.selectedCategoryIDs = validSelection
+                guard let categorySelectionIDs else { return }
+                let validSelection = categorySelectionIDs.intersection(categoryIDs)
+                if validSelection != categorySelectionIDs {
+                    self.categorySelectionIDs = validSelection
                 }
             }
     }
@@ -93,8 +98,10 @@ struct DetailListAccessory<SortMode: Hashable>: View {
                 scopeMenu(expenseScope, compact: compact, equalWidths: equalWidths)
                 separator
             }
-            categoriesMenu
-            separator
+            if selectedCategoryIDs != nil {
+                categoriesMenu
+                separator
+            }
             sortMenu(compact: compact, equalWidths: equalWidths)
         }
     }
@@ -167,7 +174,7 @@ struct DetailListAccessory<SortMode: Hashable>: View {
 
     private var categoriesMenu: some View {
         let selection = selectedCategories
-        let isFiltered = selectedCategoryIDs != nil
+        let isFiltered = categorySelectionIDs != nil
         let value = categoryAccessibilityValue(selection)
         #if targetEnvironment(macCatalyst)
         return Button {
@@ -187,13 +194,13 @@ struct DetailListAccessory<SortMode: Hashable>: View {
             .nativeDetailMenu(label: categoriesTitle, value: value, identifier: "detailList.categories",
                               isEnabled: !categories.isEmpty, refreshWhileOpen: true) {
                 let categoryIDs = Set(categories.map(\.id))
-                let allSelected = selectedCategoryIDs.map { categoryIDs.isSubset(of: $0) } ?? true
+                let allSelected = categorySelectionIDs.map { categoryIDs.isSubset(of: $0) } ?? true
                 let bulkAction = UIAction(
                     title: allSelected ? String(localized: "Deselect All") : String(localized: "Select All"),
                     identifier: UIAction.Identifier("detailList.categories.bulk"),
                     attributes: .keepsMenuPresented
                 ) { _ in
-                    selectedCategoryIDs = allSelected ? [] : categoryIDs
+                    categorySelectionIDs = allSelected ? [] : categoryIDs
                 }
                 let rows = categories.map { category in
                     let selection = categorySelection(category.id)
@@ -214,7 +221,7 @@ struct DetailListAccessory<SortMode: Hashable>: View {
     }
 
     private func categoryAccessibilityValue(_ selection: [Category]) -> String {
-        guard selectedCategoryIDs != nil else { return String(localized: "No category filter") }
+        guard categorySelectionIDs != nil else { return String(localized: "No category filter") }
         guard !selection.isEmpty else { return String(localized: "No categories selected") }
         return selection.map(\.name).formatted(.list(type: .and))
     }
@@ -230,23 +237,23 @@ struct DetailListAccessory<SortMode: Hashable>: View {
 
     private var categoryBulkAction: some View {
         let categoryIDs = Set(categories.map(\.id))
-        let allSelected = selectedCategoryIDs.map { categoryIDs.isSubset(of: $0) } ?? true
+        let allSelected = categorySelectionIDs.map { categoryIDs.isSubset(of: $0) } ?? true
         return Button(allSelected ? LocalizedStringKey("Deselect All") : LocalizedStringKey("Select All")) {
-            selectedCategoryIDs = allSelected ? [] : categoryIDs
+            categorySelectionIDs = allSelected ? [] : categoryIDs
         }
     }
 
     private func categorySelection(_ id: UUID) -> Binding<Bool> {
         Binding(
-            get: { selectedCategoryIDs?.contains(id) ?? true },
+            get: { categorySelectionIDs?.contains(id) ?? true },
             set: { isSelected in
-                var updatedSelection = selectedCategoryIDs ?? Set(categories.map(\.id))
+                var updatedSelection = categorySelectionIDs ?? Set(categories.map(\.id))
                 if isSelected {
                     updatedSelection.insert(id)
                 } else {
                     updatedSelection.remove(id)
                 }
-                selectedCategoryIDs = updatedSelection
+                categorySelectionIDs = updatedSelection
             }
         )
     }
