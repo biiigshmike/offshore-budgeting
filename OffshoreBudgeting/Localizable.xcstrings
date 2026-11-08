@@ -39149,6 +39149,12 @@
         }
       }
     },
+    "Manage Presets" : {
+
+    },
+    "Manage Presets has a cleaner look and a new detail view for every preset. Tap a preset to compare planned and effective costs over time, review and edit past expenses, and explore its linked budgets." : {
+
+    },
     "Manage Selected Photos" : {
       "localizations" : {
         "ar" : {

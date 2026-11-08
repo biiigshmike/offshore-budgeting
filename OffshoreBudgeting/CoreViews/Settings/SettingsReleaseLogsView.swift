@@ -82,6 +82,11 @@ struct SettingsReleaseLogsView: View {
             build: "25",
             items: [
                 ReleaseItem(
+                    systemImage: "list.bullet.rectangle",
+                    title: "Manage Presets",
+                    description: "Manage Presets has a cleaner look and a new detail view for every preset. Tap a preset to compare planned and effective costs over time, review and edit past expenses, and explore its linked budgets."
+                ),
+                ReleaseItem(
                     systemImage: "ladybug.slash",
                     title: "Set Aside as Savings",
                     description: "Fixed an issue where Set Aside as Savings incorrectly reduced a budget’s Actual Savings. Setting money aside now reduces only your available Offshore Savings balance."

@@ -154,6 +154,28 @@ struct AppRootView: View {
     private enum SidebarSelection: Hashable {
         case section(AppSection)
         case account(AccountsView.Segment)
+        case settings(SettingsDestination)
+    }
+
+    private enum SettingsDestination: CaseIterable, Hashable {
+        case categories
+        case presets
+
+        var title: String {
+            switch self {
+            case .categories:
+                String(localized: "settings.manageCategories", defaultValue: "Manage Categories", comment: "Title for manage categories row.")
+            case .presets:
+                String(localized: "settings.managePresets", defaultValue: "Manage Presets", comment: "Title for manage presets row.")
+            }
+        }
+
+        var systemImage: String {
+            switch self {
+            case .categories: "tag"
+            case .presets: "list.bullet.rectangle"
+            }
+        }
     }
 
     let workspace: Workspace
@@ -181,6 +203,7 @@ struct AppRootView: View {
     private var persistedSelectedSectionRaw: String = AppSection.home.rawValue
 
     @State private var selectedSectionRaw: String = AppSection.home.rawValue
+    @State private var selectedSettingsDestination: SettingsDestination?
     @State private var selectedAccountsDestination: AccountsView.Segment? = nil
     @State private var queuedAccountsDestination: AccountsView.Segment? = nil
 
@@ -255,6 +278,9 @@ struct AppRootView: View {
                 if selectedSection == .cards, let selectedAccountsDestination {
                     return .account(selectedAccountsDestination)
                 }
+                if selectedSection == .settings, let selectedSettingsDestination {
+                    return .settings(selectedSettingsDestination)
+                }
                 return .section(selectedSection)
             },
             set: { newValue in
@@ -265,11 +291,19 @@ struct AppRootView: View {
                         cardsPath = NavigationPath()
                         selectedAccountsDestination = nil
                     }
+                    if section == .settings {
+                        settingsPath = NavigationPath()
+                        selectedSettingsDestination = nil
+                    }
                     selectedSectionRaw = section.rawValue
                 case .account(let destination):
                     cardsPath = NavigationPath()
                     selectedAccountsDestination = destination
                     selectedSectionRaw = AppSection.cards.rawValue
+                case .settings(let destination):
+                    settingsPath = NavigationPath()
+                    selectedSettingsDestination = destination
+                    selectedSectionRaw = AppSection.settings.rawValue
                 }
             }
         )
@@ -476,6 +510,15 @@ struct AppRootView: View {
                                 .padding(.leading, 18)
                                 .tag(SidebarSelection.account(destination))
                                 .accessibilityIdentifier("accounts.sidebar.\(destination.rawValue)")
+                        }
+                    }
+
+                    if section == .settings {
+                        ForEach(SettingsDestination.allCases, id: \.self) { destination in
+                            Label(destination.title, systemImage: destination.systemImage)
+                                .font(.subheadline)
+                                .padding(.leading, 18)
+                                .tag(SidebarSelection.settings(destination))
                         }
                     }
                 }
@@ -787,7 +830,14 @@ struct AppRootView: View {
         case .cards:
             AccountsView(workspace: workspace, selectedDestination: $selectedAccountsDestination)
         case .settings:
-            SettingsView(workspace: workspace, selectedWorkspaceID: $selectedWorkspaceID)
+            switch selectedSettingsDestination {
+            case .categories:
+                ManageCategoriesView(workspace: workspace)
+            case .presets:
+                ManagePresetsView(workspace: workspace)
+            case nil:
+                SettingsView(workspace: workspace, selectedWorkspaceID: $selectedWorkspaceID)
+            }
         }
     }
 

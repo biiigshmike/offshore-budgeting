@@ -227,6 +227,10 @@ struct ManagePresetsView: View {
                             .tint(Color("OffshoreDepth"))
                         }
                     }
+                } header: {
+                    if !activePresetsWithoutHighlighted.isEmpty {
+                        Text("Active")
+                    }
                 }
 
                 // MARK: - Archived presets

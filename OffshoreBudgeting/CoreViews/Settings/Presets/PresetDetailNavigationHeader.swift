@@ -33,7 +33,18 @@ struct PresetDetailNavigationHeader: ViewModifier {
     }
 
     func body(content: Content) -> some View {
-        if #available(iOS 26.0, macCatalyst 26.0, *) {
+        #if targetEnvironment(macCatalyst)
+        // The native window owns both lines on Catalyst. A navigation title
+        // here would replace that heading and hide its subtitle.
+        content
+            .navigationTitle("")
+            .navigationBarTitleDisplayMode(.inline)
+            .background {
+                PresetMacWindowSubtitle(title: title, subtitle: subtitle)
+                    .frame(width: 0, height: 0)
+            }
+        #else
+        if #available(iOS 26.0, *) {
             content
                 .navigationTitle(title)
                 .navigationSubtitle(intervalText(style: .medium))
@@ -64,5 +75,6 @@ struct PresetDetailNavigationHeader: ViewModifier {
                     }
                 }
         }
+        #endif
     }
 }
