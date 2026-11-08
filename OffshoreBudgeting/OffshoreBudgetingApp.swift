@@ -281,7 +281,9 @@ struct OffshoreBudgetingApp: App {
             }
             #endif
 
-            let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+            let appSupport = PersistentStoreLocation.directory(
+                in: FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+            )
             try FileManager.default.createDirectory(at: appSupport, withIntermediateDirectories: true)
 
             let localStoreURL = appSupport.appendingPathComponent("Local.store")
@@ -369,7 +371,9 @@ struct OffshoreBudgetingApp: App {
                 Income.self
             ])
 
-            let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+            let appSupport = PersistentStoreLocation.directory(
+                in: FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+            )
             try? FileManager.default.createDirectory(at: appSupport, withIntermediateDirectories: true)
 
             let fallbackStoreURL = appSupport.appendingPathComponent("FallbackLocal.store")

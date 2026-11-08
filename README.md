@@ -29,6 +29,16 @@ For most code work, inspect Swift files and tests first. Avoid spending analysis
 
 Use the existing Xcode scheme and focused tests. For business logic changes, prefer the targeted tests named in `AGENTS.md` before running broader suites.
 
+## Development Database Isolation
+
+Debug builds open their SwiftData databases beneath Application Support/Development, including local, iCloud, fallback, screenshot, and UI-test stores. TestFlight and App Store (Release) builds retain their existing Application Support paths: `Local.store`, `Cloud.store`, and `FallbackLocal.store`. AppIntents use the same store factory.
+
+No existing database is copied, moved, or deleted when this isolation takes effect. The first Debug launch may show an empty local store or download development iCloud data. Previous stores remain available to Release builds; existing duplicate records are not automatically merged or removed. Install updates over the existing app rather than uninstalling it to preserve local files.
+
+CloudKit's remote environment is still determined by signing. Keep development builds signed for the development environment; directory isolation does not protect production cloud records from a build deliberately signed to access production. Preferences and widget snapshots are not separated by this database change.
+
+Before release, verify a TestFlight-to-TestFlight update on a device with existing budgets, then an updated Debug-to-TestFlight transition. Confirm budget IDs/counts and relationships remain unchanged in Release. `PersistentStoreLocationTests` checks path compatibility, development separation, and preservation of existing files without opening a real user store.
+
 ## Retired Assistant
 
 Marina chat has been removed. Existing financial records and app features remain independent of chat. `AssistantAliasRule` and `MarinaChatSession` remain only as inactive SwiftData compatibility models so existing Local and iCloud stores can open safely; do not restore assistant behavior or erase stores to remove them. Legacy workspace archive alias fields are accepted for compatibility and are not imported into new workspaces.
