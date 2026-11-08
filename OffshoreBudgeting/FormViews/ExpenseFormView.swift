@@ -269,7 +269,7 @@ struct ExpenseFormView: View {
                 Group {
                     if let mode = activeSharedBalanceMode {
                         Picker("Reconciliation Account", selection: accountBinding(for: mode)) {
-                            Text("Choose a Reconciliation").tag(UUID?.none)
+                            Text("Choose").tag(UUID?.none)
                             ForEach(allocationAccounts) { account in
                                 Text(account.name).tag(Optional(account.id))
                             }

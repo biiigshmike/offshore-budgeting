@@ -398,7 +398,7 @@ struct EditPlannedExpenseView: View {
                 Group {
                     if let mode = activeSharedBalanceMode {
                         Picker("Reconciliation Account", selection: accountBinding(for: mode)) {
-                            Text("Choose a Reconciliation").tag(UUID?.none)
+                            Text("Choose").tag(UUID?.none)
                             ForEach(selectableAllocationAccounts) { account in
                                 Text(account.name).tag(UUID?.some(account.id))
                             }
