@@ -409,6 +409,11 @@ struct SavingsAccountView<TrailingToolbar: ToolbarContent>: View {
             }
         }
         .listStyle(.insetGrouped)
+        .modifier(DateRangeNavigationHeader(
+            title: AccountsView.Segment.savings.title,
+            startDate: appliedStartDate,
+            endDate: appliedEndDate
+        ))
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
                 DateRangeToolbarControls(

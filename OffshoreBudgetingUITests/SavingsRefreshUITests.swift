@@ -34,7 +34,7 @@ final class SavingsRefreshUITests: XCTestCase {
             XCTAssertEqual(toggle.value as? String, "1")
         }
         app.buttons["Save"].tap()
-        XCTAssertTrue(app.navigationBars["Savings"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.navigationBars["Offshore Savings"].waitForExistence(timeout: 5))
     }
 
     private func ledgerRow(_ note: String, in app: XCUIApplication) -> XCUIElement {
@@ -57,7 +57,7 @@ final class SavingsRefreshUITests: XCTestCase {
         XCTAssertTrue(app.navigationBars["Home"].waitForExistence(timeout: 15))
         app.tabBars.buttons["Accounts"].tap()
         app.buttons["accounts.destination.savings"].tap()
-        XCTAssertTrue(app.navigationBars["Savings"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.navigationBars["Offshore Savings"].waitForExistence(timeout: 5))
         assertBalance("0.00", in: app)
         XCTAssertFalse(app.buttons["Refresh Savings"].exists)
         XCTAssertFalse(app.staticTexts["Offshore Savings is up to date."].exists)

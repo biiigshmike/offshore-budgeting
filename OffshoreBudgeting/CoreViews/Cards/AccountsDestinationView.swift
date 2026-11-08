@@ -49,7 +49,6 @@ struct AccountsDestinationView: View {
 
     var body: some View {
         stagedSegmentContent
-        .navigationTitle(navigationTitleText)
         .toolbar {
             if selectedSegment != .savings {
                 accountsToolbar
@@ -143,8 +142,10 @@ struct AccountsDestinationView: View {
             switch selectedSegment {
             case .cards:
                 CardsView(workspace: workspace)
+                    .navigationTitle(Segment.cards.title)
             case .sharedBalances:
                 AllocationAccountView(workspace: workspace)
+                    .navigationTitle(Segment.sharedBalances.title)
             case .savings:
                 SavingsAccountView(workspace: workspace) {
                     accountsToolbar
@@ -450,14 +451,5 @@ struct AccountsDestinationView: View {
         case .savings:
             return String(localized: "accounts.addSavingsEntry", defaultValue: "Add Savings Entry", comment: "Accessibility label for add savings entry action.")
         }
-    }
-
-    private var navigationTitleText: String {
-        // Leave room for the calendar, sort, and add controls in the phone's
-        // inline navigation bar. The Accounts destination keeps its full name.
-        if isPhone, selectedSegment == .savings {
-            return String(localized: "accounts.savings.phoneTitle", defaultValue: "Savings", comment: "Short savings navigation title on iPhone, leaving room for toolbar controls.")
-        }
-        return selectedSegment.title
     }
 }

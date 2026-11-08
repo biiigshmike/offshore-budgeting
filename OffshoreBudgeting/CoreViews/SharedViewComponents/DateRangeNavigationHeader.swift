@@ -1,10 +1,13 @@
 import SwiftUI
 
-struct PresetDetailNavigationHeader: ViewModifier {
+struct DateRangeNavigationHeader: ViewModifier {
     let title: String
-    let subtitle: String
     let startDate: Date
     let endDate: Date
+
+    private var subtitle: String {
+        "\(AppDateFormat.abbreviatedDate(startDate)) – \(AppDateFormat.abbreviatedDate(endDate))"
+    }
 
     private func intervalText(style: DateIntervalFormatter.Style) -> String {
         let formatter = DateIntervalFormatter()
@@ -40,7 +43,7 @@ struct PresetDetailNavigationHeader: ViewModifier {
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .background {
-                PresetMacWindowSubtitle(title: title, subtitle: subtitle)
+                MacDateRangeWindowSubtitle(title: title, subtitle: subtitle)
                     .frame(width: 0, height: 0)
             }
         #else
@@ -48,7 +51,7 @@ struct PresetDetailNavigationHeader: ViewModifier {
             content
                 .navigationTitle(title)
                 .navigationSubtitle(intervalText(style: .medium))
-                .navigationBarTitleDisplayMode(.large)
+                .toolbarTitleDisplayMode(.large)
                 .toolbarRole(.navigationStack)
                 .toolbar {
                     ToolbarItem(placement: .largeSubtitle) {

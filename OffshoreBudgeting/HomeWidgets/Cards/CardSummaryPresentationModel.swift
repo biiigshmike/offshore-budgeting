@@ -20,10 +20,6 @@ struct CardSummaryPresentationModel: Codable, Equatable, Identifiable, Sendable 
 
     var id: UUID { cardID }
 
-    var dateRangeSubtitle: String {
-        "\(AppDateFormat.abbreviatedDate(startDate)) - \(AppDateFormat.abbreviatedDate(endDate))"
-    }
-
     init(
         cardID: UUID,
         title: String,

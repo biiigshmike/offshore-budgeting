@@ -513,7 +513,11 @@ struct CardDetailView: View {
                 items: Self.tipItems
             )
             .listStyle(.insetGrouped)
-            .navigationTitle(card.name)
+            .modifier(DateRangeNavigationHeader(
+                title: card.name,
+                startDate: appliedStartDate,
+                endDate: appliedEndDate
+            ))
             .searchable(
                 text: $searchText,
                 placement: .navigationBarDrawer(displayMode: .always),

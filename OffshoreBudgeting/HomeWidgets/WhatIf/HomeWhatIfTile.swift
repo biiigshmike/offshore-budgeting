@@ -80,10 +80,6 @@ struct HomeWhatIfTile: View {
         displayValue >= 0 ? .green : .red
     }
 
-    private var subtitleText: String {
-        "\(formattedDate(startDate)) - \(formattedDate(endDate))"
-    }
-
     private var refreshInputToken: Int {
         var hasher = Hasher()
         hasher.combine(startDate.timeIntervalSinceReferenceDate)
@@ -99,7 +95,6 @@ struct HomeWhatIfTile: View {
     var body: some View {
         HomeTileContainer(
             title: String(localized: "homeWidget.whatIf", defaultValue: "What If?", comment: "Pinned home widget title for what-if planner."),
-            subtitle: subtitleText,
             accent: valueColor,
             showsChevron: false,
             headerTrailing: AnyView(
@@ -206,10 +201,6 @@ struct HomeWhatIfTile: View {
 
     private func isInRange(_ date: Date) -> Bool {
         (date >= startDate) && (date <= endDate)
-    }
-
-    private func formattedDate(_ date: Date) -> String {
-        AppDateFormat.abbreviatedDate(date)
     }
 
     private func buildBaselineBoundsByCategoryID() -> [UUID: WhatIfScenarioStore.WhatIfCategoryBounds] {

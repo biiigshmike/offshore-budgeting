@@ -141,19 +141,15 @@ struct CategorySpotlightDetailView: View {
             )
         }
         .listStyle(.insetGrouped)
-        .navigationTitle(String(localized: "homeWidget.categorySpotlight", defaultValue: "Category Spotlight", comment: "Pinned home widget title for category spotlight."))
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .principal) {
-                VStack(spacing: 2) {
-                    Text(String(localized: "homeWidget.categorySpotlight", defaultValue: "Category Spotlight", comment: "Pinned home widget title for category spotlight."))
-                        .font(.headline)
-                    Text(subtitle)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
-        }
+        .modifier(DateRangeNavigationHeader(
+            title: String(
+                localized: "homeWidget.categorySpotlight",
+                defaultValue: "Category Spotlight",
+                comment: "Pinned home widget title for category spotlight."
+            ),
+            startDate: startDate,
+            endDate: endDate
+        ))
     }
 
 }

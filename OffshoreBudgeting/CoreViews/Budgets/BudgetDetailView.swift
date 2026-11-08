@@ -626,7 +626,11 @@ struct BudgetDetailView: View {
             items: Self.tipItems
         )
         .listStyle(.insetGrouped)
-        .navigationTitle(budget.name)
+        .modifier(DateRangeNavigationHeader(
+            title: budget.name,
+            startDate: budget.startDate,
+            endDate: budget.endDate
+        ))
 
         .searchable(
             text: $searchText,
@@ -860,7 +864,7 @@ struct BudgetDetailView: View {
                 activeModal = .calculations
             }
         } header: {
-            Text(String(format: String(localized: "budgetDetail.overviewHeader", defaultValue: "Overview • %@", comment: "Budget detail overview section header with date range."), locale: Locale.current, budgetDateRangeLabel))
+            Text("Overview")
         } footer: {
             if let footnote = presetRequiresCardFootnote {
                 Text(footnote)

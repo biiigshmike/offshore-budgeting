@@ -10,7 +10,7 @@ import SwiftUI
 struct HomeTileContainer<Content: View>: View {
 
     let title: String
-    let subtitle: String
+    let subtitle: String?
     let accent: Color
     let showsChevron: Bool
     let headerTrailing: AnyView?
@@ -18,7 +18,7 @@ struct HomeTileContainer<Content: View>: View {
 
     init(
         title: String,
-        subtitle: String,
+        subtitle: String? = nil,
         accent: Color = .blue,
         showsChevron: Bool = true,
         headerTrailing: AnyView? = nil,
@@ -67,9 +67,11 @@ struct HomeTileContainer<Content: View>: View {
                     .font(.headline.weight(.semibold))
                     .foregroundStyle(accent)
 
-                Text(subtitle)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                if let subtitle {
+                    Text(subtitle)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
             }
 
             Spacer(minLength: 0)

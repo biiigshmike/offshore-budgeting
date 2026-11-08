@@ -87,13 +87,14 @@ final class PresetDetailUITests: XCTestCase {
         reveal(nextMonth, in: app)
         nextMonth.tap()
         let homeDateRange = monthRangeText(offset: 1)
+        assertSubtitle(homeDateRange, title: "Home", in: app)
 
         // The fixture has an unrecorded Rent occurrence on the first day of next month.
         let tile = app.descendants(matching: .any).matching(identifier: "home.nextPlannedExpense").firstMatch
         reveal(tile, in: app)
         XCTAssertTrue(tile.label.contains("Rent"))
         XCTAssertTrue(tile.label.contains("Not recorded"))
-        XCTAssertTrue(tile.label.contains(homeDateRange))
+        XCTAssertFalse(tile.label.contains(homeDateRange))
         attachScreenshot(app, named: "Calmer themed Next Planned Expense tile")
         tile.tap()
         XCTAssertTrue(app.navigationBars["Rent"].waitForExistence(timeout: 5))
@@ -144,9 +145,10 @@ final class PresetDetailUITests: XCTestCase {
         assertSubtitle(detailDateRange, title: "Rent", in: app)
         app.navigationBars["Rent"].buttons["Home"].tap()
         XCTAssertTrue(app.navigationBars["Home"].waitForExistence(timeout: 5))
+        assertSubtitle(homeDateRange, title: "Home", in: app)
         let returnedTile = element("home.nextPlannedExpense", in: app)
         reveal(returnedTile, in: app)
-        XCTAssertTrue(returnedTile.label.contains(homeDateRange))
+        XCTAssertFalse(returnedTile.label.contains(homeDateRange))
     }
 
     func testLinkedBudgetsStartCollapsedExpandAndShowZeroForUnassignedPreset() {

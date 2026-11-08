@@ -80,7 +80,11 @@ struct AllocationAccountDetailView: View {
             )
         }
         .listStyle(.insetGrouped)
-        .navigationTitle(account.name)
+        .modifier(DateRangeNavigationHeader(
+            title: account.name,
+            startDate: appliedStartDate,
+            endDate: appliedEndDate
+        ))
         .searchable(
             text: $searchText,
             placement: .navigationBarDrawer(displayMode: .always),

@@ -350,19 +350,16 @@ struct WhatIfScenarioPlannerView: View {
                 refreshFromSyncedGlobalScenarios()
             }
             .listStyle(.insetGrouped)
-            .navigationTitle(String(localized: "homeWidget.whatIf", defaultValue: "What If?", comment: "Pinned home widget title for what-if planner."))
-            .navigationBarTitleDisplayMode(.inline)
+            .modifier(DateRangeNavigationHeader(
+                title: String(
+                    localized: "homeWidget.whatIf",
+                    defaultValue: "What If?",
+                    comment: "Pinned home widget title for what-if planner."
+                ),
+                startDate: startDate,
+                endDate: endDate
+            ))
             .toolbar {
-                ToolbarItem(placement: .principal) {
-                    VStack(spacing: 2) {
-                        Text(String(localized: "homeWidget.whatIf", defaultValue: "What If?", comment: "Pinned home widget title for what-if planner."))
-                            .font(.headline)
-                        Text(subtitleText)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-
                 ToolbarItem(placement: .topBarTrailing) {
                     scenarioMenu
                 }

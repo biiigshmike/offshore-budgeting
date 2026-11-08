@@ -96,8 +96,11 @@ struct PresetDetailView: View, Equatable {
 
     var body: some View {
         content(now: referenceDate)
-            .modifier(PresetDetailNavigationHeader(title: preset.title, subtitle: dateRangeText,
-                                                   startDate: startDate, endDate: endDate))
+            .modifier(DateRangeNavigationHeader(
+                title: preset.title,
+                startDate: startDate,
+                endDate: endDate
+            ))
             .onAppear { initializeHistoryRangeIfNeeded() }
             .task { await refreshAtDayBoundary() }
             .onChange(of: scenePhase) { _, phase in

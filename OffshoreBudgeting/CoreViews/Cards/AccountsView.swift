@@ -46,9 +46,9 @@ struct AccountsView: View {
                 )
             } else {
                 AccountsOverviewView()
+                    .navigationTitle(String(localized: "app.section.cards", defaultValue: "Accounts", comment: "Main tab title for the Accounts section."))
             }
         }
-        .navigationTitle(selectedDestination?.title ?? String(localized: "app.section.cards", defaultValue: "Accounts", comment: "Main tab title for the Accounts section."))
         .navigationDestination(for: Segment.self) { destination in
             AccountsDestinationView(workspace: workspace, initialSegment: destination)
         }

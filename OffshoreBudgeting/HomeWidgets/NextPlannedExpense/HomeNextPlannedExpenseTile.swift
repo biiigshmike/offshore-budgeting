@@ -11,17 +11,13 @@ import SwiftData
 struct HomeNextPlannedExpenseTile: View {
     let workspace: Workspace
     let expense: PlannedExpense
-    let startDate: Date
-    let endDate: Date
 
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Query private var presets: [Preset]
 
-    init(workspace: Workspace, expense: PlannedExpense, startDate: Date, endDate: Date) {
+    init(workspace: Workspace, expense: PlannedExpense) {
         self.workspace = workspace
         self.expense = expense
-        self.startDate = startDate
-        self.endDate = endDate
         let workspaceID = workspace.id
         _presets = Query(filter: #Predicate<Preset> { $0.workspace?.id == workspaceID })
     }
@@ -78,7 +74,6 @@ struct HomeNextPlannedExpenseTile: View {
         } label: {
             HomeTileContainer(
                 title: String(localized: "Next Planned Expense", defaultValue: "Next Planned Expense", comment: "Pinned home widget title for next planned expense."),
-                subtitle: dateRangeSubtitle,
                 accent: .orange,
                 showsChevron: true
             ) {
@@ -152,11 +147,7 @@ struct HomeNextPlannedExpenseTile: View {
         .font(.subheadline)
     }
 
-    private var dateRangeSubtitle: String {
-        "\(AppDateFormat.abbreviatedDate(startDate)) – \(AppDateFormat.abbreviatedDate(endDate))"
-    }
-
     private var accessibilityLabel: String {
-        String(localized: "Next planned expense. \(expense.title). Card \(cardName). Due \(dateText). Planned \(plannedText). Actual \(actualText). \(dateRangeSubtitle).")
+        String(localized: "Next planned expense. \(expense.title). Card \(cardName). Due \(dateText). Planned \(plannedText). Actual \(actualText).")
     }
 }

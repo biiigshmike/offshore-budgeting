@@ -92,7 +92,7 @@ private struct MacWindowSceneTitleRepresentable: UIViewRepresentable {
         private func applyTitleIfNeeded() {
             guard let scene else { return }
 
-            // A detail with a native subtitle supplies its own window heading.
+            // A screen with a native date subtitle supplies its own window heading.
             if scene.subtitle.isEmpty && scene.title != desiredTitle {
                 isApplyingSceneTitle = true
                 scene.title = desiredTitle

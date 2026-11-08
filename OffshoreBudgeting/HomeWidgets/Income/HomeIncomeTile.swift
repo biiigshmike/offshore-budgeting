@@ -38,7 +38,6 @@ struct HomeIncomeTile: View {
         } label: {
             HomeTileContainer(
                 title: String(localized: "homeWidget.income", defaultValue: "Income", comment: "Pinned home widget title for income metrics."),
-                subtitle: dateRangeSubtitle,
                 accent: .blue,
                 showsChevron: true
             ) {
@@ -51,14 +50,6 @@ struct HomeIncomeTile: View {
     }
 
     // MARK: - UI Helpers
-
-    private var dateRangeSubtitle: String {
-        "\(formattedDate(startDate)) - \(formattedDate(endDate))"
-    }
-
-    private func formattedDate(_ date: Date) -> String {
-        AppDateFormat.abbreviatedDate(date)
-    }
 
     private func isInRange(_ date: Date) -> Bool {
         (date >= startDate) && (date <= endDate)

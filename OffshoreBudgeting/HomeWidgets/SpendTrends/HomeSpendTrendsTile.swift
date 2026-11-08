@@ -47,7 +47,6 @@ struct HomeSpendTrendsTile: View {
                     defaultValue: "Spend Trends",
                     comment: "Widget title for the spend trends Home tile."
                 ),
-                subtitle: "\(formattedDate(startDate)) - \(formattedDate(endDate))",
                 accent: .purple,
                 showsChevron: true
             ) {
@@ -130,9 +129,5 @@ struct HomeSpendTrendsTile: View {
                     .foregroundStyle(.secondary)
             }
         }
-    }
-
-    private func formattedDate(_ date: Date) -> String {
-        AppDateFormat.abbreviatedDate(date)
     }
 }

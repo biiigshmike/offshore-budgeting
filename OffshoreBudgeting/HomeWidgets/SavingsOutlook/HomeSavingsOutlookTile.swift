@@ -72,7 +72,6 @@ struct HomeSavingsOutlookTile: View {
         } label: {
             HomeTileContainer(
                 title: String(localized: "homeWidget.savingsOutlook", defaultValue: "Savings Outlook", comment: "Pinned home widget title for Offshore Savings outlook."),
-                subtitle: dateRangeSubtitle,
                 accent: accentColor,
                 showsChevron: true
             ) {
@@ -121,14 +120,6 @@ struct HomeSavingsOutlookTile: View {
                 .font(.headline.weight(.semibold))
                 .foregroundStyle(valueColor)
         }
-    }
-
-    private var dateRangeSubtitle: String {
-        "\(formattedDate(startDate)) - \(formattedDate(endDate))"
-    }
-
-    private func formattedDate(_ date: Date) -> String {
-        AppDateFormat.abbreviatedDate(date)
     }
 
 }

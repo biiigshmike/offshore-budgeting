@@ -124,22 +124,15 @@ struct HomeSavingsOutlookMetricsView: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 14)
         }
-        .navigationBarTitleDisplayMode(.inline)
-        .navigationTitle("") // we render a custom title + subtitle in the navigation area
-        .toolbar {
-            ToolbarItem(placement: .principal) {
-                VStack(spacing: 2) {
-                    Text(String(localized: "homeWidget.savingsOutlook", defaultValue: "Savings Outlook", comment: "Pinned home widget title for Offshore Savings outlook."))
-                        .font(.headline.weight(.semibold))
-                        .foregroundStyle(.primary)
-
-                    Text("\(formattedDate(resolved.start)) - \(formattedDate(resolved.end))")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
-                .accessibilityElement(children: .combine)
-            }
-        }
+        .modifier(DateRangeNavigationHeader(
+            title: String(
+                localized: "homeWidget.savingsOutlook",
+                defaultValue: "Savings Outlook",
+                comment: "Pinned home widget title for Offshore Savings outlook."
+            ),
+            startDate: resolved.start,
+            endDate: resolved.end
+        ))
         .appSheet(isPresented: $showingCalculationHelp) {
             FinancialCalculationHelpView(
                 sections: SavingsCalculationExplanation.outlook(

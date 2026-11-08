@@ -263,7 +263,6 @@ struct HomeView: View {
                             if pinnedItems.isEmpty {
                                 HomeTileContainer(
                                     title: String(localized: "app.section.home", defaultValue: "Home", comment: "Main tab title for the Home section."),
-                                    subtitle: dateRangeSubtitle,
                                     accent: .primary,
                                     showsChevron: false
                                 ) {
@@ -327,7 +326,11 @@ struct HomeView: View {
                 )
             ]
         )
-        .navigationTitle(String(localized: "app.section.home", defaultValue: "Home", comment: "Main tab title for the Home section."))
+        .modifier(DateRangeNavigationHeader(
+            title: String(localized: "app.section.home", defaultValue: "Home", comment: "Main tab title for the Home section."),
+            startDate: appliedStartDate,
+            endDate: appliedEndDate
+        ))
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
                 Button {
@@ -540,7 +543,6 @@ struct HomeView: View {
             } else {
                 HomeTileContainer(
                     title: "Missing Card",
-                    subtitle: dateRangeSubtitle,
                     accent: .secondary,
                     showsChevron: false
                 ) {
@@ -752,14 +754,11 @@ struct HomeView: View {
         if let next = nextPlannedExpenseForHome {
             HomeNextPlannedExpenseTile(
                 workspace: workspace,
-                expense: next,
-                startDate: appliedStartDate,
-                endDate: appliedEndDate
+                expense: next
             )
         } else {
             HomeTileContainer(
                 title: String(localized: "Next Planned Expense", defaultValue: "Next Planned Expense", comment: "Home tile title for the next planned expense widget."),
-                subtitle: dateRangeSubtitle,
                 accent: .orange,
                 showsChevron: false
             ) {
@@ -1324,10 +1323,6 @@ struct HomeView: View {
         Date(timeIntervalSince1970: appliedEndTimestamp)
     }
 
-    private var dateRangeSubtitle: String {
-        "\(formattedDate(appliedStartDate)) - \(formattedDate(appliedEndDate))"
-    }
-
     private func syncDraftToAppliedIfNeeded() {
         guard draftStartDate != appliedStartDate || draftEndDate != appliedEndDate else { return }
         draftStartDate = appliedStartDate
@@ -1422,10 +1417,6 @@ struct HomeView: View {
         }
 
         setAppliedRange(start: start, end: end)
-    }
-
-    private func formattedDate(_ date: Date) -> String {
-        AppDateFormat.abbreviatedDate(date)
     }
 
     // MARK: - Persistence: Unified pins + Migration

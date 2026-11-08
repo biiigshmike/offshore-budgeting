@@ -88,7 +88,6 @@ struct HomeCategoryAvailabilityTile: View {
 
         HomeTileContainer(
             title: String(localized: "homeWidget.categoryAvailability", defaultValue: "Category Goals"),
-            subtitle: result.activeBudget.map { "\($0.name) • \(subtitleText)" } ?? subtitleText,
             accent: accentColor(for: result),
             showsChevron: false
         ) {
@@ -327,14 +326,6 @@ struct HomeCategoryAvailabilityTile: View {
     }
 
     // MARK: - Formatting
-
-    private var subtitleText: String {
-        "\(formattedDate(startDate)) - \(formattedDate(endDate))"
-    }
-
-    private func formattedDate(_ date: Date) -> String {
-        AppDateFormat.abbreviatedDate(date)
-    }
 
     private func localizedInt(_ value: Int) -> String {
         AppNumberFormat.integer(value)

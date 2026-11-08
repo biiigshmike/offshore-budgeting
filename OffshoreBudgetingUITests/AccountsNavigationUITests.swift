@@ -91,12 +91,13 @@ final class AccountsNavigationUITests: XCTestCase {
             if destination.id == "savings" {
                 assertSavingsToolbar(app)
             }
-            // Direct selection has the existing return-to-overview action,
-            // rather than a pushed route beneath the selected destination.
-            XCTAssertTrue(app.buttons["accounts.overview.return"].waitForExistence(timeout: 5))
+            // The sidebar handles navigation on iPad. The direct return
+            // button is only used by the phone shortcut flow.
+            XCTAssertFalse(app.buttons["accounts.overview.return"].exists)
+            XCTAssertFalse(app.navigationBars[destination.title].buttons["Accounts"].exists)
         }
 
-        app.buttons["accounts.overview.return"].tap()
+        app.staticTexts["Accounts"].firstMatch.tap()
         XCTAssertTrue(app.buttons["accounts.destination.cards"].waitForExistence(timeout: 5))
     }
 }

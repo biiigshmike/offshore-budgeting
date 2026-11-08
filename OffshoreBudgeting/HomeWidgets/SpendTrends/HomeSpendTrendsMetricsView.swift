@@ -89,28 +89,15 @@ struct HomeSpendTrendsMetricsView: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 14)
         }
-        .navigationBarTitleDisplayMode(.inline)
-        .navigationTitle("") // render a custom title + subtitle in the navigation area
-        .toolbar {
-            ToolbarItem(placement: .principal) {
-                VStack(spacing: 2) {
-                    Text(
-                        String(
-                            localized: "homeWidget.spendTrends.title",
-                            defaultValue: "Spend Trends",
-                            comment: "Widget title for the spend trends experience."
-                        )
-                    )
-                        .font(.headline.weight(.semibold))
-                        .foregroundStyle(.primary)
-
-                    Text("\(formattedDate(result.resolvedStart)) - \(formattedDate(result.resolvedEnd))")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
-                .accessibilityElement(children: .combine)
-            }
-        }
+        .modifier(DateRangeNavigationHeader(
+            title: String(
+                localized: "homeWidget.spendTrends.title",
+                defaultValue: "Spend Trends",
+                comment: "Widget title for the spend trends experience."
+            ),
+            startDate: result.resolvedStart,
+            endDate: result.resolvedEnd
+        ))
         .appSheet(isPresented: $showingCalculationHelp) {
             let sections = SpendingCalculationExplanation.trends(
                 result: result, card: selectedCard,

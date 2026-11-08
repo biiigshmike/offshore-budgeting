@@ -18,13 +18,13 @@ final class HomeSavingsNavigationUITests: XCTestCase {
         let openSavings = app.buttons["Open Offshore Savings"].firstMatch
         reveal(openSavings, in: app)
         openSavings.tap()
-        XCTAssertTrue(app.navigationBars["Savings"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.navigationBars["Offshore Savings"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.buttons["Add Savings Entry"].exists)
-        app.navigationBars["Savings"].buttons.element(boundBy: 0).tap()
+        app.navigationBars["Offshore Savings"].buttons.element(boundBy: 0).tap()
 
         XCTAssertTrue(openSavings.waitForExistence(timeout: 5))
         XCTAssertTrue(app.tabBars.buttons["Home"].isSelected)
-        XCTAssertFalse(app.navigationBars["Savings"].exists)
+        XCTAssertFalse(app.navigationBars["Offshore Savings"].exists)
     }
 
     private func reveal(_ element: XCUIElement, in app: XCUIApplication) {

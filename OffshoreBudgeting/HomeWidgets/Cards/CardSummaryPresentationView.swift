@@ -14,7 +14,6 @@ struct CardSummaryPresentationView: View {
     var body: some View {
         HomeTileContainer(
             title: model.title,
-            subtitle: model.dateRangeSubtitle,
             accent: .primary,
             showsChevron: showsChevron
         ) {
@@ -24,7 +23,7 @@ struct CardSummaryPresentationView: View {
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(model.title) card summary")
         .accessibilityValue(
-            "\(model.dateRangeSubtitle), total \(CurrencyFormatter.string(from: model.total)), planned \(CurrencyFormatter.string(from: model.plannedTotal)), variable \(CurrencyFormatter.string(from: model.variableTotal))"
+            "Total \(CurrencyFormatter.string(from: model.total)), planned \(CurrencyFormatter.string(from: model.plannedTotal)), variable \(CurrencyFormatter.string(from: model.variableTotal))"
         )
     }
 

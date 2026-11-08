@@ -98,22 +98,15 @@ struct HomeIncomeMetricsView: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 14)
         }
-        .navigationBarTitleDisplayMode(.inline)
-        .navigationTitle("") // render a custom title + subtitle in the navigation area
-        .toolbar {
-            ToolbarItem(placement: .principal) {
-                VStack(spacing: 2) {
-                    Text(String(localized: "homeWidget.income", defaultValue: "Income", comment: "Pinned home widget title for income metrics."))
-                        .font(.headline.weight(.semibold))
-                        .foregroundStyle(.primary)
-
-                    Text("\(formattedDate(resolved.start)) - \(formattedDate(resolved.end))")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
-                .accessibilityElement(children: .combine)
-            }
-        }
+        .modifier(DateRangeNavigationHeader(
+            title: String(
+                localized: "homeWidget.income",
+                defaultValue: "Income",
+                comment: "Pinned home widget title for income metrics."
+            ),
+            startDate: resolved.start,
+            endDate: resolved.end
+        ))
         .appSheet(isPresented: $showingCalculationHelp) {
             FinancialCalculationHelpView(
                 sections: incomeCalculationSections(from: resolved.start, to: resolved.end),

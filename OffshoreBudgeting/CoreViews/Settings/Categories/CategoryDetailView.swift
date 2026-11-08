@@ -105,7 +105,11 @@ struct CategoryDetailView: View, Equatable {
             )
         }
         .listStyle(.insetGrouped)
-        .navigationTitle(category.name)
+        .modifier(DateRangeNavigationHeader(
+            title: category.name,
+            startDate: startDate,
+            endDate: endDate
+        ))
         .searchable(text: $searchText, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search")
         .toolbar {
             if #available(iOS 26.0, macCatalyst 26.0, *) {

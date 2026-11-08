@@ -44,15 +44,7 @@ struct HomeCategorySpotlightTile: View {
         guard let topMetric else { return .blue }
         return topMetric.categoryColorHex.flatMap { Color(hex: $0) } ?? .blue
     }
-
-    private var subtitle: String {
-        "\(formattedDate(startDate)) - \(formattedDate(endDate))"
-    }
     
-    private func formattedDate(_ date: Date) -> String {
-        AppDateFormat.abbreviatedDate(date)
-    }
-
     var body: some View {
         NavigationLink {
             CategorySpotlightDetailView(
@@ -66,7 +58,6 @@ struct HomeCategorySpotlightTile: View {
         } label: {
             HomeTileContainer(
                 title: String(localized: "homeWidget.categorySpotlight", defaultValue: "Category Spotlight", comment: "Pinned home widget title for category spotlight."),
-                subtitle: subtitle,
                 accent: accentColor,
                 showsChevron: true
             ) {
