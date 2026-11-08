@@ -14901,6 +14901,7 @@
       }
     },
     "Choose a Reconciliation" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -38952,6 +38953,7 @@
       }
     },
     "Made minor but important tweaks here and there to improve the Offshore experience." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -38990,6 +38992,9 @@
           }
         }
       }
+    },
+    "Made minor but important visual tweaks here and there to improve the Offshore experience." : {
+
     },
     "Mailbox" : {
       "localizations" : {

@@ -99,7 +99,7 @@ struct SettingsReleaseLogsView: View {
                 ReleaseItem(
                     systemImage: "sparkles",
                     title: "Fine Polish",
-                    description: "Made minor but important tweaks here and there to improve the Offshore experience."
+                    description: "Made minor but important visual tweaks here and there to improve the Offshore experience."
                 )
             ]
         ),

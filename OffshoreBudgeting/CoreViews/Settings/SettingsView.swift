@@ -330,21 +330,16 @@ struct SettingsView: View {
         #endif
         sections += [
             SettingsSectionModel(
+                id: "categories-and-presets",
+                rows: [
+                    SettingsRowModel(id: .manageCategories, title: String(localized: "settings.manageCategories", defaultValue: "Manage Categories", comment: "Title for manage categories row."), systemImage: "tag", tint: .purple),
+                    SettingsRowModel(id: .managePresets, title: String(localized: "settings.managePresets", defaultValue: "Manage Presets", comment: "Title for manage presets row."), systemImage: "list.bullet.rectangle", tint: .orange)
+                ]
+            ),
+            SettingsSectionModel(
                 id: "quick-actions",
                 rows: [
                     SettingsRowModel(id: .quickActions, title: String(localized: "settings.quickActions", defaultValue: "Quick Actions", comment: "Title for quick actions settings."), systemImage: "bolt.circle", tint: .green)
-                ]
-            ),
-            SettingsSectionModel(
-                id: "categories",
-                rows: [
-                    SettingsRowModel(id: .manageCategories, title: String(localized: "settings.manageCategories", defaultValue: "Manage Categories", comment: "Title for manage categories row."), systemImage: "tag", tint: .purple)
-                ]
-            ),
-            SettingsSectionModel(
-                id: "presets",
-                rows: [
-                    SettingsRowModel(id: .managePresets, title: String(localized: "settings.managePresets", defaultValue: "Manage Presets", comment: "Title for manage presets row."), systemImage: "list.bullet.rectangle", tint: .orange)
                 ]
             )
         ]
