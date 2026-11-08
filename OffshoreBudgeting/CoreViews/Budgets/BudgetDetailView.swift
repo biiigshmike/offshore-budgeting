@@ -976,7 +976,7 @@ struct BudgetDetailView: View {
         switch expenseScope {
         case .planned:
             if derived.plannedExpensesFiltered.isEmpty {
-                ContentUnavailableView(plannedEmptyMessage(derived), systemImage: "")
+                DetailListEmptyRow(message: plannedEmptyMessage(derived))
             } else {
                 ForEach(derived.plannedExpensesFiltered, id: \.id) { expense in
                     plannedExpenseRow(expense, presetBySourceID: derived.presetBySourceID)
@@ -985,7 +985,7 @@ struct BudgetDetailView: View {
 
         case .variable:
             if derived.variableExpensesFiltered.isEmpty {
-                ContentUnavailableView(variableEmptyMessage(derived), systemImage: "")
+                DetailListEmptyRow(message: variableEmptyMessage(derived))
             } else {
                 ForEach(derived.variableExpensesFiltered, id: \.id) { expense in
                     variableExpenseRow(expense)
@@ -994,7 +994,7 @@ struct BudgetDetailView: View {
 
         case .unified:
             if derived.unifiedItemsFiltered.isEmpty {
-                ContentUnavailableView(unifiedEmptyMessage(derived), systemImage: "")
+                DetailListEmptyRow(message: unifiedEmptyMessage(derived))
             } else {
                 ForEach(derived.unifiedItemsFiltered) { item in
                     unifiedExpenseRow(item, presetBySourceID: derived.presetBySourceID)

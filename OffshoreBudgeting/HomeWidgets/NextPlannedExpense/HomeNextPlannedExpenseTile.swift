@@ -6,23 +6,53 @@
 //
 
 import SwiftUI
+import SwiftData
 
 struct HomeNextPlannedExpenseTile: View {
-
     let workspace: Workspace
     let expense: PlannedExpense
     let startDate: Date
     let endDate: Date
 
-    private var card: Card? { expense.card }
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Query private var presets: [Preset]
+
+    init(workspace: Workspace, expense: PlannedExpense, startDate: Date, endDate: Date) {
+        self.workspace = workspace
+        self.expense = expense
+        self.startDate = startDate
+        self.endDate = endDate
+        let workspaceID = workspace.id
+        _presets = Query(filter: #Predicate<Preset> { $0.workspace?.id == workspaceID })
+    }
+
+    private var sourcePreset: Preset? {
+        Self.resolveSourcePreset(workspaceID: workspace.id, expense: expense, presets: presets)
+    }
+
+    /// Resolve by identity, including archived templates, and never cross workspace boundaries.
+    static func resolveSourcePreset(workspaceID: UUID, expense: PlannedExpense, presets: [Preset]) -> Preset? {
+        guard expense.workspace?.id == workspaceID, let presetID = expense.sourcePresetID else { return nil }
+        return presets.first { $0.id == presetID && $0.workspace?.id == workspaceID }
+    }
+
+    private var card: Card? {
+        guard let card = expense.card, card.workspace?.id == workspace.id else { return nil }
+        return card
+    }
+
+    private var cardName: String {
+        card?.name ?? String(localized: "homeWidget.nextPlannedExpense.fallbackCardName", defaultValue: "Card", comment: "Fallback card name in next planned expense widget.")
+    }
 
     private var plannedText: String {
         expense.plannedAmount.formatted(CurrencyFormatter.currencyStyle())
     }
 
     private var actualText: String {
-        HomeNextPlannedExpenseFinder.effectiveAmount(for: expense)
-            .formatted(CurrencyFormatter.currencyStyle())
+        expense.actualAmount > 0
+            ? expense.actualAmount.formatted(CurrencyFormatter.currencyStyle())
+            : String(localized: "Not recorded")
     }
 
     private var dateText: String {
@@ -38,10 +68,13 @@ struct HomeNextPlannedExpenseTile: View {
     }
 
     var body: some View {
-        let presetID = expense.sourcePresetID
-
         NavigationLink {
-            ManagePresetsView(workspace: workspace, highlightedPresetID: presetID)
+            if let sourcePreset {
+                PresetDetailView(workspace: workspace, preset: sourcePreset)
+                    .equatable()
+            } else {
+                ManagePresetsView(workspace: workspace)
+            }
         } label: {
             HomeTileContainer(
                 title: String(localized: "Next Planned Expense", defaultValue: "Next Planned Expense", comment: "Pinned home widget title for next planned expense."),
@@ -49,81 +82,81 @@ struct HomeNextPlannedExpenseTile: View {
                 accent: .orange,
                 showsChevron: true
             ) {
-                HStack(alignment: .center, spacing: 14) {
+                VStack(alignment: .leading, spacing: 12) {
+                    expenseTitle
 
-                    CardVisualView(
-                        title: card?.name ?? String(localized: "homeWidget.nextPlannedExpense.fallbackCardName", defaultValue: "Card", comment: "Fallback card name in next planned expense widget."),
-                        theme: themeOption,
-                        effect: effectOption,
-                        minHeight: nil,
-                        showsShadow: false,
-                        titleFont: .headline.weight(.semibold),
-                        titlePadding: 12,
-                        titleOpacity: 0.85
-                    )
-                    .frame(width: 120)
+                    cardAndMetricsLayout {
+                        CardVisualView(
+                            title: cardName,
+                            theme: themeOption,
+                            effect: effectOption,
+                            minHeight: nil,
+                            showsShadow: false,
+                            titleFont: .headline.weight(.semibold),
+                            titlePadding: 12,
+                            titleOpacity: 0.85
+                        )
+                        .frame(width: dynamicTypeSize.isAccessibilitySize ? nil : 120)
+                        .accessibilityHidden(true)
 
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text(expense.title)
-                            .font(.headline.weight(.semibold))
-                            .foregroundStyle(.primary)
-                            .lineLimit(1)
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("Due \(dateText)")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
 
-                        Text(dateText)
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-
-                        VStack(spacing: 6) {
-                            metricRow(title: String(localized: "common.planned", defaultValue: "Planned", comment: "Common label for planned values."), value: plannedText, isEmphasized: false)
-                            metricRow(title: String(localized: "common.actual", defaultValue: "Actual", comment: "Common label for actual values."), value: actualText, isEmphasized: false)
+                            amountRow("Planned", value: plannedText)
+                            amountRow("Actual", value: actualText, isPending: expense.actualAmount <= 0)
                         }
-                        .padding(.top, 2)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     }
-
-                    Spacer(minLength: 0)
                 }
             }
         }
         .buttonStyle(.plain)
-        .accessibilityElement(children: .combine)
+        .accessibilityElement(children: .ignore)
+        .accessibilityAddTraits(.isButton)
+        .accessibilityIdentifier("home.nextPlannedExpense")
         .accessibilityLabel(accessibilityLabel)
-        .accessibilityHint(String(localized: "homeWidget.nextPlannedExpense.accessibilityHint", defaultValue: "Opens Presets and pins this expense at the top.", comment: "Accessibility hint for next planned expense widget."))
+        .accessibilityHint(sourcePreset == nil
+            ? String(localized: "Opens Manage Presets.")
+            : String(localized: "Opens preset details and history."))
     }
 
-    private func metricRow(title: String, value: String, isEmphasized: Bool) -> some View {
-        HStack(spacing: 10) {
+    private var expenseTitle: some View {
+        Text(expense.title)
+            .font(.headline)
+            .foregroundStyle(.primary)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+
+    private var cardAndMetricsLayout: AnyLayout {
+        dynamicTypeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 12))
+            : AnyLayout(HStackLayout(alignment: .center, spacing: 14))
+    }
+
+    private func amountRow(_ title: LocalizedStringKey, value: String, isPending: Bool = false) -> some View {
+        let layout = dynamicTypeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 4))
+            : AnyLayout(HStackLayout(alignment: .firstTextBaseline, spacing: 10))
+        return layout {
             Text(title)
-                .font(.subheadline)
                 .foregroundStyle(.secondary)
-
-            Spacer()
-
+            if !dynamicTypeSize.isAccessibilitySize { Spacer(minLength: 0) }
             Text(value)
-                .font(isEmphasized ? .headline.weight(.semibold) : .subheadline.weight(.semibold))
-                .foregroundStyle(.primary)
+                .foregroundStyle(isPending ? .secondary : .primary)
+                .bold(!isPending)
+                .fixedSize(horizontal: false, vertical: true)
         }
+        .font(.subheadline)
     }
 
     private var dateRangeSubtitle: String {
-        "\(formattedDate(startDate)) - \(formattedDate(endDate))"
-    }
-
-    private func formattedDate(_ date: Date) -> String {
-        AppDateFormat.abbreviatedDate(date)
+        "\(AppDateFormat.abbreviatedDate(startDate)) – \(AppDateFormat.abbreviatedDate(endDate))"
     }
 
     private var accessibilityLabel: String {
-        String(
-            format: String(
-                localized: "homeWidget.nextPlannedExpense.accessibilityLabelFormat",
-                defaultValue: "Next planned expense. %1$@. Date %2$@. Planned %3$@. Actual %4$@.",
-                comment: "Accessibility label format for next planned expense widget."
-            ),
-            locale: .current,
-            expense.title,
-            dateText,
-            plannedText,
-            actualText
-        )
+        String(localized: "Next planned expense. \(expense.title). Card \(cardName). Due \(dateText). Planned \(plannedText). Actual \(actualText). \(dateRangeSubtitle).")
     }
 }

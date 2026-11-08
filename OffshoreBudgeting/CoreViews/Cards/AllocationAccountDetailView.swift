@@ -500,8 +500,7 @@ struct AllocationAccountDetailView: View {
     private func ledgerSection(_ derived: ReconciliationDetailDerivedState) -> some View {
         Section {
             if derived.filteredLedgerRows.isEmpty {
-                Text(emptyLedgerMessage)
-                    .foregroundStyle(.secondary)
+                DetailListEmptyRow(message: emptyLedgerMessage)
             } else {
                 ForEach(derived.filteredLedgerRows) { row in
                     ledgerRowView(row)

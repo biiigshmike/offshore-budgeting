@@ -723,8 +723,7 @@ struct CardDetailView: View {
     @ViewBuilder
     private func plannedExpensesRows(_ derived: CardDetailDerivedState) -> some View {
         if derived.plannedExpensesFiltered.isEmpty {
-            Text(emptyMessage(derived))
-                .foregroundStyle(.secondary)
+            DetailListEmptyRow(message: emptyMessage(derived))
         } else {
             ForEach(derived.plannedExpensesFiltered, id: \.id) { expense in
                 plannedExpenseRow(expense, presetBySourceID: derived.presetBySourceID)
@@ -769,8 +768,7 @@ struct CardDetailView: View {
     @ViewBuilder
     private func variableExpensesRows(_ derived: CardDetailDerivedState) -> some View {
         if derived.variableExpensesFiltered.isEmpty {
-            Text(emptyMessage(derived))
-                .foregroundStyle(.secondary)
+            DetailListEmptyRow(message: emptyMessage(derived))
         } else {
             ForEach(derived.variableExpensesFiltered, id: \.id) { expense in
                 variableExpenseRow(expense)
@@ -808,8 +806,7 @@ struct CardDetailView: View {
     @ViewBuilder
     private func unifiedExpensesRows(_ derived: CardDetailDerivedState) -> some View {
         if derived.unifiedExpensesFiltered.isEmpty {
-            Text(emptyMessage(derived))
-                .foregroundStyle(.secondary)
+            DetailListEmptyRow(message: emptyMessage(derived))
         } else {
             ForEach(derived.unifiedExpensesFiltered, id: \.id) { item in
                 switch item {

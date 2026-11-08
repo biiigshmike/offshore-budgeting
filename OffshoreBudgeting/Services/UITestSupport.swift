@@ -160,6 +160,10 @@ enum UITestSupport {
                 seedCategoryDetailHistory(context: context, workspace: workspace, cardA: cardA, cardB: cardB,
                                           monthStart: range.start)
             }
+            if ProcessInfo.processInfo.arguments.contains("-uiTestPresetDetailHistory") {
+                seedPresetDetailHistory(context: context, workspace: workspace, preset: presetB,
+                                        card: cardB, category: category, monthStart: range.start)
+            }
             let defaults = UserDefaults.standard
             defaults.set(true, forKey: "didCompleteOnboarding")
             defaults.set(true, forKey: "onboarding_didChooseDataSource")
@@ -331,6 +335,28 @@ enum UITestSupport {
         defaults.set(AppSection.cards.rawValue, forKey: AppShortcutNavigationStore.pendingSectionKey)
         defaults.set(AppShortcutNavigationStore.PendingAction.openQuickAddExpenseFromShoppingMode.rawValue,
                      forKey: AppShortcutNavigationStore.pendingActionKey)
+    }
+
+    private static func seedPresetDetailHistory(
+        context: ModelContext, workspace: Workspace, preset: Preset,
+        card: Card, category: Category, monthStart: Date
+    ) {
+        let calendar = Calendar.current
+        for (monthOffset, actualAmount) in [(-4, 0.0), (-3, 780.0), (-2, 820.0), (-1, 800.0), (1, 0.0)] {
+            let start = calendar.date(byAdding: .month, value: monthOffset, to: monthStart)!
+            let end = calendar.date(byAdding: DateComponents(month: 1, day: -1), to: start)!
+            let budget = Budget(name: "Rent History \(monthOffset)", startDate: start,
+                                endDate: end, workspace: workspace)
+            context.insert(budget)
+            context.insert(BudgetCardLink(budget: budget, card: card))
+            context.insert(BudgetPresetLink(budget: budget, preset: preset))
+            context.insert(PlannedExpense(
+                title: preset.title, plannedAmount: 800, actualAmount: actualAmount,
+                expenseDate: start, workspace: workspace, card: card, category: category,
+                sourcePresetID: preset.id, sourceBudgetID: budget.id
+            ))
+        }
+        HomePinnedItemsStore(workspaceID: workspace.id).save([.widget(.nextPlannedExpense, .small)])
     }
 
     private static func seedCategoryDetailHistory(

@@ -130,21 +130,31 @@ struct ManagePresetsView: View {
                     Section(String(localized: "Next Planned Expense", defaultValue: "Next Planned Expense", comment: "Section title for the next planned expense preset spotlight.")) {
                         let assignedCount = assignedBudgetCountsByPresetID[pinned.id, default: 0]
 
-                        VStack(alignment: .leading, spacing: 6) {
-                            PresetRowView(
-                                preset: pinned,
-                                assignedBudgetsCount: assignedCount
-                            )
+                        NavigationLink {
+                            PresetDetailView(workspace: workspace, preset: pinned).equatable()
+                        } label: {
+                            VStack(alignment: .leading, spacing: 5) {
+                                PresetRowView(
+                                    preset: pinned,
+                                    assignedBudgetsCount: assignedCount
+                                )
 
-                            if presetIDsMissingLinkedCards.contains(pinned.id) {
-                                Text(presetRequiresCardFootnoteText)
-                                    .font(.footnote)
-                                    .foregroundStyle(.secondary)
+                                if presetIDsMissingLinkedCards.contains(pinned.id) {
+                                    Text(presetRequiresCardFootnoteText)
+                                        .font(.footnote)
+                                        .foregroundStyle(.secondary)
+                                }
                             }
                         }
                         .padding(.vertical, 4)
-                        .listRowBackground(pinnedPresetBackground(for: pinned))
-                        .listRowSeparator(.hidden)
+                        .overlay(alignment: .leading) {
+                            Capsule()
+                                .fill(pinnedPresetStroke(for: pinned))
+                                .frame(width: 3)
+                                .padding(.vertical, 8)
+                                .offset(x: -10)
+                                .accessibilityHidden(true)
+                        }
                         .swipeActions(edge: .leading, allowsFullSwipe: false) {
                             Button {
                                 sheetRoute = .edit(pinned)
@@ -177,16 +187,20 @@ struct ManagePresetsView: View {
                     ForEach(activePresetsWithoutHighlighted) { preset in
                         let assignedCount = assignedBudgetCountsByPresetID[preset.id, default: 0]
 
-                        VStack(alignment: .leading, spacing: 6) {
-                            PresetRowView(
-                                preset: preset,
-                                assignedBudgetsCount: assignedCount
-                            )
+                        NavigationLink {
+                            PresetDetailView(workspace: workspace, preset: preset).equatable()
+                        } label: {
+                            VStack(alignment: .leading, spacing: 5) {
+                                PresetRowView(
+                                    preset: preset,
+                                    assignedBudgetsCount: assignedCount
+                                )
 
-                            if presetIDsMissingLinkedCards.contains(preset.id) {
-                                Text(presetRequiresCardFootnoteText)
-                                    .font(.footnote)
-                                    .foregroundStyle(.secondary)
+                                if presetIDsMissingLinkedCards.contains(preset.id) {
+                                    Text(presetRequiresCardFootnoteText)
+                                        .font(.footnote)
+                                        .foregroundStyle(.secondary)
+                                }
                             }
                         }
                         .swipeActions(edge: .leading, allowsFullSwipe: false) {
@@ -222,16 +236,20 @@ struct ManagePresetsView: View {
                         ForEach(archivedPresets) { preset in
                             let assignedCount = assignedBudgetCountsByPresetID[preset.id, default: 0]
 
-                            VStack(alignment: .leading, spacing: 6) {
-                                PresetRowView(
-                                    preset: preset,
-                                    assignedBudgetsCount: assignedCount
-                                )
+                            NavigationLink {
+                                PresetDetailView(workspace: workspace, preset: preset).equatable()
+                            } label: {
+                                VStack(alignment: .leading, spacing: 5) {
+                                    PresetRowView(
+                                        preset: preset,
+                                        assignedBudgetsCount: assignedCount
+                                    )
 
-                                if presetIDsMissingLinkedCards.contains(preset.id) {
-                                    Text(presetRequiresCardFootnoteText)
-                                        .font(.footnote)
-                                        .foregroundStyle(.secondary)
+                                    if presetIDsMissingLinkedCards.contains(preset.id) {
+                                        Text(presetRequiresCardFootnoteText)
+                                            .font(.footnote)
+                                            .foregroundStyle(.secondary)
+                                    }
                                 }
                             }
                             .swipeActions(edge: .leading, allowsFullSwipe: false) {
@@ -390,11 +408,11 @@ struct ManagePresetsView: View {
 
     private func sortedPresets(_ source: [Preset]) -> [Preset] {
         let now = Calendar.current.startOfDay(for: Date())
-        let nextDatesByID: [UUID: Date?] = Dictionary(
+        let nextDatesByID: [UUID: Date?] = (sortMode == .dateAsc || sortMode == .dateDesc) ? Dictionary(
             uniqueKeysWithValues: source.map { preset in
                 (preset.id, nextOccurrenceDate(for: preset, from: now))
             }
-        )
+        ) : [:]
 
         switch sortMode {
         case .az:
@@ -461,9 +479,8 @@ struct ManagePresetsView: View {
         let start = calendar.startOfDay(for: date)
         guard let horizon = calendar.date(byAdding: .year, value: 10, to: start) else { return nil }
 
-        let probe = Budget(name: "Sort Probe", startDate: start, endDate: horizon)
         return PresetScheduleEngine
-            .occurrences(for: preset, in: probe, calendar: calendar)
+            .occurrences(for: preset, startDate: start, endDate: horizon, calendar: calendar)
             .first(where: { $0 >= start })
     }
 
@@ -509,26 +526,11 @@ struct ManagePresetsView: View {
 
     // MARK: - Styling
 
-    private func pinnedPresetBackground(for preset: Preset) -> some View {
-        let categoryTint = preset.defaultCategory.flatMap { Color(hex: $0.hexColor) } ?? Color.secondary.opacity(0.22)
+    private func pinnedPresetStroke(for preset: Preset) -> LinearGradient {
         let palette = preset.defaultCard.map { cardThemePalette(raw: $0.theme) } ?? [.blue]
-        let primary = palette.first ?? .blue
-        let secondary = palette.dropFirst().first ?? primary
-
-        return LinearGradient(
-            colors: [
-                primary.opacity(0.22),
-                secondary.opacity(0.18),
-                categoryTint.opacity(0.18)
-            ],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
-    }
-
-    private func pinnedPresetStroke(for preset: Preset) -> Color {
-        let palette = preset.defaultCard.map { cardThemePalette(raw: $0.theme) } ?? [.blue]
-        return (palette.first ?? .blue)
+        let cardColor = palette.first ?? .blue
+        let categoryColor = preset.defaultCategory.flatMap { Color(hex: $0.hexColor) } ?? cardColor
+        return LinearGradient(colors: [cardColor, categoryColor], startPoint: .top, endPoint: .bottom)
     }
 
     private func cardThemePalette(raw: String) -> [Color] {

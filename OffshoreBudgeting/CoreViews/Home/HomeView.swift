@@ -66,6 +66,7 @@ struct HomeView: View {
     @State private var isApplyingSyncedPinnedItems: Bool = false
     @State private var dashboardSnapshot: HomeDashboardSnapshot = .empty
     @State private var hasLoadedDashboardSnapshot: Bool = false
+    @State private var hasInitializedDefaultDateRange = false
     @State private var needsDashboardSnapshotRefresh: Bool = false
     @State private var dashboardSnapshotRefreshTask: Task<Void, Never>? = nil
     @State private var postSettleHousekeepingTask: Task<Void, Never>? = nil
@@ -401,7 +402,10 @@ struct HomeView: View {
                 commandHub.activate(.home)
             }
             bootstrapAppliedDatesIfNeeded()
-            syncAppliedRangeToCurrentDefaultBudgetingPeriodIfNeeded()
+            if !hasInitializedDefaultDateRange {
+                syncAppliedRangeToCurrentDefaultBudgetingPeriodIfNeeded()
+                hasInitializedDefaultDateRange = true
+            }
             applyDefaultBudgetingPeriodIfSettingsChanged()
             syncDraftToAppliedIfNeeded()
             if hasLoadedDashboardSnapshot == false {
@@ -1392,6 +1396,9 @@ struct HomeView: View {
         let clampedEnd = max(end, start)
         appliedStartTimestamp = start.timeIntervalSince1970
         appliedEndTimestamp = clampedEnd.timeIntervalSince1970
+        // Persist the preference alongside custom dates so a recreated Home view
+        // does not mistake its AppStorage fallback for a changed setting.
+        lastSyncedDefaultBudgetingPeriodRaw = defaultBudgetingPeriodRaw
     }
 
     private func applyQuickRange(_ preset: CalendarQuickRangePreset) {
