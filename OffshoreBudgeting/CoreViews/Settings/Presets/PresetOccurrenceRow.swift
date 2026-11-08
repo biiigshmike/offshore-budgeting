@@ -19,7 +19,7 @@ struct PresetOccurrenceRow: View {
                     .font(.headline)
                 if !dynamicTypeSize.isAccessibilitySize { Spacer(minLength: 8) }
                 if let effective = occurrence.effectiveAmount(now: now) {
-                    Text(effective, format: CurrencyFormatter.currencyStyle()).monospacedDigit()
+                    Text(effective, format: CurrencyFormatter.currencyStyle())
                 } else {
                     Text("Not recorded").foregroundStyle(.secondary)
                 }
@@ -37,7 +37,7 @@ struct PresetOccurrenceRow: View {
             }
             if let variance = occurrence.effectiveVariance(now: now) {
                 LabeledContent("Variance") {
-                    Text(variance, format: CurrencyFormatter.currencyStyle()).monospacedDigit()
+                    Text(variance, format: CurrencyFormatter.currencyStyle())
                 }
             }
         }

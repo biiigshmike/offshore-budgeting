@@ -26,7 +26,6 @@ struct PresetRowContent: View {
                 if !dynamicTypeSize.isAccessibilitySize { Spacer(minLength: 8) }
                 Text(plannedAmount, format: CurrencyFormatter.currencyStyle())
                     .font(.body)
-                    .monospacedDigit()
                     .fixedSize(horizontal: false, vertical: true)
             }
             .foregroundStyle(.primary)

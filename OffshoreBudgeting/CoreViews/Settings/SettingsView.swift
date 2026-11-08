@@ -247,7 +247,6 @@ struct SettingsView: View {
                     if row.id == .workspaceProgress {
                         Text(Double(WorkspaceProgressService.percentage(in: workspace)) / 100, format: .percent.precision(.fractionLength(0)))
                             .foregroundStyle(.secondary)
-                            .monospacedDigit()
                     }
                 }
             }

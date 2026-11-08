@@ -94,7 +94,6 @@ struct CategoryAvailabilityRowView: View {
     private var availableAmount: some View {
         Text(available.map { formatCurrency(abs($0)) } ?? "∞")
             .font(.title3.weight(.semibold))
-            .monospacedDigit()
             .foregroundStyle(.primary)
             .fixedSize(horizontal: false, vertical: true)
     }

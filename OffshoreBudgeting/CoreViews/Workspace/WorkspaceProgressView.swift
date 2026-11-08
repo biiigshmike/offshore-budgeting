@@ -140,7 +140,6 @@ struct WorkspaceProgressView: View {
 
                 Text(Double(WorkspaceProgressService.percentage(in: workspace)) / 100, format: .percent.precision(.fractionLength(0)))
                     .font(.title.weight(.semibold))
-                    .monospacedDigit()
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
             }

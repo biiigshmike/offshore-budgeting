@@ -36,7 +36,7 @@ struct ExcursionStatusHero: View {
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                     Text(timerInterval: startsAt...expiresAt, countsDown: true)
-                        .font(.largeTitle.monospacedDigit().bold())
+                        .font(.largeTitle.bold())
                 }
                 .accessibilityElement(children: .combine)
 

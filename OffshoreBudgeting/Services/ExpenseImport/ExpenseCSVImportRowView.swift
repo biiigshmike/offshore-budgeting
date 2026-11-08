@@ -446,7 +446,6 @@ struct ExpenseCSVImportRowView: View {
                 Spacer()
                 Text(splitPercentage.formatted(.percent.precision(.fractionLength(0))))
                     .foregroundStyle(.secondary)
-                    .monospacedDigit()
             }
 
             Slider(

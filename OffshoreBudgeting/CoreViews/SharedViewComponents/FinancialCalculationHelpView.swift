@@ -111,6 +111,5 @@ struct FinancialCalculationHelpView: View {
 
     private func rowAmount(_ row: FinancialCalculationRow) -> some View {
         Text(row.amount, format: CurrencyFormatter.currencyStyle())
-            .monospacedDigit()
     }
 }

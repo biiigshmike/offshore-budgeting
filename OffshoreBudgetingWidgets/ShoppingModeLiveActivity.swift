@@ -506,7 +506,6 @@ private struct FinishedTimerBadge: View {
 
             Text(liveActivityLocalized("Done"))
                 .font(.system(size: fontSize, weight: .semibold, design: .rounded))
-                .monospacedDigit()
                 .foregroundStyle(ShoppingModeLiveActivityPalette.primaryText)
                 .minimumScaleFactor(0.7)
                 .lineLimit(1)
@@ -524,7 +523,6 @@ private struct LockScreenRingTimerText: View {
             if ExcursionLiveActivityPhase.isExpired(endDate: endDate, now: timeline.date) {
                 Text(liveActivityLocalized("Done"))
                     .font(.system(size: 14, weight: .medium, design: .rounded))
-                    .monospacedDigit()
                     .lineLimit(1)
                     .foregroundStyle(ShoppingModeLiveActivityPalette.primaryText)
                     .minimumScaleFactor(0.8)
@@ -538,7 +536,6 @@ private struct LockScreenRingTimerText: View {
                     showsHours: true
                 )
                 .font(.system(size: 14, weight: .medium, design: .rounded))
-                .monospacedDigit()
                 .lineLimit(1)
                 .foregroundStyle(ShoppingModeLiveActivityPalette.primaryText)
                 .minimumScaleFactor(0.8)
@@ -561,7 +558,6 @@ private struct ExpandedRingTimerText: View {
             if ExcursionLiveActivityPhase.isExpired(endDate: endDate, now: timeline.date) {
                 Text(liveActivityLocalized("Done"))
                     .font(.system(size: fontSize, weight: .semibold, design: .rounded))
-                    .monospacedDigit()
                     .lineLimit(1)
                     .foregroundStyle(ShoppingModeLiveActivityPalette.primaryText)
                     .minimumScaleFactor(0.8)
@@ -575,7 +571,6 @@ private struct ExpandedRingTimerText: View {
                     showsHours: true
                 )
                 .font(.system(size: fontSize, weight: .semibold, design: .rounded))
-                .monospacedDigit()
                 .lineLimit(1)
                 .foregroundStyle(ShoppingModeLiveActivityPalette.primaryText)
                 .minimumScaleFactor(0.8)
@@ -596,7 +591,6 @@ private struct CompactCountdownText: View {
         TimelineView(.periodic(from: .now, by: 1)) { timeline in
             if ExcursionLiveActivityPhase.isExpired(endDate: endDate, now: timeline.date) {
                 Text(liveActivityLocalized("Done"))
-                    .monospacedDigit()
                     .font(.caption2.weight(.semibold))
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
@@ -609,7 +603,6 @@ private struct CompactCountdownText: View {
                     countsDown: true,
                     showsHours: false
                 )
-                .monospacedDigit()
                 .font(.caption2.weight(.semibold))
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)

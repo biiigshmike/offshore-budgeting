@@ -275,7 +275,6 @@ struct PresetDetailView: View, Equatable {
     private func countValue(_ count: Int) -> Text {
         Text(AppNumberFormat.integer(count))
             .foregroundStyle(.secondary)
-            .monospacedDigit()
     }
 
     private func planCount(_ text: Text) -> some View {
@@ -288,7 +287,7 @@ struct PresetDetailView: View, Equatable {
     private func amountRow(_ title: LocalizedStringKey, amount: Double?) -> some View {
         LabeledContent(title) {
             if let amount {
-                Text(amount, format: CurrencyFormatter.currencyStyle()).monospacedDigit()
+                Text(amount, format: CurrencyFormatter.currencyStyle())
             } else {
                 Text("Not available").foregroundStyle(.secondary)
             }

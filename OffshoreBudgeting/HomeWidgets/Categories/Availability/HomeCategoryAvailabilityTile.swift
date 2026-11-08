@@ -374,7 +374,7 @@ private struct AvailabilityCountPill: View {
             Circle().fill(foregroundColor).frame(width: 6, height: 6)
                 .accessibilityHidden(true)
             Text(title)
-            Text(localizedInt(count)).monospacedDigit()
+            Text(localizedInt(count))
         }
         .font(.footnote.weight(.medium))
         .foregroundStyle(.secondary)

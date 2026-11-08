@@ -390,7 +390,7 @@ private struct DetailCategoryAccessoryLabel: View {
                         }
                         if visibleCount < categories.count {
                             Text("+\(categories.count - visibleCount)")
-                                .font(.footnote.monospacedDigit())
+                                .font(.footnote)
                         }
                     }
                     .fixedSize()
