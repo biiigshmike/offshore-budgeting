@@ -38,6 +38,40 @@ struct OffshoreBudgetingTests {
         return ModelContext(container)
     }
 
+    @Test func nextIncomeIgnoresOtherWorkspacesAndReceivedIncomeAcrossMidnight() throws {
+        let context = try makeContext()
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = try #require(TimeZone(identifier: "America/Los_Angeles"))
+        let today = try #require(calendar.date(from: DateComponents(year: 2026, month: 3, day: 8)))
+        let tomorrow = try #require(calendar.date(byAdding: .day, value: 1, to: today))
+        let later = try #require(calendar.date(byAdding: .day, value: 2, to: today))
+        let workspace = Workspace(name: "Personal", hexColor: "#000000")
+        let otherWorkspace = Workspace(name: "Work", hexColor: "#000000")
+        context.insert(workspace)
+        context.insert(otherWorkspace)
+        let expected = Income(source: "Invoice", amount: 100, date: today, isPlanned: true, workspace: workspace)
+        context.insert(expected)
+        context.insert(Income(source: "Pay", amount: 100, date: later, isPlanned: true, workspace: workspace))
+        context.insert(Income(source: "Other", amount: 100, date: tomorrow, isPlanned: true, workspace: otherWorkspace))
+        try context.save()
+
+        let days = try #require(NextIncomeWidgetSnapshotBuilder.buildDays(
+            modelContext: context, workspaceID: workspace.id, now: today, calendar: calendar
+        ))
+        #expect(days[0].nextIncomeDate == today)
+        #expect(days[1].date == tomorrow)
+        #expect(days[1].date.timeIntervalSince(days[0].date) == 23 * 60 * 60)
+        #expect(days[1].nextIncomeDate == later)
+        #expect(days[3].nextIncomeDate == nil)
+
+        expected.isPlanned = false
+        try context.save()
+        let updatedDays = try #require(NextIncomeWidgetSnapshotBuilder.buildDays(
+            modelContext: context, workspaceID: workspace.id, now: today, calendar: calendar
+        ))
+        #expect(updatedDays[0].nextIncomeDate == later)
+    }
+
     @Test func import_PositiveUnsignedAmountDefaultsToExpense() {
         let categories = [
             Category(name: "Transportation-Fuel", hexColor: "#000000")

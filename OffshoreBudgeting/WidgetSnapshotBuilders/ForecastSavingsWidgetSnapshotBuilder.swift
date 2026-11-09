@@ -117,7 +117,6 @@ enum ForecastSavingsWidgetSnapshotBuilder {
 
     private static func save(snapshot: Snapshot, workspaceID: String) {
         guard let defaults = UserDefaults(suiteName: appGroupID) else { return }
-        setSelectedWorkspaceID(workspaceID)
         guard let data = try? JSONEncoder().encode(snapshot) else { return }
         defaults.set(data, forKey: snapshotKey(workspaceID: workspaceID))
     }

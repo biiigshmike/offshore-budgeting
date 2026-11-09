@@ -22,6 +22,14 @@ struct BudgetFormView: View {
     var plannedGoalContributions: [UUID: Double]? = nil
     var maximumGoalSuggestionProvider: (() throws -> [UUID: CategoryGoalSuggestion])? = nil
     
+    var allowsRepeat = false
+    var followingBudgets = false
+    @Binding var repeatPeriodRaw: String
+    @Binding var repeatInterval: Int
+    @Binding var repeatCount: Int
+    var onCreateFollowingBudgets: (() -> Void)? = nil
+    var canCreateFollowingBudgets = false
+
     // MARK: - Multiple-selection menus
 
     private var cardsMenu: some View {
@@ -177,7 +185,12 @@ struct BudgetFormView: View {
                 }
 
                 LabeledContent("Start Date") {
-                    PillDatePickerField(title: "Start Date", date: $startDate)
+                    if followingBudgets {
+                        Text(startDate, format: .dateTime.month().day().year())
+                    } else {
+                        PillDatePickerField(title: "Start Date", date: $startDate)
+                            .accessibilityIdentifier("budget.startDate")
+                    }
                 }
                 .onChange(of: startDate) { _, newValue in
                     onStartDateChanged(newValue)
@@ -185,6 +198,7 @@ struct BudgetFormView: View {
 
                 LabeledContent("End Date") {
                     PillDatePickerField(title: "End Date", date: $endDate)
+                        .accessibilityIdentifier("budget.endDate")
                 }
                 .onChange(of: endDate) { _, newValue in
                     onEndDateChanged(newValue)
@@ -259,6 +273,25 @@ struct BudgetFormView: View {
                     }
                     Text("Choose which presets to include. Offshore creates their planned expenses within this budget’s dates.")
                     Text("Set optional minimum and maximum spending goals for this budget. You can change them later.")
+                }
+            }
+            if allowsRepeat {
+                BudgetRepeatOptionsView(
+                    periodRaw: $repeatPeriodRaw, interval: $repeatInterval, count: $repeatCount,
+                    allowsNone: !followingBudgets, followingBudgets: followingBudgets
+                )
+            }
+            if let onCreateFollowingBudgets {
+                Section {
+                    Button("Create Following Budgets", action: onCreateFollowingBudgets)
+                        .disabled(!canCreateFollowingBudgets)
+                        .accessibilityIdentifier("budget.createFollowing")
+                } footer: {
+                    if !canCreateFollowingBudgets {
+                        Text("Save or discard your changes before creating following budgets.")
+                    } else {
+                        Text("Use this saved budget as a template for new, independent budgets.")
+                    }
                 }
             }
         }

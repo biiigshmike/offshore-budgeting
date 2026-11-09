@@ -32,9 +32,38 @@ nonisolated struct NextPlannedExpenseWidgetEntry: TimelineEntry {
     let periodToken: String
     let cardID: String?
     let snapshot: NextPlannedExpenseWidgetSnapshot?
+    var configurationNeedsReview = false
 }
 
 extension NextPlannedExpenseWidgetSnapshot {
+    static func merging(_ snapshots: [Self], asOf date: Date, calendar: Calendar = .current) -> Self? {
+        let today = calendar.startOfDay(for: date)
+        guard let range = snapshots.first,
+              range.rangeStart <= today, range.rangeEnd >= today,
+              snapshots.allSatisfy({
+                  $0.periodToken == range.periodToken && $0.rangeStart == range.rangeStart && $0.rangeEnd == range.rangeEnd
+              }) else {
+            return nil
+        }
+
+        let items = snapshots
+            .flatMap(\.items)
+            .filter { $0.expenseDate >= today }
+            .sorted {
+                if $0.expenseDate == $1.expenseDate { return $0.expenseID < $1.expenseID }
+                return $0.expenseDate < $1.expenseDate
+            }
+        var seenIDs: Set<String> = []
+        let uniqueItems = items.filter { seenIDs.insert($0.expenseID).inserted }
+        return Self(
+            title: range.title,
+            periodToken: range.periodToken,
+            rangeStart: range.rangeStart,
+            rangeEnd: range.rangeEnd,
+            items: Array(uniqueItems.prefix(4))
+        )
+    }
+
     static var placeholder: NextPlannedExpenseWidgetSnapshot {
         NextPlannedExpenseWidgetSnapshot(
             title: NSLocalizedString("Next Planned Expense", comment: "Next planned expense widget preview title."),

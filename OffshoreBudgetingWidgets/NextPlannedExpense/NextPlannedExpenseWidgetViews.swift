@@ -42,7 +42,7 @@ private extension NextPlannedExpenseWidgetSnapshot {
     }
 }
 
-private func nextPlannedExpenseCurrencyFormatStyle() -> FloatingPointFormatStyle<Double>.Currency {
+func nextPlannedExpenseCurrencyFormatStyle() -> FloatingPointFormatStyle<Double>.Currency {
     let code = Locale.current.currency?.identifier ?? "USD"
     return .currency(code: code)
 }

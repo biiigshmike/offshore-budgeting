@@ -9,11 +9,6 @@ import SwiftUI
 import SwiftData
 import Foundation
 
-private struct ContentViewCardDataSignature: Equatable {
-    let workspaceID: UUID
-    let cardsSignature: Int
-}
-
 struct ContentView: View {
     let initialSectionOverride: AppSection?
     @StateObject private var resumeState = ContentViewResumeState()
@@ -283,14 +278,13 @@ struct ContentView: View {
                     includesNotifications: false
                 )
             }
-            .onChange(of: selectedWorkspaceCardDataSignature) { oldValue, newValue in
-                guard
-                    let oldValue,
-                    let newValue,
-                    oldValue.workspaceID == newValue.workspaceID,
-                    oldValue.cardsSignature != newValue.cardsSignature
+            .onChange(of: widgetRefreshSignature) { oldValue, newValue in
+                guard let oldValue, let newValue, oldValue.workspaceID == newValue.workspaceID,
+                      oldValue.cardsSignature != newValue.cardsSignature
+                        || oldValue.lockScreenDataSignature != newValue.lockScreenDataSignature
                 else { return }
 
+                publishWidgetPickerOptions()
                 scheduleDeferredResumeRefresh(
                     trigger: .widgetDataChanged,
                     includesWidgets: true,
@@ -501,6 +495,16 @@ struct ContentView: View {
         SpendTrendsWidgetSnapshotStore.setSelectedWorkspaceID(workspaceID)
         SafeSpendTodayWidgetSnapshotBuilder.setSelectedWorkspaceID(workspaceID)
         ForecastSavingsWidgetSnapshotBuilder.setSelectedWorkspaceID(workspaceID)
+        publishWidgetPickerOptions()
+    }
+
+    @MainActor
+    private func publishWidgetPickerOptions() {
+        guard let workspace = selectedWorkspace else { return }
+        NextPlannedExpenseWidgetSnapshotBuilder.publishCardOptions(
+            cards: cards(in: workspace.id), workspaceID: workspace.id
+        )
+        CategoryLimitWidgetSnapshotBuilder.publishPickerOptions(workspace: workspace)
     }
 
     @MainActor
@@ -727,16 +731,57 @@ struct ContentView: View {
             defaultBudgetingPeriodRaw: defaultBudgetingPeriodRaw,
             excludeFuturePlannedExpensesFromCalculations: excludeFuturePlannedExpensesFromCalculations,
             excludeFutureVariableExpensesFromCalculations: excludeFutureVariableExpensesFromCalculations,
-            cardsSignature: SnapshotContentSignature.cards(cards(in: workspaceID))
+            cardsSignature: SnapshotContentSignature.cards(cards(in: workspaceID)),
+            lockScreenDataSignature: lockScreenDataSignature(workspaceID: workspaceID)
         )
     }
 
-    private var selectedWorkspaceCardDataSignature: ContentViewCardDataSignature? {
-        guard let workspaceID = UUID(uuidString: selectedWorkspaceID) else { return nil }
-        return ContentViewCardDataSignature(
-            workspaceID: workspaceID,
-            cardsSignature: SnapshotContentSignature.cards(cards(in: workspaceID))
-        )
+    private func lockScreenDataSignature(workspaceID: UUID) -> Int {
+        var signature = Hasher()
+        for income in allIncomes where income.workspace?.id == workspaceID && income.isPlanned {
+            signature.combine(income.id)
+            signature.combine(income.date)
+        }
+
+        var limitedCategories = Set<UUID>()
+        for budget in selectedWorkspace?.budgets ?? [] where budget.workspace?.id == workspaceID {
+            signature.combine(budget.id)
+            signature.combine(budget.startDate)
+            signature.combine(budget.endDate)
+            for limit in budget.categoryLimits ?? [] {
+                guard let category = limit.category, category.workspace?.id == workspaceID else { continue }
+                signature.combine(limit.id)
+                signature.combine(category.id)
+                signature.combine(category.name)
+                signature.combine(limit.maxAmount)
+                if (limit.maxAmount ?? 0) > 0 {
+                    limitedCategories.insert(category.id)
+                }
+            }
+        }
+
+        for expense in allPlannedExpenses where expense.workspace?.id == workspaceID {
+            signature.combine(expense.id)
+            signature.combine(expense.title)
+            signature.combine(expense.card?.id)
+            signature.combine(expense.category?.id)
+            signature.combine(expense.sourceBudgetID)
+            signature.combine(expense.expenseDate)
+            signature.combine(expense.plannedAmount)
+            signature.combine(expense.actualAmount)
+            if let categoryID = expense.category?.id, limitedCategories.contains(categoryID) {
+                signature.combine(SavingsMathService.plannedBudgetImpactAmount(for: expense))
+            }
+        }
+
+        for expense in allVariableExpenses where expense.workspace?.id == workspaceID {
+            guard let categoryID = expense.category?.id, limitedCategories.contains(categoryID) else { continue }
+            signature.combine(expense.id)
+            signature.combine(categoryID)
+            signature.combine(expense.transactionDate)
+            signature.combine(SavingsMathService.variableBudgetImpactAmount(for: expense))
+        }
+        return signature.finalize()
     }
 
     private func cards(in workspaceID: UUID) -> [Card] {

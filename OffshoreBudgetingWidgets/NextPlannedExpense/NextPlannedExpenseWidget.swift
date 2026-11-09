@@ -20,7 +20,7 @@ struct NextPlannedExpenseWidget: Widget {
             NextPlannedExpenseWidgetEntryView(entry: entry)
         }
         .configurationDisplayName("Next Planned Expense")
-        .description("Show upcoming planned expenses for all cards or a selected card.")
-        .supportedFamilies([.systemSmall, .systemMedium, .systemLarge, .systemExtraLarge])
+        .description("Show upcoming planned expenses for all cards or selected cards.")
+        .supportedFamilies([.systemSmall, .systemMedium, .systemLarge, .systemExtraLarge, .accessoryCircular, .accessoryRectangular])
     }
 }

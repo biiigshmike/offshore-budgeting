@@ -36,6 +36,7 @@ struct EditBudgetView: View {
     // MARK: - Alerts
 
     @State private var showingInvalidDatesAlert: Bool = false
+    @State private var showingFollowingBudgets = false
 
     init(workspace: Workspace, budget: Budget) {
         self.workspace = workspace
@@ -102,6 +103,11 @@ struct EditBudgetView: View {
                     excludingBudgetID: budget.id, modelContext: modelContext
                 )
             } : nil,
+            repeatPeriodRaw: .constant(""),
+            repeatInterval: .constant(1),
+            repeatCount: .constant(2),
+            onCreateFollowingBudgets: { showingFollowingBudgets = true },
+            canCreateFollowingBudgets: didSeedForm && !hasUnsavedChanges,
             name: $name,
             userEditedName: $userEditedName,
             startDate: $startDate,
@@ -135,6 +141,11 @@ struct EditBudgetView: View {
                 }
             }
         }
+        .appSheet(isPresented: $showingFollowingBudgets) {
+            NavigationStack {
+                AddBudgetView(workspace: workspace, templateBudget: budget)
+            }
+        }
         .blocksAutomaticExpenseReview(while: showingInvalidDatesAlert)
         .alert("Invalid Dates", isPresented: $showingInvalidDatesAlert) {
             Button("OK", role: .cancel) { }
@@ -147,6 +158,15 @@ struct EditBudgetView: View {
             seedFromBudget()
             applyScreenshotPrefillIfNeeded()
         }
+    }
+
+    private var hasUnsavedChanges: Bool {
+        name != budget.name
+            || startDate != Calendar.current.startOfDay(for: budget.startDate)
+            || endDate != Calendar.current.startOfDay(for: budget.endDate)
+            || selectedCardIDs != Set((budget.cardLinks ?? []).compactMap { $0.card?.id })
+            || selectedPresetIDs != linkedPresetIDs
+            || categoryGoalDrafts != BudgetCategoryGoalStore.drafts(for: budget)
     }
 
     // MARK: - Seed

@@ -149,6 +149,45 @@ struct ContentViewWidgetRefreshExecutorTests {
         )
     }
 
+    @Test func nextPlannedExpenseIncludesManualAndGeneratedRowsInTheRequestedScope() throws {
+        let context = ModelContext(try makeContainer())
+        let workspace = Workspace(name: "Personal", hexColor: "#3B82F6")
+        let otherWorkspace = Workspace(name: "Work", hexColor: "#3B82F6")
+        let card = Card(name: "Visa", workspace: workspace)
+        let otherCard = Card(name: "Cash", workspace: workspace)
+        let now = Calendar.current.startOfDay(for: .now)
+        let generatedBudgetID = UUID()
+        context.insert(workspace)
+        context.insert(otherWorkspace)
+        context.insert(card)
+        context.insert(otherCard)
+
+        for (title, owner, assignedCard, sourceBudgetID) in [
+            ("Manual", workspace, card, nil),
+            ("Generated", workspace, otherCard, generatedBudgetID),
+            ("Unassigned", workspace, nil, nil),
+            ("Other workspace", otherWorkspace, nil, nil)
+        ] as [(String, Workspace, Card?, UUID?)] {
+            context.insert(PlannedExpense(
+                title: title, plannedAmount: 10, expenseDate: now, workspace: owner,
+                card: assignedCard, sourceBudgetID: sourceBudgetID
+            ))
+        }
+        try context.save()
+
+        let all = try #require(NextPlannedExpenseWidgetSnapshotBuilder.buildSnapshot(
+            modelContext: context, workspaceID: workspace.id, period: .oneMonth,
+            cardID: nil, now: now, maxItems: 4
+        ))
+        let selected = try #require(NextPlannedExpenseWidgetSnapshotBuilder.buildSnapshot(
+            modelContext: context, workspaceID: workspace.id, period: .oneMonth,
+            cardID: card.id, now: now, maxItems: 4
+        ))
+
+        #expect(Set(all.items.map(\.expenseTitle)) == ["Manual", "Generated", "Unassigned"])
+        #expect(selected.items.map(\.expenseTitle) == ["Manual"])
+    }
+
     @Test func widgetTimelineSchedule_rollsToNextBoundaryStarts() throws {
         let calendar = Calendar.current
         let now = try #require(calendar.date(from: DateComponents(year: 2026, month: 5, day: 31, hour: 12)))

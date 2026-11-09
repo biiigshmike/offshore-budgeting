@@ -50,6 +50,11 @@ actor ContentViewWidgetRefreshExecutor {
     func refreshAll(workspaceID: UUID, now: Date = Date()) async -> ContentViewWidgetRefreshReport {
         let incomeDurationMillis = Self.measure {
             let modelContext = ModelContext(modelContainer)
+            NextIncomeWidgetSnapshotBuilder.buildAndSave(
+                modelContext: modelContext,
+                workspaceID: workspaceID,
+                now: now
+            )
             IncomeWidgetSnapshotBuilder.buildAndSaveAllPeriods(
                 modelContext: modelContext,
                 workspaceID: workspaceID,
@@ -112,6 +117,17 @@ actor ContentViewWidgetRefreshExecutor {
         }
         let forecastSavingsDurationMillis = Double(DispatchTime.now().uptimeNanoseconds - forecastSavingsStart) / 1_000_000
 
+        await MainActor.run {
+            CategoryLimitWidgetSnapshotBuilder.buildAndSave(
+                modelContext: ModelContext(modelContainer),
+                workspaceID: workspaceID,
+                now: now,
+                shouldReloadTimelines: false
+            )
+        }
+
+        NextIncomeWidgetSnapshotStore.reloadTimelines()
+        CategoryLimitWidgetSnapshotStore.reloadTimelines()
         IncomeWidgetSnapshotStore.reloadIncomeWidgetTimelines()
         CardWidgetSnapshotStore.reloadCardWidgetTimelines()
         NextPlannedExpenseWidgetSnapshotStore.reloadTimelines()

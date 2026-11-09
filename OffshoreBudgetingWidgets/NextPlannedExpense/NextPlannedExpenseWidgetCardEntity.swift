@@ -30,24 +30,22 @@ struct NextPlannedExpenseWidgetCardEntity: AppEntity, Identifiable, Hashable {
 
 struct NextPlannedExpenseWidgetCardQuery: EntityQuery {
     func suggestedEntities() async throws -> [NextPlannedExpenseWidgetCardEntity] {
-        if let workspaceID = NextPlannedExpenseWidgetSnapshotStore.selectedWorkspaceID(),
-           !workspaceID.isEmpty {
-            let options = NextPlannedExpenseWidgetSnapshotStore.loadCardOptions(workspaceID: workspaceID)
-            return [NextPlannedExpenseWidgetCardEntity.allCards] + options.map { NextPlannedExpenseWidgetCardEntity(id: $0.id, name: $0.name) }
+        guard let workspaceID = NextPlannedExpenseWidgetSnapshotStore.selectedWorkspaceID(),
+              !workspaceID.isEmpty else {
+            return []
         }
 
-        let fallbackWorkspaceID = UserDefaults.standard.string(forKey: "selectedWorkspaceID") ?? ""
-        if !fallbackWorkspaceID.isEmpty {
-            let options = NextPlannedExpenseWidgetSnapshotStore.loadCardOptions(workspaceID: fallbackWorkspaceID)
-            return [NextPlannedExpenseWidgetCardEntity.allCards] + options.map { NextPlannedExpenseWidgetCardEntity(id: $0.id, name: $0.name) }
+        return NextPlannedExpenseWidgetSnapshotStore.loadCardOptions(workspaceID: workspaceID).map {
+            NextPlannedExpenseWidgetCardEntity(id: $0.id, name: $0.name)
         }
-
-        return [.allCards]
     }
 
     func entities(for identifiers: [NextPlannedExpenseWidgetCardEntity.ID]) async throws -> [NextPlannedExpenseWidgetCardEntity] {
-        let all = try await suggestedEntities()
-        let set = Set(identifiers)
-        return all.filter { set.contains($0.id) }
+        let available = try await suggestedEntities()
+        return identifiers.map { id in
+            if id == NextPlannedExpenseWidgetCardEntity.allCardsID { return .allCards }
+            return available.first { $0.id == id }
+                ?? NextPlannedExpenseWidgetCardEntity(id: id, name: String(localized: "Unavailable Card"))
+        }
     }
 }

@@ -142,14 +142,25 @@ private struct ForecastSavingsWidgetEntryView: View {
         amountText(snapshot.gapToProjected)
     }
 
-    private var compactStatusText: String {
-        if (snapshot.projectedSavings ?? 0) < 0 {
-            return "Overspending"
+    private var currentProgressLine: some View {
+        ViewThatFits(in: .horizontal) {
+            Text("Current Progress: \(actualText)")
+                .fixedSize(horizontal: true, vertical: false)
+
+            VStack(alignment: .leading, spacing: 0) {
+                Text("Current Progress")
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+                Text(actualText)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.65)
+            }
         }
-        if (snapshot.actualSavings ?? 0) < 0 {
-            return "Actuals Negative"
-        }
-        return "On Track"
+        .foregroundStyle(.secondary)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text("Current Progress"))
+        .accessibilityValue(Text(actualText))
+        .privacySensitive()
     }
 
     private var smallBody: some View {
@@ -173,13 +184,8 @@ private struct ForecastSavingsWidgetEntryView: View {
 
                 Spacer(minLength: 0)
 
-                Text(compactStatusText)
+                currentProgressLine
                     .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(2)
-                    .minimumScaleFactor(0.78)
-                    .allowsTightening(true)
-                    .accessibilityLabel(Text(snapshot.statusLine))
             }
         }
         .padding(12)
@@ -230,7 +236,7 @@ private struct ForecastSavingsWidgetEntryView: View {
                 }
 
                 HStack(spacing: 12) {
-                    summaryPill(title: "Actual", value: actualText)
+                    summaryPill(title: "Current Progress", value: actualText)
                     summaryPill(title: "Gap", value: gapText)
                 }
 
@@ -245,30 +251,45 @@ private struct ForecastSavingsWidgetEntryView: View {
 
     private var rectangularBody: some View {
         VStack(alignment: .leading, spacing: 3) {
-            Text(snapshot.title)
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-
             if let message = snapshot.message {
+                rectangularHeading(Text(snapshot.title))
                 Text(message)
                     .font(.caption.weight(.semibold))
                     .lineLimit(2)
             } else {
-                Text(projectedText)
-                    .font(.headline.weight(.bold))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
+                ViewThatFits(in: .horizontal) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        rectangularHeading(Text(snapshot.title))
+                        Text("\(projectedText) projected")
+                            .font(.headline.weight(.bold))
+                            .fixedSize(horizontal: true, vertical: false)
+                            .privacySensitive()
+                    }
 
-                Text(compactStatusText)
+                    VStack(alignment: .leading, spacing: 3) {
+                        rectangularHeading(Text("Projected Savings"))
+                        Text(projectedText)
+                            .font(.headline.weight(.bold))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.65)
+                            .privacySensitive()
+                    }
+                }
+
+                currentProgressLine
                     .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
             }
         }
     }
 
-    private func summaryPill(title: String, value: String) -> some View {
+    private func rectangularHeading(_ title: Text) -> some View {
+        title
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(.secondary)
+            .lineLimit(1)
+    }
+
+    private func summaryPill(title: LocalizedStringKey, value: String) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(title)
                 .font(.caption.weight(.semibold))

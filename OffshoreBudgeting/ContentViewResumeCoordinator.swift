@@ -77,6 +77,7 @@ nonisolated struct ContentViewWidgetRefreshSignature: Equatable {
     let excludeFuturePlannedExpensesFromCalculations: Bool
     let excludeFutureVariableExpensesFromCalculations: Bool
     let cardsSignature: Int
+    var lockScreenDataSignature: Int = 0
 }
 
 nonisolated struct ContentViewSavingsDataSignature: Equatable {

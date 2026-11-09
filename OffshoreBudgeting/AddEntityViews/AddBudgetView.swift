@@ -11,6 +11,7 @@ import SwiftData
 struct AddBudgetView: View {
 
     let workspace: Workspace
+    let templateBudget: Budget?
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
@@ -35,14 +36,23 @@ struct AddBudgetView: View {
     @State private var categoryGoalDrafts: [UUID: CategoryGoalDraft] = [:]
     @State private var didSeedForm: Bool = false
 
+    @State private var repeatPeriodRaw = ""
+    @State private var repeatInterval = 1
+    @State private var repeatCount = 2
+    @State private var manualEndDate: Date?
+    @State private var userEditedEndDate = false
+    @State private var batchPreview: BudgetBatchPreview?
+    @State private var showingBatchPreview = false
+
     // MARK: - Alerts
 
     @State private var showingInvalidDatesAlert: Bool = false
     @State private var budgetSaveErrorMessage: String = ""
     @State private var showingBudgetSaveError: Bool = false
 
-    init(workspace: Workspace) {
+    init(workspace: Workspace, templateBudget: Budget? = nil) {
         self.workspace = workspace
+        self.templateBudget = templateBudget
         let workspaceID = workspace.id
 
         _cards = Query(
@@ -61,6 +71,10 @@ struct AddBudgetView: View {
         )
     }
 
+    private var goalCategories: [Category] {
+        categories.filter { !$0.isArchived || (templateBudget != nil && categoryGoalDrafts[$0.id]?.hasValues == true) }
+    }
+
     private var trimmedName: String {
         name.trimmingCharacters(in: .whitespacesAndNewlines)
     }
@@ -72,10 +86,10 @@ struct AddBudgetView: View {
 
     var body: some View {
         BudgetFormView(
-            modeTitle: "Add Budget",
+            modeTitle: templateBudget == nil ? "Add Budget" : "Create Following Budgets",
             cards: cards,
             presets: presets,
-            categories: CategoryArchivePolicy.activeCategories(from: categories),
+            categories: goalCategories,
             scheduleString: scheduleString(for:),
             plannedGoalContributions: BudgetCategoryGoalStore.plannedContributions(
                 presets: presets,
@@ -87,10 +101,15 @@ struct AddBudgetView: View {
             ),
             maximumGoalSuggestionProvider: workspace.categoryGoalAutoConfiguration.suggestMaximums
                 ? { try loadMaximumSuggestions() } : nil,
+            allowsRepeat: true,
+            followingBudgets: templateBudget != nil,
+            repeatPeriodRaw: $repeatPeriodRaw,
+            repeatInterval: $repeatInterval,
+            repeatCount: $repeatCount,
             name: $name,
             userEditedName: $userEditedName,
             startDate: $startDate,
-            endDate: $endDate,
+            endDate: editableEndDate,
             selectedCardIDs: $selectedCardIDs,
             selectedPresetIDs: $selectedPresetIDs,
             categoryGoalDrafts: $categoryGoalDrafts,
@@ -106,14 +125,14 @@ struct AddBudgetView: View {
             }
             if #available(iOS 26.0, *) {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("Save") { createBudget() }
+                    Button(repeatPeriodRaw.isEmpty ? "Save" : "Preview") { submit() }
                         .disabled(!canCreate)
                         .tint(.accentColor)
                         .glassProminentButtonStyleCompat()
                 }
             } else {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("Save") { createBudget() }
+                    Button(repeatPeriodRaw.isEmpty ? "Save" : "Preview") { submit() }
                         .disabled(!canCreate)
                         .tint(.accentColor)
                         .controlSize(.large)
@@ -124,12 +143,45 @@ struct AddBudgetView: View {
         .onAppear {
             guard !didSeedForm else { return }
             didSeedForm = true
-            seedInitialDatesAndName()
-            applyScreenshotPrefillIfNeeded()
+            if let templateBudget {
+                seedFollowingBudgets(from: templateBudget)
+            } else {
+                seedInitialDatesAndName()
+                applyScreenshotPrefillIfNeeded()
+            }
         }
         .onChange(of: defaultBudgetingPeriodRaw) { _, _ in
+            guard templateBudget == nil, !userEditedEndDate else { return }
             applyDefaultPeriodRange()
+            updateCycleEndDate()
             autoFillNameIfNeeded()
+        }
+        .onChange(of: repeatPeriodRaw) { oldValue, newValue in
+            if oldValue.isEmpty && !newValue.isEmpty { manualEndDate = endDate }
+            if newValue.isEmpty {
+                if !userEditedEndDate { endDate = max(startDate, manualEndDate ?? endDate) }
+                manualEndDate = nil
+                autoFillNameIfNeeded()
+            } else {
+                updateCycleEndDate()
+            }
+        }
+        .onChange(of: repeatInterval) { _, _ in updateCycleEndDate() }
+        .appSheet(isPresented: $showingBatchPreview) {
+            if let batchPreview {
+                NavigationStack {
+                    BudgetBatchPreviewView(
+                        workspace: workspace, preview: batchPreview,
+                        cards: cards.filter { selectedCardIDs.contains($0.id) },
+                        presets: presets.filter { selectedPresetIDs.contains($0.id) },
+                        categories: categories, categoryGoalDrafts: categoryGoalDrafts,
+                        excludedArchivedPresetNames: excludedArchivedPresetNames
+                    ) {
+                        showingBatchPreview = false
+                        dismiss()
+                    }
+                }
+            }
         }
         .blocksAutomaticExpenseReview(while: showingInvalidDatesAlert)
         .alert("Invalid Dates", isPresented: $showingInvalidDatesAlert) {
@@ -186,7 +238,20 @@ struct AddBudgetView: View {
         endDate = range.end
     }
 
+    // Only picker writes mark the date as manual; cycle suggestions do not.
+    private var editableEndDate: Binding<Date> {
+        Binding(
+            get: { endDate },
+            set: { newValue in
+                guard newValue != endDate else { return }
+                userEditedEndDate = true
+                endDate = max(startDate, newValue)
+            }
+        )
+    }
+
     private func handleStartDateChanged(_ newValue: Date) {
+        updateCycleEndDate()
         if endDate < newValue {
             endDate = newValue
         }
@@ -224,6 +289,62 @@ struct AddBudgetView: View {
             selectedPresetIDs.removeAll()
         } else {
             selectedPresetIDs = Set(presets.map { $0.id })
+        }
+    }
+
+    private var excludedArchivedPresetNames: [String] {
+        (templateBudget?.presetLinks ?? []).compactMap { $0.preset }
+            .filter { $0.workspace?.id == workspace.id && $0.isArchived }
+            .map(\.title).sorted()
+    }
+
+    private func seedFollowingBudgets(from template: Budget) {
+        guard template.workspace?.id == workspace.id else { return }
+        startDate = Calendar.current.date(byAdding: .day, value: 1,
+            to: Calendar.current.startOfDay(for: template.endDate)) ?? template.endDate
+        endDate = startDate
+        name = template.name
+        userEditedName = template.name != BudgetNameSuggestion.suggestedName(
+            start: template.startDate, end: template.endDate, calendar: .current
+        )
+        selectedCardIDs = Set((template.cardLinks ?? []).compactMap { $0.card }
+            .filter { $0.workspace?.id == workspace.id }.map(\.id))
+        selectedPresetIDs = Set((template.presetLinks ?? []).compactMap { $0.preset }
+            .filter { $0.workspace?.id == workspace.id && !$0.isArchived }.map(\.id))
+        categoryGoalDrafts = BudgetCategoryGoalStore.drafts(for: template)
+        repeatPeriodRaw = (BudgetingPeriod(rawValue: defaultBudgetingPeriodRaw) ?? .monthly).rawValue
+        updateCycleEndDate()
+    }
+
+    private func updateCycleEndDate() {
+        guard !userEditedEndDate,
+              let period = BudgetingPeriod(rawValue: repeatPeriodRaw),
+              let range = try? BudgetCycleCalculator.ranges(
+                startDate: startDate, period: period, interval: repeatInterval, count: 1
+              ).first else { return }
+        endDate = range.endDate
+        autoFillNameIfNeeded()
+    }
+
+    private func submit() {
+        guard !repeatPeriodRaw.isEmpty else { createBudget(); return }
+        do {
+            guard let period = BudgetingPeriod(rawValue: repeatPeriodRaw) else { return }
+            let ranges = try BudgetCycleCalculator.ranges(
+                startDate: startDate, period: period, interval: repeatInterval, count: repeatCount,
+                firstPeriodEndDate: userEditedEndDate ? endDate : nil
+            )
+            batchPreview = try BudgetBatchCreationService.preview(
+                workspace: workspace, ranges: ranges, templateName: trimmedName,
+                customName: trimmedName != BudgetNameSuggestion.suggestedName(
+                    start: startDate, end: endDate, calendar: .current
+                ), preserveFirstName: templateBudget == nil,
+                presets: presets.filter { selectedPresetIDs.contains($0.id) }, modelContext: modelContext
+            )
+            showingBatchPreview = true
+        } catch {
+            budgetSaveErrorMessage = error.localizedDescription
+            showingBudgetSaveError = true
         }
     }
 

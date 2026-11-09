@@ -12,6 +12,19 @@ enum NextPlannedExpenseWidgetSnapshotBuilder {
     nonisolated private static let futureTimelineHorizon = 3
     nonisolated private static let dailyTimelineHorizon = 14
 
+    nonisolated static func publishCardOptions(cards: [Card], workspaceID: UUID) {
+        let workspaceCards = cards.filter { $0.workspace?.id == workspaceID }
+        let options: [NextPlannedExpenseWidgetSnapshotStore.CardOption] = workspaceCards.map {
+            .init(
+                id: $0.id.uuidString,
+                name: $0.name,
+                themeToken: WidgetCardVisualTheme.resolve($0.theme).rawValue,
+                effectToken: WidgetCardVisualEffect.resolve($0.effect).rawValue
+            )
+        }
+        NextPlannedExpenseWidgetSnapshotStore.saveCardOptions(options, workspaceID: workspaceID.uuidString)
+    }
+
     nonisolated static func buildAndSaveAllPeriods(
         modelContext: ModelContext,
         workspaceID: UUID,
@@ -36,15 +49,7 @@ enum NextPlannedExpenseWidgetSnapshotBuilder {
             periodTokens: NextPlannedExpenseWidgetPeriod.allCases.map(\.rawValue)
         )
 
-        let options: [NextPlannedExpenseWidgetSnapshotStore.CardOption] = cards.map {
-            .init(
-                id: $0.id.uuidString,
-                name: $0.name,
-                themeToken: WidgetCardVisualTheme.resolve($0.theme).rawValue,
-                effectToken: WidgetCardVisualEffect.resolve($0.effect).rawValue
-            )
-        }
-        NextPlannedExpenseWidgetSnapshotStore.saveCardOptions(options, workspaceID: workspaceIDString)
+        publishCardOptions(cards: cards, workspaceID: workspaceID)
 
         for period in NextPlannedExpenseWidgetPeriod.allCases {
             if let allCardsSnapshot = buildSnapshot(
@@ -153,7 +158,6 @@ enum NextPlannedExpenseWidgetSnapshotBuilder {
                     && expense.card?.id == cardID
                     && expense.expenseDate >= start
                     && expense.expenseDate <= end
-                    && expense.sourceBudgetID != nil
                 },
                 sortBy: [SortDescriptor(\PlannedExpense.expenseDate, order: .forward)]
             )
@@ -164,7 +168,6 @@ enum NextPlannedExpenseWidgetSnapshotBuilder {
                     expense.workspace?.id == wid
                     && expense.expenseDate >= start
                     && expense.expenseDate <= end
-                    && expense.sourceBudgetID != nil
                 },
                 sortBy: [SortDescriptor(\PlannedExpense.expenseDate, order: .forward)]
             )

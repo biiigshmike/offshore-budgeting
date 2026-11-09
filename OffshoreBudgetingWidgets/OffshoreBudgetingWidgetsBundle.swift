@@ -17,6 +17,8 @@ struct OffshoreBudgetingWidgetsBundle: WidgetBundle {
         SpendTrendsWidget()
         SafeSpendTodayWidget()
         ForecastSavingsWidget()
+        CategoryLimitWidget()
+        NextIncomeWidget()
         if #available(iOS 18.0, *) {
             AddExpenseControlWidget()
             AddIncomeControlWidget()
