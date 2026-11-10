@@ -64,6 +64,7 @@ struct ManageCategoriesView: View {
                     systemImage: "tag",
                     description: Text("Create categories to organize expenses and presets.")
                 )
+                .frame(maxWidth: .infinity, alignment: .center)
             } else {
                 if activeCategories.isEmpty == false {
                     Section {

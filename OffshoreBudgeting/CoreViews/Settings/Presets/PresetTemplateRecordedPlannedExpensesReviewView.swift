@@ -36,6 +36,7 @@ struct PresetTemplateRecordedPlannedExpensesReviewView: View {
                         systemImage: "checkmark.circle",
                         description: Text("Nothing to review.")
                     )
+                    .frame(maxWidth: .infinity, alignment: .center)
                 } else {
                     ForEach(recordedExpenses, id: \.id) { expense in
                         row(expense)

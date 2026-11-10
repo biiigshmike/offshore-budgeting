@@ -66,6 +66,7 @@ struct BudgetRecordedPlannedExpensesReviewView: View {
                         systemImage: "checkmark.circle",
                         description: Text("You can delete the budget now, or tap Done to keep it.")
                     )
+                    .frame(maxWidth: .infinity, alignment: .center)
                 } else {
                     ForEach(recordedExpenses, id: \.id) { expense in
                         Button {

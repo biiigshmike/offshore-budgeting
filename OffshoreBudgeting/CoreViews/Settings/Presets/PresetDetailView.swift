@@ -144,6 +144,7 @@ struct PresetDetailView: View, Equatable {
                 if derived.history.isEmpty {
                     ContentUnavailableView("No Occurrences", systemImage: "calendar",
                         description: Text("No planned expenses match these dates and visibility settings."))
+                    .frame(maxWidth: .infinity, alignment: .center)
                 }
                 ForEach(derived.history) { occurrence in
                     if let expense = expensesByID[occurrence.id] {

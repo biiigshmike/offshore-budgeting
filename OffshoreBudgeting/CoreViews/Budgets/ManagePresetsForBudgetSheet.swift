@@ -41,6 +41,7 @@ struct ManagePresetsForBudgetSheet: View {
                     systemImage: "list.bullet.rectangle",
                     description: Text("Create a preset first, then you can link it to this budget.")
                 )
+                .frame(maxWidth: .infinity, alignment: .center)
             } else {
                 Section {
                     ForEach(visiblePresets) { preset in

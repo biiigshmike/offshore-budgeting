@@ -1363,6 +1363,7 @@ private struct OnboardingPresetsStep: View {
                         systemImage: "list.bullet.rectangle",
                         description: Text("Add presets now, or skip and add them later from the Presets screen.")
                     )
+                    .frame(maxWidth: .infinity, alignment: .center)
                 } else {
                     ForEach(presets) { preset in
                         VStack(alignment: .leading, spacing: 4) {

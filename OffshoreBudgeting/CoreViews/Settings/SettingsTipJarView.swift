@@ -13,6 +13,7 @@ struct SettingsTipJarView: View {
             Section {
                 if store.isLoading {
                     ProgressView("Loading tips…")
+                    .frame(maxWidth: .infinity, alignment: .center)
                 } else {
                     ForEach(store.products) { product in
                         Button {

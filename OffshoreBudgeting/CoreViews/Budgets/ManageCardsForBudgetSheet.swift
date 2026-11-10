@@ -50,6 +50,7 @@ struct ManageCardsForBudgetSheet: View {
                     systemImage: "creditcard",
                     description: Text("Create a card first, then you can link it to this budget.")
                 )
+                .frame(maxWidth: .infinity, alignment: .center)
             } else {
                 ForEach(cards) { card in
                     Toggle(isOn: bindingForCard(card)) {

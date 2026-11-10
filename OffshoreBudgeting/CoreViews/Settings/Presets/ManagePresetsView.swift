@@ -124,6 +124,7 @@ struct ManagePresetsView: View {
                     systemImage: "list.bullet.rectangle",
                     description: Text("Create presets to generate planned expenses when you assign them to budgets.")
                 )
+                .frame(maxWidth: .infinity, alignment: .center)
             } else {
 
                 if let pinned = highlightedPreset {

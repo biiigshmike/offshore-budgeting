@@ -41,6 +41,7 @@ struct WorkspaceListRows: View {
                     systemImage: usesICloud ? "icloud.slash" : "person.fill",
                     description: Text(usesICloud ? "Nothing was found in iCloud. Create a workspace to begin." : "Create a workspace to begin.")
                 )
+                .frame(maxWidth: .infinity, alignment: .center)
 
             case .loaded(hasWorkspaces: true):
                 EmptyView()
@@ -91,6 +92,7 @@ struct WorkspaceListRows: View {
                 .padding(.bottom, 6)
         }
         .padding(.vertical, 10)
+        .frame(maxWidth: .infinity, alignment: .center)
     }
 
     @ViewBuilder
@@ -162,6 +164,7 @@ struct CategoryListRows<Destination: View>: View {
                 systemImage: "tag",
                 description: Text("Create categories to organize expenses and presets.")
             )
+            .frame(maxWidth: .infinity, alignment: .center)
         } else {
             ForEach(categories) { category in
                 Group {

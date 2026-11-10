@@ -48,9 +48,11 @@ struct UncategorizedExpenseReviewView: View {
             }
             if reviewExpenses.isEmpty {
                 ContentUnavailableView("No Uncategorized Expenses", systemImage: "checkmark.circle")
+                .frame(maxWidth: .infinity, alignment: .center)
             } else if availableCategories.isEmpty {
                 ContentUnavailableView("No Available Categories", systemImage: "tag",
                     description: Text("Create a category in Settings to categorize these expenses."))
+                .frame(maxWidth: .infinity, alignment: .center)
             } else {
                 ForEach(reviewExpenses) { expense in
                     Section {

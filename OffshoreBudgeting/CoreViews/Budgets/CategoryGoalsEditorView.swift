@@ -121,6 +121,7 @@ struct CategoryGoalsEditorView: View {
                         systemImage: "tag",
                         description: Text("Create a category in Settings to set spending goals.")
                     )
+                    .frame(maxWidth: .infinity, alignment: .center)
                 }
             }
             .navigationTitle("Category Goals")

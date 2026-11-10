@@ -41,6 +41,7 @@ struct PresetDetailTrendChart: View {
         if periods.isEmpty {
             ContentUnavailableView("No Results Yet", systemImage: "chart.bar.xaxis",
                 description: Text("Results appear after an expense date passes or an actual amount is recorded."))
+            .frame(maxWidth: .infinity, alignment: .center)
         } else {
             Chart(periods) { period in
                 BarMark(x: .value("Period", period.startDate, unit: calendarUnit),

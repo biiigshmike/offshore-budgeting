@@ -65,6 +65,7 @@ struct ReviewTodayView: View {
                     systemImage: "list.bullet.clipboard",
                     description: Text("There are no transactions or planned expenses for today in this workspace.")
                 )
+                .frame(maxWidth: .infinity, alignment: .center)
                 .listRowBackground(Color.clear)
             }
             if !review.entries.isEmpty {

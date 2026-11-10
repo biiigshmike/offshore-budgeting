@@ -44,6 +44,7 @@ struct PresetRecordedPlannedExpensesReviewView: View {
                         systemImage: "checkmark.circle",
                         description: Text("You can tap Done to return.")
                     )
+                    .frame(maxWidth: .infinity, alignment: .center)
                 } else {
                     ForEach(recordedExpenses, id: \.id) { expense in
                         Button {

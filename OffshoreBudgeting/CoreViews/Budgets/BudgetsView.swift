@@ -167,12 +167,14 @@ struct BudgetsView: View {
                     systemImage: "chart.pie",
                     description: Text(String(localized: "budgets.empty.message", defaultValue: "Create a budget to start planning spending.", comment: "Empty state message when no budgets exist."))
                 )
+                .frame(maxWidth: .infinity, alignment: .center)
             } else if filteredBudgets.isEmpty {
                 ContentUnavailableView(
                     String(localized: "common.noResults", defaultValue: "No Results", comment: "Empty state title for no search results."),
                     systemImage: "magnifyingglass",
                     description: Text(String(localized: "common.tryDifferentSearch", defaultValue: "Try a different search.", comment: "Prompt to try a different search query."))
                 )
+                .frame(maxWidth: .infinity, alignment: .center)
             } else {
 
                 // Order: Active → Upcoming → Past
