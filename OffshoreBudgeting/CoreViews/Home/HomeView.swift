@@ -286,10 +286,7 @@ struct HomeView: View {
                 }
                 .safeAreaInset(edge: .bottom, alignment: .trailing, spacing: 0) {
                     if isPhone, let onReviewToday {
-                        reviewTodayButton(action: onReviewToday, isAccessory: true)
-                            .buttonStyle(.plain)
-                            .foregroundStyle(.primary)
-                            .bottomAccessorySurface()
+                        floatingReviewTodayButton(action: onReviewToday)
                             .padding(.horizontal, 20)
                             .padding(.vertical, 4)
                     }
@@ -1294,15 +1291,29 @@ struct HomeView: View {
 
     // MARK: - Home Toolbar
 
-    private func reviewTodayButton(action: @escaping () -> Void, isAccessory: Bool = false) -> some View {
+    @ViewBuilder
+    private func floatingReviewTodayButton(action: @escaping () -> Void) -> some View {
+        let button = reviewTodayButton(action: action, isFloating: true)
+        if #available(iOS 26.0, macCatalyst 26.0, *) {
+            button
+                .buttonStyle(.glass)
+                .buttonBorderShape(.circle)
+        } else {
+            button
+                .buttonStyle(.bordered)
+                .buttonBorderShape(.roundedRectangle(radius: 12))
+        }
+    }
+
+    private func reviewTodayButton(action: @escaping () -> Void, isFloating: Bool = false) -> some View {
         Button(action: action) {
             let label = Label("Review Today", systemImage: "list.bullet.clipboard")
                 .labelStyle(.iconOnly)
-            if isAccessory {
+            if isFloating {
                 label
                     .font(.title2)
+                    .foregroundStyle(.primary)
                     .frame(width: 44, height: 44)
-                    .contentShape(Circle())
             } else {
                 label
             }
