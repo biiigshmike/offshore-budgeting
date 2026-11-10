@@ -38,10 +38,6 @@ struct AllocationAccountDetailView: View {
     @State private var searchText: String = ""
     @FocusState private var searchFocused: Bool
 
-    private var balance: Double {
-        CurrencyFormatter.normalizedCurrencyDisplayValue(AllocationLedgerService.balance(for: account))
-    }
-
     private var ledgerRows: [AllocationLedgerService.LedgerRow] {
         AllocationLedgerService.rows(for: account)
     }
@@ -310,7 +306,8 @@ struct AllocationAccountDetailView: View {
         }
 
         let categoryFiltered: [AllocationLedgerService.LedgerRow]
-        if let selectedCategoryIDs {
+        if let selectedCategoryIDs,
+           selectedCategoryIDs.isEmpty || !selectedCategoryIDs.isSuperset(of: categoriesByID.keys) {
             categoryFiltered = dateFiltered.filter { row in
                 guard let categoryID = category(for: row)?.id else { return false }
                 return selectedCategoryIDs.contains(categoryID)
@@ -491,14 +488,12 @@ struct AllocationAccountDetailView: View {
     private func balanceSection(_ derived: ReconciliationDetailDerivedState) -> some View {
         Section {
             ReconciliationBalanceStatementRow(
-                total: balance,
+                total: derived.filteredAmountValue,
                 heatMapStops: derived.heatMapStops
             )
             .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
         } header: {
             Text("Balance")
-        } footer: {
-            Text("Current outstanding reconciliation balance across all history.")
         }
     }
 
