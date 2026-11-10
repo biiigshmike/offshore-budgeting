@@ -5,7 +5,7 @@ import WidgetKit
 struct AddExpenseControlWidget: ControlWidget {
     var body: some ControlWidgetConfiguration {
         StaticControlConfiguration(kind: "com.mb.offshore.control.add-expense") {
-            ControlWidgetButton(action: WidgetOpenAddExpenseIntent()) {
+            ControlWidgetButton(action: OpenOffshoreControlIntent(target: .addExpense)) {
                 Label("Add Expense", systemImage: "creditcard")
             }
         }
@@ -18,7 +18,7 @@ struct AddExpenseControlWidget: ControlWidget {
 struct AddIncomeControlWidget: ControlWidget {
     var body: some ControlWidgetConfiguration {
         StaticControlConfiguration(kind: "com.mb.offshore.control.add-income") {
-            ControlWidgetButton(action: WidgetOpenAddIncomeIntent()) {
+            ControlWidgetButton(action: OpenOffshoreControlIntent(target: .addIncome)) {
                 Label("Add Income", systemImage: "banknote.fill")
             }
         }
@@ -31,7 +31,7 @@ struct AddIncomeControlWidget: ControlWidget {
 struct ReviewTodayControlWidget: ControlWidget {
     var body: some ControlWidgetConfiguration {
         StaticControlConfiguration(kind: "com.mb.offshore.control.review-today") {
-            ControlWidgetButton(action: WidgetReviewTodayIntent()) {
+            ControlWidgetButton(action: OpenOffshoreControlIntent(target: .reviewToday)) {
                 Label("Review Today", systemImage: "list.bullet.clipboard")
             }
         }
@@ -44,9 +44,15 @@ struct ReviewTodayControlWidget: ControlWidget {
 struct ExcursionModeControlWidget: ControlWidget {
     var body: some ControlWidgetConfiguration {
         StaticControlConfiguration(kind: "com.mb.offshore.control.excursion-mode") {
-            ControlWidgetButton(action: WidgetStartExcursionModeIntent()) {
+            #if canImport(ActivityKit) && !targetEnvironment(macCatalyst)
+            ControlWidgetButton(action: StartExcursionControlIntent()) {
                 Label("Excursion Mode", systemImage: "sailboat.fill")
             }
+            #else
+            ControlWidgetButton(action: OpenOffshoreControlIntent(target: .excursionMode)) {
+                Label("Excursion Mode", systemImage: "sailboat.fill")
+            }
+            #endif
         }
         .displayName("Excursion Mode")
         .description("Start a 2-hour Excursion Mode session.")

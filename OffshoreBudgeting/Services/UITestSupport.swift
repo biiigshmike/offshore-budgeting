@@ -55,7 +55,6 @@ enum UITestSupport {
         }
         SpendingSessionStore.end()
         ShoppingModeSuggestionService.shared.resetAllCooldowns()
-        _ = WidgetActionRequestStore.consumePendingURL()
         ExcursionPreferencesStore.shared.restoreDefaults()
 
         for key in [

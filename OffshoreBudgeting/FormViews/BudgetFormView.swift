@@ -156,6 +156,7 @@ struct BudgetFormView: View {
     @Binding var selectedCardIDs: Set<UUID>
     @Binding var selectedPresetIDs: Set<UUID>
     @Binding var categoryGoalDrafts: [UUID: CategoryGoalDraft]
+    @Binding var categoryGoalAutoConfiguration: CategoryGoalAutoConfigurationDraft
     @State private var showingCategoryGoals: Bool = false
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.displayScale) private var displayScale
@@ -303,9 +304,11 @@ struct BudgetFormView: View {
                 plannedContributions: plannedGoalContributions ?? [:],
                 allowsPlannedMinimum: plannedGoalContributions != nil,
                 maximumSuggestionProvider: maximumGoalSuggestionProvider,
-                replacesExistingGoals: reconfiguresExistingGoals
-            ) { updatedDrafts in
+                replacesExistingGoals: reconfiguresExistingGoals,
+                autoConfiguration: categoryGoalAutoConfiguration
+            ) { updatedDrafts, autoConfiguration in
                 categoryGoalDrafts = updatedDrafts
+                categoryGoalAutoConfiguration = autoConfiguration
             }
         }
     }

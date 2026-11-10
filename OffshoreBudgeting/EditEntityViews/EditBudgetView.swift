@@ -31,6 +31,7 @@ struct EditBudgetView: View {
     @State private var selectedCardIDs: Set<UUID> = []
     @State private var selectedPresetIDs: Set<UUID> = []
     @State private var categoryGoalDrafts: [UUID: CategoryGoalDraft] = [:]
+    @State private var categoryGoalAutoConfiguration = CategoryGoalAutoConfigurationDraft()
     @State private var didSeedForm: Bool = false
 
     // MARK: - Alerts
@@ -115,6 +116,7 @@ struct EditBudgetView: View {
             selectedCardIDs: $selectedCardIDs,
             selectedPresetIDs: $selectedPresetIDs,
             categoryGoalDrafts: $categoryGoalDrafts,
+            categoryGoalAutoConfiguration: $categoryGoalAutoConfiguration,
             onToggleAllCards: toggleAllCards,
             onToggleAllPresets: toggleAllPresets,
             onStartDateChanged: handleStartDateChanged(_:),
@@ -167,6 +169,7 @@ struct EditBudgetView: View {
             || selectedCardIDs != Set((budget.cardLinks ?? []).compactMap { $0.card?.id })
             || selectedPresetIDs != linkedPresetIDs
             || categoryGoalDrafts != BudgetCategoryGoalStore.drafts(for: budget)
+            || categoryGoalAutoConfiguration != BudgetCategoryGoalStore.autoConfiguration(for: budget)
     }
 
     // MARK: - Seed
@@ -183,6 +186,7 @@ struct EditBudgetView: View {
         selectedCardIDs = Set((budget.cardLinks ?? []).compactMap { $0.card?.id })
         selectedPresetIDs = Set((budget.presetLinks ?? []).compactMap { $0.preset?.id })
         categoryGoalDrafts = BudgetCategoryGoalStore.drafts(for: budget)
+        categoryGoalAutoConfiguration = BudgetCategoryGoalStore.autoConfiguration(for: budget)
     }
 
     private func applyScreenshotPrefillIfNeeded() {
@@ -317,7 +321,9 @@ struct EditBudgetView: View {
             selectedCardIDs: selectedCardIDs
         )
 
-        try? modelContext.save()
+        if (try? modelContext.save()) != nil {
+            BudgetCategoryGoalStore.saveAutoConfiguration(categoryGoalAutoConfiguration, for: budget)
+        }
 
         Task {
             await LocalNotificationService.syncFromUserDefaultsIfPossible(

@@ -91,6 +91,8 @@ struct ContentView: View {
 
     private var defersAutomaticLaunchPrompts: Bool {
         !pendingWorkspaceProgressID.isEmpty || progressHandoffCoordinator.isPresenting
+            || OffshoreControlPresentation.shared.pendingSheet != nil
+            || OffshoreControlPresentation.shared.pendingExcursionBlockers != nil
     }
 
     private var progressHandoffEligibility: [String] {

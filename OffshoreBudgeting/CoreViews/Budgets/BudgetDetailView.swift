@@ -771,15 +771,18 @@ struct BudgetDetailView: View {
                         presets: workspacePresets, selectedPresetIDs: Set(linkedPresets.map(\.id)),
                         selectedCardIDs: Set(linkedCards.map(\.id)), workspaceID: workspace.id,
                         startDate: budget.startDate, endDate: budget.endDate
-                    )
-                ) { drafts in
-                    BudgetCategoryGoalStore.apply(
+                    ),
+                    autoConfiguration: BudgetCategoryGoalStore.autoConfiguration(for: budget)
+                ) { drafts, autoConfiguration in
+                    if BudgetCategoryGoalStore.apply(
                         drafts,
                         categories: derived.categoriesInBudget,
                         budget: budget,
                         workspaceID: workspace.id,
                         modelContext: modelContext
-                    )
+                    ), (try? modelContext.save()) != nil {
+                        BudgetCategoryGoalStore.saveAutoConfiguration(autoConfiguration, for: budget)
+                    }
                 }
             case .calculations:
                 FinancialCalculationHelpView(

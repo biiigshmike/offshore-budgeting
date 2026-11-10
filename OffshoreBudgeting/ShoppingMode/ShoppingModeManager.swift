@@ -104,7 +104,8 @@ final class ShoppingModeManager: ObservableObject {
         ShoppingModeSuggestionService.shared.clearCooldownsIfSessionChanged(newSessionID: status.sessionID)
         ShoppingModeLocationService.shared.startMonitoringIfPossible()
 
-        startOrRefreshLiveActivity()
+        // Keep the start intent running until the queued ActivityKit request finishes.
+        await activityUpdateTask?.value
         #if DEBUG
         if let sessionID = status.sessionID, let expiresAt = status.expiresAt {
             debugLog(

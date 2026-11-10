@@ -111,13 +111,6 @@ enum AppTabActivationPhase: String, Equatable {
     case active
 }
 
-private enum QuickLinkSheet: String, Identifiable {
-    case expense
-    case income
-
-    var id: String { rawValue }
-}
-
 struct AppTabActivationContext: Equatable {
     let sectionRawValue: String
     let phase: AppTabActivationPhase
@@ -217,6 +210,8 @@ struct AppRootView: View {
     @State private var didApplyInitialSection: Bool = false
     @State private var showingHelpSheet: Bool = false
     @State private var activeQuickLinkSheet: QuickLinkSheet? = nil
+    @State private var excursionBlockerMessage = ""
+    @State private var showingExcursionBlockers = false
     @State private var detailSnapshotCache = DetailViewSnapshotCache()
     @State private var loadedPhoneSections: Set<AppSection> = []
     @State private var mountedPhoneSections: Set<AppSection> = []
@@ -230,6 +225,15 @@ struct AppRootView: View {
     @State private var sharedInvalidationWaveScheduled: Bool = false
 
     @Environment(\.appCommandHub) private var commandHub
+    @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.appPresentationActivity) private var presentationActivity
+
+    private let controlPresentation = OffshoreControlPresentation.shared
+
+    private var canPresentControlRequest: Bool {
+        scenePhase == .active && presentationActivity?.isBusy != true
+            && activeQuickLinkSheet == nil && !showingExcursionBlockers
+    }
 
     private var isPhone: Bool {
         #if os(iOS)
@@ -383,6 +387,40 @@ struct AppRootView: View {
             }
             if shouldSyncActiveSectionToCommandHub {
                 commandHub.setActiveSectionRaw(newValue)
+            }
+        }
+        .onChange(of: canPresentControlRequest ? controlPresentation.pendingSheet : nil, initial: true) {
+            guard canPresentControlRequest, let sheet = controlPresentation.pendingSheet else { return }
+            activeQuickLinkSheet = sheet
+            controlPresentation.pendingSheet = nil
+        }
+        .onChange(of: canPresentControlRequest ? controlPresentation.pendingExcursionBlockers : nil, initial: true) {
+            guard canPresentControlRequest, let blockers = controlPresentation.pendingExcursionBlockers else { return }
+            excursionBlockerMessage = blockers.map(\.message).joined(separator: "\n")
+            showingExcursionBlockers = true
+            controlPresentation.pendingExcursionBlockers = nil
+        }
+        .alert("Unable to Start Excursion Mode", isPresented: $showingExcursionBlockers) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(excursionBlockerMessage)
+        }
+        .appSheet(item: $activeQuickLinkSheet) { sheet in
+            switch sheet {
+            case .expense:
+                NavigationStack {
+                    AddExpenseView(workspace: workspace)
+                }
+            case .income:
+                NavigationStack {
+                    AddIncomeView(
+                        workspace: workspace,
+                        initialDate: Calendar.current.startOfDay(for: .now),
+                        initialIsPlanned: false
+                    )
+                }
+            case .reviewToday:
+                ReviewTodayView(workspace: workspace)
             }
         }
         .appSheet(isPresented: $showingHelpSheet) {
@@ -575,20 +613,6 @@ struct AppRootView: View {
         }
         .background {
             MacWindowSceneTitleHost(title: macWindowSceneTitle)
-        }
-        .appSheet(item: $activeQuickLinkSheet) { sheet in
-            NavigationStack {
-                switch sheet {
-                case .expense:
-                    AddExpenseView(workspace: workspace)
-                case .income:
-                    AddIncomeView(
-                        workspace: workspace,
-                        initialDate: Calendar.current.startOfDay(for: .now),
-                        initialIsPlanned: false
-                    )
-                }
-            }
         }
     }
 
@@ -842,7 +866,9 @@ struct AppRootView: View {
     }
 
     private var homeRootView: some View {
-        HomeView(workspace: workspace)
+        HomeView(workspace: workspace) {
+            activeQuickLinkSheet = .reviewToday
+        }
     }
 
     private func traceTabSelection(from oldValue: String, to newValue: String) {

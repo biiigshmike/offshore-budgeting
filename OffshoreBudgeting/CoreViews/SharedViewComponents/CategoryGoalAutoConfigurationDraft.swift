@@ -1,11 +1,36 @@
 import Foundation
 
 /// Tracks only generated fields so turning Auto-Configure off preserves manual edits.
-struct CategoryGoalAutoConfigurationDraft {
+struct CategoryGoalAutoConfigurationDraft: Codable, Equatable {
+    var hasGeneratedValues: Bool { !generatedMinimums.isEmpty || !generatedMaximums.isEmpty }
     private var previousMinimums: [UUID: String] = [:]
     private var generatedMinimums: [UUID: String] = [:]
     private var previousMaximums: [UUID: String] = [:]
     private var generatedMaximums: [UUID: String] = [:]
+
+    /// Persist amounts in a locale-independent format; drafts still restore the original
+    /// input verbatim when the toggle is turned off before saving.
+    func normalizedForStorage() -> Self {
+        mapAmounts { text in
+            guard let amount = CurrencyFormatter.parseAmount(text), amount.isFinite, amount >= 0 else { return "" }
+            return String(amount)
+        }
+    }
+
+    func formattedForEditing() -> Self {
+        mapAmounts { text in
+            Double(text).map { CurrencyFormatter.editingString(from: $0) } ?? ""
+        }
+    }
+
+    private func mapAmounts(_ transform: (String) -> String) -> Self {
+        var result = self
+        result.previousMinimums = previousMinimums.mapValues(transform)
+        result.generatedMinimums = generatedMinimums.mapValues(transform)
+        result.previousMaximums = previousMaximums.mapValues(transform)
+        result.generatedMaximums = generatedMaximums.mapValues(transform)
+        return result
+    }
 
     mutating func apply(
         to drafts: inout [UUID: CategoryGoalDraft],

@@ -1,6 +1,5 @@
 import AppIntents
 import Foundation
-import SwiftData
 
 // MARK: - OpenOffshoreAppIntent
 
@@ -33,60 +32,18 @@ struct ReviewTodaysSpendingIntent: AppIntent {
             let dataStore = OffshoreIntentDataStore.shared
 
             return try dataStore.performInSelectedWorkspace { modelContext, workspace in
-                let calendar = Calendar.current
-                let dayStart = calendar.startOfDay(for: .now)
-                let dayEnd = calendar.date(byAdding: DateComponents(day: 1, second: -1), to: dayStart) ?? dayStart
-
-                let workspaceID = workspace.id
-
-                let variableDescriptor = FetchDescriptor<VariableExpense>(
-                    predicate: #Predicate<VariableExpense> { expense in
-                        expense.workspace?.id == workspaceID
-                        && expense.transactionDate >= dayStart
-                        && expense.transactionDate <= dayEnd
-                    }
-                )
-
-                let plannedDescriptor = FetchDescriptor<PlannedExpense>(
-                    predicate: #Predicate<PlannedExpense> { expense in
-                        expense.workspace?.id == workspaceID
-                        && expense.expenseDate >= dayStart
-                        && expense.expenseDate <= dayEnd
-                    }
-                )
-
-                let variableExpenses = try modelContext.fetch(variableDescriptor)
-                let plannedExpenses = try modelContext.fetch(plannedDescriptor)
-
-                let variableTotal = variableExpenses.reduce(0.0) { $0 + $1.ledgerSignedAmount() }
-                let plannedTotal = plannedExpenses.reduce(0.0) { $0 + $1.effectiveAmount() }
-                let total = variableTotal + plannedTotal
-
-                let variableCount = variableExpenses.count
-                let plannedCount = plannedExpenses.count
-
-                var totalsByCardName: [String: Double] = [:]
-                for expense in variableExpenses {
-                    let cardName = expense.card?.name ?? "Unknown Card"
-                    totalsByCardName[cardName, default: 0] += expense.ledgerSignedAmount()
-                }
-                for expense in plannedExpenses {
-                    let cardName = expense.card?.name ?? "Unknown Card"
-                    totalsByCardName[cardName, default: 0] += expense.effectiveAmount()
+                let summary = try ReviewTodaySummary.load(workspaceID: workspace.id, in: modelContext)
+                let topCards = summary.topCards.map {
+                    "\($0.name): \(CurrencyFormatter.string(from: $0.amount))"
                 }
 
-                let topCards = totalsByCardName
-                    .sorted { $0.value > $1.value }
-                    .prefix(2)
-                    .map { "\($0.key): \(CurrencyFormatter.string(from: $0.value))" }
-
-                var lines: [String] = []
-                lines.append("Today: \(CurrencyFormatter.string(from: total))")
-                lines.append("\(variableCount.formatted()) variable, \(plannedCount.formatted()) planned")
+                var lines = [
+                    "Today: \(CurrencyFormatter.string(from: summary.total))",
+                    "\(summary.variableCount.formatted()) variable, \(summary.plannedCount.formatted()) planned"
+                ]
                 if !topCards.isEmpty {
                     lines.append("Top cards: \(topCards.joined(separator: ", "))")
                 }
-
                 return lines.joined(separator: "\n")
             }
         }

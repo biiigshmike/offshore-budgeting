@@ -34,6 +34,7 @@ struct AddBudgetView: View {
     @State private var selectedCardIDs: Set<UUID> = []
     @State private var selectedPresetIDs: Set<UUID> = []
     @State private var categoryGoalDrafts: [UUID: CategoryGoalDraft] = [:]
+    @State private var categoryGoalAutoConfiguration = CategoryGoalAutoConfigurationDraft()
     @State private var didSeedForm: Bool = false
 
     @State private var repeatPeriodRaw = ""
@@ -113,6 +114,7 @@ struct AddBudgetView: View {
             selectedCardIDs: $selectedCardIDs,
             selectedPresetIDs: $selectedPresetIDs,
             categoryGoalDrafts: $categoryGoalDrafts,
+            categoryGoalAutoConfiguration: $categoryGoalAutoConfiguration,
             onToggleAllCards: toggleAllCards,
             onToggleAllPresets: toggleAllPresets,
             onStartDateChanged: handleStartDateChanged(_:),
@@ -409,6 +411,8 @@ struct AddBudgetView: View {
             showingBudgetSaveError = true
             return
         }
+
+        BudgetCategoryGoalStore.saveAutoConfiguration(categoryGoalAutoConfiguration, for: budget)
 
         Task {
             await LocalNotificationService.syncFromUserDefaultsIfPossible(

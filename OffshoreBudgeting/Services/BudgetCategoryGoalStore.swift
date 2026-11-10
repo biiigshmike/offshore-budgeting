@@ -3,6 +3,28 @@ import SwiftData
 
 @MainActor
 enum BudgetCategoryGoalStore {
+    static func autoConfiguration(for budget: Budget) -> CategoryGoalAutoConfigurationDraft {
+        guard let key = autoConfigurationKey(for: budget),
+              let data = UserDefaults.standard.data(forKey: key),
+              let configuration = try? JSONDecoder().decode(CategoryGoalAutoConfigurationDraft.self, from: data)
+        else { return CategoryGoalAutoConfigurationDraft() }
+        return configuration.formattedForEditing()
+    }
+
+    static func saveAutoConfiguration(_ configuration: CategoryGoalAutoConfigurationDraft, for budget: Budget) {
+        guard let key = autoConfigurationKey(for: budget) else { return }
+        if configuration.hasGeneratedValues, let data = try? JSONEncoder().encode(configuration.normalizedForStorage()) {
+            UserDefaults.standard.set(data, forKey: key)
+        } else {
+            UserDefaults.standard.removeObject(forKey: key)
+        }
+    }
+
+    private static func autoConfigurationKey(for budget: Budget) -> String? {
+        guard let workspaceID = budget.workspace?.id else { return nil }
+        return "categoryGoals.autoConfiguration.\(workspaceID.uuidString).\(budget.id.uuidString)"
+    }
+
     /// Shared on-demand history lookup for creation and existing-budget editors.
     static func maximumSuggestions(
         workspace: Workspace, categories: [Category], startDate: Date, endDate: Date,

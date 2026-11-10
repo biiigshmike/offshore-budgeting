@@ -1,4 +1,5 @@
 import Foundation
+import Observation
 
 // MARK: - OffshoreDeepLink
 
@@ -16,10 +17,42 @@ enum OffshoreDeepLink {
     }
 }
 
+enum QuickLinkSheet: String, Identifiable {
+    case expense
+    case income
+    case reviewToday
+
+    var id: String { rawValue }
+}
+
+@MainActor
+@Observable
+final class OffshoreControlPresentation {
+    static let shared = OffshoreControlPresentation()
+
+    var pendingSheet: QuickLinkSheet?
+    var pendingExcursionBlockers: [ShoppingModeStartBlocker]?
+
+    private init() {}
+}
+
 // MARK: - OffshoreDeepLinkHandler
 
 @MainActor
 enum OffshoreDeepLinkHandler {
+    static func handleControl(_ destination: OffshoreControlDestination) async {
+        switch destination {
+        case .addExpense:
+            handle(OffshoreDeepLink.openAddExpenseURL)
+        case .addIncome:
+            handle(OffshoreDeepLink.openAddIncomeURL)
+        case .reviewToday:
+            handle(OffshoreDeepLink.openReviewTodayURL)
+        case .excursionMode:
+            await startExcursion(hours: 2)
+        }
+    }
+
     @discardableResult
     static func handle(_ url: URL) -> Bool {
         if ShoppingModeManager.shared.handleDeepLink(url) {
@@ -37,23 +70,15 @@ enum OffshoreDeepLinkHandler {
 
         switch (url.host, path) {
         case ("open", "/add-expense"):
-            UserDefaults.standard.set(AppSection.cards.rawValue, forKey: AppShortcutNavigationStore.pendingSectionKey)
-            UserDefaults.standard.set(
-                AppShortcutNavigationStore.PendingAction.openQuickAddExpense.rawValue,
-                forKey: AppShortcutNavigationStore.pendingActionKey
-            )
+            OffshoreControlPresentation.shared.pendingSheet = .expense
             return true
 
         case ("open", "/add-income"):
-            UserDefaults.standard.set(AppSection.income.rawValue, forKey: AppShortcutNavigationStore.pendingSectionKey)
-            UserDefaults.standard.set(
-                AppShortcutNavigationStore.PendingAction.openQuickAddIncome.rawValue,
-                forKey: AppShortcutNavigationStore.pendingActionKey
-            )
+            OffshoreControlPresentation.shared.pendingSheet = .income
             return true
 
         case ("open", "/review-today"):
-            UserDefaults.standard.set(AppSection.cards.rawValue, forKey: AppShortcutNavigationStore.pendingSectionKey)
+            OffshoreControlPresentation.shared.pendingSheet = .reviewToday
             return true
 
         case ("open", "/safe-spend-today"):
@@ -73,12 +98,22 @@ enum OffshoreDeepLinkHandler {
 
             let hours = min(max(1, requestedHours), 4)
             Task {
-                _ = await ShoppingModeManager.shared.start(hours: hours)
+                await startExcursion(hours: hours)
             }
             return true
 
         default:
             return false
+        }
+    }
+
+    private static func startExcursion(hours: Int) async {
+        let result = await ShoppingModeManager.shared.start(hours: hours)
+        switch result {
+        case .started:
+            OffshoreControlPresentation.shared.pendingExcursionBlockers = nil
+        case .blocked(let blockers):
+            OffshoreControlPresentation.shared.pendingExcursionBlockers = blockers
         }
     }
 }

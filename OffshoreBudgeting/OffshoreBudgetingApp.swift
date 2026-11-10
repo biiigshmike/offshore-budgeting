@@ -105,7 +105,6 @@ struct OffshoreBudgetingApp: App {
                 )
                     .id(rootResetToken)
                     .onAppear {
-                        consumePendingWidgetActionIfNeeded()
                         refreshShoppingModeForForeground(reason: "sceneOnAppear")
                     }
                     .task {
@@ -125,7 +124,6 @@ struct OffshoreBudgetingApp: App {
                         }
                         guard newValue == .active else { return }
                         ShoppingModeLocationService.shared.setApplicationInForeground(true)
-                        consumePendingWidgetActionIfNeeded()
                         refreshShoppingModeForForeground(reason: "sceneBecameActive")
                     }
                     .onOpenURL { url in
@@ -171,12 +169,6 @@ struct OffshoreBudgetingApp: App {
         tabBar.standardAppearance = appearance
         tabBar.scrollEdgeAppearance = appearance
         #endif
-    }
-
-    @MainActor
-    private func consumePendingWidgetActionIfNeeded() {
-        guard let pendingURL = WidgetActionRequestStore.consumePendingURL() else { return }
-        _ = OffshoreDeepLinkHandler.handle(pendingURL)
     }
 
     @MainActor

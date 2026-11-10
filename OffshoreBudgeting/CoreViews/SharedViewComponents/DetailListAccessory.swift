@@ -3,6 +3,22 @@ import SwiftUI
 import UIKit
 #endif
 
+extension View {
+    func bottomAccessorySurface() -> some View {
+        background {
+            if #available(iOS 26.0, macCatalyst 26.0, *) {
+                Color.clear
+                    .glassEffect(.regular, in: .capsule)
+                    .allowsHitTesting(false)
+            } else {
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(.regularMaterial)
+                    .allowsHitTesting(false)
+            }
+        }
+    }
+}
+
 struct DetailListAccessory<SortMode: Hashable>: View {
     var categories: [Category] = []
     // nil is the initial unfiltered state. An empty set matches no categories.
@@ -47,8 +63,9 @@ struct DetailListAccessory<SortMode: Hashable>: View {
     }
 
     var body: some View {
-        glassBar
-//            .frame(maxWidth: 500)
+        bar
+            .bottomAccessorySurface()
+            .contentShape(.contextMenuPreview, Capsule())
             .frame(maxWidth: .infinity)
             .padding(.horizontal, 20)
             .padding(.vertical, 4)
@@ -59,21 +76,6 @@ struct DetailListAccessory<SortMode: Hashable>: View {
                     self.categorySelectionIDs = validSelection
                 }
             }
-    }
-
-    private var glassBar: some View {
-        bar.background {
-            if #available(iOS 26.0, macCatalyst 26.0, *) {
-                Color.clear
-                    .glassEffect(.regular, in: .capsule)
-                    .allowsHitTesting(false)
-            } else {
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(.regularMaterial)
-                    .allowsHitTesting(false)
-            }
-        }
-        .contentShape(.contextMenuPreview, Capsule())
     }
 
     private var bar: some View {

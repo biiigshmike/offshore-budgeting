@@ -85,8 +85,30 @@ final class CategoryGoalAutoConfigurationUITests: XCTestCase {
         let categoryGoals = app.buttons["Category Goals"].firstMatch
         XCTAssertTrue(categoryGoals.waitForExistence(timeout: 5))
         categoryGoals.tap()
+        let toggle = app.switches["categoryGoals.autoConfigure"]
+        XCTAssertEqual(toggle.value as? String, "1")
         app.staticTexts["Bills"].firstMatch.tap()
         XCTAssertEqual(app.textFields["Maximum"].value as? String, "1,400.00")
+        app.navigationBars["Bills"].buttons["Category Goals"].tap()
+
+        toggleAutoConfigure(in: app)
+        app.staticTexts["Bills"].firstMatch.tap()
+        XCTAssertEqual(app.textFields["Maximum"].value as? String, "Maximum")
+        app.navigationBars["Bills"].buttons["Category Goals"].tap()
+        app.navigationBars["Category Goals"].buttons["Cancel"].tap()
+
+        app.buttons["Budget Actions"].tap()
+        categoryGoals.tap()
+        XCTAssertEqual(toggle.value as? String, "1")
+        toggleAutoConfigure(in: app)
+        app.navigationBars["Category Goals"].buttons["Done"].tap()
+
+        app.buttons["Budget Actions"].tap()
+        categoryGoals.tap()
+        XCTAssertEqual(toggle.value as? String, "0")
+        app.staticTexts["Bills"].firstMatch.tap()
+        XCTAssertEqual(app.textFields["Minimum"].value as? String, "Minimum")
+        XCTAssertEqual(app.textFields["Maximum"].value as? String, "Maximum")
     }
 
     func testWorkspaceSettingsChangeNewSuggestionsAndCanDisableMaximums() throws {

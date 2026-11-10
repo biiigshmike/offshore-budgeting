@@ -10,12 +10,12 @@ struct CategoryGoalsEditorView: View {
     let maximumSuggestionProvider: (() throws -> [UUID: CategoryGoalSuggestion])?
     let replacesExistingGoals: Bool
     let autoConfigurePlannedContributions: [UUID: Double]?
-    let onSave: ([UUID: CategoryGoalDraft]) -> Void
+    let onSave: ([UUID: CategoryGoalDraft], CategoryGoalAutoConfigurationDraft) -> Void
 
     @Environment(\.dismiss) private var dismiss
-    @State private var autoConfigure = false
-    @State private var generatedValues = CategoryGoalAutoConfigurationDraft()
-    @State private var maximumSuggestions: [UUID: CategoryGoalSuggestion] = [:]
+    @State private var autoConfigure: Bool
+    @State private var generatedValues: CategoryGoalAutoConfigurationDraft
+    @State private var maximumSuggestions: [UUID: CategoryGoalSuggestion]?
     @State private var showingHistoryError = false
     @State private var drafts: [UUID: CategoryGoalDraft]
 
@@ -28,7 +28,8 @@ struct CategoryGoalsEditorView: View {
         maximumSuggestionProvider: (() throws -> [UUID: CategoryGoalSuggestion])? = nil,
         replacesExistingGoals: Bool = false,
         autoConfigurePlannedContributions: [UUID: Double]? = nil,
-        onSave: @escaping ([UUID: CategoryGoalDraft]) -> Void
+        autoConfiguration: CategoryGoalAutoConfigurationDraft = CategoryGoalAutoConfigurationDraft(),
+        onSave: @escaping ([UUID: CategoryGoalDraft], CategoryGoalAutoConfigurationDraft) -> Void
     ) {
         self.categories = categories
         self.plannedContributions = plannedContributions
@@ -39,6 +40,8 @@ struct CategoryGoalsEditorView: View {
         self.autoConfigurePlannedContributions = autoConfigurePlannedContributions
         self.onSave = onSave
         _drafts = State(initialValue: drafts)
+        _autoConfigure = State(initialValue: autoConfiguration.hasGeneratedValues)
+        _generatedValues = State(initialValue: autoConfiguration)
     }
 
     var body: some View {
@@ -70,8 +73,8 @@ struct CategoryGoalsEditorView: View {
                                 draft: draftBinding(for: category.id),
                                 plannedContribution: plannedContributions[category.id] ?? 0,
                                 variableContribution: variableContributions[category.id] ?? 0,
-                                maximumSuggestion: maximumSuggestions[category.id],
-                                showsMaximumSuggestion: autoConfigure && maximumSuggestionProvider != nil
+                                maximumSuggestion: maximumSuggestions?[category.id],
+                                showsMaximumSuggestion: autoConfigure && maximumSuggestions != nil && maximumSuggestionProvider != nil
                             )
                         } label: {
                             VStack(alignment: .leading, spacing: 6) {
@@ -83,7 +86,7 @@ struct CategoryGoalsEditorView: View {
                                     Text(category.name)
                                 }
                                 goalSummary(for: category.id)
-                                if autoConfigure, maximumSuggestionProvider != nil {
+                                if autoConfigure, let maximumSuggestions, maximumSuggestionProvider != nil {
                                     if let suggestion = maximumSuggestions[category.id] {
                                         Group {
                                             if suggestion.samples.count == 1 {
@@ -133,7 +136,7 @@ struct CategoryGoalsEditorView: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") {
-                        onSave(drafts)
+                        onSave(drafts, generatedValues)
                         dismiss()
                     }
                     .disabled(!drafts.values.allSatisfy(\.isValid))
@@ -174,12 +177,12 @@ struct CategoryGoalsEditorView: View {
                 to: &drafts,
                 categoryIDs: categories.map(\.id),
                 plannedContributions: autoConfigurePlannedContributions ?? plannedContributions,
-                suggestions: maximumSuggestions,
+                suggestions: maximumSuggestions ?? [:],
                 replacesExistingGoals: replacesExistingGoals
             )
         } else {
             generatedValues.restore(in: &drafts)
-            maximumSuggestions = [:]
+            maximumSuggestions = nil
         }
     }
 

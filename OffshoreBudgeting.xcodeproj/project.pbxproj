@@ -10,6 +10,7 @@
 		4CAD3C3F2F28AF7D001E3F5B /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4CAD3C3E2F28AF7C001E3F5B /* WidgetKit.framework */; };
 		4CAD3C412F28AF7D001E3F5B /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4CAD3C402F28AF7D001E3F5B /* SwiftUI.framework */; };
 		4CAD3C522F28AF7F001E3F5B /* OffshoreBudgetingWidgetsExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 4CAD3C3C2F28AF7C001E3F5B /* OffshoreBudgetingWidgetsExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		F8A033101BE44C70A812DA52 /* OffshoreWidgetActions.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8A033111BE44C70A812DA52 /* OffshoreWidgetActions.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -58,6 +59,7 @@
 		4CAD3C3C2F28AF7C001E3F5B /* OffshoreBudgetingWidgetsExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = OffshoreBudgetingWidgetsExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		4CAD3C3E2F28AF7C001E3F5B /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
 		4CAD3C402F28AF7D001E3F5B /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
+		F8A033111BE44C70A812DA52 /* OffshoreWidgetActions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = OffshoreWidgetActions.swift; path = OffshoreBudgetingWidgets/OffshoreWidgetActions.swift; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -171,6 +173,7 @@
 				4C96F8612F20523900541774 /* OffshoreBudgetingTests */,
 				4C96F86B2F20523900541774 /* OffshoreBudgetingUITests */,
 				4CAD3C422F28AF7D001E3F5B /* OffshoreBudgetingWidgets */,
+				F8A033111BE44C70A812DA52 /* OffshoreWidgetActions.swift */,
 				4CAD3C3D2F28AF7C001E3F5B /* Frameworks */,
 				4C96F8522F20523700541774 /* Products */,
 			);
@@ -368,6 +371,7 @@
 		4C96F84D2F20523700541774 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			files = (
+				F8A033101BE44C70A812DA52 /* OffshoreWidgetActions.swift in Sources */,
 			);
 		};
 		4C96F85A2F20523900541774 /* Sources */ = {
@@ -818,6 +822,7 @@
 				SUPPORTS_MACCATALYST = YES;
 				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
 				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) OFFSHORE_WIDGET_EXTENSION";
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
@@ -867,6 +872,7 @@
 				SUPPORTS_MACCATALYST = YES;
 				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
 				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) OFFSHORE_WIDGET_EXTENSION";
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;

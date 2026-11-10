@@ -1,90 +1,87 @@
 import AppIntents
 import Foundation
 
-// MARK: - OffshoreWidgetDeepLink
+#if canImport(ActivityKit) && !targetEnvironment(macCatalyst) && !OFFSHORE_WIDGET_EXTENSION
+import UIKit
+#endif
 
 enum OffshoreWidgetDeepLink {
-    static let openAddExpenseURL = URL(string: "offshore://open/add-expense")!
-    static let openAddIncomeURL = URL(string: "offshore://open/add-income")!
-    static let openReviewTodayURL = URL(string: "offshore://open/review-today")!
     static let openSafeSpendTodayURL = URL(string: "offshore://open/safe-spend-today")!
     static let openForecastSavingsURL = URL(string: "offshore://open/forecast-savings")!
-
-    static func startExcursionModeURL(hours: Int = 2) -> URL {
-        URL(string: "offshore://action/excursion-mode/start?hours=\(hours)")!
-    }
 }
 
-// MARK: - Widget Launch Intents
+nonisolated enum OffshoreControlDestination: String, AppEnum {
+    case addExpense
+    case addIncome
+    case reviewToday
+    case excursionMode
 
-struct WidgetOpenAddExpenseIntent: AppIntent {
-    static var title: LocalizedStringResource = "Add Expense"
-    static var description = IntentDescription("Open Offshore directly to quick add expense.")
-    static var isDiscoverable: Bool = false
-    static var openAppWhenRun: Bool = true
+    static let typeDisplayRepresentation = TypeDisplayRepresentation(name: "Offshore Action")
+    static let caseDisplayRepresentations: [Self: DisplayRepresentation] = [
+        .addExpense: "Add Expense",
+        .addIncome: "Add Income",
+        .reviewToday: "Review Today",
+        .excursionMode: "Excursion Mode"
+    ]
+}
 
-    func perform() async throws -> some IntentResult {
-        WidgetActionLaunchStore.queue(OffshoreWidgetDeepLink.openAddExpenseURL)
+struct OpenOffshoreControlIntent: OpenIntent {
+    static let title: LocalizedStringResource = "Open Offshore Control"
+    static let isDiscoverable = false
+    static let authenticationPolicy: IntentAuthenticationPolicy = .requiresLocalDeviceAuthentication
+
+    @available(iOS 26.0, *)
+    static var supportedModes: IntentModes { .foreground(.immediate) }
+
+    @Parameter(title: "Action")
+    var target: OffshoreControlDestination
+
+    init() {}
+
+    init(target: OffshoreControlDestination) {
+        self.target = target
+    }
+
+    @MainActor
+    func perform() async throws -> IntentResultContainer<Never, Never, Never, Never> {
+        #if OFFSHORE_WIDGET_EXTENSION
+        // Foreground actions require the host app to handle the destination.
+        throw CocoaError(.featureUnsupported)
+        #else
+        await OffshoreDeepLinkHandler.handleControl(target)
         return .result()
+        #endif
     }
 }
 
-struct WidgetOpenAddIncomeIntent: AppIntent {
-    static var title: LocalizedStringResource = "Add Income"
-    static var description = IntentDescription("Open Offshore directly to quick add income.")
-    static var isDiscoverable: Bool = false
-    static var openAppWhenRun: Bool = true
+#if canImport(ActivityKit) && !targetEnvironment(macCatalyst)
+struct StartExcursionControlIntent: LiveActivityIntent {
+    static let title: LocalizedStringResource = "Start Excursion Mode"
+    static let isDiscoverable = false
+    static let authenticationPolicy: IntentAuthenticationPolicy = .requiresLocalDeviceAuthentication
 
-    func perform() async throws -> some IntentResult {
-        WidgetActionLaunchStore.queue(OffshoreWidgetDeepLink.openAddIncomeURL)
+    @available(iOS 26.0, *)
+    static var supportedModes: IntentModes { .background }
+
+    @MainActor
+    func perform() async throws -> IntentResultContainer<Never, Never, Never, Never> {
+        #if OFFSHORE_WIDGET_EXTENSION
+        throw CocoaError(.featureUnsupported)
+        #else
+        ShoppingModeLocationService.shared.setApplicationInForeground(
+            UIApplication.shared.applicationState == .active
+        )
+        if case .blocked(let blockers) = await ShoppingModeManager.shared.start(hours: 2) {
+            throw StartError(message: blockers.map(\.message).joined(separator: "\n"))
+        }
         return .result()
+        #endif
+    }
+
+    private struct StartError: LocalizedError {
+        let message: String
+
+        var errorDescription: String? { message }
     }
 }
-
-struct WidgetReviewTodayIntent: AppIntent {
-    static var title: LocalizedStringResource = "Review Today"
-    static var description = IntentDescription("Open Offshore for a review of today's spending.")
-    static var isDiscoverable: Bool = false
-    static var openAppWhenRun: Bool = true
-
-    func perform() async throws -> some IntentResult {
-        WidgetActionLaunchStore.queue(OffshoreWidgetDeepLink.openReviewTodayURL)
-        return .result()
-    }
-}
-
-struct WidgetOpenSafeSpendTodayIntent: AppIntent {
-    static var title: LocalizedStringResource = "Safe Spend Today"
-    static var description = IntentDescription("Open Offshore to review safe spending guidance for today.")
-    static var isDiscoverable: Bool = false
-    static var openAppWhenRun: Bool = true
-
-    func perform() async throws -> some IntentResult {
-        WidgetActionLaunchStore.queue(OffshoreWidgetDeepLink.openSafeSpendTodayURL)
-        return .result()
-    }
-}
-
-struct WidgetOpenForecastSavingsIntent: AppIntent {
-    static var title: LocalizedStringResource = "Forecast Savings"
-    static var description = IntentDescription("Open Offshore to review your savings outlook.")
-    static var isDiscoverable: Bool = false
-    static var openAppWhenRun: Bool = true
-
-    func perform() async throws -> some IntentResult {
-        WidgetActionLaunchStore.queue(OffshoreWidgetDeepLink.openForecastSavingsURL)
-        return .result()
-    }
-}
-
-struct WidgetStartExcursionModeIntent: AppIntent {
-    static var title: LocalizedStringResource = "Excursion Mode"
-    static var description = IntentDescription("Start a 2-hour Excursion Mode session in Offshore.")
-    static var isDiscoverable: Bool = false
-    static var openAppWhenRun: Bool = true
-
-    func perform() async throws -> some IntentResult {
-        WidgetActionLaunchStore.queue(OffshoreWidgetDeepLink.startExcursionModeURL(hours: 2))
-        return .result()
-    }
-}
+#endif

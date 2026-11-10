@@ -12,6 +12,7 @@ import Foundation
 struct HomeView: View {
 
     let workspace: Workspace
+    private let onReviewToday: (() -> Void)?
 
     @Query private var budgets: [Budget]
     @Query private var cards: [Card]
@@ -170,8 +171,9 @@ struct HomeView: View {
         isPhone == false
     }
 
-    init(workspace: Workspace) {
+    init(workspace: Workspace, onReviewToday: (() -> Void)? = nil) {
         self.workspace = workspace
+        self.onReviewToday = onReviewToday
         let workspaceID = workspace.id
         let defaults = UserDefaults.standard
         let defaultBudgetingPeriodRaw = defaults.string(forKey: "general_defaultBudgetingPeriod")
@@ -282,6 +284,16 @@ struct HomeView: View {
                     .padding(.horizontal, contentHorizontalPadding)
                     .padding(.bottom, 18)
                 }
+                .safeAreaInset(edge: .bottom, alignment: .trailing, spacing: 0) {
+                    if isPhone, let onReviewToday {
+                        reviewTodayButton(action: onReviewToday, isAccessory: true)
+                            .buttonStyle(.plain)
+                            .foregroundStyle(.primary)
+                            .bottomAccessorySurface()
+                            .padding(.horizontal, 20)
+                            .padding(.vertical, 4)
+                    }
+                }
                 .onAppear {
                     updateMeasuredUsableWidth(totalWidth: proxy.size.width)
                 }
@@ -332,6 +344,12 @@ struct HomeView: View {
             endDate: appliedEndDate
         ))
         .toolbar {
+            if !isPhone, let onReviewToday {
+                ToolbarItem(placement: .primaryAction) {
+                    reviewTodayButton(action: onReviewToday)
+                }
+            }
+
             ToolbarItem(placement: .topBarLeading) {
                 Button {
                     isEditingWidgets = true
@@ -1275,6 +1293,23 @@ struct HomeView: View {
     }
 
     // MARK: - Home Toolbar
+
+    private func reviewTodayButton(action: @escaping () -> Void, isAccessory: Bool = false) -> some View {
+        Button(action: action) {
+            let label = Label("Review Today", systemImage: "list.bullet.clipboard")
+                .labelStyle(.iconOnly)
+            if isAccessory {
+                label
+                    .font(.title2)
+                    .frame(width: 44, height: 44)
+                    .contentShape(Circle())
+            } else {
+                label
+            }
+        }
+        .accessibilityLabel("Review Today")
+        .accessibilityIdentifier("home.reviewToday")
+    }
 
     private var homeActionsToolbarButton: some View {
         let hasActiveExpenseFilters = hideFuturePlannedExpensesInView
