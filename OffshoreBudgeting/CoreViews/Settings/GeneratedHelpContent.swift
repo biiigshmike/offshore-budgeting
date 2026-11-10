@@ -1466,57 +1466,34 @@ private func quickActionsGuideSections(prefix: String, isSettingsVariant: Bool) 
     let introHeader: LocalizedStringResource = isSettingsVariant ? "Install and Use Quick Actions" : "What Quick Actions Are"
     let introBody: LocalizedStringResource
     if isSettingsVariant {
-        introBody = "Quick Actions is the install hub for Offshore shortcut links and setup guidance. Use it to configure repeat tasks like income capture from SMS or email, expense capture from email, and Tap to Pay logging.\n\nShortcuts are optional. Offshore works without them, so treat automations as a convenience layer you build gradually."
+        introBody = "Quick Actions is the install hub for Offshore shortcut links and setup guidance. Use it to configure repeat tasks like income and expense capture from email or SMS, and Tap to Pay logging.\n\nShortcuts are optional. Offshore works without them, so treat automations as a convenience layer you build gradually."
     } else {
         introBody = "Quick Actions are optional Apple Shortcuts that make repeat tasks faster. Offshore works fully without them, so treat automations as a convenience layer.\n\nSome workflows can use Apple Intelligence for better names or labels, but every flow should still have a non-AI fallback so setup works on more devices."
     }
 
     let setupPatternBody: LocalizedStringResource = isSettingsVariant
-        ? "Start with one automation for one trusted source, test it with a real message or transaction, then expand only after it behaves reliably. Keep card mapping, amount parsing, and source naming as simple as possible on the first pass.\n\nIf a workflow offers both Apple Intelligence and non-AI variants, install the non-AI option by default and treat the AI-enhanced version as optional."
+        ? "Start with one automation for one trusted source, test it with a real message or transaction, then expand only after it behaves reliably. Keep card mapping, amount parsing, and source naming as simple as possible on the first pass.\n\nChoose Standard for broader device support. The Apple Intelligence version requires Apple Intelligence and uses it to suggest a source or merchant name."
         : "Start with one automation for one source, confirm the right variables are being passed into Offshore, then expand only after real-world testing. This keeps troubleshooting small and prevents duplicate or misparsed entries.\n\nFor shared shortcut links, assume people who already installed an older copy may need to reinstall to get later improvements."
 
-    let incomeSMSHeader: LocalizedStringResource = "Add Income From An SMS Message"
-    let incomeSMSGuideHeader: LocalizedStringResource = "Add Income From An SMS Message Setup Guide"
-    let incomeEmailHeader: LocalizedStringResource = "Add Income From An Email"
-    let incomeEmailGuideHeader: LocalizedStringResource = "Add Income From An Email Setup Guide"
-    let expenseEmailHeader: LocalizedStringResource = "Add Expense From Email"
-    let expenseEmailGuideHeader: LocalizedStringResource = "Add Expense From Email Setup Guide"
     let tapToPayHeader: LocalizedStringResource = "Add Expense via Tap to Pay"
     let tapToPayGuideHeader: LocalizedStringResource = "Add Expense via Tap to Pay Setup Guide"
-    let incomeSMSBody: LocalizedStringResource = "Use this workflow for bank or payment messages that announce incoming funds. The shortcut should extract the credited amount first, then set a short income source name or a safe fallback before calling Offshore Add Income.\n\nPlan for a non-AI baseline first. If you later offer an Apple Intelligence version, keep the non-AI shortcut available for unsupported devices."
-    let incomeEmailBody: LocalizedStringResource = "Use this workflow for deposit confirmations and payroll-style emails. The shortcut should look for amount phrases near deposit language, then pass the extracted amount, description, date, and income type into Offshore Add Income.\n\nFallback prompting is still helpful here because forwarded emails or changed templates can strip out the expected amount format."
-    let expenseEmailBody: LocalizedStringResource = "Use this workflow for receipts, order confirmations, and shipped or delivered purchase emails. Match labeled totals first, then pass the amount and a merchant or fallback label into Offshore Add Expense.\n\nIf an email can include multiple final totals, decide whether the shortcut should log each one or only the best single match before you share it widely."
     let tapToPayBody: LocalizedStringResource = "Use this workflow for Apple Wallet transaction automations. Setup is per device and works best with one automation per card. Leave categories selected, keep merchant filters broad unless you need them, and let Offshore resolve merchant-based category matching later when possible.\n\nTap to Pay is configured manually in Shortcuts using Offshore’s built-in Add Expense action, so no shortcut download is required."
     let reliabilityBody: LocalizedStringResource = "Test after each automation is created. If parsing fails, recheck that the intended variables are mapped to the correct Shortcut Input details and that the installed shortcut version matches the instructions you are following.\n\nAvoid creating many near-duplicate automations up front. Start with one, verify it runs from a real message or transaction, then expand only if needed."
-    let shortcutDownloadsHeader: LocalizedStringResource = "Download Shortcuts"
     let shortcutDownloadsBody: LocalizedStringResource = "Choose the version you want to install before following the setup guide."
-    let incomeEmailSteps: [LocalizedStringResource] = [
-        "Open the Shortcuts app, make sure you have downloaded the correct shortcut, then go to the Automation tab. Tap the plus button to create a new automation.",
-        "On this screen, choose the Email trigger.",
-        "On the next screen, define when the shortcut should run. Find the email address that sends your direct deposit notifications and paste it into the Sender field. You can also add a Subject Contains trigger if that is more reliable. Set Run Immediately, then tap Next.",
-        "On the next screen, under Get Started, tap Create New Shortcut.",
-        "Search the Actions list for Run Shortcut.",
-        "Tap the blue Shortcut field to open your list of shortcuts. If you downloaded Add Income From An Email, you should see it here. Tap it to select it, then return to the shortcut setup screen.",
-        "Before saving, tap the blue arrow. Change Input from Choose Variable to Shortcut Input. You should see the two fields connect with a line. Once that appears, tap Save."
-    ]
-    let expenseEmailSteps: [LocalizedStringResource] = [
-        "Open the Shortcuts app, make sure you have downloaded the correct shortcut, then go to the Automation tab. Tap the plus button to create a new automation.",
-        "On this screen, choose the Email trigger.",
-        "On the next screen, define when the shortcut should run. Find the email address that sends your receipt or order confirmation emails and paste it into the Sender field. You can also add a Subject Contains trigger if that is more reliable. Set Run Immediately, then tap Next.",
-        "On the next screen, under Get Started, tap Create New Shortcut.",
-        "Search the Actions list for Run Shortcut.",
-        "Tap the blue Shortcut field to open your list of shortcuts. If you downloaded Add Expense From Email, you should see it here. Tap it to select it, then return to the shortcut setup screen.",
-        "Before saving, tap the blue arrow. Change Input from Choose Variable to Shortcut Input. You should see the two fields connect with a line. Once that appears, tap Save."
-    ]
-    let incomeSMSSteps: [LocalizedStringResource] = [
-        "Open the Shortcuts app, make sure you have downloaded the correct shortcut, then go to the Automation tab. Tap the plus button to create a new automation.",
-        "On this screen, choose the Message trigger.",
-        "On the next screen, define when the shortcut should run. Fill in the Sender field or the Message Contains field using the text pattern from the SMS message that confirms a direct deposit. Set Run Immediately, then tap Next.",
-        "On the next screen, under Get Started, tap Create New Shortcut.",
-        "Search the Actions list for Run Shortcut.",
-        "Tap the blue Shortcut field to open your list of shortcuts. If you downloaded Add Income From An SMS Message, you should see it here. Tap it to select it, then return to the shortcut setup screen.",
-        "Before saving, tap the blue arrow. Change Input from Choose Variable to Shortcut Input. You should see the two fields connect with a line. Once that appears, tap Save."
-    ]
+    let incomeSetup: LocalizedStringResource = """
+    1. Under Add Income, choose Standard or Apple Intelligence, then download the shortcut.
+    2. In Shortcuts, open Automation and tap +. Choose Email for deposit emails and filter by sender and subject. For SMS, choose Message and filter by sender and text such as “direct deposit.” Choose Run Immediately, then tap Next.
+    3. Create a new shortcut in the automation and add Run Shortcut. Select your Add Income download. Expand the action, set Input to Shortcut Input, and save.
+    4. Test one alert, such as “Direct deposit of $250.00 was credited to your account,” and check the amount and source in Offshore. Use the comments inside the shortcut to adapt the matching pattern to your bank’s wording.
+    """
+    let expenseSetup: LocalizedStringResource = """
+    1. Under Add Expense, choose Standard or Apple Intelligence, then download the shortcut. Open it and choose your Offshore Card in both Add Expense actions. Set a category if you want one.
+    2. In Shortcuts, open Automation and tap +. Choose Email for receipts and filter by sender and subject. For SMS, choose Message and filter by sender and text such as “Card purchase of.” Choose Run Immediately, then tap Next.
+    3. Create a new shortcut in the automation and add Run Shortcut. Select your Add Expense download. Expand the action, set Input to Shortcut Input, and save.
+    4. Test a receipt or an SMS such as “Card purchase of $18.42 at Corner Market.” Check the amount and card in Offshore. Use the comments inside the shortcut to adapt the matching pattern. Receipts with multiple matching totals can create multiple expenses.
+    """
+    let replaceShortcutBody: LocalizedStringResource = "When replacing a downloaded shortcut, open your existing automation and change the shortcut selected in Run Shortcut. Keep Input set to Shortcut Input. Test the updated automation before removing the old shortcut."
+
     let tapToPaySteps: [LocalizedStringResource] = [
         "Open the Shortcuts app and go to the Automations tab. Tap the plus button to create a new automation.",
         "On this screen, choose the Wallet trigger.",
@@ -1542,74 +1519,36 @@ private func quickActionsGuideSections(prefix: String, isSettingsVariant: Bool) 
             header: "Recommended Setup Pattern",
             body: setupPatternBody
         ),
-        quickActionsWorkflowTextSection(
-            prefix: prefix,
-            sectionNumber: 3,
-            workflowSlug: "income-sms",
-            header: incomeSMSHeader,
-            body: incomeSMSBody
+        textSection(
+            id: "\(prefix)-3-income",
+            header: "Add Income from Email or SMS",
+            body: incomeSetup
         ),
         quickActionsWorkflowLinksSection(
             prefix: prefix,
             sectionNumber: 4,
-            workflowSlug: "income-sms",
-            header: shortcutDownloadsHeader,
+            workflowSlug: "income",
+            header: "Download Add Income",
             body: shortcutDownloadsBody,
-            workflowID: "income-sms"
+            workflowID: "income"
         ),
-        quickActionsWorkflowMediaSection(
-            prefix: prefix,
-            sectionNumber: 5,
-            workflowSlug: "income-sms",
-            header: incomeSMSGuideHeader,
-            assetPrefix: "income-sms",
-            steps: incomeSMSSteps
-        ),
-        quickActionsWorkflowTextSection(
-            prefix: prefix,
-            sectionNumber: 6,
-            workflowSlug: "income-email",
-            header: incomeEmailHeader,
-            body: incomeEmailBody
-        ),
-        quickActionsWorkflowLinksSection(
-            prefix: prefix,
-            sectionNumber: 7,
-            workflowSlug: "income-email",
-            header: shortcutDownloadsHeader,
-            body: shortcutDownloadsBody,
-            workflowID: "income-email"
-        ),
-        quickActionsWorkflowMediaSection(
-            prefix: prefix,
-            sectionNumber: 8,
-            workflowSlug: "income-email",
-            header: incomeEmailGuideHeader,
-            assetPrefix: "income-email",
-            steps: incomeEmailSteps
-        ),
-        quickActionsWorkflowTextSection(
-            prefix: prefix,
-            sectionNumber: 9,
-            workflowSlug: "expense-email",
-            header: expenseEmailHeader,
-            body: expenseEmailBody
+        textSection(
+            id: "\(prefix)-9-expense",
+            header: "Add Expense from Email or SMS",
+            body: expenseSetup
         ),
         quickActionsWorkflowLinksSection(
             prefix: prefix,
             sectionNumber: 10,
-            workflowSlug: "expense-email",
-            header: shortcutDownloadsHeader,
+            workflowSlug: "expense",
+            header: "Download Add Expense",
             body: shortcutDownloadsBody,
-            workflowID: "expense-email"
+            workflowID: "expense"
         ),
-        quickActionsWorkflowMediaSection(
-            prefix: prefix,
-            sectionNumber: 11,
-            workflowSlug: "expense-email",
-            header: expenseEmailGuideHeader,
-            assetPrefix: "expense-email",
-            steps: expenseEmailSteps
+        textSection(
+            id: "\(prefix)-11-replace-shortcut",
+            header: "Replace an Installed Shortcut",
+            body: replaceShortcutBody
         ),
         quickActionsWorkflowTextSection(
             prefix: prefix,

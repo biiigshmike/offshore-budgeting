@@ -61,72 +61,48 @@ struct ShortcutLinkGroup: Identifiable, Hashable {
 enum ShortcutLinkCatalog {
     static let installGroups: [ShortcutLinkGroup] = [
         ShortcutLinkGroup(
-            id: "income-email",
-            title: "Add Income From An Email",
-            subtitle: "Install the version you want, then use the setup guide to connect it to your email automation.",
+            id: "income",
+            title: "Add Income",
+            subtitle: "Choose a version to use with an Email or Message automation.",
             variants: [
                 ShortcutLinkVariant(
-                    id: "income-email-non-ai",
-                    title: "Non-Apple Intelligence",
+                    id: "income-standard",
+                    title: "Standard",
                     subtitle: "Recommended default for broader device support.",
-                    systemImageName: "square.and.arrow.down",
-                    url: URL(string: "https://www.icloud.com/shortcuts/bdb4cf4e1f38431c9e6cc4353d1c9d71")!,
+                    systemImageName: "square.2.layers.3d.top.filled",
+                    url: URL(string: "https://www.icloud.com/shortcuts/53b01ca8d1e140e2aa94b55e7e4a15ec")!,
                     platformNote: "Supported on: iPhone, iPad, and Mac"
                 ),
                 ShortcutLinkVariant(
-                    id: "income-email-ai",
+                    id: "income-ai",
                     title: "Apple Intelligence",
                     subtitle: "Uses Apple Intelligence for richer source naming when available.",
-                    systemImageName: "square.and.arrow.down",
-                    url: URL(string: "https://www.icloud.com/shortcuts/3dbbd2b0f2334e679be0b4b1e903f019")!,
+                    systemImageName: "square.2.layers.3d.top.filled",
+                    url: URL(string: "https://www.icloud.com/shortcuts/8262c2e3b8a642d9a096ba05757ff545")!,
                     platformNote: "Requires Apple Intelligence support on the device.",
                     requiresAppleIntelligence: true
                 )
             ]
         ),
         ShortcutLinkGroup(
-            id: "income-sms",
-            title: "Add Income From An SMS Message",
-            subtitle: "Install the version you want, then use the setup guide to connect it to your message automation.",
+            id: "expense",
+            title: "Add Expense",
+            subtitle: "Choose a version to use with an Email or Message automation.",
             variants: [
                 ShortcutLinkVariant(
-                    id: "income-sms-non-ai",
-                    title: "Non-Apple Intelligence",
+                    id: "expense-standard",
+                    title: "Standard",
                     subtitle: "Recommended default for broader device support.",
-                    systemImageName: "square.and.arrow.down",
-                    url: URL(string: "https://www.icloud.com/shortcuts/ba5e0593ce9c4708b25930cdbaf683af")!,
+                    systemImageName: "square.2.layers.3d.top.filled",
+                    url: URL(string: "https://www.icloud.com/shortcuts/96f0316605544c8db7d7427eae2da568")!,
                     platformNote: "Supported on: iPhone, iPad, and Mac"
                 ),
                 ShortcutLinkVariant(
-                    id: "income-sms-ai",
-                    title: "Apple Intelligence",
-                    subtitle: "Uses Apple Intelligence for richer source naming when available.",
-                    systemImageName: "square.and.arrow.down",
-                    url: URL(string: "https://www.icloud.com/shortcuts/c97015724fdc433391d1afad6d928b88")!,
-                    platformNote: "Requires Apple Intelligence support on the device.",
-                    requiresAppleIntelligence: true
-                )
-            ]
-        ),
-        ShortcutLinkGroup(
-            id: "expense-email",
-            title: "Add Expense From Email",
-            subtitle: "Install the version you want, then use the setup guide to connect it to your email automation.",
-            variants: [
-                ShortcutLinkVariant(
-                    id: "expense-email-non-ai",
-                    title: "Non-Apple Intelligence",
-                    subtitle: "Recommended default for broader device support.",
-                    systemImageName: "square.and.arrow.down",
-                    url: URL(string: "https://www.icloud.com/shortcuts/bd258ccf9ccc47f18efba68c71913504")!,
-                    platformNote: "Supported on: iPhone, iPad, and Mac"
-                ),
-                ShortcutLinkVariant(
-                    id: "expense-email-ai",
+                    id: "expense-ai",
                     title: "Apple Intelligence",
                     subtitle: "Uses Apple Intelligence for richer merchant naming when available.",
-                    systemImageName: "square.and.arrow.down",
-                    url: URL(string: "https://www.icloud.com/shortcuts/b6e256f053ba4ec79faffcd32477daf8")!,
+                    systemImageName: "square.2.layers.3d.top.filled",
+                    url: URL(string: "https://www.icloud.com/shortcuts/07af55bcac2246809332079a7d7218ac")!,
                     platformNote: "Requires Apple Intelligence support on the device.",
                     requiresAppleIntelligence: true
                 )

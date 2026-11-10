@@ -9,8 +9,6 @@ struct QuickActionsInstallView: View {
 
     let isOnboarding: Bool
 
-    @Environment(\.openURL) private var openURL
-
     private var quickActionsHelpTopic: GeneratedHelpLeafTopic? {
         GeneratedHelpContent.visibleLeafTopic(for: "introduction-quick-actions")
     }
@@ -41,14 +39,14 @@ struct QuickActionsInstallView: View {
             }
 
             List {
-                shortcutsSection
+                ForEach(ShortcutLinkCatalog.installGroups) { group in
+                    ShortcutDownloadSection(group: group)
+                }
                 if !isOnboarding {
                     helpSection
                 }
             }
             .listStyle(.insetGrouped)
-            .scrollContentBackground(.hidden)
-            .background(Color(.systemBackground))
             .frame(minHeight: 300)
 
         }
@@ -63,35 +61,18 @@ struct QuickActionsInstallView: View {
 
     // MARK: - Sections
 
-    private var shortcutsSection: some View {
-        Section {
-            ForEach(ShortcutLinkCatalog.installGroups) { group in
-                ShortcutLinkGroupCard(
-                    group: group,
-                    openURL: openURL
-                )
-                .listRowInsets(EdgeInsets(top: 10, leading: 16, bottom: 10, trailing: 16))
-                .listRowBackground(Color.clear)
-            }
-        } header: {
-            Text("Shortcuts")
-        } footer: {
-            if !isOnboarding && isPhone {
-                Text("Tap to Pay is configured directly in the Shortcuts app using Offshore’s built-in Add Expense action.\n\nThere is no Tap to Pay shortcut download. Use the Setup Guide for the manual automation steps.")
-            }
-        }
-    }
-
     private var helpSection: some View {
-        Section("Automation Setup Help") {
+        Section {
             if let quickActionsHelpTopic {
                 NavigationLink {
                     HelpTopicDetailView(topic: quickActionsHelpTopic)
                 } label: {
-                    Text("Setup Guide for Installing Automation Shortcuts")
-                        .font(.footnote.weight(.semibold))
-                        .foregroundStyle(Color("AccentColor"))
+                    Label("Setup Guide", systemImage: "book")
                 }
+            }
+        } footer: {
+            if isPhone {
+                Text("Tap to Pay is configured directly in the Shortcuts app using Offshore’s built-in Add Expense action.\n\nThere is no Tap to Pay shortcut download. Use the Setup Guide for the manual automation steps.")
             }
         }
     }
@@ -108,87 +89,51 @@ struct QuickActionsInstallView: View {
     }
 }
 
-private struct ShortcutLinkGroupCard: View {
+private struct ShortcutDownloadSection: View {
     let group: ShortcutLinkGroup
-    let openURL: OpenURLAction
 
-    private var columns: [GridItem] {
-        Array(repeating: GridItem(.flexible(), spacing: 12, alignment: .top), count: max(1, min(2, group.variants.count)))
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @State private var selectedVariantID: String
+
+    init(group: ShortcutLinkGroup) {
+        self.group = group
+        _selectedVariantID = State(initialValue: group.variants.first?.id ?? "")
+    }
+
+    private var selectedVariant: ShortcutLinkVariant? {
+        group.variants.first { $0.id == selectedVariantID }
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(group.title)
-                    .font(.headline)
-                    .foregroundStyle(.primary)
-
-                Text(group.subtitle)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
+        Section {
+            if dynamicTypeSize.isAccessibilitySize {
+                versionPicker.pickerStyle(.inline)
+            } else {
+                versionPicker.pickerStyle(.segmented)
             }
 
-            LazyVGrid(columns: columns, alignment: .leading, spacing: 12) {
-                ForEach(group.variants) { variant in
-                    ShortcutLinkVariantCard(
-                        variant: variant,
-                        openURL: openURL
-                    )
+            if let variant = selectedVariant {
+                let title: LocalizedStringKey = variant.requiresAppleIntelligence ? "Download Apple Intelligence" : "Download Standard"
+                Link(destination: variant.url) {
+                    Label(title, systemImage: variant.systemImageName)
                 }
+                .accessibilityLabel(Text("Download \(group.title) - \(variant.title)"))
+            }
+        } header: {
+            Text(group.title)
+        } footer: {
+            if selectedVariant?.requiresAppleIntelligence == true {
+                Text("Requires Apple Intelligence")
             }
         }
-        .padding(14)
-        .background(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(Color(.secondarySystemGroupedBackground))
-        )
     }
-}
 
-private struct ShortcutLinkVariantCard: View {
-    let variant: ShortcutLinkVariant
-    let openURL: OpenURLAction
-
-    var body: some View {
-        Button {
-            openURL(variant.url)
-        } label: {
-            VStack(alignment: .leading, spacing: 10) {
-                HStack(alignment: .top, spacing: 8) {
-                    Image(systemName: variant.systemImageName)
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(Color("AccentColor"))
-                }
-
-                Text(variant.title)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.primary)
-                    .multilineTextAlignment(.leading)
-
-                Text(variant.subtitle)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.leading)
-
-                if let platformNote = variant.platformNote {
-                    Text(platformNote)
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.leading)
-                }
+    private var versionPicker: some View {
+        Picker("Version for \(group.title)", selection: $selectedVariantID) {
+            ForEach(group.variants) { variant in
+                Text(variant.title).tag(variant.id)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            .padding(12)
-            .background(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(Color(.systemBackground))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .stroke(Color.primary.opacity(0.08), lineWidth: 1)
-            )
         }
-        .buttonStyle(.plain)
     }
 }
 

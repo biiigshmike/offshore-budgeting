@@ -238,7 +238,14 @@ struct HelpFAQEngineTests {
 
         let sectionIDs = Set(topic?.sections.map(\.id) ?? [])
         #expect(sectionIDs.contains("settings-quick-actions-2"))
-        #expect(sectionIDs.contains("settings-quick-actions-3-income-sms"))
+        #expect(sectionIDs.contains("settings-quick-actions-3-income"))
+        #expect(sectionIDs.contains("settings-quick-actions-9-expense"))
+        #expect(sectionIDs.contains("settings-quick-actions-13-tap-to-pay"))
+        let downloads = topic?.sections.filter { !$0.linkItems.isEmpty } ?? []
+        #expect(downloads.map(\.id) == ["settings-quick-actions-4-income", "settings-quick-actions-10-expense"])
+        for download in downloads {
+            #expect(download.linkItems.count == 2)
+        }
         #expect(sectionIDs.contains("settings-quick-actions-nonphone-note") == false)
     }
 
