@@ -6,6 +6,7 @@ struct DateRangeToolbarControls: View {
     let endDate: Date
     var isEnabled: Bool = true
     let onApply: (Date, Date) -> Void
+    let allTimeDates: () -> [Date]
     let onSelectQuickRange: (CalendarQuickRangePreset) -> Void
 
     @State private var editorDraft: DateRangeEditorDraft?
@@ -40,10 +41,19 @@ struct DateRangeToolbarControls: View {
         }
 
         Menu {
-            CalendarQuickRangeMenuItems(onSelect: onSelectQuickRange)
+            CalendarQuickRangeMenuItems(
+                onSelectAllTime: {
+                    let range = CalendarQuickRange.covering(allTimeDates())
+                    DispatchQueue.main.async {
+                        onApply(range.start, range.end)
+                    }
+                },
+                onSelect: onSelectQuickRange
+            )
         } label: {
             Label("Date Ranges", systemImage: "calendar")
         }
+        .menuOrder(.fixed)
         .accessibilityLabel("Quick Date Ranges")
         .accessibilityIdentifier("dateRange.quickRanges")
         .help("Quick Date Ranges")

@@ -12,6 +12,15 @@ import SwiftUI
 struct CalendarQuickRange: Sendable {
     let start: Date
     let end: Date
+
+    static func covering(
+        _ dates: [Date], now: Date = .now, calendar: Calendar = .current
+    ) -> Self {
+        let start = calendar.startOfDay(for: dates.min() ?? now)
+        let lastDay = calendar.startOfDay(for: dates.max() ?? now)
+        let end = calendar.date(byAdding: DateComponents(day: 1, second: -1), to: lastDay) ?? lastDay
+        return Self(start: start, end: end)
+    }
 }
 
 enum CalendarQuickRangePreset: String, Identifiable, CaseIterable {
@@ -184,9 +193,16 @@ enum CalendarQuickRangePreset: String, Identifiable, CaseIterable {
 // MARK: - Menu Content
 
 struct CalendarQuickRangeMenuItems: View {
+    let onSelectAllTime: () -> Void
     let onSelect: (CalendarQuickRangePreset) -> Void
 
     var body: some View {
+        Section {
+            Button("All Time", action: onSelectAllTime)
+        }
+
+        Divider()
+
         Section("Daily") {
             ForEach(CalendarQuickRangePreset.dailyPresets) { preset in
                 Button(preset.title) { onSelect(preset) }

@@ -111,6 +111,7 @@ struct AllocationAccountDetailView: View {
                         draftEndDate = end
                         applyDraftDates()
                     },
+                    allTimeDates: { ledgerRows.map(\.date) },
                     onSelectQuickRange: applyQuickRangePresetDeferred
                 )
             }

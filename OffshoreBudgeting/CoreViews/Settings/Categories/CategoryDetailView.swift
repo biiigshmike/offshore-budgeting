@@ -300,6 +300,7 @@ struct CategoryDetailView: View, Equatable {
             startDate: startDate, endDate: endDate,
             isEnabled: !isApplyingQuickRange,
             onApply: applyDates,
+            allTimeDates: allTimeDates,
             onSelectQuickRange: applyQuickRange
         )
     }
@@ -313,6 +314,20 @@ struct CategoryDetailView: View, Equatable {
     private func applyDates(_ start: Date, _ end: Date) {
         startDate = Calendar.current.startOfDay(for: start)
         endDate = Calendar.current.startOfDay(for: end)
+    }
+
+    private func allTimeDates() -> [Date] {
+        let planned = PlannedExpenseFuturePolicy.filteredForVisibility(
+            plannedExpenses, hideFuture: hideFuturePlanned && excludeFuturePlanned
+        )
+        let variable = VariableExpenseFuturePolicy.filteredForVisibility(
+            variableExpenses, hideFuture: hideFutureVariable && excludeFutureVariable
+        )
+        switch scope {
+        case .planned: return planned.map(\.expenseDate)
+        case .variable: return variable.map(\.transactionDate)
+        case .unified: return planned.map(\.expenseDate) + variable.map(\.transactionDate)
+        }
     }
 
     private func applyQuickRange(_ preset: CalendarQuickRangePreset) {

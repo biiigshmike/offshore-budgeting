@@ -835,6 +835,7 @@ struct CardDetailView: View {
                     draftEndDate = end
                     applyDraftDates()
                 },
+                allTimeDates: allTimeDates,
                 onSelectQuickRange: applyQuickRangePresetDeferred
             )
         }
@@ -999,6 +1000,22 @@ struct CardDetailView: View {
     private func applyDraftDates() {
         appliedStartDate = normalizedStart(draftStartDate)
         appliedEndDate = normalizedEnd(draftEndDate)
+    }
+
+    private func allTimeDates() -> [Date] {
+        let planned = PlannedExpenseFuturePolicy.filteredForVisibility(
+            plannedExpensesBase,
+            hideFuture: hideFuturePlannedExpensesInView && excludeFuturePlannedExpensesFromCalculationsInView
+        )
+        let variable = VariableExpenseFuturePolicy.filteredForVisibility(
+            variableExpensesBase,
+            hideFuture: hideFutureVariableExpensesInView && excludeFutureVariableExpensesFromCalculationsInView
+        )
+        switch expenseScope {
+        case .planned: return planned.map(\.expenseDate)
+        case .variable: return variable.map(\.transactionDate)
+        case .unified: return planned.map(\.expenseDate) + variable.map(\.transactionDate)
+        }
     }
 
     private func applyQuickRangePresetDeferred(_ preset: CalendarQuickRangePreset) {

@@ -410,7 +410,7 @@ struct SavingsAccountView<TrailingToolbar: ToolbarContent>: View {
         }
         .listStyle(.insetGrouped)
         .modifier(DateRangeNavigationHeader(
-            title: AccountsView.Segment.savings.title,
+            title: String(localized: "Savings"),
             startDate: appliedStartDate,
             endDate: appliedEndDate
         ))
@@ -425,6 +425,7 @@ struct SavingsAccountView<TrailingToolbar: ToolbarContent>: View {
                         draftEndDate = end
                         applyDraftDates()
                     },
+                    allTimeDates: { accountScopedEntries.map(\.date) },
                     onSelectQuickRange: applyQuickRangePresetDeferred
                 )
             }

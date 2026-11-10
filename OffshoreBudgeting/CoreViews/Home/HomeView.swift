@@ -369,6 +369,7 @@ struct HomeView: View {
                         draftEndDate = end
                         applyDraftRange()
                     },
+                    allTimeDates: allTimeDates,
                     onSelectQuickRange: applyQuickRange
                 )
             }
@@ -1440,6 +1441,20 @@ struct HomeView: View {
         // Persist the preference alongside custom dates so a recreated Home view
         // does not mistake its AppStorage fallback for a changed setting.
         lastSyncedDefaultBudgetingPeriodRaw = defaultBudgetingPeriodRaw
+    }
+
+    private func allTimeDates() -> [Date] {
+        let planned = PlannedExpenseFuturePolicy.filteredForVisibility(
+            computePlannedExpensesForHome(),
+            hideFuture: hideFuturePlannedExpensesInView && excludeFuturePlannedExpensesFromCalculationsInView
+        )
+        let variable = VariableExpenseFuturePolicy.filteredForVisibility(
+            variableExpenses,
+            hideFuture: hideFutureVariableExpensesInView && excludeFutureVariableExpensesFromCalculationsInView
+        )
+        return planned.map(\.expenseDate) + variable.map(\.transactionDate)
+            + incomes.map(\.date) + savingsEntries.filter { $0.kind != .reconciliationSettlement }.map(\.date)
+            + budgets.flatMap { [$0.startDate, $0.endDate] }
     }
 
     private func applyQuickRange(_ preset: CalendarQuickRangePreset) {

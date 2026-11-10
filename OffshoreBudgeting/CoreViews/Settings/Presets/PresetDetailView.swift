@@ -189,10 +189,20 @@ struct PresetDetailView: View, Equatable {
         .listStyle(.insetGrouped)
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
-                DateRangeToolbarControls(startDate: startDate, endDate: endDate, onApply: applyDates) {
-                    let dates = $0.makeRange()
-                    applyDates(dates.start, dates.end)
-                }
+                DateRangeToolbarControls(
+                    startDate: startDate,
+                    endDate: endDate,
+                    onApply: applyDates,
+                    allTimeDates: {
+                        PlannedExpenseFuturePolicy.filteredForVisibility(
+                            expenses, hideFuture: hideFuture && excludeFuture
+                        ).map(\.expenseDate)
+                    },
+                    onSelectQuickRange: {
+                        let dates = $0.makeRange()
+                        applyDates(dates.start, dates.end)
+                    }
+                )
             }
             if #available(iOS 26.0, macCatalyst 26.0, *) {
                 ToolbarSpacer(.fixed, placement: .primaryAction)
