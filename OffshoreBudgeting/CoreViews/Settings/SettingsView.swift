@@ -169,10 +169,8 @@ struct SettingsView: View {
         let baseMenu = Menu {
             workspaceSwitcherMenuContent
 
-            Button {
+            Button(String(localized: "settings.manageWorkspaces", defaultValue: "Manage Workspaces", comment: "Menu action to open workspace manager.")) {
                 showingWorkspaceManager = true
-            } label: {
-                Label(String(localized: "settings.manageWorkspaces", defaultValue: "Manage Workspaces", comment: "Menu action to open workspace manager."), systemImage: "person.fill")
             }
         } label: {
             WorkspaceToolbarMenuLabel(
