@@ -1313,7 +1313,7 @@ struct HomeView: View {
                 label
                     .font(.title2)
                     .foregroundStyle(.primary)
-                    .frame(width: 44, height: 44)
+                    .frame(width: 33, height: 33)
             } else {
                 label
             }
