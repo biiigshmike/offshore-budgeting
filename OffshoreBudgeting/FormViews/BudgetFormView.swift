@@ -283,12 +283,12 @@ struct BudgetFormView: View {
             }
             if let onCreateFollowingBudgets {
                 Section {
-                    Button("Create Following Budgets", action: onCreateFollowingBudgets)
+                    Button("Copy Budget Setup", action: onCreateFollowingBudgets)
                         .disabled(!canCreateFollowingBudgets)
                         .accessibilityIdentifier("budget.createFollowing")
                 } footer: {
                     if !canCreateFollowingBudgets {
-                        Text("Save or discard your changes before creating following budgets.")
+                        Text("Save or discard your changes before copying this budget’s setup.")
                     } else {
                         Text("Use this saved budget as a template for new, independent budgets.")
                     }

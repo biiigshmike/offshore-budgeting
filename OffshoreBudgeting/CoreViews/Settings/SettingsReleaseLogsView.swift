@@ -78,6 +78,22 @@ struct SettingsReleaseLogsView: View {
 
     static let releaseSections: [ReleaseSection] = [
         ReleaseSection(
+            version: "2.5.2",
+            build: "26",
+            items: [
+                ReleaseItem(
+                    systemImage: "chart.pie.fill",
+                    title: "Recurring Budgets",
+                    description: "Set up several budget periods at once. In Add Budget, use Repeat to choose how often it repeats and how many budgets to create, including the first. Tap Preview to check the dates before creating them.\n\nEach budget starts with the same cards, presets, and category goals, and you can edit it independently. To reuse an existing budget’s setup, open it for editing and tap Copy Budget Setup."
+                ),
+                ReleaseItem(
+                    systemImage: "widget.small",
+                    title: "Lock Screen Widgets",
+                    description: "Small Lock Screen widgets have been added to the collection. Customize your Lock Screen with small variants of Next Planned Expense and Category Limit."
+                )
+            ]
+        ),
+        ReleaseSection(
             version: "2.5.1",
             build: "25",
             items: [

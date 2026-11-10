@@ -86,7 +86,7 @@ struct AddBudgetView: View {
 
     var body: some View {
         BudgetFormView(
-            modeTitle: templateBudget == nil ? "Add Budget" : "Create Following Budgets",
+            modeTitle: "Add Budget",
             cards: cards,
             presets: presets,
             categories: goalCategories,
