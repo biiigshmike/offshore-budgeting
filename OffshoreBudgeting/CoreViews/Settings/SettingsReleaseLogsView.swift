@@ -90,6 +90,21 @@ struct SettingsReleaseLogsView: View {
                     systemImage: "widget.small",
                     title: "Lock Screen Widgets",
                     description: "Small Lock Screen widgets have been added to the collection. Customize your Lock Screen with small variants of Next Planned Expense and Category Limit."
+                ),
+                ReleaseItem(
+                    systemImage: "calendar",
+                    title: "All Time in Quick Ranges",
+                    description: "Choose All Time from Quick Ranges to see your full history without setting dates manually."
+                ),
+                ReleaseItem(
+                    systemImage: "list.bullet.clipboard",
+                    title: "Daily Review Improvements",
+                    description: "Open Review Today from Home to see today’s activity, check which expenses are still planned, and break down spending by category or card."
+                ),
+                ReleaseItem(
+                    systemImage: "sparkles.2",
+                    title: "Additional Improvements",
+                    description: "A few small refinements across Offshore."
                 )
             ]
         ),
