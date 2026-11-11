@@ -1475,6 +1475,14 @@ private func quickActionsGuideSections(prefix: String, isSettingsVariant: Bool) 
         ? "Start with one automation for one trusted source, test it with a real message or transaction, then expand only after it behaves reliably. Keep card mapping, amount parsing, and source naming as simple as possible on the first pass.\n\nChoose Standard for broader device support. The Apple Intelligence version requires Apple Intelligence and uses it to suggest a source or merchant name."
         : "Start with one automation for one source, confirm the right variables are being passed into Offshore, then expand only after real-world testing. This keeps troubleshooting small and prevents duplicate or misparsed entries.\n\nFor shared shortcut links, assume people who already installed an older copy may need to reinstall to get later improvements."
 
+    let deviceSetupBody: LocalizedStringResource = """
+    Set up and enable the automation on the device that will receive the alert. On iPhone and iPad, open Automation in Shortcuts and tap +. On a Mac with macOS 26 or later, open the shortcut in Shortcuts and add a trigger from the Edit menu. Choose Email or Message if that trigger is available on your device.
+
+    Set sender and subject or message filters on that device. Enable automatic running if offered. If the automation uses Run Shortcut, set its Input to Shortcut Input so the alert reaches the installed shortcut.
+
+    Use one device per alert source. Test a matching alert and check Offshore for one entry before setting up another source.
+    """
+
     let tapToPayHeader: LocalizedStringResource = "Add Expense via Tap to Pay"
     let tapToPayGuideHeader: LocalizedStringResource = "Add Expense via Tap to Pay Setup Guide"
     let tapToPayBody: LocalizedStringResource = "Use this workflow for Apple Wallet transaction automations. Setup is per device and works best with one automation per card. Leave categories selected, keep merchant filters broad unless you need them, and let Offshore resolve merchant-based category matching later when possible.\n\nTap to Pay is configured manually in Shortcuts using Offshore’s built-in Add Expense action, so no shortcut download is required."
@@ -1482,14 +1490,14 @@ private func quickActionsGuideSections(prefix: String, isSettingsVariant: Bool) 
     let shortcutDownloadsBody: LocalizedStringResource = "Choose the version you want to install before following the setup guide."
     let incomeSetup: LocalizedStringResource = """
     1. Under Add Income, choose Standard or Apple Intelligence, then download the shortcut.
-    2. In Shortcuts, open Automation and tap +. Choose Email for deposit emails and filter by sender and subject. For SMS, choose Message and filter by sender and text such as “direct deposit.” Choose Run Immediately, then tap Next.
-    3. Create a new shortcut in the automation and add Run Shortcut. Select your Add Income download. Expand the action, set Input to Shortcut Input, and save.
+    2. Follow Set Up on Your Device above. Choose Email for deposit emails and filter by sender and subject. For SMS, choose Message and filter by sender and text such as “direct deposit.”
+    3. If you are setting up the trigger in a separate shortcut, add Run Shortcut and select your Add Income download. Expand the action, set Input to Shortcut Input, and save.
     4. Test one alert, such as “Direct deposit of $250.00 was credited to your account,” and check the amount and source in Offshore. Use the comments inside the shortcut to adapt the matching pattern to your bank’s wording.
     """
     let expenseSetup: LocalizedStringResource = """
     1. Under Add Expense, choose Standard or Apple Intelligence, then download the shortcut. Open it and choose your Offshore Card in both Add Expense actions. Set a category if you want one.
-    2. In Shortcuts, open Automation and tap +. Choose Email for receipts and filter by sender and subject. For SMS, choose Message and filter by sender and text such as “Card purchase of.” Choose Run Immediately, then tap Next.
-    3. Create a new shortcut in the automation and add Run Shortcut. Select your Add Expense download. Expand the action, set Input to Shortcut Input, and save.
+    2. Follow Set Up on Your Device above. Choose Email for receipts and filter by sender and subject. For SMS, choose Message and filter by sender and text such as “Card purchase of.”
+    3. If you are setting up the trigger in a separate shortcut, add Run Shortcut and select your Add Expense download. Expand the action, set Input to Shortcut Input, and save.
     4. Test a receipt or an SMS such as “Card purchase of $18.42 at Corner Market.” Check the amount and card in Offshore. Use the comments inside the shortcut to adapt the matching pattern. Receipts with multiple matching totals can create multiple expenses.
     """
     let replaceShortcutBody: LocalizedStringResource = "When replacing a downloaded shortcut, open your existing automation and change the shortcut selected in Run Shortcut. Keep Input set to Shortcut Input. Test the updated automation before removing the old shortcut."
@@ -1518,6 +1526,11 @@ private func quickActionsGuideSections(prefix: String, isSettingsVariant: Bool) 
             id: "\(prefix)-2",
             header: "Recommended Setup Pattern",
             body: setupPatternBody
+        ),
+        textSection(
+            id: "\(prefix)-device-setup",
+            header: "Set Up on Your Device",
+            body: deviceSetupBody
         ),
         textSection(
             id: "\(prefix)-3-income",

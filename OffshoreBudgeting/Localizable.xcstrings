@@ -1419,10 +1419,10 @@
         }
       }
     },
-    "1. Under Add Expense, choose Standard or Apple Intelligence, then download the shortcut. Open it and choose your Offshore Card in both Add Expense actions. Set a category if you want one.\n2. In Shortcuts, open Automation and tap +. Choose Email for receipts and filter by sender and subject. For SMS, choose Message and filter by sender and text such as “Card purchase of.” Choose Run Immediately, then tap Next.\n3. Create a new shortcut in the automation and add Run Shortcut. Select your Add Expense download. Expand the action, set Input to Shortcut Input, and save.\n4. Test a receipt or an SMS such as “Card purchase of $18.42 at Corner Market.” Check the amount and card in Offshore. Use the comments inside the shortcut to adapt the matching pattern. Receipts with multiple matching totals can create multiple expenses." : {
+    "1. Under Add Expense, choose Standard or Apple Intelligence, then download the shortcut. Open it and choose your Offshore Card in both Add Expense actions. Set a category if you want one.\n2. Follow Set Up on Your Device above. Choose Email for receipts and filter by sender and subject. For SMS, choose Message and filter by sender and text such as “Card purchase of.”\n3. If you are setting up the trigger in a separate shortcut, add Run Shortcut and select your Add Expense download. Expand the action, set Input to Shortcut Input, and save.\n4. Test a receipt or an SMS such as “Card purchase of $18.42 at Corner Market.” Check the amount and card in Offshore. Use the comments inside the shortcut to adapt the matching pattern. Receipts with multiple matching totals can create multiple expenses." : {
 
     },
-    "1. Under Add Income, choose Standard or Apple Intelligence, then download the shortcut.\n2. In Shortcuts, open Automation and tap +. Choose Email for deposit emails and filter by sender and subject. For SMS, choose Message and filter by sender and text such as “direct deposit.” Choose Run Immediately, then tap Next.\n3. Create a new shortcut in the automation and add Run Shortcut. Select your Add Income download. Expand the action, set Input to Shortcut Input, and save.\n4. Test one alert, such as “Direct deposit of $250.00 was credited to your account,” and check the amount and source in Offshore. Use the comments inside the shortcut to adapt the matching pattern to your bank’s wording." : {
+    "1. Under Add Income, choose Standard or Apple Intelligence, then download the shortcut.\n2. Follow Set Up on Your Device above. Choose Email for deposit emails and filter by sender and subject. For SMS, choose Message and filter by sender and text such as “direct deposit.”\n3. If you are setting up the trigger in a separate shortcut, add Run Shortcut and select your Add Income download. Expand the action, set Input to Shortcut Input, and save.\n4. Test one alert, such as “Direct deposit of $250.00 was credited to your account,” and check the amount and source in Offshore. Use the comments inside the shortcut to adapt the matching pattern to your bank’s wording." : {
 
     },
     "2 hours" : {
@@ -57887,6 +57887,9 @@
         }
       }
     },
+    "Set up and enable the automation on the device that will receive the alert. On iPhone and iPad, open Automation in Shortcuts and tap +. On a Mac with macOS 26 or later, open the shortcut in Shortcuts and add a trigger from the Edit menu. Choose Email or Message if that trigger is available on your device.\n\nSet sender and subject or message filters on that device. Enable automatic running if offered. If the automation uses Run Shortcut, set its Input to Shortcut Input so the alert reaches the installed shortcut.\n\nUse one device per alert source. Test a matching alert and check Offshore for one entry before setting up another source." : {
+
+    },
     "Set Up Location" : {
       "localizations" : {
         "ar" : {
@@ -57926,6 +57929,9 @@
           }
         }
       }
+    },
+    "Set Up on Your Device" : {
+
     },
     "Set Up Reminders" : {
       "comment" : "A button that opens a system settings page to set up notifications.",

@@ -70,7 +70,7 @@ enum ShortcutLinkCatalog {
                     title: "Standard",
                     subtitle: "Recommended default for broader device support.",
                     systemImageName: "square.2.layers.3d.top.filled",
-                    url: URL(string: "https://www.icloud.com/shortcuts/53b01ca8d1e140e2aa94b55e7e4a15ec")!,
+                    url: URL(string: "https://www.icloud.com/shortcuts/56b952b912994b8fbc12df1209b41009")!,
                     platformNote: "Supported on: iPhone, iPad, and Mac"
                 ),
                 ShortcutLinkVariant(
@@ -78,7 +78,7 @@ enum ShortcutLinkCatalog {
                     title: "Apple Intelligence",
                     subtitle: "Uses Apple Intelligence for richer source naming when available.",
                     systemImageName: "square.2.layers.3d.top.filled",
-                    url: URL(string: "https://www.icloud.com/shortcuts/8262c2e3b8a642d9a096ba05757ff545")!,
+                    url: URL(string: "https://www.icloud.com/shortcuts/0e5ceaa7d9544a7aa81b395059c35427")!,
                     platformNote: "Requires Apple Intelligence support on the device.",
                     requiresAppleIntelligence: true
                 )
@@ -94,7 +94,7 @@ enum ShortcutLinkCatalog {
                     title: "Standard",
                     subtitle: "Recommended default for broader device support.",
                     systemImageName: "square.2.layers.3d.top.filled",
-                    url: URL(string: "https://www.icloud.com/shortcuts/96f0316605544c8db7d7427eae2da568")!,
+                    url: URL(string: "https://www.icloud.com/shortcuts/288a06cfed9c455dbf8c05ceb25d94d2")!,
                     platformNote: "Supported on: iPhone, iPad, and Mac"
                 ),
                 ShortcutLinkVariant(
@@ -102,7 +102,7 @@ enum ShortcutLinkCatalog {
                     title: "Apple Intelligence",
                     subtitle: "Uses Apple Intelligence for richer merchant naming when available.",
                     systemImageName: "square.2.layers.3d.top.filled",
-                    url: URL(string: "https://www.icloud.com/shortcuts/07af55bcac2246809332079a7d7218ac")!,
+                    url: URL(string: "https://www.icloud.com/shortcuts/d7e508157da9421aa59020a7f77f4df4")!,
                     platformNote: "Requires Apple Intelligence support on the device.",
                     requiresAppleIntelligence: true
                 )
