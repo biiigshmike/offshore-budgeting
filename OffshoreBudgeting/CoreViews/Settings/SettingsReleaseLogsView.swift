@@ -79,7 +79,7 @@ struct SettingsReleaseLogsView: View {
     static let releaseSections: [ReleaseSection] = [
         ReleaseSection(
             version: "2.5.2",
-            build: "26",
+            build: "27",
             items: [
                 ReleaseItem(
                     systemImage: "chart.pie.fill",

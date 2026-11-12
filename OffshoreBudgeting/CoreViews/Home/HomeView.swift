@@ -345,6 +345,9 @@ struct HomeView: View {
                 ToolbarItem(placement: .primaryAction) {
                     reviewTodayButton(action: onReviewToday)
                 }
+                if #available(iOS 26.0, macCatalyst 26.0, *) {
+                    ToolbarSpacer(.fixed, placement: .primaryAction)
+                }
             }
 
             ToolbarItem(placement: .topBarLeading) {
