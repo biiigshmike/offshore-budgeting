@@ -84,6 +84,7 @@ struct IncomeFormView: View {
                         
                     case .monthly:
                         Toggle("Last Day of Month", isOn: $monthlyIsLastDay)
+                            .toggleStyle(.switch)
                             .tint(Color("AccentColor"))
                         
                         if !monthlyIsLastDay {

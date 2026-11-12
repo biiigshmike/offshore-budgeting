@@ -92,6 +92,7 @@ struct SettingsPrivacyView: View {
 
             Section {
                 Toggle(biometricToggleTitle, isOn: $requireBiometricsToggle)
+                    .toggleStyle(.switch)
                     .tint(Color("AccentColor"))
                     .disabled(!biometricsToggleIsEnabled)
 
@@ -109,9 +110,12 @@ struct SettingsPrivacyView: View {
             // MARK: - System Permissions
 
             Section {
+                #if !targetEnvironment(macCatalyst)
                 locationPermissionRow
+                #endif
                 photosPermissionRow
 
+                #if !targetEnvironment(macCatalyst)
                 permissionRow(
                     title: "Live Activities",
                     status: liveActivitiesStatus,
@@ -133,14 +137,15 @@ struct SettingsPrivacyView: View {
                 Button {
                     openAppOrSystemSettings()
                 } label: {
-                    Label(isMacCatalyst ? "Open System Settings" : "Open App Settings", systemImage: "gearshape")
+                    Label("Open App Settings", systemImage: "gearshape")
                 }
+                #endif
             } header: {
                 Text("System Permissions")
             } footer: {
                 Text(
                     isMacCatalyst
-                    ? "Offshore reflects Apple’s on-device permission system status. On Mac, the button opens the relevant area in System Settings, and you can enable Offshore there if needed."
+                    ? "Offshore reflects Apple’s on-device permission system status."
                     : "Offshore reflects Apple’s on-device permission system status. You can change any permission at any time in App Settings."
                 )
             }

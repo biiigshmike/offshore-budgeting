@@ -645,6 +645,7 @@ private struct OnboardingWorkspaceStep: View {
 
                 Section {
                     Toggle("Confirm Before Deleting", isOn: $confirmBeforeDeleting)
+                        .toggleStyle(.switch)
                         .tint(Color("AccentColor"))
                 } footer: {
                     Text("You can change these later in Settings.")
@@ -817,6 +818,7 @@ private struct OnboardingPrivacySyncStep: View {
 
                 Section("App Lock") {
                     Toggle(biometricsInfo.kind.displayName, isOn: $requireBiometrics)
+                        .toggleStyle(.switch)
                         .tint(Color("AccentColor"))
                         .disabled(!biometricsInfo.isAvailable)
                     
@@ -840,6 +842,7 @@ private struct OnboardingPrivacySyncStep: View {
                                 handleICloudToggleChanged(wantsEnabled: wantsEnabled)
                             }
                         )).tint(Color("AccentColor"))
+                        .toggleStyle(.switch)
 
                         
                         Text("Use iCloud to sync your workspaces and budgets across your devices signed into this Apple ID.")

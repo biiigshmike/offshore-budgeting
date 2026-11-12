@@ -69,6 +69,7 @@ struct SettingsiCloudView: View {
                         handleToggleChange(newValue)
                     }
                 )).tint(Color("AccentColor"))
+                .toggleStyle(.switch)
 
                 statusRow
 
@@ -85,6 +86,7 @@ struct SettingsiCloudView: View {
                     get: { syncHomeLayout },
                     set: { handleHomeLayoutSyncChange($0) }
                 ))
+                .toggleStyle(.switch)
                 .tint(Color("AccentColor"))
                 .disabled(canUsePreferenceSync == false)
 
@@ -92,6 +94,7 @@ struct SettingsiCloudView: View {
                     get: { syncWhatIfScenarios },
                     set: { handleWhatIfScenariosSyncChange($0) }
                 ))
+                .toggleStyle(.switch)
                 .tint(Color("AccentColor"))
                 .disabled(canUsePreferenceSync == false)
             }

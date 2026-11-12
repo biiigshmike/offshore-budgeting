@@ -42,6 +42,7 @@ struct SettingsNotificationsView: View {
 
             Section("Scheduled Reminders") {
                 Toggle("Send Scheduled Reminders", isOn: $notificationsEnabled)
+                    .toggleStyle(.switch)
                     .accessibilityIdentifier("scheduledRemindersEnabled")
                     .tint(Color("AccentColor"))
                     .disabled(isRequestingPermission)
@@ -89,6 +90,7 @@ struct SettingsNotificationsView: View {
 
             Section("Expenses") {
                 Toggle("Daily Expense Reminder", isOn: $dailyExpenseReminderEnabled)
+                    .toggleStyle(.switch)
                     .tint(Color("AccentColor"))
                     .disabled(isRequestingPermission)
                     .onChange(of: dailyExpenseReminderEnabled) { _, _ in
@@ -104,6 +106,7 @@ struct SettingsNotificationsView: View {
 
             Section("Income") {
                 Toggle("Planned Income Reminder", isOn: $plannedIncomeReminderEnabled)
+                    .toggleStyle(.switch)
                     .tint(Color("AccentColor"))
 
                     .disabled(isRequestingPermission)
@@ -120,6 +123,7 @@ struct SettingsNotificationsView: View {
 
             Section("Presets") {
                 Toggle("Preset Expense Due Reminder", isOn: $presetDueReminderEnabled)
+                    .toggleStyle(.switch)
                     .tint(Color("AccentColor"))
 
                     .disabled(isRequestingPermission)

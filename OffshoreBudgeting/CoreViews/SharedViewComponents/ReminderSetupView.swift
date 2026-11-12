@@ -27,6 +27,7 @@ struct ReminderSetupView: View {
                                 .font(.footnote).foregroundStyle(.secondary)
                         }
                     }
+                    .toggleStyle(.switch)
                     .accessibilityIdentifier("reminderSetupDaily")
                     Toggle(isOn: $preferences.income) {
                         VStack(alignment: .leading) {
@@ -35,6 +36,7 @@ struct ReminderSetupView: View {
                                 .font(.footnote).foregroundStyle(.secondary)
                         }
                     }
+                    .toggleStyle(.switch)
                     .accessibilityIdentifier("reminderSetupIncome")
                     Toggle(isOn: $preferences.preset) {
                         VStack(alignment: .leading) {
@@ -43,6 +45,7 @@ struct ReminderSetupView: View {
                                 .font(.footnote).foregroundStyle(.secondary)
                         }
                     }
+                    .toggleStyle(.switch)
                     .accessibilityIdentifier("reminderSetupPreset")
                 } header: {
                     Text("Choose Your Reminders")

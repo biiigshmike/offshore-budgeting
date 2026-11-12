@@ -53,6 +53,7 @@ struct SettingsGeneralView: View {
             Section("Behavior") {
                 Toggle("Confirm Before Deleting", isOn: $confirmBeforeDeleting
                 )
+                .toggleStyle(.switch)
                 .tint(Color("AccentColor"))
 
                 Text("When enabled, you’ll always be asked to confirm before anything is deleted.")
@@ -60,6 +61,7 @@ struct SettingsGeneralView: View {
                     .foregroundStyle(.secondary)
 
                 Toggle("Review Uncategorized Expenses on App Open", isOn: $reviewUncategorizedExpensesOnOpen)
+                    .toggleStyle(.switch)
                     .tint(Color("AccentColor"))
                     .accessibilityIdentifier("reviewUncategorizedExpensesOnOpen")
 
@@ -274,6 +276,7 @@ private struct SettingsMaintenanceView: View {
             if WorkspaceProgressService.canHideProgress(in: workspace) {
                 Section {
                     Toggle("Hide Workspace Progress", isOn: hideWorkspaceProgress)
+                        .toggleStyle(.switch)
                         .tint(Color("AccentColor"))
                         .accessibilityIdentifier("hideWorkspaceProgress")
                 } footer: {
@@ -386,6 +389,7 @@ private struct SettingsExpenseDisplayView: View {
         List {
             Section("Planned Expenses") {
                 Toggle("Hide Future Planned Expenses", isOn: $hideFuturePlannedExpenses)
+                    .toggleStyle(.switch)
                     .tint(Color("AccentColor"))
 
                 Text("When enabled, planned expenses scheduled after today are hidden from expense lists.")
@@ -396,6 +400,7 @@ private struct SettingsExpenseDisplayView: View {
                     "Exclude Future Planned Expenses from Totals",
                     isOn: $excludeFuturePlannedExpensesFromCalculations
                 )
+                .toggleStyle(.switch)
                 .tint(Color("AccentColor"))
 
                 Text("When enabled, planned expenses scheduled after today are excluded from totals and savings calculations.")
@@ -405,6 +410,7 @@ private struct SettingsExpenseDisplayView: View {
 
             Section("Variable Expenses") {
                 Toggle("Hide Future Variable Expenses", isOn: $hideFutureVariableExpenses)
+                    .toggleStyle(.switch)
                     .tint(Color("AccentColor"))
 
                 Text("When enabled, variable expenses dated after today are hidden from expense lists.")
@@ -415,6 +421,7 @@ private struct SettingsExpenseDisplayView: View {
                     "Exclude Future Variable Expenses from Totals",
                     isOn: $excludeFutureVariableExpensesFromCalculations
                 )
+                .toggleStyle(.switch)
                 .tint(Color("AccentColor"))
 
                 Text("When enabled, variable expenses dated after today are excluded from totals and savings calculations.")

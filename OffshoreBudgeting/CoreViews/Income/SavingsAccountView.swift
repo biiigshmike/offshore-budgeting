@@ -925,6 +925,7 @@ private struct SavingsLedgerEntryFormView: View {
                 TextField("Note", text: $note)
 
                 Toggle("Set Aside as Savings", isOn: $isTransferToTrueSavings)
+                    .toggleStyle(.switch)
                     .tint(Color("AccentColor"))
                     .onChange(of: isTransferToTrueSavings) { _, isEnabled in
                         guard isEnabled else { return }
