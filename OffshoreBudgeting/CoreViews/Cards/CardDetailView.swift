@@ -666,27 +666,27 @@ struct CardDetailView: View {
         let currentScopeExplanation: String
         switch expenseScope {
         case .planned:
-            currentScopeExplanation = "Total Spent currently shows Planned expenses only."
+            currentScopeExplanation = "Total Spent shows only Planned expenses because that is the view you selected."
         case .variable:
-            currentScopeExplanation = "Total Spent currently shows Variable debit purchases only."
+            currentScopeExplanation = "Total Spent shows only purchases entered as Variable Expenses because that is the view you selected."
         case .unified:
-            currentScopeExplanation = "Total Spent currently shows Planned and Variable spending combined."
+            currentScopeExplanation = "Total Spent includes both Planned expenses and purchases entered as Variable Expenses."
         }
 
         return [
             FinancialCalculationSection(
                 id: "combined", title: "Combined Spending",
-                explanation: "Planned expenses plus variable debit purchases, using the current date range, search, category filters, and calculation settings.",
+                explanation: "This total adds Planned expenses and purchases entered as Variable Expenses. It uses your selected dates, search, categories, and calculation settings.",
                 rows: [
                     .init(id: "planned", title: "Planned", amount: derived.plannedTotal),
                     .init(id: "variable", title: "Variable", amount: derived.variableTotal),
                     .init(id: "total", title: "Combined Total", amount: derived.unifiedTotal, isTotal: true)
                 ],
                 notes: [
-                    "Planned expenses use their actual amount when greater than zero; otherwise, they use the planned amount.",
-                    "Credits and adjustments stay in card history and do not contribute to this gross spending total.",
-                    "Shared splits and Pay From Savings affect budget impact elsewhere; they do not reduce this card’s gross spending total.",
-                    "Hiding future expenses changes the list. Excluding future expenses from totals changes this calculation."
+                    "For each planned expense, an actual amount entered above zero takes the place of the planned amount. Otherwise, the planned amount still counts.",
+                    "Refunds and transactions marked Adjustment stay in your card history but do not change this total.",
+                    "Amounts assigned to someone else and amounts covered by Pay From Savings do not reduce this total. They do reduce spending totals on Home.",
+                    "Hiding future expenses only removes them from the list. To leave them out of this total, use the setting to exclude them from calculations."
                 ]
             ),
             FinancialCalculationSection(

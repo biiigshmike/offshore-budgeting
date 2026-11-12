@@ -29,29 +29,29 @@ enum SavingsCalculationExplanation {
         return [
             FinancialCalculationSection(
                 id: "projected", title: "Projected Savings",
-                explanation: "Expected income minus planned expenses at their planned amounts, after shared splits.",
+                explanation: "Start with the income you expect and subtract your share of the original planned costs.",
                 rows: [
                     .init(id: "income", title: "Planned Income", amount: plannedIncome),
-                    .init(id: "planned", title: "Planned-expense allowance", amount: -plannedImpact),
+                    .init(id: "planned", title: "Your share of planned expenses", amount: -plannedImpact),
                     .init(id: "total", title: "Projected Savings", amount: totals.projected, isTotal: true)
                 ],
-                notes: ["Variable expenses, Pay From Savings, and manual savings adjustments do not change this projection."]
+                notes: ["This estimate does not include variable expenses, payments from savings, or changes you enter directly in Offshore Savings."]
             ),
             FinancialCalculationSection(
                 id: "actual", title: "Actual Savings",
-                explanation: "Received income minus the budget impact of planned and variable expenses, plus manual savings adjustments.",
+                explanation: "Money left from the income you’ve received, after expenses and amounts still planned for this period, plus or minus changes you enter in savings. This is separate from your Offshore Savings balance.",
                 rows: [
                     .init(id: "income", title: "Actual Income", amount: actualIncome),
-                    .init(id: "planned", title: "Planned-expense budget impact", amount: -effectiveImpact),
-                    .init(id: "variable", title: "Variable-expense budget impact", amount: -variableImpact),
-                    .init(id: "adjustments", title: "Manual savings adjustments", amount: adjustments),
+                    .init(id: "planned", title: "Planned expenses counted here", amount: -effectiveImpact),
+                    .init(id: "variable", title: "Variable expenses counted here", amount: -variableImpact),
+                    .init(id: "adjustments", title: "Changes you’ve entered", amount: adjustments),
                     .init(id: "total", title: "Actual Savings", amount: totals.actual, isTotal: true)
                 ],
                 notes: [
-                    "A planned expense uses its actual amount when recorded; otherwise, its planned amount is still allowed for.",
-                    "Shared splits and Pay From Savings reduce expense budget impact. Refunds reduce variable-expense impact; adjustments have no budget impact.",
-                    "Set Aside as Savings reduces the Offshore Savings running balance and leaves Actual Savings unchanged.",
-                    "These totals use the expenses included by this screen’s calculation settings. Hiding an expense does not by itself exclude it from totals."
+                    "For each planned expense, an actual amount entered above zero takes the place of the planned amount. Otherwise, the planned amount still counts.",
+                    "Amounts assigned to someone else and amounts covered by Pay From Savings reduce the expenses counted here. Refunds reduce spending. Transactions marked Adjustment do not affect this total.",
+                    "Set Aside as Savings lowers your available Offshore Savings balance. It does not change Actual Savings for this period.",
+                    "Your calculation settings control which expenses count here. An expense can be hidden from the list and still count toward these totals."
                 ]
             )
         ]
@@ -65,18 +65,18 @@ enum SavingsCalculationExplanation {
 
         return [FinancialCalculationSection(
             id: "ledger", title: "Running Total",
-            explanation: "The sum of this account’s savings ledger entries across all dates.",
+            explanation: "Your available Offshore Savings balance, including all dates. This balance includes savings from completed budgeting periods and changes you’ve entered, minus amounts used through Pay From Savings or marked Set Aside as Savings.",
             rows: [
-                .init(id: "closes", title: "Completed-period savings", amount: periodCloses),
-                .init(id: "adjustments", title: "Manual savings adjustments", amount: adjustments),
-                .init(id: "payments", title: "Payments from savings", amount: expensePayments),
+                .init(id: "closes", title: "Savings from completed periods", amount: periodCloses),
+                .init(id: "adjustments", title: "Changes you’ve entered", amount: adjustments),
+                .init(id: "payments", title: "Amounts used through Pay From Savings", amount: expensePayments),
                 .init(id: "total", title: "Running Total", amount: included.reduce(0) { $0 + $1.amount }, isTotal: true)
             ],
             notes: [
-                "Automatic period closes follow your default budgeting period and its calendar dates. Individual custom budgets do not create separate deposits when they end.",
-                "Pay From Savings reduces this available balance. The full purchase remains in your card history.",
-                "Set Aside as Savings removes money you have reserved elsewhere from this available balance. Offshore records the change; it does not move money between bank accounts.",
-                "In Current Period, the date filter limits ledger entries and the chart. Running Total always includes all dates."
+                "Offshore calculates savings when your default budgeting period ends. Ending a custom budget does not add savings separately.",
+                "Using Pay From Savings reduces your available savings. The full expense stays in your card history.",
+                "Money you mark as saved elsewhere through Set Aside as Savings is taken out of this available balance. Offshore records this change; it does not transfer money between bank accounts.",
+                "Running Total includes all dates, even when you’re viewing activity for a shorter period."
             ]
         )]
     }

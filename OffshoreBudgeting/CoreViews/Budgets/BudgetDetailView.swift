@@ -894,46 +894,46 @@ struct BudgetDetailView: View {
             endDate: budget.endDate
         )
         var notes = [
-            "Expense totals follow the current search and category filters. Income and savings adjustments use the full budget date range.",
-            "Expenses must be on cards tracked by this budget. Planned expenses must also belong to this budget.",
-            "Planned expenses use their recorded actual amount when greater than zero; otherwise, their planned amount is reserved."
+            "Searching or choosing categories changes which expenses count here. Income and changes entered in savings still use the full budget date range.",
+            "Only expenses on this budget’s cards count here. Planned expenses must also belong to this budget.",
+            "For each planned expense, an actual amount entered above zero takes the place of the planned amount. Otherwise, the planned amount still counts."
         ]
         if excludeFuturePlannedExpensesFromCalculationsInView {
-            notes.append("Future planned expenses are excluded from these totals.")
+            notes.append("Planned expenses dated after today do not count here.")
         }
         if excludeFutureVariableExpensesFromCalculationsInView {
-            notes.append("Future variable expenses are excluded from these totals.")
+            notes.append("Variable expenses dated after today do not count here.")
         }
         var sections = [
             FinancialCalculationSection(
                 id: "max-savings",
                 title: "Max Savings",
-                explanation: "Planned income minus planned expenses at their current budget impact, before variable expenses.",
+                explanation: "Expected income minus the planned expenses counted here. Actual amounts above zero replace planned amounts when entered. Only your share counts, and amounts covered by Pay From Savings are left out. Variable expenses are not included.",
                 rows: [
                     .init(id: "income", title: "Planned Income", amount: derived.plannedIncomeTotal),
-                    .init(id: "planned", title: "Planned Expense Budget Impact", amount: -derived.plannedExpensesEffectiveTotal),
+                    .init(id: "planned", title: "Planned expenses counted here", amount: -derived.plannedExpensesEffectiveTotal),
                     .init(id: "total", title: "Max Savings", amount: derived.maxSavings, isTotal: true)
                 ]
             ),
             FinancialCalculationSection(
                 id: "projected-savings",
                 title: "Projected Savings",
-                explanation: "Planned income minus the original planned expense amounts, after shared splits. Variable expenses are not included.",
+                explanation: "Start with the income you expect and subtract your share of the original planned costs. Variable expenses are not included.",
                 rows: [
                     .init(id: "income", title: "Planned Income", amount: derived.plannedIncomeTotal),
-                    .init(id: "planned", title: "Planned Expenses After Splits", amount: -derived.plannedExpensesPlannedTotal),
+                    .init(id: "planned", title: "Your share of planned expenses", amount: -derived.plannedExpensesPlannedTotal),
                     .init(id: "total", title: "Projected Savings", amount: derived.projectedSavings, isTotal: true)
                 ]
             ),
             FinancialCalculationSection(
                 id: "actual-savings",
                 title: "Actual Savings",
-                explanation: "Received income minus planned and variable expense budget impacts, plus manual savings adjustments.",
+                explanation: "Money left from the income you’ve received, after expenses and amounts still planned for this period, plus or minus changes you enter in savings. This is separate from your Offshore Savings balance.",
                 rows: [
                     .init(id: "income", title: "Actual Income", amount: derived.actualIncomeTotal),
-                    .init(id: "planned", title: "Planned Expense Budget Impact", amount: -derived.plannedExpensesEffectiveTotal),
-                    .init(id: "variable", title: "Variable Expense Budget Impact", amount: -derived.variableExpensesTotal),
-                    .init(id: "adjustments", title: "Manual Savings Adjustments", amount: adjustments),
+                    .init(id: "planned", title: "Planned expenses counted here", amount: -derived.plannedExpensesEffectiveTotal),
+                    .init(id: "variable", title: "Variable expenses counted here", amount: -derived.variableExpensesTotal),
+                    .init(id: "adjustments", title: "Changes you’ve entered", amount: adjustments),
                     .init(id: "total", title: "Actual Savings", amount: derived.actualSavings, isTotal: true)
                 ],
                 notes: notes
@@ -941,25 +941,25 @@ struct BudgetDetailView: View {
         ]
         if let scenario = derived.goalMaximumSavings {
             var scenarioNotes = [
-                "Uses the full budget, regardless of search, selected categories, or expense-list type.",
-                "Current expense impact includes recorded planned amounts when available, otherwise planned amounts, plus variable expenses. Shared splits, payments from savings, and refunds follow the usual budget-impact rules.",
-                "Each category maximum reserves only the allowance left after its current expense impact. Spending above a maximum is kept in full.",
-                "Categories without a maximum, including minimum-only goals and Uncategorized, receive no extra allowance. Manual savings adjustments are not included."
+                "This estimate uses the full budget. Searching, choosing categories, or switching expense lists does not change it.",
+                "Planned expenses count at their actual amount when an amount above zero is entered, or their planned amount otherwise. Variable expenses also count. Amounts assigned to someone else, payments from savings, and refunds reduce the expenses counted here.",
+                "For each category with a maximum, this estimate allows for spending up to that limit. If a category is already over its limit, the full amount still counts.",
+                "No extra spending is allowed for in categories without a maximum, including Uncategorized and categories with only a minimum goal. Changes entered directly in savings are not included."
             ]
             if excludeFuturePlannedExpensesFromCalculationsInView {
-                scenarioNotes.append("Future planned expenses are excluded from these totals.")
+                scenarioNotes.append("Planned expenses dated after today do not count here.")
             }
             if excludeFutureVariableExpensesFromCalculationsInView {
-                scenarioNotes.append("Future variable expenses are excluded from these totals.")
+                scenarioNotes.append("Variable expenses dated after today do not count here.")
             }
             sections.insert(FinancialCalculationSection(
                 id: "goal-maximum-savings",
                 title: "Savings at Goal Maximums",
-                explanation: "Planned income minus current expense impact and the remaining allowance under category maximums.",
+                explanation: "An estimate of what would be left if you used all the money still available under your category spending limits.",
                 rows: [
                     .init(id: "income", title: "Planned Income", amount: scenario.plannedIncome),
-                    .init(id: "expenses", title: "Current Expense Impact", amount: -scenario.currentExpenseImpact),
-                    .init(id: "allowance", title: "Remaining Category Allowances", amount: -scenario.remainingCategoryAllowance),
+                    .init(id: "expenses", title: "Expenses counted here", amount: -scenario.currentExpenseImpact),
+                    .init(id: "allowance", title: "Spending still allowed by category limits", amount: -scenario.remainingCategoryAllowance),
                     .init(id: "total", title: "Savings at Goal Maximums", amount: scenario.estimatedSavings, isTotal: true)
                 ],
                 notes: scenarioNotes

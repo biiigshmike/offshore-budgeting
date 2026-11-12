@@ -319,16 +319,16 @@ struct PresetDetailView: View, Equatable {
     }
 
     private func calculationSections(_ result: PresetDetailCalculator.Result) -> [FinancialCalculationSection] {
-        [.init(id: "preset-variance", title: "Effective Variance",
-               explanation: "An actual amount greater than zero takes priority. Once the planned expense date has passed, a blank actual is assumed to match its planned amount. Today’s and future blanks remain pending. No actual amounts are written to your records.",
+        [.init(id: "preset-variance", title: "How costs compare with your plan",
+               explanation: "See how much higher or lower costs are than originally planned. An actual amount entered above zero takes the place of the planned amount. For past expenses without one, the planned amount serves as an estimate. Expenses dated today or later stay out of this comparison until an actual amount above zero is entered. These estimates do not change your expense records.",
                rows: [
-                .init(id: "effective", title: "Effective", amount: result.effectiveTotal),
-                .init(id: "planned", title: "Planned", amount: -result.plannedTotal),
-                .init(id: "variance", title: "Total Variance", amount: result.totalVariance, isTotal: true)
+                .init(id: "effective", title: "Recorded or estimated costs", amount: result.effectiveTotal),
+                .init(id: "planned", title: "Subtract planned costs", amount: -result.plannedTotal),
+                .init(id: "variance", title: "Difference from plan", amount: result.totalVariance, isTotal: true)
                ], notes: [
-                "Amounts are gross costs before allocation splits or savings offsets. Separate occurrences from overlapping budgets are counted separately.",
-                "Variance is effective amount minus the occurrence’s stored planned amount, not the preset’s current amount. Averages and period comparisons include recorded and assumed occurrences. Averages are per occurrence, not per chart period. Future visibility and calculation settings apply independently.",
-                "Above, below, and on-plan counts compare amounts at the selected currency’s precision."
+                "Amounts assigned to someone else and amounts covered by Pay From Savings do not reduce these costs. Each expense is counted separately, including expenses created in overlapping budgets.",
+                "A positive difference means costs were higher than planned. A negative difference means they were lower. Each expense is compared with its own original planned amount, even if you have since changed the preset. Averages and comparisons include recorded costs and estimates for past expenses. Averages are per expense, not per chart period. Hiding future expenses does not exclude them from calculations.",
+                "Amounts are rounded for your selected currency before expenses are counted as above, below, or on plan."
                ])]
     }
 }

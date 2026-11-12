@@ -351,21 +351,21 @@ struct CategoryDetailView: View, Equatable {
     private func calculationSections(_ derived: CategoryDetailCalculator.Result) -> [FinancialCalculationSection] {
         [FinancialCalculationSection(
             id: "category-spending", title: "Category Spending",
-            explanation: "Planned expenses plus variable debit purchases for this category across all cards, using the current dates, search, and calculation settings.",
+            explanation: "This total adds Planned expenses and purchases entered as Variable Expenses in this category, across all cards. It uses your selected dates, search, and calculation settings.",
             rows: [
                 .init(id: "planned", title: "Planned", amount: derived.plannedTotal),
                 .init(id: "variable", title: "Variable", amount: derived.variableTotal),
                 .init(id: "combined", title: "Combined Total", amount: derived.plannedTotal + derived.variableTotal, isTotal: true)
             ],
             notes: [
-                "Planned expenses use their actual amount when greater than zero; otherwise, they use the planned amount.",
-                "Credits and adjustments remain in history and do not contribute to this gross spending total.",
-                "Shared splits and Pay From Savings affect budget impact elsewhere; they do not reduce this category’s gross spending total.",
-                "Hiding future expenses changes the list. Excluding future expenses from totals changes this calculation."
+                "For each planned expense, an actual amount entered above zero takes the place of the planned amount. Otherwise, the planned amount still counts.",
+                "Refunds and transactions marked Adjustment stay in your history but do not change this total.",
+                "Amounts assigned to someone else and amounts covered by Pay From Savings do not reduce this total. They do reduce spending totals on Home.",
+                "Hiding future expenses only removes them from the list. To leave them out of this total, use the setting to exclude them from calculations."
             ]
         ), FinancialCalculationSection(
             id: "current-view", title: "Current View",
-            explanation: "Total Spent follows the selected Planned, Combined, or Variable expense scope.",
+            explanation: "Total Spent follows the view you selected: Planned, Combined, or Variable.",
             rows: [.init(id: "displayed", title: "Total Spent", amount: derived.displayTotal, isTotal: true)]
         )]
     }

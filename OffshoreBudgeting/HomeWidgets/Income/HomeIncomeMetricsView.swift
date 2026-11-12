@@ -134,12 +134,12 @@ struct HomeIncomeMetricsView: View {
             return FinancialCalculationSection(
                 id: isPlanned ? "planned" : "actual", title: title,
                 explanation: isPlanned
-                    ? "Expected income entries dated within the selected range, grouped by source."
-                    : "Received income entries dated within the selected range, grouped by source.",
+                    ? "Income you expect to receive during these dates, grouped by where it comes from."
+                    : "Income you’ve received during these dates, grouped by where it comes from.",
                 rows: sourceRows + [.init(id: "total", title: title, amount: sum(isPlanned: isPlanned, from: start, to: end), isTotal: true)],
                 notes: isPlanned
-                    ? ["Progress compares Actual Income with Planned Income. A percentage is shown when Planned Income is greater than zero."]
-                    : ["Actual and Planned Income are separate groups. They are not added into a combined income total."]
+                    ? ["Progress shows how much of your Planned Income you’ve received. Receiving half of the amount you planned means 50%. A percentage appears when Planned Income is above zero."]
+                    : ["Actual Income is money you’ve received. Planned Income is money you expect. These amounts are shown separately rather than added together."]
             )
         }
     }

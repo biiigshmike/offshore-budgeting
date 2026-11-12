@@ -74,7 +74,7 @@ struct SpendingCalculationExplanationTests {
         #expect(categories.compactMap { $0.rows.last?.amount }.reduce(0, +) == 80)
         let negative = try #require(categories.first { $0.rows.last?.title == "Returns" })
         #expect(negative.rows.last?.amount == -20)
-        #expect(negative.notes.last?.contains("omitted") == true)
+        #expect(negative.notes.last?.contains("not shown in the chart") == true)
         let positive = try #require(categories.first { $0.rows.last?.title == "Food" })
         #expect(positive.notes.first?.contains("125%") == true)
         let refundOnly = SpendingCalculationExplanation.spotlight(

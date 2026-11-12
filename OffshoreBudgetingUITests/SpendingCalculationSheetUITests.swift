@@ -35,7 +35,7 @@ final class SpendingCalculationSheetUITests: XCTestCase {
             let sheet = app.navigationBars["How is this calculated?"]
             XCTAssertTrue(sheet.waitForExistence(timeout: 5))
             XCTAssertTrue(app.staticTexts["Dates Included"].exists)
-            let effective = app.staticTexts["Effective planned amounts"].firstMatch
+            let effective = app.staticTexts["Planned expenses before deductions"].firstMatch
             reveal(effective, in: app)
             XCTAssertTrue(effective.isHittable)
             let screenshot = XCTAttachment(screenshot: app.screenshot())
@@ -51,7 +51,10 @@ final class SpendingCalculationSheetUITests: XCTestCase {
                 revealHeader(categoryTitle, in: app)
                 XCTAssertTrue((category.label).contains("$"))
                 XCTAssertEqual(app.staticTexts.matching(identifier: "Category Spending").count, 1)
-                let explanation = app.staticTexts["Planned budget impact plus variable budget impact for this category."].firstMatch
+                let explanation = app.staticTexts.matching(NSPredicate(
+                    format: "label == %@",
+                    "This category’s total includes Planned Expenses and Variable Expenses, minus shared expense amounts, Pay From Savings, and refunds."
+                )).firstMatch
                 XCTAssertFalse(explanation.exists)
                 let collapsed = XCTAttachment(screenshot: app.screenshot())
                 collapsed.name = "Collapsed category spending, large text: \(largeText)"
@@ -77,7 +80,7 @@ final class SpendingCalculationSheetUITests: XCTestCase {
                 revealHeader(periodTitle, in: app)
                 XCTAssertTrue(period.label.contains("$"))
                 XCTAssertEqual(app.staticTexts.matching(identifier: "Spending Periods").count, 1)
-                let reconciliation = app.staticTexts.matching(NSPredicate(format: "label == %@", "Period Reconciliation")).firstMatch
+                let reconciliation = app.staticTexts.matching(NSPredicate(format: "label == %@", "Why the chart and total can differ")).firstMatch
                 XCTAssertFalse(reconciliation.exists)
                 let collapsed = XCTAttachment(screenshot: app.screenshot())
                 collapsed.name = "Collapsed spending periods, large text: \(largeText)"
@@ -111,6 +114,12 @@ final class SpendingCalculationSheetUITests: XCTestCase {
 
     private func revealHeader(_ element: XCUIElement, in app: XCUIApplication) {
         for _ in 0..<20 {
+            // Expanded details can move their header out of the visible List cells.
+            // Bring it back from above before deciding which way to scroll.
+            if !element.exists {
+                app.swipeDown()
+                continue
+            }
             if element.exists {
                 let top = app.navigationBars.firstMatch.frame.maxY + 12
                 if element.frame.minY < top {
