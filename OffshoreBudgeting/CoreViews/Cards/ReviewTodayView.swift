@@ -6,8 +6,13 @@ struct ReviewTodayView: View {
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
+    @AppStorage("general_confirmBeforeDeleting") private var confirmBeforeDeleting = true
+    @Query private var workspacePresets: [Preset]
     @State private var result: Result<ReviewTodayActivity, any Error>?
     @State private var editingEntry: ReviewTodayActivity.Entry?
+    @State private var editingPreset: Preset?
+    @State private var pendingDelete: ReviewTodayActivity.Entry?
+    @State private var showingDeleteConfirm = false
 
     @State private var breakdown: Breakdown = .category
     @State private var expandedCardID: ReviewTodayActivity.CardTotal.ID?
@@ -15,6 +20,12 @@ struct ReviewTodayView: View {
     private enum Breakdown: Hashable {
         case category
         case card
+    }
+
+    init(workspace: Workspace) {
+        self.workspace = workspace
+        let workspaceID = workspace.id
+        _workspacePresets = Query(filter: #Predicate<Preset> { $0.workspace?.id == workspaceID })
     }
 
     var body: some View {
@@ -26,6 +37,18 @@ struct ReviewTodayView: View {
                         Button("Done") { dismiss() }
                     }
                 }
+                .blocksAutomaticExpenseReview(while: showingDeleteConfirm)
+                .alert("Delete Expense?", isPresented: $showingDeleteConfirm) {
+                    Button("Delete", role: .destructive) {
+                        if let pendingDelete {
+                            delete(pendingDelete)
+                        }
+                        pendingDelete = nil
+                    }
+                    Button("Cancel", role: .cancel) {
+                        pendingDelete = nil
+                    }
+                }
                 .appSheet(item: $editingEntry, onDismiss: reload) { entry in
                     NavigationStack {
                         switch entry {
@@ -34,6 +57,11 @@ struct ReviewTodayView: View {
                         case .planned(let expense):
                             EditPlannedExpenseView(workspace: workspace, plannedExpense: expense)
                         }
+                    }
+                }
+                .appSheet(item: $editingPreset, onDismiss: reload) { preset in
+                    NavigationStack {
+                        EditPresetView(workspace: workspace, preset: preset)
                     }
                 }
         }
@@ -134,15 +162,18 @@ struct ReviewTodayView: View {
     private func statement(_ review: ReviewTodayActivity) -> some View {
         let color = Color(hex: workspace.hexColor) ?? .secondary
         return Section {
-            TotalSpentStatementRow(total: review.spent, heatMapStops: [
-                .init(color: color, location: 0), .init(color: color, location: 1)
-            ])
-            .listRowInsets(EdgeInsets())
-            .accessibilityIdentifier("reviewToday.spent")
+            TotalSpentStatementRow(total: review.spent, heatMapStops: gradientStops(for: review))
+                .listRowInsets(EdgeInsets())
+                .accessibilityIdentifier("reviewToday.spent")
         } header: {
             VStack(alignment: .leading, spacing: 4) {
-                Label(workspace.name, systemImage: "person.fill")
-                    .accessibilityLabel("Workspace: \(workspace.name)")
+                Label {
+                    Text(workspace.name)
+                } icon: {
+                    Image(systemName: "person.fill")
+                        .foregroundStyle(color)
+                }
+                .accessibilityLabel("Workspace: \(workspace.name)")
                 Text(review.day, format: .dateTime.weekday(.wide).month(.wide).day())
                 Text("Spent Today")
                     .fontWeight(.semibold)
@@ -168,6 +199,70 @@ struct ReviewTodayView: View {
             }
         }
         .buttonStyle(.plain)
+        .swipeActions(edge: .leading, allowsFullSwipe: allowsFullSwipeEdit(entry)) {
+            Button {
+                editingEntry = entry
+            } label: {
+                Label("Edit", systemImage: "pencil")
+            }
+            .tint(Color("AccentColor"))
+
+            if case .planned(let expense) = entry,
+               let presetID = expense.sourcePresetID,
+               let preset = workspacePresets.first(where: { $0.id == presetID }) {
+                Button {
+                    editingPreset = preset
+                } label: {
+                    Label("Edit Preset", systemImage: "list.bullet.rectangle")
+                }
+                .tint(Color("OffshoreSand"))
+            }
+        }
+        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+            Button(role: .destructive) {
+                if confirmBeforeDeleting {
+                    pendingDelete = entry
+                    showingDeleteConfirm = true
+                } else {
+                    delete(entry)
+                }
+            } label: {
+                Label("Delete", systemImage: "trash")
+            }
+            .tint(Color("OffshoreDepth"))
+        }
+    }
+
+    private func allowsFullSwipeEdit(_ entry: ReviewTodayActivity.Entry) -> Bool {
+        if case .variable = entry { return true }
+        return false
+    }
+
+    private func gradientStops(for review: ReviewTodayActivity) -> [Gradient.Stop] {
+        let categories = review.categories.filter { $0.id != nil && $0.amount > 0 }.prefix(10)
+        let total = categories.reduce(0) { $0 + $1.amount }
+        guard total > 0 else { return [] }
+
+        var cursor = 0.0
+        var stops: [Gradient.Stop] = []
+        for (index, category) in categories.enumerated() {
+            let color = category.colorHex.flatMap { Color(hex: $0) } ?? Color.secondary.opacity(0.35)
+            let end = index == categories.count - 1 ? 1.0 : min(1.0, cursor + category.amount / total)
+            stops.append(.init(color: color, location: cursor))
+            stops.append(.init(color: color, location: end))
+            cursor = end
+        }
+        return stops
+    }
+
+    private func delete(_ entry: ReviewTodayActivity.Entry) {
+        switch entry {
+        case .variable(let expense):
+            VariableExpenseDeletionService.delete(expense, modelContext: modelContext)
+        case .planned(let expense):
+            PlannedExpenseDeletionService.delete(expense, modelContext: modelContext)
+        }
+        reload()
     }
 
     private func reload() {
