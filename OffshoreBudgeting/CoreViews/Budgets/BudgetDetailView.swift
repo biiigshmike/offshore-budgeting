@@ -1038,6 +1038,8 @@ struct BudgetDetailView: View {
     ) -> some View {
         BudgetPlannedExpenseRow(expense: expense, showsCardName: true)
             .swipeActions(edge: .leading, allowsFullSwipe: false) {
+                RecordPlannedExpenseButton(expense: expense)
+
                 Button {
                     openEdit(expense)
                 } label: {

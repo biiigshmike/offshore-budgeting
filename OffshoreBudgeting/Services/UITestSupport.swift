@@ -138,6 +138,13 @@ enum UITestSupport {
             context.insert(budget)
             context.insert(BudgetCardLink(budget: budget, card: cardA))
             context.insert(BudgetPresetLink(budget: budget, preset: presetA))
+            if ProcessInfo.processInfo.arguments.contains("-uiTestRecordAsPlanned") {
+                context.insert(PlannedExpense(
+                    title: "Record Test Bill", plannedAmount: 60, expenseDate: .now,
+                    workspace: workspace, card: cardA, category: category,
+                    sourcePresetID: presetA.id, sourceBudgetID: budget.id
+                ))
+            }
             if ProcessInfo.processInfo.arguments.contains("-uiTestCategoryGoalHistory") {
                 context.insert(Category(name: "New Category", hexColor: "#123456", workspace: workspace))
                 for monthsAgo in 1...3 {

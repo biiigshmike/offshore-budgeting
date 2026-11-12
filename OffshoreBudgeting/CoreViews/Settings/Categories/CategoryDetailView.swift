@@ -220,6 +220,8 @@ struct CategoryDetailView: View, Equatable {
         case .planned(let expense):
             SharedPlannedExpenseRow(expense: expense, showsCardName: true)
                 .swipeActions(edge: .leading, allowsFullSwipe: false) {
+                    RecordPlannedExpenseButton(expense: expense)
+
                     Button("Edit", systemImage: "pencil") { modal = .editPlanned(expense) }
                         .tint(Color("AccentColor"))
                     if let presetID = expense.sourcePresetID,

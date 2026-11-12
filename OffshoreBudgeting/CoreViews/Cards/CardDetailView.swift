@@ -741,6 +741,8 @@ struct CardDetailView: View {
     ) -> some View {
         SharedPlannedExpenseRow(expense: expense)
             .swipeActions(edge: .leading, allowsFullSwipe: false) {
+                RecordPlannedExpenseButton(expense: expense)
+
                 Button {
                     openEdit(expense)
                 } label: {

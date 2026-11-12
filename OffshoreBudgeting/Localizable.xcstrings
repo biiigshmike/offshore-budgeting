@@ -7453,6 +7453,47 @@
         }
       }
     },
+    "As Planned" : {
+      "comment" : "Swipe action that records a planned expense using its planned amount as the actual amount.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "حسب المخطط"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wie geplant"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Según lo previsto"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Comme prévu"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Conforme planejado"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "按计划"
+          }
+        }
+      }
+    },
     "Assigned Budgets" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -18749,6 +18790,47 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "无法保存"
+          }
+        }
+      }
+    },
+    "Couldn’t Record Expense" : {
+      "comment" : "Title of the alert when recording a planned expense fails.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تعذّر تسجيل المصروف"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ausgabe konnte nicht erfasst werden"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se pudo registrar el gasto"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible d’enregistrer la dépense"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Não foi possível registrar a despesa"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法记录支出"
           }
         }
       }
@@ -57789,6 +57871,47 @@
         }
       }
     },
+    "Sets the actual amount to the planned amount." : {
+      "comment" : "Accessibility hint for recording a planned expense at its planned amount.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "يعيّن المبلغ الفعلي إلى المبلغ المخطط."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Setzt den tatsächlichen Betrag auf den geplanten Betrag."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Establece el importe real en el importe previsto."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Définit le montant réel sur le montant prévu."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Define o valor real como o valor planejado."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "将实际金额设为计划金额。"
+          }
+        }
+      }
+    },
     "Settings" : {
       "localizations" : {
         "ar" : {
@@ -63019,6 +63142,47 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "每创建一条自动化后都进行测试。如果解析失败，请重新检查目标变量是否映射到了正确的“快捷指令输入”详情，以及已安装的快捷指令版本是否与你正在遵循的说明一致。\\n\\n避免一开始就创建大量几乎重复的自动化。先从一条开始，确认它能从真实消息或交易中运行，然后只在确有需要时再扩展。"
+          }
+        }
+      }
+    },
+    "The actual amount couldn’t be saved. Please try again." : {
+      "comment" : "Message shown when saving a planned expense actual amount fails.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تعذّر حفظ المبلغ الفعلي. يُرجى المحاولة مرة أخرى."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Der tatsächliche Betrag konnte nicht gespeichert werden. Bitte versuche es erneut."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se pudo guardar el importe real. Inténtalo de nuevo."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le montant réel n’a pas pu être enregistré. Veuillez réessayer."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Não foi possível salvar o valor real. Tente novamente."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法保存实际金额。请重试。"
           }
         }
       }

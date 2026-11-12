@@ -200,6 +200,10 @@ struct ReviewTodayView: View {
         }
         .buttonStyle(.plain)
         .swipeActions(edge: .leading, allowsFullSwipe: allowsFullSwipeEdit(entry)) {
+            if case .planned(let expense) = entry {
+                RecordPlannedExpenseButton(expense: expense, onRecorded: reload)
+            }
+
             Button {
                 editingEntry = entry
             } label: {
