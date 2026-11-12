@@ -64,7 +64,10 @@ struct OffshoreBudgetingApp: App {
         if Self.isScreenshotModeEnabled {
             UserDefaults.standard.set(false, forKey: "icloud_activeUseCloud")
             UserDefaults.standard.set(0.0, forKey: "icloud_bootstrapStartedAt")
-            return Self.makeModelContainer(useICloud: false, debugStoreOverride: "Personal")
+            let container = Self.makeModelContainer(useICloud: false, debugStoreOverride: "Personal")
+            // Finish destructive seed resets before views can fetch models from this store.
+            DebugSeeder.runIfNeeded(container: container, forceReset: Self.isSeedResetRequested)
+            return container
         }
         #endif
 
@@ -103,16 +106,6 @@ struct OffshoreBudgetingApp: App {
                     .id(rootResetToken)
                     .onAppear {
                         refreshShoppingModeForForeground(reason: "sceneOnAppear")
-                    }
-                    .task {
-                        #if DEBUG
-                        if Self.isScreenshotModeEnabled {
-                            DebugSeeder.runIfNeeded(
-                                container: modelContainer,
-                                forceReset: Self.isSeedResetRequested
-                            )
-                        }
-                        #endif
                     }
                     .onChange(of: scenePhase) { _, newValue in
                         if newValue == .background {
