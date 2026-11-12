@@ -25,9 +25,6 @@ struct OffshoreBudgetingApp: App {
 
     init() {
         configureLegacyTabBarAppearanceIfNeeded()
-        if !Self.isUnitTestHost {
-            TipJarStore.shared.start()
-        }
     }
 
     // MARK: - Notifications Delegate
