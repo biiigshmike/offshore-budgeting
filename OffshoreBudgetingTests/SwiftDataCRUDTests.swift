@@ -177,6 +177,168 @@ struct SwiftDataCRUDTests {
         #expect(presets3.isEmpty)
     }
 
+    @Test(arguments: [0.0, 1250.0])
+    func deletingPreset_preservesGeneratedPlannedExpense(actualAmount: Double) throws {
+        let context = try makeContext()
+        let workspace = Workspace(name: "Personal", hexColor: "#3B82F6")
+        let card = Card(name: "Visa", theme: "default", effect: "none", workspace: workspace)
+        let category = Category(name: "Housing", hexColor: "#111111", workspace: workspace)
+        let date = Calendar.current.startOfDay(for: Date())
+        let budget = Budget(name: "Rent budget", startDate: date, endDate: date, workspace: workspace)
+        let preset = Preset(title: "Rent", plannedAmount: 1200, workspace: workspace,
+                            defaultCard: card, defaultCategory: category)
+        let expense = PlannedExpense(
+            title: preset.title, plannedAmount: preset.plannedAmount, actualAmount: actualAmount,
+            expenseDate: date, workspace: workspace, card: card, category: category,
+            sourcePresetID: preset.id, sourceBudgetID: budget.id
+        )
+        let expenseID = expense.id
+        let presetID = preset.id
+        let budgetID = budget.id
+        let workspaceID = workspace.id
+        let cardID = card.id
+        let categoryID = category.id
+
+        context.insert(workspace)
+        context.insert(card)
+        context.insert(category)
+        context.insert(budget)
+        context.insert(preset)
+        context.insert(BudgetCardLink(budget: budget, card: card))
+        context.insert(BudgetPresetLink(budget: budget, preset: preset))
+        context.insert(expense)
+        try context.save()
+        #expect(try fetchAll(PlannedExpense.self, in: context).count == 1)
+
+        // Match the direct deletion used by Settings and onboarding.
+        context.delete(preset)
+        try context.save()
+
+        // Fetch through a fresh context so assertions check saved data.
+        let verificationContext = ModelContext(context.container)
+        #expect(try fetchAll(Preset.self, in: verificationContext).isEmpty)
+        let remaining = try fetchAll(PlannedExpense.self, in: verificationContext)
+        #expect(remaining.count == 1)
+        let savedExpense = try #require(remaining.first)
+        #expect(savedExpense.id == expenseID)
+        #expect(savedExpense.title == "Rent")
+        #expect(savedExpense.plannedAmount == 1200)
+        #expect(savedExpense.actualAmount == actualAmount)
+        #expect(savedExpense.expenseDate == date)
+        #expect(savedExpense.sourcePresetID == presetID)
+        #expect(savedExpense.sourceBudgetID == budgetID)
+        #expect(savedExpense.workspace?.id == workspaceID)
+        #expect(savedExpense.card?.id == cardID)
+        #expect(savedExpense.category?.id == categoryID)
+    }
+
+    @Test(arguments: [0.0, 1250.0])
+    func budgetEditCleanup_preservesExpensesFromDeletedPreset(actualAmount: Double) throws {
+        let context = try makeContext()
+        let workspace = Workspace(name: "Personal", hexColor: "#3B82F6")
+        let card = Card(name: "Visa", workspace: workspace)
+        let date = Calendar.current.startOfDay(for: Date())
+        let budget = Budget(name: "Original", startDate: date, endDate: date, workspace: workspace)
+        let preset = Preset(title: "Rent", plannedAmount: 1200, workspace: workspace, defaultCard: card)
+        let expense = PlannedExpense(
+            title: "Rent", plannedAmount: 1200, actualAmount: actualAmount,
+            expenseDate: date, workspace: workspace, card: card,
+            sourcePresetID: preset.id, sourceBudgetID: budget.id
+        )
+        let expenseID = expense.id
+        let presetID = preset.id
+        context.insert(workspace)
+        context.insert(card)
+        context.insert(budget)
+        context.insert(preset)
+        context.insert(BudgetCardLink(budget: budget, card: card))
+        context.insert(BudgetPresetLink(budget: budget, preset: preset))
+        context.insert(expense)
+        try context.save()
+        context.delete(preset)
+        try context.save()
+
+        // Exercise the cleanup used by EditBudgetView when saving a name-only edit.
+        budget.name = "Renamed"
+        try BudgetPlannedExpenseCleanupService.cleanup(
+            budget: budget, workspaceID: workspace.id, selectedPresetIDs: [],
+            selectedCardIDs: [card.id], modelContext: context
+        )
+        try context.save()
+
+        let verificationContext = ModelContext(context.container)
+        #expect(try fetchAll(Preset.self, in: verificationContext).isEmpty)
+        let remaining = try fetchAll(PlannedExpense.self, in: verificationContext)
+        #expect(remaining.count == 1)
+        let saved = try #require(remaining.first)
+        #expect(saved.id == expenseID)
+        #expect(saved.sourcePresetID == presetID)
+        #expect(saved.sourceBudgetID == budget.id)
+        #expect(saved.workspace?.id == workspace.id)
+        #expect(saved.card?.id == card.id)
+        #expect(saved.title == "Rent")
+        #expect(saved.plannedAmount == 1200)
+        #expect(saved.actualAmount == actualAmount)
+        #expect(saved.expenseDate == date)
+        let savedBudget = try #require(fetchAll(Budget.self, in: verificationContext).first)
+        #expect(savedBudget.name == "Renamed")
+        #expect(BudgetPlannedExpenseStore.plannedExpenses(in: workspace, for: budget).map(\.id) == [expenseID])
+    }
+
+    @Test(arguments: [0.0, 1250.0])
+    func budgetEditCleanup_preservesSelectionRulesAndScope(actualAmount: Double) throws {
+        let context = try makeContext()
+        let workspace = Workspace(name: "Personal", hexColor: "#3B82F6")
+        let otherWorkspace = Workspace(name: "Work", hexColor: "#111111")
+        let card = Card(name: "Visa", workspace: workspace)
+        let removedCard = Card(name: "Removed", workspace: workspace)
+        let date = Calendar.current.startOfDay(for: Date())
+        let tomorrow = Calendar.current.date(byAdding: .day, value: 1, to: date)!
+        let budget = Budget(name: "Today", startDate: date, endDate: date, workspace: workspace)
+        let otherBudget = Budget(name: "Other", startDate: date, endDate: date, workspace: workspace)
+        let selected = Preset(title: "Selected", plannedAmount: 100, workspace: workspace)
+        let deselected = Preset(title: "Deselected", plannedAmount: 100, workspace: workspace)
+        let archived = Preset(title: "Archived", plannedAmount: 100, workspace: workspace, isArchived: true)
+        context.insert(workspace)
+        context.insert(otherWorkspace)
+        context.insert(card)
+        context.insert(removedCard)
+        context.insert(budget)
+        context.insert(otherBudget)
+        context.insert(selected)
+        context.insert(deselected)
+        context.insert(archived)
+        let missingPresetID = UUID()
+        func insert(_ title: String, presetID: UUID?, date expenseDate: Date,
+                    card expenseCard: Card, budgetID: UUID, owner: Workspace) -> UUID {
+            let expense = PlannedExpense(
+                title: title, plannedAmount: 100, actualAmount: actualAmount,
+                expenseDate: expenseDate, workspace: owner, card: expenseCard,
+                sourcePresetID: presetID, sourceBudgetID: budgetID
+            )
+            context.insert(expense)
+            return expense.id
+        }
+        let selectedID = insert("Selected", presetID: selected.id, date: date, card: card, budgetID: budget.id, owner: workspace)
+        let archivedID = insert("Archived selected", presetID: archived.id, date: date, card: card, budgetID: budget.id, owner: workspace)
+        _ = insert("Deselected", presetID: deselected.id, date: date, card: card, budgetID: budget.id, owner: workspace)
+        _ = insert("Outside dates", presetID: missingPresetID, date: tomorrow, card: card, budgetID: budget.id, owner: workspace)
+        _ = insert("Removed card", presetID: missingPresetID, date: date, card: removedCard, budgetID: budget.id, owner: workspace)
+        _ = insert("No source preset", presetID: nil, date: date, card: card, budgetID: budget.id, owner: workspace)
+        let otherBudgetID = insert("Other budget", presetID: deselected.id, date: date, card: card, budgetID: otherBudget.id, owner: workspace)
+        // Even a matching sourceBudgetID cannot cross the workspace boundary.
+        let otherWorkspaceID = insert("Other workspace", presetID: deselected.id, date: date, card: card, budgetID: budget.id, owner: otherWorkspace)
+        try context.save()
+        try BudgetPlannedExpenseCleanupService.cleanup(
+            budget: budget, workspaceID: workspace.id, selectedPresetIDs: [selected.id, archived.id],
+            selectedCardIDs: [card.id], modelContext: context
+        )
+        try context.save()
+        let verificationContext = ModelContext(context.container)
+        let remaining = try fetchAll(PlannedExpense.self, in: verificationContext)
+        #expect(Set(remaining.map(\.id)) == [selectedID, archivedID, otherBudgetID, otherWorkspaceID])
+    }
+
     // MARK: - Budget + join links
 
     @Test func budget_withLinks_CRUD() throws {

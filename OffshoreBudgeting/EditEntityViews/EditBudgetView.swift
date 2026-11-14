@@ -343,19 +343,17 @@ struct EditBudgetView: View {
         selectedCardIDs: Set<UUID>
     ) {
         let selectedPresetIDSet = Set(selectedPresets.map { $0.id })
-        let windowStart = Calendar.current.startOfDay(for: budget.startDate)
-        let windowEnd = Calendar.current.startOfDay(for: budget.endDate)
 
         // 1) Delete generated expenses that should no longer exist:
-        //    - preset unselected
+        //    - an existing preset was unselected (deleted presets preserve their expenses)
         //    - outside new date window
         //    - card no longer linked to this budget
-        deleteGeneratedPlannedExpensesNotMatchingSelection(
-            budgetID: budget.id,
+        try? BudgetPlannedExpenseCleanupService.cleanup(
+            budget: budget,
+            workspaceID: workspace.id,
             selectedPresetIDs: selectedPresetIDSet,
-            windowStart: windowStart,
-            windowEnd: windowEnd,
-            selectedCardIDs: selectedCardIDs
+            selectedCardIDs: selectedCardIDs,
+            modelContext: modelContext
         )
 
         // 2) Materialize missing occurrences for selected presets within the window.
@@ -364,40 +362,6 @@ struct EditBudgetView: View {
             selectedPresets: selectedPresets,
             selectedCardIDs: selectedCardIDs
         )
-    }
-
-    private func deleteGeneratedPlannedExpensesNotMatchingSelection(
-        budgetID: UUID,
-        selectedPresetIDs: Set<UUID>,
-        windowStart: Date,
-        windowEnd: Date,
-        selectedCardIDs: Set<UUID>
-    ) {
-        let descriptor = FetchDescriptor<PlannedExpense>(
-            predicate: #Predicate { expense in
-                expense.sourceBudgetID == budgetID
-            }
-        )
-
-        do {
-            let matches = try modelContext.fetch(descriptor)
-            for expense in matches {
-                let presetID = expense.sourcePresetID
-                let inSelectedPresets = presetID.map { selectedPresetIDs.contains($0) } ?? false
-
-                let day = Calendar.current.startOfDay(for: expense.expenseDate)
-                let inWindow = (day >= windowStart && day <= windowEnd)
-
-                let cardID = expense.card?.id
-                let cardStillLinked = cardID.map { selectedCardIDs.contains($0) } ?? true
-
-                if !inSelectedPresets || !inWindow || !cardStillLinked {
-                    PlannedExpenseDeletionService.delete(expense, modelContext: modelContext)
-                }
-            }
-        } catch {
-            // Intentionally ignore fetch errors for now.
-        }
     }
 
     private func materializePlannedExpenses(
