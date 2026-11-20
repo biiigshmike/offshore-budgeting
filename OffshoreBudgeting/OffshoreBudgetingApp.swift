@@ -24,6 +24,19 @@ struct AppWindowContext: Codable, Hashable {
 struct OffshoreBudgetingApp: App {
 
     init() {
+        #if DEBUG
+        StartupDiagnostics.beginLaunch()
+        StartupDiagnostics.log("launch pid=\(ProcessInfo.processInfo.processIdentifier) arguments=\(ProcessInfo.processInfo.arguments)")
+        StartupDiagnostics.log("flags screenshotMode=\(Self.isScreenshotModeEnabled) resetSeed=\(Self.isSeedResetRequested) unitTestHost=\(Self.isUnitTestHost)")
+        StartupDiagnostics.log("preferences didCompleteOnboarding=\(UserDefaults.standard.bool(forKey: "didCompleteOnboarding")) didChooseDataSource=\(UserDefaults.standard.bool(forKey: "onboarding_didChooseDataSource")) desiredICloud=\(UserDefaults.standard.bool(forKey: "icloud_useCloud")) selectedWorkspaceID=\(UserDefaults.standard.string(forKey: "selectedWorkspaceID") ?? "<none>")")
+        if DebugScreenshotMode.isEnabled, !Self.isUnitTestHost {
+            _modelContainer = State(initialValue: nil)
+        } else {
+            _modelContainer = State(initialValue: Self.startupModelContainer)
+        }
+        #else
+        _modelContainer = State(initialValue: Self.startupModelContainer)
+        #endif
         configureLegacyTabBarAppearanceIfNeeded()
     }
 
@@ -41,7 +54,9 @@ struct OffshoreBudgetingApp: App {
 
     // MARK: - ModelContainer
 
-    @State private var modelContainer: ModelContainer = {
+    @State private var modelContainer: ModelContainer?
+
+    private static let startupModelContainer: ModelContainer = {
         #if DEBUG
         if Self.isUnitTestHost {
             return Self.makeModelContainer(useICloud: false, inMemoryOnly: true)
@@ -57,19 +72,6 @@ struct OffshoreBudgetingApp: App {
         } else {
             UserDefaults.standard.set(0.0, forKey: "icloud_bootstrapStartedAt")
         }
-
-        #if DEBUG
-        // If screenshot mode is enabled, ALWAYS use a local-only container
-        // never touch Cloud data while staging screenshots.
-        if Self.isScreenshotModeEnabled {
-            UserDefaults.standard.set(false, forKey: "icloud_activeUseCloud")
-            UserDefaults.standard.set(0.0, forKey: "icloud_bootstrapStartedAt")
-            let container = Self.makeModelContainer(useICloud: false, debugStoreOverride: "Personal")
-            // Finish destructive seed resets before views can fetch models from this store.
-            DebugSeeder.runIfNeeded(container: container, forceReset: Self.isSeedResetRequested)
-            return container
-        }
-        #endif
 
         #if DEBUG
         if UITestSupport.isEnabled, UITestSupport.scenario == .workspaceProgress {
@@ -98,11 +100,7 @@ struct OffshoreBudgetingApp: App {
             if Self.isUnitTestHost {
                 Color.clear
             } else {
-                WindowSceneRootView(
-                    modelContainer: $modelContainer,
-                    postBoardingTipsStore: postBoardingTipsStore,
-                    initialSectionOverride: initialSection(from: windowContext.wrappedValue)
-                )
+                windowRoot(initialSectionOverride: initialSection(from: windowContext.wrappedValue))
                     .id(rootResetToken)
                     .onAppear {
                         refreshShoppingModeForForeground(reason: "sceneOnAppear")
@@ -121,12 +119,37 @@ struct OffshoreBudgetingApp: App {
                     }
             }
         }
-        .modelContainer(modelContainer)
         .commands {
             if shouldInstallMenuCommands {
                 OffshoreAppCommands()
             }
         }
+    }
+
+    @ViewBuilder
+    private func windowRoot(initialSectionOverride: AppSection?) -> some View {
+        #if DEBUG
+        if DebugScreenshotMode.isEnabled {
+            ScreenshotStartupRootView(
+                postBoardingTipsStore: postBoardingTipsStore,
+                initialSectionOverride: initialSectionOverride
+            )
+        } else if let container = Binding($modelContainer) {
+            WindowSceneRootView(
+                modelContainer: container,
+                postBoardingTipsStore: postBoardingTipsStore,
+                initialSectionOverride: initialSectionOverride
+            )
+        }
+        #else
+        if let container = Binding($modelContainer) {
+            WindowSceneRootView(
+                modelContainer: container,
+                postBoardingTipsStore: postBoardingTipsStore,
+                initialSectionOverride: initialSectionOverride
+            )
+        }
+        #endif
     }
 
     private func initialSection(from context: AppWindowContext?) -> AppSection? {
@@ -226,30 +249,64 @@ struct OffshoreBudgetingApp: App {
 
     private static let cloudKitContainerIdentifier: String = "iCloud.com.mb.offshore-budgeting"
 
+    static var modelSchema: Schema {
+        Schema([
+            Workspace.self,
+            Budget.self,
+            BudgetCategoryLimit.self,
+            Card.self,
+            BudgetCardLink.self,
+            BudgetPresetLink.self,
+            Category.self,
+            Preset.self,
+            PlannedExpense.self,
+            VariableExpense.self,
+            AllocationAccount.self,
+            ExpenseAllocation.self,
+            AllocationSettlement.self,
+            SavingsAccount.self,
+            SavingsLedgerEntry.self,
+            ImportMerchantRule.self,
+            AssistantAliasRule.self,
+            MarinaChatSession.self,
+            IncomeSeries.self,
+            Income.self
+        ])
+    }
+
+    #if DEBUG
+    static func makeScreenshotContainer() throws -> ModelContainer {
+        let url = DebugScreenshotMode.storeURL
+        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        let configuration = ModelConfiguration(
+            DebugScreenshotMode.storeName,
+            schema: modelSchema,
+            url: url,
+            allowsSave: true,
+            cloudKitDatabase: .none
+        )
+        StartupDiagnostics.log("opening requested screenshot store url=\(url.absoluteString)")
+        let container = try ModelContainer(for: modelSchema, configurations: [configuration])
+        StartupDiagnostics.logContainer(container)
+        return container
+    }
+    #endif
+
     static func makeModelContainer(useICloud: Bool, debugStoreOverride: String? = nil, inMemoryOnly: Bool = false) -> ModelContainer {
+        #if DEBUG
+        StartupDiagnostics.log("container request useICloud=\(useICloud) debugStoreOverride=\(debugStoreOverride ?? "<none>") inMemoryOnly=\(inMemoryOnly)")
+        if DebugScreenshotMode.isEnabled, !inMemoryOnly {
+            do {
+                return try ScreenshotStartupCoordinator.shared.requireContainer()
+            } catch {
+                // UI startup handles this error through the coordinator's error screen.
+                // Nonthrowing legacy callers must never open a normal store instead.
+                fatalError("Screenshot session is unavailable: \(error)")
+            }
+        }
+        #endif
         do {
-            let schema = Schema([
-                Workspace.self,
-                Budget.self,
-                BudgetCategoryLimit.self,
-                Card.self,
-                BudgetCardLink.self,
-                BudgetPresetLink.self,
-                Category.self,
-                Preset.self,
-                PlannedExpense.self,
-                VariableExpense.self,
-                AllocationAccount.self,
-                ExpenseAllocation.self,
-                AllocationSettlement.self,
-                SavingsAccount.self,
-                SavingsLedgerEntry.self,
-                ImportMerchantRule.self,
-                AssistantAliasRule.self,
-                MarinaChatSession.self,
-                IncomeSeries.self,
-                Income.self
-            ])
+            let schema = modelSchema
 
             #if DEBUG
             if inMemoryOnly {
@@ -259,7 +316,10 @@ struct OffshoreBudgetingApp: App {
                     isStoredInMemoryOnly: true,
                     cloudKitDatabase: .none
                 )
-                return try ModelContainer(for: schema, configurations: [configuration])
+                StartupDiagnostics.log("opening requested store name=\(configuration.name) url=\(configuration.url.absoluteString) inMemory=\(configuration.isStoredInMemoryOnly)")
+                let container = try ModelContainer(for: schema, configurations: [configuration])
+                StartupDiagnostics.logContainer(container)
+                return container
             }
             #endif
 
@@ -281,7 +341,10 @@ struct OffshoreBudgetingApp: App {
                     allowsSave: true,
                     cloudKitDatabase: .none
                 )
-                return try ModelContainer(for: schema, configurations: [configuration])
+                StartupDiagnostics.log("opening requested store name=\(configuration.name) url=\(configuration.url.absoluteString) inMemory=\(configuration.isStoredInMemoryOnly)")
+                let container = try ModelContainer(for: schema, configurations: [configuration])
+                StartupDiagnostics.logContainer(container)
+                return container
             }
             #endif
 
@@ -326,9 +389,19 @@ struct OffshoreBudgetingApp: App {
                 )
             }
 
-            return try ModelContainer(for: schema, configurations: [configuration])
+            #if DEBUG
+            StartupDiagnostics.log("opening requested store name=\(configuration.name) url=\(configuration.url.absoluteString)")
+            #endif
+            let container = try ModelContainer(for: schema, configurations: [configuration])
+            #if DEBUG
+            StartupDiagnostics.logContainer(container)
+            #endif
+            return container
 
         } catch {
+            #if DEBUG
+            StartupDiagnostics.log("requested container failed error=\(String(reflecting: error)) details=\((error as NSError).userInfo)")
+            #endif
             // Fallback local store (still needs a non-optional URL and CloudKitDatabase)
             let fallbackSchema = Schema([
                 Workspace.self,
@@ -368,9 +441,21 @@ struct OffshoreBudgetingApp: App {
                 cloudKitDatabase: .none
             )
 
-            return (try? ModelContainer(for: fallbackSchema, configurations: [fallbackConfiguration])) ?? {
+            #if DEBUG
+            StartupDiagnostics.log("opening fallback store url=\(fallbackStoreURL.absoluteString)")
+            #endif
+            do {
+                let container = try ModelContainer(for: fallbackSchema, configurations: [fallbackConfiguration])
+                #if DEBUG
+                StartupDiagnostics.logContainer(container)
+                #endif
+                return container
+            } catch let fallbackError {
+                #if DEBUG
+                StartupDiagnostics.log("fallback container failed error=\(String(reflecting: fallbackError)) details=\((fallbackError as NSError).userInfo)")
+                #endif
                 fatalError("Failed to create SwiftData ModelContainer: \(error)")
-            }()
+            }
         }
     }
 
@@ -378,9 +463,7 @@ struct OffshoreBudgetingApp: App {
 
     #if DEBUG
     private static var isScreenshotModeEnabled: Bool {
-        let args = ProcessInfo.processInfo.arguments
-        if args.contains("-screenshotMode") { return true }
-        return UserDefaults.standard.bool(forKey: "debug_screenshotMode")
+        DebugScreenshotMode.isEnabled
     }
 
     private static var isSeedResetRequested: Bool {
@@ -391,7 +474,7 @@ struct OffshoreBudgetingApp: App {
     #endif
 }
 
-private struct WindowSceneRootView: View {
+struct WindowSceneRootView: View {
     @Binding var modelContainer: ModelContainer
     let postBoardingTipsStore: PostBoardingTipsStore
     let initialSectionOverride: AppSection?
@@ -424,6 +507,7 @@ private struct WindowSceneRootView: View {
             modelContainer: $modelContainer,
             initialSectionOverride: initialSectionOverride
         )
+        .modelContainer(modelContainer)
         .environment(\.appCommandHub, commandHub)
         .environment(postBoardingTipsStore)
 

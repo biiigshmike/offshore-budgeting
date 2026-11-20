@@ -446,6 +446,12 @@ struct OnboardingView: View {
             isExitingWelcome = true
         }
         
+        #if DEBUG
+        if DebugScreenshotMode.isEnabled {
+            startLocalFromGetStarted()
+            return
+        }
+        #endif
         isCheckingICloudForGetStarted = true
         Task {
             let status = (try? await CKContainer.default().accountStatus()) ?? .couldNotDetermine
@@ -476,6 +482,12 @@ struct OnboardingView: View {
     
     
     private func startUsingICloudFromGetStarted() {
+        #if DEBUG
+        if DebugScreenshotMode.isEnabled {
+            startLocalFromGetStarted()
+            return
+        }
+        #endif
         desiredUseICloud = true
         didChooseICloudFromGetStarted = true
         
@@ -538,6 +550,11 @@ struct OnboardingView: View {
     /// - If iCloud is enabled AND we already have workspaces, onboarding is likely redundant.
     /// - If iCloud account is available, we explain why enabling iCloud can pull data from other devices.
     private func maybeOfferSkipIfCloudAlreadyHasData() async {
+        #if DEBUG
+        // The screenshot app deliberately has no CloudKit entitlement. Even an
+        // account-availability probe must not construct a default CKContainer.
+        guard !DebugScreenshotMode.isEnabled else { return }
+        #endif
         // Only offer the prompt on the welcome screen.
         guard onboardingStep == 0 else { return }
         

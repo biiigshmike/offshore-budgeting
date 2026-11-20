@@ -39,6 +39,16 @@ CloudKit's remote environment is still determined by signing. Keep development b
 
 Before release, verify a TestFlight-to-TestFlight update on a device with existing budgets, then an updated Debug-to-TestFlight transition. Confirm budget IDs/counts and relationships remain unchanged in Release. `PersistentStoreLocationTests` checks path compatibility, development separation, and preservation of existing files without opening a real user store.
 
+## Screenshot Builds
+
+Select the shared **OffshoreBudgeting-Screenshots** scheme and Run. It installs a separate **Offshore Screenshots** app (`com.mb.offshore-budgeting.screenshots`). Screenshot mode is compiled into this configuration; no launch arguments are required, including when opening the app from the Home Screen. Normal Debug/Release builds ignore the old `-screenshotMode` argument and `debug_screenshotMode` preference.
+
+The screenshot app has its own preferences, app group, widget extension, deep links, and local-only `Development/Screenshots.store`. It seeds an empty store, validates the sample workspace and cards, selects that workspace, and enters the sample app directly. Existing normal and legacy stores are never moved or erased. To rebuild demo data, enable the optional **-resetSeed** argument in the Screenshots scheme, launch once, then disable it to preserve screenshot edits across subsequent launches.
+
+If setup fails, the app shows **Screenshot Setup Failed**, with Retry and a startup-log share action; it never falls back to normal Local or iCloud data. **Settings → About → Debug → Startup Diagnostics** shows the actual installed context, sample-data validation, and recent logs even when Xcode's console is empty. Logs are bounded and kept inside the screenshot app's sandbox. Repeat Onboarding still uses the isolated screenshot store.
+
+Verification must use an existing simulator listed in Device Hub, explicitly selected by UDID. Never create or clone simulators. Run the focused screenshot unit/UI tests with parallel testing disabled; the UI suite includes twenty terminate/relaunch cycles without resetting simulator content. Test-only `-uiTesting -screenshotTestFailOpen`, `-screenshotTestFailSave`, and `-screenshotTestFailValidation` arguments exercise the setup error screen.
+
 ## Retired Assistant
 
 Marina chat has been removed. Existing financial records and app features remain independent of chat. `AssistantAliasRule` and `MarinaChatSession` remain only as inactive SwiftData compatibility models so existing Local and iCloud stores can open safely; do not restore assistant behavior or erase stores to remove them. Legacy workspace archive alias fields are accepted for compatibility and are not imported into new workspaces.

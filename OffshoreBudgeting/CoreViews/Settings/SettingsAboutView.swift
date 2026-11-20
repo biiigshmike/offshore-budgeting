@@ -46,6 +46,17 @@ struct SettingsAboutView: View {
                     AboutRow(systemImage: "doc.text", title: "Release Logs")
                 }
             }
+
+            #if DEBUG
+            Section("Debug") {
+                NavigationLink {
+                    DebugStartupDiagnosticsView()
+                } label: {
+                    AboutRow(systemImage: "stethoscope", title: "Startup Diagnostics")
+                }
+                .accessibilityIdentifier("startupDiagnosticsLink")
+            }
+            #endif
         }
         .listStyle(.insetGrouped)
         .navigationTitle("About")

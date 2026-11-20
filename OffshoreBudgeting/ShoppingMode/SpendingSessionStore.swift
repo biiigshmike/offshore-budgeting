@@ -3,7 +3,7 @@ import Foundation
 // MARK: - SpendingSessionStore
 
 enum SpendingSessionStore {
-    private static let appGroupID = "group.com.mb.offshore-budgeting"
+    private static let appGroupID = OffshoreAppIdentity.appGroupIdentifier
 
     private enum Key {
         static let expiresAt = "spendingSession_expiresAt"

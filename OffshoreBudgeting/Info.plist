@@ -8,10 +8,10 @@
 			<key>CFBundleTypeRole</key>
 			<string>Editor</string>
 			<key>CFBundleURLName</key>
-			<string>com.mb.offshore-budgeting</string>
+			<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>offshore</string>
+				<string>$(OFFSHORE_URL_SCHEME)</string>
 			</array>
 		</dict>
 	</array>

@@ -6,8 +6,8 @@ import UIKit
 #endif
 
 enum OffshoreWidgetDeepLink {
-    static let openSafeSpendTodayURL = URL(string: "offshore://open/safe-spend-today")!
-    static let openForecastSavingsURL = URL(string: "offshore://open/forecast-savings")!
+    static let openSafeSpendTodayURL = URL(string: "\(OffshoreAppIdentity.urlScheme)://open/safe-spend-today")!
+    static let openForecastSavingsURL = URL(string: "\(OffshoreAppIdentity.urlScheme)://open/forecast-savings")!
 }
 
 nonisolated enum OffshoreControlDestination: String, AppEnum {

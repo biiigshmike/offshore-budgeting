@@ -38,6 +38,17 @@ struct AppBootstrapRootView: View {
     }
 
     private func chooseDataSource(_ useICloud: Bool) {
+        #if DEBUG
+        if DebugScreenshotMode.isEnabled {
+            // Keep the already-seeded container and preserve the normal storage preference.
+            StartupDiagnostics.log("onboarding keeping isolated screenshot store; requested useICloud=\(useICloud)")
+            activeUseICloud = false
+            iCloudBootstrapStartedAt = 0
+            onboardingStep = max(1, onboardingStep)
+            didChooseDataSource = true
+            return
+        }
+        #endif
         if useICloud != activeUseICloud {
             // Onboarding edits can still be waiting for SwiftData autosave.
             let context = modelContainer.mainContext
@@ -74,6 +85,11 @@ struct AppBootstrapRootView: View {
         UITestSupport.applyScenarioDataIfNeeded(container: container)
         #endif
 
+        #if DEBUG
+        StartupDiagnostics.log("onboarding replacing container useICloud=\(useICloud)")
+        StartupDiagnostics.logContainer(container)
+        StartupDiagnostics.logWorkspaceCount(container: container, stage: "onboarding replacement")
+        #endif
         modelContainer = container
         selectedWorkspaceID = ""
         activeUseICloud = useICloud

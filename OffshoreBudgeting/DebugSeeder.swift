@@ -13,43 +13,49 @@ enum DebugSeeder {
 
     // MARK: - Run control
 
-    private static var didRunThisLaunch: Bool = false
-
-    static func runIfNeeded(container: ModelContainer, forceReset: Bool) {
-        guard !didRunThisLaunch else { return }
-        didRunThisLaunch = true
+    @discardableResult
+    static func runIfNeeded(container: ModelContainer, forceReset: Bool, beforeSave: () throws -> Void = {}) throws -> UUID {
+        guard DebugScreenshotMode.isEnabled,
+              container.configurations.count == 1,
+              container.configurations.allSatisfy({ DebugScreenshotMode.owns($0) }) else {
+            StartupDiagnostics.log("seed refused: container is not the isolated screenshot store")
+            throw ScreenshotStartupError.invalidStore
+        }
+        StartupDiagnostics.log("seed requested forceReset=\(forceReset)")
+        defer { StartupDiagnostics.logWorkspaceCount(container: container, stage: "after seed attempt") }
+        StartupDiagnostics.logWorkspaceCount(container: container, stage: "before seed")
 
         let context = ModelContext(container)
-        let now = Date()
-
-        if forceReset {
-            wipeAllData(context: context)
-        } else {
-            if hasAnyWorkspace(context: context) {
-                applyPinnedHomeOrderForExistingWorkspaceIfPossible(context: context)
-                refreshScreenshotSavingsForExistingWorkspaceIfPossible(context: context, now: now)
-                _ = ensureDebugImportSampleCSV(modelContext: context)
-                return
-            }
-        }
-
-        seedSampleData(context: context)
-
+        context.autosaveEnabled = false
         do {
+            if forceReset {
+                StartupDiagnostics.log("seed resetting screenshot store records")
+                try wipeAllData(context: context)
+            }
+            if try context.fetchCount(FetchDescriptor<Workspace>()) == 0 {
+                try seedSampleData(context: context)
+            } else {
+                StartupDiagnostics.log("seed reusing existing screenshot workspace")
+                try applyPinnedHomeOrderForExistingWorkspace(context: context)
+                try refreshScreenshotSavingsForExistingWorkspace(context: context, now: Date())
+            }
+            try beforeSave()
             try context.save()
+            let workspaceID = try ScreenshotStartupCoordinator.validate(container: container)
+            StartupDiagnostics.log("seed save and validation succeeded workspaceID=\(workspaceID)")
+            _ = ensureDebugImportSampleCSV(modelContext: context)
+            return workspaceID
         } catch {
-            assertionFailure("DebugSeeder failed to save seed data: \(error)")
+            context.rollback()
+            StartupDiagnostics.log("seed failed; rolled back pending changes error=\(String(reflecting: error)) details=\((error as NSError).userInfo)")
+            throw error
         }
-
-        _ = ensureDebugImportSampleCSV(modelContext: context)
     }
 
     // MARK: - Debug Import CSV
 
     static var isScreenshotModeEnabledForDebugTools: Bool {
-        let args = ProcessInfo.processInfo.arguments
-        if args.contains("-screenshotMode") { return true }
-        return UserDefaults.standard.bool(forKey: "debug_screenshotMode")
+        DebugScreenshotMode.isEnabled
     }
 
     static func ensureDebugImportSampleCSV(container: ModelContainer) -> URL? {
@@ -67,70 +73,33 @@ enum DebugSeeder {
             try csv.write(to: fileURL, atomically: true, encoding: .utf8)
             return fileURL
         } catch {
-            assertionFailure("DebugSeeder failed to write debug import CSV: \(error)")
+            StartupDiagnostics.log("DebugSeeder failed to write debug import CSV: \(error)")
             return nil
-        }
-    }
-
-    // MARK: - Checks
-
-    private static func hasAnyWorkspace(context: ModelContext) -> Bool {
-        do {
-            let existing = try context.fetch(FetchDescriptor<Workspace>())
-            return !existing.isEmpty
-        } catch {
-            return false
         }
     }
 
     // MARK: - Home Pins
 
-    private static func applyPinnedHomeOrderForExistingWorkspaceIfPossible(context: ModelContext) {
-        do {
-            let workspaces = try context.fetch(FetchDescriptor<Workspace>())
-            guard let workspace = pickPinnedWorkspace(from: workspaces) else {
-                assertionFailure("DebugSeeder could not find a workspace for pinned widget seeding.")
-                return
-            }
-
-            let cards = try context.fetch(FetchDescriptor<Card>())
-                .filter { $0.workspace?.id == workspace.id }
-
-            guard
-                let checkingCardID = cardID(named: "checking", in: cards),
-                let appleCardID = cardID(named: "applecard", in: cards),
-                let amexCardID = cardID(named: "amex", in: cards)
-            else {
-                assertionFailure("DebugSeeder could not resolve Checking/Apple Card/AmEx for pinned widget seeding.")
-                return
-            }
-
-            applyPinnedHomeOrder(
-                workspaceID: workspace.id,
-                checkingCardID: checkingCardID,
-                appleCardID: appleCardID,
-                amexCardID: amexCardID
-            )
-        } catch {
-            assertionFailure("DebugSeeder failed to apply pinned widget order: \(error)")
+    private static func applyPinnedHomeOrderForExistingWorkspace(context: ModelContext) throws {
+        let workspaces = try context.fetch(FetchDescriptor<Workspace>())
+        guard let workspace = pickPinnedWorkspace(from: workspaces) else {
+            throw ScreenshotStartupError.missingSampleData
         }
+        let cards = try context.fetch(FetchDescriptor<Card>()).filter { $0.workspace?.id == workspace.id }
+        guard let checkingCardID = cardID(named: "checking", in: cards),
+              let appleCardID = cardID(named: "applecard", in: cards),
+              let amexCardID = cardID(named: "amex", in: cards) else {
+            throw ScreenshotStartupError.missingSampleData
+        }
+        applyPinnedHomeOrder(workspaceID: workspace.id, checkingCardID: checkingCardID, appleCardID: appleCardID, amexCardID: amexCardID)
     }
 
-    private static func refreshScreenshotSavingsForExistingWorkspaceIfPossible(context: ModelContext, now: Date) {
-        guard isScreenshotModeEnabledForDebugTools else { return }
-
-        do {
-            let workspaces = try context.fetch(FetchDescriptor<Workspace>())
-            guard let workspace = pickPinnedWorkspace(from: workspaces) else {
-                assertionFailure("DebugSeeder could not find a workspace for screenshot savings seeding.")
-                return
-            }
-
-            seedScreenshotSavingsLedger(context: context, workspace: workspace, now: now)
-            try context.save()
-        } catch {
-            assertionFailure("DebugSeeder failed to refresh screenshot savings ledger: \(error)")
+    private static func refreshScreenshotSavingsForExistingWorkspace(context: ModelContext, now: Date) throws {
+        let workspaces = try context.fetch(FetchDescriptor<Workspace>())
+        guard let workspace = pickPinnedWorkspace(from: workspaces) else {
+            throw ScreenshotStartupError.missingSampleData
         }
+        try seedScreenshotSavingsLedger(context: context, workspace: workspace, now: now)
     }
 
     private static func applyPinnedHomeOrder(
@@ -335,50 +304,46 @@ enum DebugSeeder {
 
     // MARK: - Wipe
 
-    private static func wipeAllData(context: ModelContext) {
+    private static func wipeAllData(context: ModelContext) throws {
         SpendingSessionStore.end()
 
-        deleteAll(Income.self, context: context)
-        deleteAll(IncomeSeries.self, context: context)
+        try deleteAll(Income.self, context: context)
+        try deleteAll(IncomeSeries.self, context: context)
 
-        deleteAll(ExpenseAllocation.self, context: context)
-        deleteAll(AllocationSettlement.self, context: context)
-        deleteAll(AllocationAccount.self, context: context)
-        deleteAll(SavingsLedgerEntry.self, context: context)
-        deleteAll(SavingsAccount.self, context: context)
+        try deleteAll(ExpenseAllocation.self, context: context)
+        try deleteAll(AllocationSettlement.self, context: context)
+        try deleteAll(AllocationAccount.self, context: context)
+        try deleteAll(SavingsLedgerEntry.self, context: context)
+        try deleteAll(SavingsAccount.self, context: context)
 
-        deleteAll(VariableExpense.self, context: context)
-        deleteAll(PlannedExpense.self, context: context)
+        try deleteAll(VariableExpense.self, context: context)
+        try deleteAll(PlannedExpense.self, context: context)
 
-        deleteAll(BudgetCategoryLimit.self, context: context)
-        deleteAll(BudgetPresetLink.self, context: context)
-        deleteAll(BudgetCardLink.self, context: context)
+        try deleteAll(BudgetCategoryLimit.self, context: context)
+        try deleteAll(BudgetPresetLink.self, context: context)
+        try deleteAll(BudgetCardLink.self, context: context)
 
-        deleteAll(Preset.self, context: context)
-        deleteAll(Category.self, context: context)
-        deleteAll(Card.self, context: context)
-        deleteAll(Budget.self, context: context)
+        try deleteAll(Preset.self, context: context)
+        try deleteAll(Category.self, context: context)
+        try deleteAll(Card.self, context: context)
+        try deleteAll(Budget.self, context: context)
 
-        deleteAll(ImportMerchantRule.self, context: context)
-        deleteAll(AssistantAliasRule.self, context: context)
-        deleteAll(MarinaChatSession.self, context: context)
-        deleteAll(Workspace.self, context: context)
+        try deleteAll(ImportMerchantRule.self, context: context)
+        try deleteAll(AssistantAliasRule.self, context: context)
+        try deleteAll(MarinaChatSession.self, context: context)
+        try deleteAll(Workspace.self, context: context)
     }
 
-    private static func deleteAll<T: PersistentModel>(_ type: T.Type, context: ModelContext) {
-        do {
-            let items = try context.fetch(FetchDescriptor<T>())
-            for item in items {
-                context.delete(item)
-            }
-        } catch {
-            // Swallow in DEBUG
+    private static func deleteAll<T: PersistentModel>(_ type: T.Type, context: ModelContext) throws {
+        let items = try context.fetch(FetchDescriptor<T>())
+        for item in items {
+            context.delete(item)
         }
     }
 
     // MARK: - Seed Data
 
-    private static func seedSampleData(context: ModelContext) {
+    private static func seedSampleData(context: ModelContext) throws {
         let cal = Calendar.current
         let now = Date()
         // Workspace
@@ -658,7 +623,7 @@ enum DebugSeeder {
             calendar: cal
         )
 
-        seedScreenshotSavingsLedger(context: context, workspace: workspace, now: now)
+        try seedScreenshotSavingsLedger(context: context, workspace: workspace, now: now)
         seedExcursionModeActive(now: now)
     }
 
@@ -1291,7 +1256,7 @@ enum DebugSeeder {
         context: ModelContext,
         workspace: Workspace,
         now: Date
-    ) {
+    ) throws {
         guard isScreenshotModeEnabledForDebugTools else { return }
 
         let workspaceID = workspace.id
@@ -1305,9 +1270,9 @@ enum DebugSeeder {
             predicate: #Predicate<VariableExpense> { $0.workspace?.id == workspaceID }
         )
 
-        let incomes = (try? context.fetch(incomeDescriptor)) ?? []
-        let plannedExpenses = (try? context.fetch(plannedDescriptor)) ?? []
-        let variableExpenses = (try? context.fetch(variableDescriptor)) ?? []
+        let incomes = try context.fetch(incomeDescriptor)
+        let plannedExpenses = try context.fetch(plannedDescriptor)
+        let variableExpenses = try context.fetch(variableDescriptor)
 
         let period = screenshotBudgetingPeriod()
         let range = period.defaultRange(containing: now, calendar: .current)

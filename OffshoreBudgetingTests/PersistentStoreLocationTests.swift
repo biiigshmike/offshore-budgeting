@@ -14,7 +14,7 @@ final class PersistentStoreLocationTests: XCTestCase {
 
     func testDevelopmentIsolatesNormalFallbackAndOverrideStores() {
         let root = URL(fileURLWithPath: "/Application Support", isDirectory: true)
-        for name in ["Local.store", "Cloud.store", "FallbackLocal.store", "Personal.store", "UITestCloud.store"] {
+        for name in ["Local.store", "Cloud.store", "FallbackLocal.store", "Personal.store", "Screenshots.store", "UITestCloud.store"] {
             let directory = PersistentStoreLocation.directory(in: root, isDevelopment: true)
             XCTAssertEqual(directory.path, root.appendingPathComponent("Development").path)
             XCTAssertNotEqual(directory.appendingPathComponent(name), root.appendingPathComponent(name))

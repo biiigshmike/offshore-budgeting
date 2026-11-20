@@ -4,16 +4,16 @@ import Observation
 // MARK: - OffshoreDeepLink
 
 enum OffshoreDeepLink {
-    static let scheme = "offshore"
+    static let scheme = OffshoreAppIdentity.urlScheme
 
-    static let openAddExpenseURL = URL(string: "offshore://open/add-expense")!
-    static let openAddIncomeURL = URL(string: "offshore://open/add-income")!
-    static let openReviewTodayURL = URL(string: "offshore://open/review-today")!
-    static let openSafeSpendTodayURL = URL(string: "offshore://open/safe-spend-today")!
-    static let openForecastSavingsURL = URL(string: "offshore://open/forecast-savings")!
+    static let openAddExpenseURL = URL(string: "\(scheme)://open/add-expense")!
+    static let openAddIncomeURL = URL(string: "\(scheme)://open/add-income")!
+    static let openReviewTodayURL = URL(string: "\(scheme)://open/review-today")!
+    static let openSafeSpendTodayURL = URL(string: "\(scheme)://open/safe-spend-today")!
+    static let openForecastSavingsURL = URL(string: "\(scheme)://open/forecast-savings")!
 
     static func startExcursionModeURL(hours: Int = 2) -> URL {
-        URL(string: "offshore://action/excursion-mode/start?hours=\(hours)")!
+        URL(string: "\(scheme)://action/excursion-mode/start?hours=\(hours)")!
     }
 }
 

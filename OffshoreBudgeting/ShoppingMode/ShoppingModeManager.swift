@@ -63,7 +63,7 @@ final class ShoppingModeManager: ObservableObject {
     }
 
     enum DeepLink {
-        static let scheme = "offshore"
+        static let scheme = OffshoreAppIdentity.urlScheme
         static let stopPath = "/excursion/stop"
         static let extendThirtyPath = "/excursion/extend30"
 

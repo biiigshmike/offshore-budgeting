@@ -253,6 +253,12 @@ final class OffshoreIntentDataStore {
     }
 
     private func makeModelContext() throws -> ModelContext {
+        #if DEBUG
+        if DebugScreenshotMode.isEnabled {
+            return ModelContext(try ScreenshotStartupCoordinator.shared.requireContainer())
+        }
+        #endif
+
         let useICloud = UserDefaults.standard.bool(forKey: "icloud_activeUseCloud")
             || UserDefaults.standard.bool(forKey: "icloud_useCloud")
         let container: ModelContainer

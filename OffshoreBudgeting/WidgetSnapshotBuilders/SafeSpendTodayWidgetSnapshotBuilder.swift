@@ -4,7 +4,7 @@ import WidgetKit
 
 @MainActor
 enum SafeSpendTodayWidgetSnapshotBuilder {
-    private static let appGroupID = "group.com.mb.offshore-budgeting"
+    private static let appGroupID = OffshoreAppIdentity.appGroupIdentifier
     private static let selectedWorkspaceKey = "selectedWorkspaceID"
     private static let widgetKind = "SafeSpendTodayWidget"
     private static let dailyTimelineHorizon = 35

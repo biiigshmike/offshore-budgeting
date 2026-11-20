@@ -202,13 +202,21 @@ struct ContentView: View {
                     }
                 }
 
-                if didCompleteOnboarding, !activeUseICloud, workspaces.isEmpty, !isBootstrapping {
+                if didCompleteOnboarding, !isScreenshotSession, !activeUseICloud, workspaces.isEmpty, !isBootstrapping {
+                    #if DEBUG
+                    StartupDiagnostics.log("onboarding reset: local workspace query is empty")
+                    StartupDiagnostics.logContainer(modelContext.container)
+                    StartupDiagnostics.logWorkspaceCount(container: modelContext.container, stage: "onboarding reset")
+                    #endif
                     didCompleteOnboarding = false
                     didSeedDefaultWorkspaces = false
                     selectedWorkspaceID = ""
                 }
             }
             .onAppear {
+                #if DEBUG
+                StartupDiagnostics.logDisplayedContext(modelContext, selectedWorkspaceID: selectedWorkspaceID)
+                #endif
                 traceResume("contentView onAppear")
                 TabFlickerDiagnostics.beginWatch(
                     reason: "coldLaunch",
@@ -991,9 +999,20 @@ struct ContentView: View {
         return workspaces.first(where: { $0.id == uuid })
     }
 
+    private var isScreenshotSession: Bool {
+        #if DEBUG
+        DebugScreenshotMode.isEnabled
+        #else
+        false
+        #endif
+    }
+
     // MARK: - Seeding
 
     private func seedDefaultWorkspacesIfNeeded() {
+        // Screenshot startup owns its workspace. An empty transient UI query must
+        // never manufacture the normal Personal/Work defaults in the demo store.
+        guard !isScreenshotSession else { return }
         if !workspaces.isEmpty {
             didSeedDefaultWorkspaces = true
 

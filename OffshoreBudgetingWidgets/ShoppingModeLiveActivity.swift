@@ -433,7 +433,7 @@ private struct ShoppingModeExpandedIslandActionsView: View {
 // MARK: - ExcursionDeepLink
 
 private enum ExcursionDeepLink {
-    static let scheme = "offshore"
+    static let scheme = OffshoreAppIdentity.urlScheme
 
     static var stopURL: URL? {
         URL(string: "\(scheme)://action/excursion/stop")

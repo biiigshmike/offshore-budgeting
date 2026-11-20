@@ -41,7 +41,7 @@ struct SpendTrendsSatinBar: View {
             .overlay {
                 if widgetRenderingMode == .accented {
                     Canvas { context, size in
-                        let dividerHeight: CGFloat = 1.5
+                        let dividerHeight: CGFloat = 0.5
                         for (lower, upper) in zip(stops, stops.dropFirst())
                         where lower.segmentIndex != upper.segmentIndex {
                             let boundary = (lower.location + upper.location) / 2

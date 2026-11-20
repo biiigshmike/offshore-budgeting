@@ -9,7 +9,7 @@ import Foundation
 import WidgetKit
 
 enum SpendTrendsWidgetSnapshotStore {
-    nonisolated static let appGroupID = "group.com.mb.offshore-budgeting"
+    nonisolated static let appGroupID = OffshoreAppIdentity.appGroupIdentifier
 
     nonisolated private static var defaults: UserDefaults? {
         UserDefaults(suiteName: appGroupID)
