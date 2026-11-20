@@ -6,8 +6,11 @@
 //
 
 import SwiftUI
+import WidgetKit
 
 struct WidgetCardVisualView: View {
+    @Environment(\.widgetRenderingMode) private var widgetRenderingMode
+
     let title: String
     let themeToken: String
     let effectToken: String
@@ -46,20 +49,26 @@ struct WidgetCardVisualView: View {
         WidgetCardVisualEffect.resolve(effectToken)
     }
 
+    private var isAccented: Bool {
+        widgetRenderingMode == .accented
+    }
+
     var body: some View {
         ZStack(alignment: .bottomLeading) {
             RoundedRectangle(cornerRadius: 18, style: .continuous)
                 .fill(baseGradient)
+                .opacity(isAccented ? 0.20 : 1)
 
             overlayEffect
+                .opacity(isAccented ? 0.35 : 1)
 
             RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .stroke(.white.opacity(0.18), lineWidth: 1)
+                .stroke(.white.opacity(isAccented ? 0.35 : 0.18), lineWidth: 1)
 
             if showsTitle {
                 Text(title)
                     .font(titleFont)
-                    .foregroundStyle(.white.opacity(titleOpacity))
+                    .foregroundStyle(.white.opacity(isAccented ? 1 : titleOpacity))
                     .padding(titlePadding)
                     .lineLimit(titleLineLimit)
                     .truncationMode(.tail)

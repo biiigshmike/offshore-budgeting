@@ -1,8 +1,10 @@
 import SwiftUI
+import WidgetKit
 
 /// Shared by Home, metric detail, and WidgetKit; dimensions are resolved by the chart.
 struct SpendTrendsSatinBar: View {
     @Environment(\.colorSchemeContrast) private var contrast
+    @Environment(\.widgetRenderingMode) private var widgetRenderingMode
 
     let segments: [SpendTrendsBarSegment]
     let width: CGFloat
@@ -36,6 +38,27 @@ struct SpendTrendsSatinBar: View {
                                    startPoint: .leading, endPoint: .trailing)
                 )
             }
+            .overlay {
+                if widgetRenderingMode == .accented {
+                    Canvas { context, size in
+                        let dividerHeight: CGFloat = 1.5
+                        for (lower, upper) in zip(stops, stops.dropFirst())
+                        where lower.segmentIndex != upper.segmentIndex {
+                            let boundary = (lower.location + upper.location) / 2
+                            let y = (1 - boundary) * size.height
+                            let rect = CGRect(
+                                x: 0,
+                                y: y - dividerHeight / 2,
+                                width: size.width,
+                                height: dividerHeight
+                            )
+                            context.fill(Path(rect), with: .color(.white))
+                        }
+                    }
+                    .blendMode(.destinationOut)
+                }
+            }
+            .compositingGroup()
             .overlay {
                 if isSelected || contrast == .increased {
                     shape.strokeBorder(.primary.opacity(isSelected ? 0.65 : 0.5),
