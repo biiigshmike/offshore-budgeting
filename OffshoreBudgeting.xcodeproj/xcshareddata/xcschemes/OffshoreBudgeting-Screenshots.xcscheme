@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Scheme
    LastUpgradeVersion = "2640"
-   version = "1.7">
+   version = "1.3">
    <BuildAction
       parallelizeBuildables = "YES"
       buildImplicitDependencies = "YES"
@@ -29,7 +29,11 @@
       selectedLauncherIdentifier = "Xcode.DebuggerFoundation.Launcher.LLDB"
       shouldUseLaunchSchemeArgsEnv = "NO">
       <EnvironmentVariables>
-         <EnvironmentVariable key="OFFSHORE_UNIT_TEST_HOST" value="1" isEnabled="YES"/>
+         <EnvironmentVariable
+            key = "OFFSHORE_UNIT_TEST_HOST"
+            value = "1"
+            isEnabled = "YES">
+         </EnvironmentVariable>
       </EnvironmentVariables>
       <Testables>
          <TestableReference
@@ -43,16 +47,30 @@
                ReferencedContainer = "container:OffshoreBudgeting.xcodeproj">
             </BuildableReference>
             <SelectedTests>
-               <Test Identifier="ScreenshotStartupCoordinatorTests"/>
-               <Test Identifier="DebugScreenshotModeTests"/>
-               <Test Identifier="PersistentStoreLocationTests"/>
+               <Test
+                  Identifier = "DebugScreenshotModeTests">
+               </Test>
+               <Test
+                  Identifier = "PersistentStoreLocationTests">
+               </Test>
+               <Test
+                  Identifier = "ScreenshotStartupCoordinatorTests">
+               </Test>
             </SelectedTests>
          </TestableReference>
-         <TestableReference skipped="NO" parallelizable="NO">
-            <BuildableReference BuildableIdentifier="primary" BlueprintIdentifier="4C96F8672F20523900541774" BuildableName="OffshoreBudgetingUITests.xctest" BlueprintName="OffshoreBudgetingUITests" ReferencedContainer="container:OffshoreBudgeting.xcodeproj">
+         <TestableReference
+            skipped = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "4C96F8672F20523900541774"
+               BuildableName = "OffshoreBudgetingUITests.xctest"
+               BlueprintName = "OffshoreBudgetingUITests"
+               ReferencedContainer = "container:OffshoreBudgeting.xcodeproj">
             </BuildableReference>
             <SelectedTests>
-               <Test Identifier="ScreenshotModeLaunchUITests"/>
+               <Test
+                  Identifier = "ScreenshotModeLaunchUITests">
+               </Test>
             </SelectedTests>
          </TestableReference>
       </Testables>
