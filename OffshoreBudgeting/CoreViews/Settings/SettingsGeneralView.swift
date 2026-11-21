@@ -29,6 +29,9 @@ struct SettingsGeneralView: View {
     private var reviewUncategorizedExpensesOnOpen = false
 
     @State private var eraseResultMessage: String = ""
+    @State private var requiresPeriodReview = true
+    @State private var isLoadingSavingsPreference = true
+    @State private var savingsPreferenceError = ""
 
     @State private var activeAlert: ActiveAlert? = nil
 
@@ -95,6 +98,18 @@ struct SettingsGeneralView: View {
                 Text("Sets the default date range for Home, account views, and widgets, and the starting dates for new budgets. Monthly, for example, starts with the current month. This period also determines when completed periods are recorded in Offshore Savings. You can choose other date ranges when needed.")
             }
 
+            Section {
+                Toggle("Review Before Posting Savings", isOn: $requiresPeriodReview)
+                    .toggleStyle(.switch)
+                    .tint(Color("AccentColor"))
+                    .disabled(isLoadingSavingsPreference)
+                    .accessibilityIdentifier("settings.reviewBeforePostingSavings")
+            } header: {
+                Text("Savings")
+            } footer: {
+                Text("Saved with \(workspace.name). When enabled, completed periods wait in Savings > Period Review until you confirm them. Turning this off allows automatic posting only for periods ending afterward. Older pending periods still need review, and corrected closing amounts stay protected.")
+            }
+
             Section("Maintenance") {
                 NavigationLink {
                     SettingsMaintenanceView(
@@ -110,6 +125,10 @@ struct SettingsGeneralView: View {
         }
         .listStyle(.insetGrouped)
         .navigationTitle("General")
+        .task(id: workspace.id) { loadSavingsPreference() }
+        .onChange(of: requiresPeriodReview) { _, enabled in
+            saveSavingsPreference(enabled)
+        }
         .blocksAutomaticExpenseReview(while: activeAlert != nil)
         .alert(item: $activeAlert) { alert in
             switch alert {
@@ -151,6 +170,12 @@ struct SettingsGeneralView: View {
                     message: Text(eraseResultMessage),
                     dismissButton: .default(Text("OK"))
                 )
+            case .savingsPreferenceFailed:
+                Alert(
+                    title: Text("Couldn’t Save Savings Settings"),
+                    message: Text(savingsPreferenceError),
+                    dismissButton: .default(Text("OK"))
+                )
             }
         }
         .appSheet(isPresented: $showingRestartRequired) {
@@ -172,6 +197,31 @@ struct SettingsGeneralView: View {
             get: { BudgetingPeriod(rawValue: defaultBudgetingPeriodRaw) ?? .monthly },
             set: { defaultBudgetingPeriodRaw = $0.rawValue }
         )
+    }
+
+    private func loadSavingsPreference() {
+        isLoadingSavingsPreference = true
+        requiresPeriodReview = SavingsAccountService.workspaceSavingsAccounts(
+            for: workspace, modelContext: modelContext
+        ).first?.requiresPeriodReview ?? true
+        isLoadingSavingsPreference = false
+    }
+
+    private func saveSavingsPreference(_ enabled: Bool) {
+        guard !isLoadingSavingsPreference else { return }
+        let savedPreference = SavingsAccountService.workspaceSavingsAccounts(
+            for: workspace, modelContext: modelContext
+        ).first?.requiresPeriodReview ?? true
+        guard enabled != savedPreference else { return }
+        do {
+            try SavingsPeriodReviewService.setRequiresReview(
+                enabled, workspace: workspace, modelContext: modelContext
+            )
+        } catch {
+            requiresPeriodReview = savedPreference
+            savingsPreferenceError = error.localizedDescription
+            activeAlert = .savingsPreferenceFailed
+        }
     }
 
     // MARK: - Erase
@@ -222,12 +272,14 @@ private enum ActiveAlert: Identifiable {
     case repeatOnboardingConfirm
     case eraseConfirm
     case eraseResult
+    case savingsPreferenceFailed
 
     var id: Int {
         switch self {
         case .repeatOnboardingConfirm: return 1
         case .eraseConfirm: return 2
         case .eraseResult: return 3
+        case .savingsPreferenceFailed: return 4
         }
     }
 }

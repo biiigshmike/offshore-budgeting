@@ -1132,7 +1132,7 @@ enum GeneratedHelpContent {
                 mediaSection(
                     id: "accounts-savings-account-overview",
                     header: "Money Available for Future Expenses",
-                    body: "Offshore Savings tracks money left over from completed default budgeting periods that remains available for future expenses. Running Total includes your full savings ledger across all dates. Current Period shows ledger activity for the selected date range.\n\nAutomatic period closes follow your Default Budgeting Period and its calendar boundaries. They do not make a separate deposit whenever a custom budget ends. Daily, weekly, monthly, and other custom Budget records are views of your finances, not separate savings accounts.\n\nPay From Savings reduces an expense’s budget impact while keeping the full transaction in card history. Set Aside as Savings removes money from this available balance when you reserve it elsewhere. Offshore records these changes; it does not move money between bank accounts.",
+                    body: "Offshore Savings tracks money left over from completed default budgeting periods that remains available for future expenses. Running Total includes your full savings ledger across all dates. Current Period shows ledger activity for the selected date range.\n\nPeriod closes follow your Default Budgeting Period and its calendar boundaries. They do not make a separate deposit whenever a custom budget ends. Daily, weekly, monthly, and other custom Budget records are views of your finances, not separate savings accounts.\n\nPay From Savings reduces an expense’s budget impact while keeping the full transaction in card history. Set Aside as Savings removes money from this available balance when you reserve it elsewhere. Offshore records these changes; it does not move money between bank accounts.",
                     media: [
                         mediaItem(
                             id: "accounts-savings-account-overview-image-1",
@@ -1141,6 +1141,11 @@ enum GeneratedHelpContent {
                             fullscreenCaptionText: "Review your available Offshore Savings balance and its ledger history."
                         )
                     ]
+                ),
+                textSection(
+                    id: "accounts-savings-account-period-review",
+                    header: "Review Before Posting",
+                    body: "Open Period Review in Offshore Savings to check completed periods. Review Today also links to this dedicated screen and shows how many periods are waiting. Each review shows overlapping budgets, income, expenses, the calculated closing amount, and the change it would make to your available Savings balance.\n\nTap an income or expense to edit it, or swipe for more options. Planned expenses still use their planned amounts until you record an actual amount. If the records don’t tell the whole story, turn on Use a Different Amount. Zero and negative amounts are fine. Add a note if you like; leaving it blank uses the usual period-close text. When you’re ready, turn on Update Savings, then tap Save at the top for a new close or Update for an existing one. Your transactions and existing manual adjustments stay as they are.\n\nChanges after confirmation appear under Needs Review. The posted amount stays in Savings until you confirm again. Posted History also lets you deliberately review older closes; existing closes are not automatically queued when you first use this feature.\n\nReview Before Posting Savings is enabled by default and saved with your workspace in Settings > General. Turning it off enables automatic posting only for periods ending afterward. Older pending periods still need review, and corrected closes remain protected from automatic recalculation."
                 ),
                 textSection(
                     id: "accounts-savings-account-set-aside",

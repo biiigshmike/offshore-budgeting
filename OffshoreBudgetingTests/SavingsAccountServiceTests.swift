@@ -51,6 +51,15 @@ struct SavingsAccountServiceTests {
         try context.fetch(FetchDescriptor<T>(sortBy: sortBy))
     }
 
+    private func enableLegacyAutomaticPosting(
+        for workspace: Workspace,
+        in context: ModelContext
+    ) {
+        let account = SavingsAccountService.ensureSavingsAccount(for: workspace, modelContext: context)
+        account.requiresPeriodReview = false
+        account.automaticPostingStartsAt = .distantPast
+    }
+
     private func makeDate(_ year: Int, _ month: Int, _ day: Int) -> Date {
         var cal = Calendar(identifier: .gregorian)
         cal.timeZone = TimeZone(secondsFromGMT: 0) ?? .current
@@ -221,6 +230,7 @@ struct SavingsAccountServiceTests {
         variableExpenses.forEach(context.insert)
         try context.save()
 
+        enableLegacyAutomaticPosting(for: ws, in: context)
         SavingsAccountService.runAutoCaptureIfNeeded(
             for: ws,
             defaultBudgetingPeriodRaw: BudgetingPeriod.monthly.rawValue,
@@ -318,6 +328,7 @@ struct SavingsAccountServiceTests {
         variableExpenses.forEach(context.insert)
         try context.save()
 
+        enableLegacyAutomaticPosting(for: ws, in: context)
         SavingsAccountService.runAutoCaptureIfNeeded(
             for: ws,
             defaultBudgetingPeriodRaw: BudgetingPeriod.monthly.rawValue,
@@ -437,6 +448,7 @@ struct SavingsAccountServiceTests {
         variableExpenses.forEach(context.insert)
         try context.save()
 
+        enableLegacyAutomaticPosting(for: ws, in: context)
         SavingsAccountService.runAutoCaptureIfNeeded(
             for: ws,
             defaultBudgetingPeriodRaw: BudgetingPeriod.monthly.rawValue,
@@ -581,6 +593,7 @@ struct SavingsAccountServiceTests {
         context.insert(duplicate)
         try context.save()
 
+        enableLegacyAutomaticPosting(for: ws, in: context)
         SavingsAccountService.runAutoCaptureIfNeeded(
             for: ws,
             defaultBudgetingPeriodRaw: BudgetingPeriod.monthly.rawValue,
@@ -631,6 +644,7 @@ struct SavingsAccountServiceTests {
         context.insert(duplicate)
         try context.save()
 
+        enableLegacyAutomaticPosting(for: ws, in: context)
         SavingsAccountService.runAutoCaptureIfNeeded(
             for: ws,
             defaultBudgetingPeriodRaw: BudgetingPeriod.monthly.rawValue,
@@ -665,6 +679,7 @@ struct SavingsAccountServiceTests {
         }
         try context.save()
 
+        enableLegacyAutomaticPosting(for: workspace, in: context)
         SavingsAccountService.runAutoCaptureIfNeeded(
             for: workspace, defaultBudgetingPeriodRaw: BudgetingPeriod.monthly.rawValue,
             incomes: [], plannedExpenses: [], variableExpenses: [],
@@ -715,6 +730,7 @@ struct SavingsAccountServiceTests {
         )
         try context.save()
 
+        enableLegacyAutomaticPosting(for: ws, in: context)
         SavingsAccountService.runAutoCaptureIfNeeded(
             for: ws,
             defaultBudgetingPeriodRaw: BudgetingPeriod.monthly.rawValue,
@@ -949,6 +965,7 @@ struct SavingsAccountServiceTests {
         let context = try makeContext()
         let fixture = try makeMonthlySavingsFixture(in: context)
 
+        enableLegacyAutomaticPosting(for: fixture.workspace, in: context)
         SavingsAccountService.runAutoCaptureIfNeeded(
             for: fixture.workspace,
             defaultBudgetingPeriodRaw: BudgetingPeriod.monthly.rawValue,
@@ -979,6 +996,7 @@ struct SavingsAccountServiceTests {
         let context = try makeContext()
         let fixture = try makeMonthlySavingsFixture(in: context)
 
+        enableLegacyAutomaticPosting(for: fixture.workspace, in: context)
         SavingsAccountService.runAutoCaptureIfNeeded(
             for: fixture.workspace,
             defaultBudgetingPeriodRaw: BudgetingPeriod.monthly.rawValue,
@@ -1011,6 +1029,7 @@ struct SavingsAccountServiceTests {
         let context = try makeContext()
         let fixture = try makeMonthlySavingsFixture(in: context)
 
+        enableLegacyAutomaticPosting(for: fixture.workspace, in: context)
         SavingsAccountService.runAutoCaptureIfNeeded(
             for: fixture.workspace,
             defaultBudgetingPeriodRaw: BudgetingPeriod.monthly.rawValue,
@@ -1062,6 +1081,7 @@ struct SavingsAccountServiceTests {
         let context = try makeContext()
         let fixture = try makeMonthlySavingsFixture(in: context)
 
+        enableLegacyAutomaticPosting(for: fixture.workspace, in: context)
         SavingsAccountService.runAutoCaptureIfNeeded(
             for: fixture.workspace,
             defaultBudgetingPeriodRaw: BudgetingPeriod.monthly.rawValue,
@@ -1134,6 +1154,7 @@ struct SavingsAccountServiceTests {
         let context = try makeContext()
         let fixture = try makeMonthlySavingsFixture(in: context)
 
+        enableLegacyAutomaticPosting(for: fixture.workspace, in: context)
         SavingsAccountService.runAutoCaptureIfNeeded(
             for: fixture.workspace,
             defaultBudgetingPeriodRaw: BudgetingPeriod.monthly.rawValue,
@@ -1188,6 +1209,7 @@ struct SavingsAccountServiceTests {
         let context = try makeContext()
         let fixture = try makeMonthlySavingsFixture(in: context)
 
+        enableLegacyAutomaticPosting(for: fixture.workspace, in: context)
         SavingsAccountService.runAutoCaptureIfNeeded(
             for: fixture.workspace,
             defaultBudgetingPeriodRaw: BudgetingPeriod.monthly.rawValue,
@@ -1611,6 +1633,7 @@ struct SavingsAccountServiceTests {
         context.insert(allocation)
         try context.save()
 
+        enableLegacyAutomaticPosting(for: ws, in: context)
         SavingsAccountService.runAutoCaptureIfNeeded(
             for: ws,
             defaultBudgetingPeriodRaw: BudgetingPeriod.monthly.rawValue,

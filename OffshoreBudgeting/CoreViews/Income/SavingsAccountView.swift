@@ -128,6 +128,7 @@ struct SavingsAccountView<TrailingToolbar: ToolbarContent>: View {
     @State private var hasLoadedGraphSnapshot: Bool = false
     @State private var needsGraphSnapshotRefresh: Bool = false
     @State private var graphSnapshotRefreshTask: Task<Void, Never>? = nil
+    @State private var pendingPeriodCount: Int?
 
     init(workspace: Workspace, @ToolbarContentBuilder trailingToolbar: () -> TrailingToolbar) {
         self.workspace = workspace
@@ -347,7 +348,21 @@ struct SavingsAccountView<TrailingToolbar: ToolbarContent>: View {
                         .foregroundStyle(runningTotal >= 0 ? .green : .red)
                 }
 
-                Text("Offshore Savings tracks money left over from completed default budgeting periods that remains available for future expenses. Your running total includes all dates in your savings ledger.")
+                NavigationLink {
+                    SavingsPeriodReviewView(workspace: workspace)
+                } label: {
+                    LabeledContent {
+                        if let pendingPeriodCount {
+                            Text("\(pendingPeriodCount) awaiting review")
+                                .foregroundStyle(.secondary)
+                        }
+                    } label: {
+                        Label("Period Review", systemImage: "calendar.badge.checkmark")
+                    }
+                }
+                .accessibilityIdentifier("savings.openPeriodReview")
+
+                Text("Offshore Savings tracks money left over from completed default budgeting periods. Review each period before posting to make sure its budgets, income, and expenses are correct. Your running total includes all posted savings ledger activity across all dates.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
 
@@ -436,6 +451,7 @@ struct SavingsAccountView<TrailingToolbar: ToolbarContent>: View {
             trailingToolbar
         }
         .onAppear {
+            reloadPendingPeriodCount()
             initializeDateRangeIfNeeded()
             hydrateGraphSnapshotIfAvailable()
             if graphSnapshot == nil {
@@ -445,9 +461,11 @@ struct SavingsAccountView<TrailingToolbar: ToolbarContent>: View {
             }
         }
         .onChange(of: defaultBudgetingPeriodRaw) { _, _ in
+            reloadPendingPeriodCount()
             applyDefaultPeriodRange()
         }
         .onChange(of: graphSignature) { _, signature in
+            reloadPendingPeriodCount()
             guard graphSnapshot?.signature != signature else { return }
             if tabActivationContext.phase == .active {
                 scheduleGraphSnapshotRefresh(reason: "inputsChanged")
@@ -510,6 +528,19 @@ struct SavingsAccountView<TrailingToolbar: ToolbarContent>: View {
     }
 
     // MARK: - Chart
+
+    private func reloadPendingPeriodCount() {
+        do {
+            pendingPeriodCount = try SavingsPeriodReviewService.summaries(
+                workspaceID: workspace.id,
+                defaultBudgetingPeriodRaw: defaultBudgetingPeriodRaw,
+                modelContext: modelContext
+            ).filter { $0.isPending || $0.needsReview }.count
+        } catch {
+            // The dedicated screen presents the load error and retry action.
+            pendingPeriodCount = nil
+        }
+    }
 
     private var savingsChartSection: some View {
         VStack(alignment: .leading, spacing: 10) {

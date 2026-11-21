@@ -73,7 +73,7 @@ enum SavingsCalculationExplanation {
                 .init(id: "total", title: "Running Total", amount: included.reduce(0) { $0 + $1.amount }, isTotal: true)
             ],
             notes: [
-                "Offshore calculates savings when your default budgeting period ends. Ending a custom budget does not add savings separately.",
+                "Offshore calculates savings when your default budgeting period ends. With Review Before Posting Savings enabled, confirm the period in Savings > Period Review before it enters this balance. Ending a custom budget does not add savings separately.",
                 "Using Pay From Savings reduces your available savings. The full expense stays in your card history.",
                 "Money you mark as saved elsewhere through Set Aside as Savings is taken out of this available balance. Offshore records this change; it does not transfer money between bank accounts.",
                 "Running Total includes all dates, even when you’re viewing activity for a shorter period."

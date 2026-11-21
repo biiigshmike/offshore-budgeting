@@ -1014,6 +1014,8 @@ final class SavingsAccount {
     var total: Double = 0
     var didBackfillHistory: Bool = false
     var autoCaptureThroughDate: Date? = nil
+    var requiresPeriodReview: Bool = true
+    var automaticPostingStartsAt: Date? = nil
     var createdAt: Date = Date.now
     var updatedAt: Date = Date.now
 
@@ -1029,6 +1031,8 @@ final class SavingsAccount {
         total: Double = 0,
         didBackfillHistory: Bool = false,
         autoCaptureThroughDate: Date? = nil,
+        requiresPeriodReview: Bool = true,
+        automaticPostingStartsAt: Date? = nil,
         createdAt: Date = .now,
         updatedAt: Date = .now,
         workspace: Workspace? = nil
@@ -1038,6 +1042,8 @@ final class SavingsAccount {
         self.total = total
         self.didBackfillHistory = didBackfillHistory
         self.autoCaptureThroughDate = autoCaptureThroughDate
+        self.requiresPeriodReview = requiresPeriodReview
+        self.automaticPostingStartsAt = automaticPostingStartsAt
         self.createdAt = createdAt
         self.updatedAt = updatedAt
         self.workspace = workspace
@@ -1056,6 +1062,11 @@ final class SavingsLedgerEntry {
     var linkedAllocationSettlementID: UUID? = nil
     var periodStartDate: Date? = nil
     var periodEndDate: Date? = nil
+    var reviewedAt: Date? = nil
+    var reviewedCalculatedAmount: Double? = nil
+    var reviewedInputFingerprint: String? = nil
+    var correctedCloseAmount: Double? = nil
+    var correctionExplanation: String? = nil
     var createdAt: Date = Date.now
     var updatedAt: Date = Date.now
 
@@ -1081,6 +1092,11 @@ final class SavingsLedgerEntry {
         linkedAllocationSettlementID: UUID? = nil,
         periodStartDate: Date? = nil,
         periodEndDate: Date? = nil,
+        reviewedAt: Date? = nil,
+        reviewedCalculatedAmount: Double? = nil,
+        reviewedInputFingerprint: String? = nil,
+        correctedCloseAmount: Double? = nil,
+        correctionExplanation: String? = nil,
         createdAt: Date = .now,
         updatedAt: Date = .now,
         workspace: Workspace? = nil,
@@ -1097,6 +1113,11 @@ final class SavingsLedgerEntry {
         self.linkedAllocationSettlementID = linkedAllocationSettlementID
         self.periodStartDate = periodStartDate
         self.periodEndDate = periodEndDate
+        self.reviewedAt = reviewedAt
+        self.reviewedCalculatedAmount = reviewedCalculatedAmount
+        self.reviewedInputFingerprint = reviewedInputFingerprint
+        self.correctedCloseAmount = correctedCloseAmount
+        self.correctionExplanation = correctionExplanation
         self.createdAt = createdAt
         self.updatedAt = updatedAt
         self.workspace = workspace

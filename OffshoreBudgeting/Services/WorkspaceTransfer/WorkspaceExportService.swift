@@ -182,6 +182,8 @@ struct WorkspaceExportService {
                     total: $0.total,
                     didBackfillHistory: $0.didBackfillHistory,
                     autoCaptureThroughDate: $0.autoCaptureThroughDate,
+                    requiresPeriodReview: $0.requiresPeriodReview,
+                    automaticPostingStartsAt: $0.automaticPostingStartsAt,
                     createdAt: $0.createdAt,
                     updatedAt: $0.updatedAt
                 )
@@ -197,6 +199,11 @@ struct WorkspaceExportService {
                     linkedAllocationSettlementID: $0.linkedAllocationSettlementID,
                     periodStartDate: $0.periodStartDate,
                     periodEndDate: $0.periodEndDate,
+                    reviewedAt: $0.reviewedAt,
+                    reviewedCalculatedAmount: $0.reviewedCalculatedAmount,
+                    reviewedInputFingerprint: $0.reviewedInputFingerprint,
+                    correctedCloseAmount: $0.correctedCloseAmount,
+                    correctionExplanation: $0.correctionExplanation,
                     createdAt: $0.createdAt,
                     updatedAt: $0.updatedAt,
                     accountID: $0.account?.id,

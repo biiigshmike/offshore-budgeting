@@ -1324,7 +1324,80 @@ enum DebugSeeder {
 
         account.didBackfillHistory = true
         account.autoCaptureThroughDate = rangeEnd
+        account.requiresPeriodReview = true
+        account.automaticPostingStartsAt = nil
+        try seedScreenshotPeriodReviews(context: context, workspace: workspace, account: account, now: now)
         SavingsAccountService.recalculateAccountTotal(account)
+    }
+
+    /// Rebuild the demo review states along with the existing screenshot ledger on each launch.
+    /// All callers are restricted to the isolated Screenshots.store by runIfNeeded.
+    private static func seedScreenshotPeriodReviews(
+        context: ModelContext,
+        workspace: Workspace,
+        account: SavingsAccount,
+        now: Date
+    ) throws {
+        let calendar = Calendar.current
+        let period = screenshotBudgetingPeriod()
+        var cursor = SavingsAccountService.periodRange(containing: now, period: period)
+        var recentRanges: [(start: Date, end: Date)] = []
+        for _ in 0..<3 {
+            guard let previousDay = calendar.date(byAdding: .day, value: -1, to: cursor.start) else { return }
+            cursor = SavingsAccountService.periodRange(containing: previousDay, period: period)
+            recentRanges.append(cursor)
+        }
+        let workspaceID = workspace.id
+        let cards = try context.fetch(FetchDescriptor<Card>(predicate: #Predicate { $0.workspace?.id == workspaceID }))
+        guard let card = cards.first(where: { normalizedCardName($0.name) == "checking" }) else {
+            throw ScreenshotStartupError.missingSampleData
+        }
+        let incomes = try context.fetch(FetchDescriptor<Income>(predicate: #Predicate { $0.workspace?.id == workspaceID }))
+        for range in recentRanges where !incomes.contains(where: {
+            !$0.isPlanned && $0.date >= range.start && $0.date <= range.end
+        }) {
+            context.insert(Income(source: "Paycheck", amount: 2500, date: range.start,
+                                  isPlanned: false, workspace: workspace, card: card))
+        }
+
+        let pendingRange = recentRanges[0]
+        let planned = try context.fetch(FetchDescriptor<PlannedExpense>(predicate: #Predicate { $0.workspace?.id == workspaceID }))
+        if !planned.contains(where: { $0.title == "Internet bill to review" && $0.expenseDate == pendingRange.start }) {
+            context.insert(PlannedExpense(title: "Internet bill to review", plannedAmount: 80,
+                                          expenseDate: pendingRange.start, workspace: workspace, card: card))
+        }
+
+        let changedRange = recentRanges[1]
+        let lateTitle = "Late grocery purchase · period review demo"
+        let variables = try context.fetch(FetchDescriptor<VariableExpense>(predicate: #Predicate { $0.workspace?.id == workspaceID }))
+        // Recreate this one demo transaction after capturing the original approved inputs.
+        for expense in variables where expense.descriptionText == lateTitle {
+            VariableExpenseDeletionService.delete(expense, modelContext: context)
+        }
+        let reviews = try SavingsPeriodReviewService.summaries(
+            workspaceID: workspaceID, defaultBudgetingPeriodRaw: period.rawValue,
+            modelContext: context, now: now
+        )
+        for review in reviews where review.start != pendingRange.start {
+            let isCorrected = review.start == recentRanges[2].start
+            let entry = SavingsLedgerEntry(
+                date: review.end, amount: isCorrected ? 0 : review.calculatedAmount,
+                note: SavingsAccountService.periodCloseNote(start: review.start, end: review.end),
+                kindRaw: SavingsLedgerEntryKind.periodClose.rawValue,
+                periodStartDate: review.start, periodEndDate: review.end,
+                reviewedAt: calendar.date(byAdding: .second, value: 1, to: review.end),
+                reviewedCalculatedAmount: review.calculatedAmount,
+                reviewedInputFingerprint: review.inputFingerprint,
+                correctedCloseAmount: isCorrected ? 0 : nil,
+                correctionExplanation: isCorrected
+                    ? "I fell behind on this period and could not reconstruct the records. No Savings was carried forward."
+                    : nil,
+                workspace: workspace, account: account
+            )
+            context.insert(entry)
+        }
+        context.insert(VariableExpense(descriptionText: lateTitle, amount: 75,
+                                       transactionDate: changedRange.start, workspace: workspace, card: card))
     }
 
     private static func screenshotBudgetingPeriod() -> BudgetingPeriod {

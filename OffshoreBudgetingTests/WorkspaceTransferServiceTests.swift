@@ -38,6 +38,92 @@ struct WorkspaceTransferServiceTests {
         try context.fetch(FetchDescriptor<T>())
     }
 
+    @Test(arguments: [true, false])
+    func savingsReviewSettingsAndCloseAudit_roundTrip(requiresReview: Bool) throws {
+        let context = try makeContext()
+        let source = try seedTransferWorkspace(in: context)
+        let account = try #require(try fetchAll(SavingsAccount.self, in: context).first)
+        let entry = try #require(try fetchAll(SavingsLedgerEntry.self, in: context).first)
+        account.requiresPeriodReview = requiresReview
+        account.automaticPostingStartsAt = date(2026, 7, 1)
+        entry.reviewedAt = date(2026, 7, 2)
+        entry.reviewedCalculatedAmount = 125
+        entry.reviewedInputFingerprint = "review-inputs-v1"
+        entry.correctedCloseAmount = 0
+        entry.correctionExplanation = "Confirmed the actual balance was zero."
+        try context.save()
+
+        let archive = try WorkspaceExportService().exportArchive(
+            for: source.workspace,
+            sections: [.savings],
+            modelContext: context
+        )
+        let decoded = try WorkspaceArchiveCoding.decode(WorkspaceArchiveCoding.encode(archive))
+        #expect(decoded.savingsAccounts.first?.requiresPeriodReview == requiresReview)
+        #expect(decoded.savingsLedgerEntries.first?.reviewedInputFingerprint == "review-inputs-v1")
+        let imported = try WorkspaceImportService().importArchive(
+            decoded,
+            existingWorkspaces: try fetchAll(Workspace.self, in: context),
+            modelContext: context
+        )
+        let importedAccount = try #require(try fetchAll(SavingsAccount.self, in: context)
+            .first { $0.workspace?.id == imported.id })
+        let importedEntry = try #require(try fetchAll(SavingsLedgerEntry.self, in: context)
+            .first { $0.workspace?.id == imported.id })
+        #expect(importedAccount.requiresPeriodReview == requiresReview)
+        #expect(importedAccount.automaticPostingStartsAt == date(2026, 7, 1))
+        #expect(importedEntry.reviewedAt == date(2026, 7, 2))
+        #expect(importedEntry.reviewedCalculatedAmount == 125)
+        #expect(importedEntry.reviewedInputFingerprint == "review-inputs-v1")
+        #expect(importedEntry.correctedCloseAmount == 0)
+        #expect(importedEntry.correctionExplanation == "Confirmed the actual balance was zero.")
+    }
+
+    @Test func legacySavingsArchive_defaultsToReviewWithoutRewritingHistory() throws {
+        let context = try makeContext()
+        let source = try seedTransferWorkspace(in: context)
+        let archive = try WorkspaceExportService().exportArchive(
+            for: source.workspace,
+            sections: [.savings],
+            modelContext: context
+        )
+        let data = try WorkspaceArchiveCoding.encode(archive)
+        var json = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        var accounts = try #require(json["savingsAccounts"] as? [[String: Any]])
+        for index in accounts.indices {
+            accounts[index].removeValue(forKey: "requiresPeriodReview")
+            accounts[index].removeValue(forKey: "automaticPostingStartsAt")
+        }
+        json["savingsAccounts"] = accounts
+        var entries = try #require(json["savingsLedgerEntries"] as? [[String: Any]])
+        for index in entries.indices {
+            for key in ["reviewedAt", "reviewedCalculatedAmount", "reviewedInputFingerprint",
+                        "correctedCloseAmount", "correctionExplanation"] {
+                entries[index].removeValue(forKey: key)
+            }
+        }
+        json["savingsLedgerEntries"] = entries
+        let decoded = try WorkspaceArchiveCoding.decode(JSONSerialization.data(withJSONObject: json))
+        #expect(decoded.savingsAccounts.first?.requiresPeriodReview == true)
+        #expect(decoded.savingsAccounts.first?.automaticPostingStartsAt == nil)
+        #expect(decoded.savingsLedgerEntries.first?.reviewedAt == nil)
+        #expect(decoded.savingsLedgerEntries.first?.correctedCloseAmount == nil)
+        let imported = try WorkspaceImportService().importArchive(
+            decoded,
+            existingWorkspaces: try fetchAll(Workspace.self, in: context),
+            modelContext: context
+        )
+        let importedAccount = try #require(try fetchAll(SavingsAccount.self, in: context)
+            .first { $0.workspace?.id == imported.id })
+        let importedEntry = try #require(try fetchAll(SavingsLedgerEntry.self, in: context)
+            .first { $0.workspace?.id == imported.id })
+        #expect(importedAccount.requiresPeriodReview)
+        #expect(importedAccount.automaticPostingStartsAt == nil)
+        #expect(importedEntry.amount == -12)
+        #expect(importedEntry.reviewedAt == nil)
+        #expect(importedEntry.correctedCloseAmount == nil)
+    }
+
     @Test func fullArchiveRoundTrip_createsCopiedWorkspaceWithRemappedRelationships() throws {
         let context = try makeContext()
         let source = try seedTransferWorkspace(in: context)

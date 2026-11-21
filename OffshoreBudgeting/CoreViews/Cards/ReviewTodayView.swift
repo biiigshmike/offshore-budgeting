@@ -7,12 +7,15 @@ struct ReviewTodayView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
     @AppStorage("general_confirmBeforeDeleting") private var confirmBeforeDeleting = true
+    @AppStorage("general_defaultBudgetingPeriod")
+    private var defaultBudgetingPeriodRaw = BudgetingPeriod.monthly.rawValue
     @Query private var workspacePresets: [Preset]
     @State private var result: Result<ReviewTodayActivity, any Error>?
     @State private var editingEntry: ReviewTodayActivity.Entry?
     @State private var editingPreset: Preset?
     @State private var pendingDelete: ReviewTodayActivity.Entry?
     @State private var showingDeleteConfirm = false
+    @State private var pendingPeriodCount: Int?
 
     @State private var breakdown: Breakdown = .category
     @State private var expandedCardID: ReviewTodayActivity.CardTotal.ID?
@@ -32,6 +35,7 @@ struct ReviewTodayView: View {
         NavigationStack {
             summaryContent
                 .navigationTitle("Review Today")
+                .onAppear(perform: reload)
                 .toolbar {
                     ToolbarItem(placement: .confirmationAction) {
                         Button("Done") { dismiss() }
@@ -66,6 +70,7 @@ struct ReviewTodayView: View {
                 }
         }
         .task(id: workspace.id) { reload() }
+        .onChange(of: defaultBudgetingPeriodRaw) { _, _ in reload() }
     }
 
     @ViewBuilder
@@ -87,6 +92,21 @@ struct ReviewTodayView: View {
     private func reviewList(_ review: ReviewTodayActivity) -> some View {
         List {
             statement(review)
+            Section {
+                NavigationLink {
+                    SavingsPeriodReviewView(workspace: workspace)
+                } label: {
+                    LabeledContent {
+                        if let pendingPeriodCount {
+                            Text("\(pendingPeriodCount) awaiting review")
+                                .foregroundStyle(.secondary)
+                        }
+                    } label: {
+                        Label("Period Review", systemImage: "banknote.fill")
+                    }
+                }
+                .accessibilityIdentifier("reviewToday.periodReview")
+            }
             if review.isEmpty {
                 ContentUnavailableView(
                     "No Expenses Today",
@@ -270,6 +290,15 @@ struct ReviewTodayView: View {
     }
 
     private func reload() {
+        do {
+            pendingPeriodCount = try SavingsPeriodReviewService.summaries(
+                workspaceID: workspace.id,
+                defaultBudgetingPeriodRaw: defaultBudgetingPeriodRaw,
+                modelContext: modelContext
+            ).filter { $0.isPending || $0.needsReview }.count
+        } catch {
+            pendingPeriodCount = nil
+        }
         result = Result {
             let expenses = try ReviewTodayExpenses.load(workspaceID: workspace.id, in: modelContext)
             let review = ReviewTodayActivity(expenses: expenses)

@@ -476,6 +476,17 @@ enum SavingsAccountService {
                     plannedExpenses: plannedExpenses,
                     variableExpenses: variableExpenses
                 )
+                let canPost = primaryAccount.map {
+                    canAutomaticallyPost(account: $0, range: currentRange, entries: workspaceEntries)
+                } ?? false
+                if !canPost {
+                    if let entry = canonicalPeriodCloseEntries[key] {
+                        expectedPeriodCloseAmounts[key] = entry.amount
+                    }
+                    guard let next = nextRange(after: currentRange, period: period) else { break }
+                    cursor = next
+                    continue
+                }
                 if hasActivity, shouldTreatRangeAsUnprocessed(currentRange, account: primaryAccount) {
                     hasClosedActivityPastProcessingState = true
                 }
@@ -599,6 +610,7 @@ enum SavingsAccountService {
         now: Date = .now
     ) {
         let account = ensureSavingsAccount(for: workspace, modelContext: modelContext)
+        guard !account.requiresPeriodReview else { return }
         let period = BudgetingPeriod(rawValue: defaultBudgetingPeriodRaw) ?? .monthly
         let workspaceID = workspace.id
 
@@ -712,6 +724,7 @@ enum SavingsAccountService {
             return false
         }
 
+        guard !account.requiresPeriodReview else { return false }
         guard let autoCaptureThroughDate = account.autoCaptureThroughDate else {
             return true
         }
@@ -1018,6 +1031,10 @@ enum SavingsAccountService {
         from source: SavingsAccount,
         into destination: SavingsAccount
     ) {
+        destination.requiresPeriodReview = destination.requiresPeriodReview || source.requiresPeriodReview
+        if let boundary = source.automaticPostingStartsAt {
+            destination.automaticPostingStartsAt = max(destination.automaticPostingStartsAt ?? .distantPast, boundary)
+        }
         if source.didBackfillHistory {
             destination.didBackfillHistory = true
         }
@@ -1128,12 +1145,7 @@ enum SavingsAccountService {
     private static func canonicalPeriodCloseEntriesByKey(
         from entries: [SavingsLedgerEntry]
     ) -> [PeriodCloseDeduplicationKey: SavingsLedgerEntry] {
-        let sortedEntries = entries.sorted { lhs, rhs in
-            if lhs.createdAt == rhs.createdAt {
-                return lhs.id.uuidString < rhs.id.uuidString
-            }
-            return lhs.createdAt < rhs.createdAt
-        }
+        let sortedEntries = entries.sorted(by: preferredPeriodClose)
 
         var canonicalEntries: [PeriodCloseDeduplicationKey: SavingsLedgerEntry] = [:]
         for entry in sortedEntries {
@@ -1210,7 +1222,7 @@ enum SavingsAccountService {
         }
 
         var firstPeriodCloseByKey: [PeriodCloseDeduplicationKey: SavingsLedgerEntry] = [:]
-        for entry in entries {
+        for entry in entries.sorted(by: preferredPeriodClose) {
             guard entry.kind == .periodClose else { continue }
             guard
                 let periodStartDate = entry.periodStartDate,
@@ -1295,6 +1307,7 @@ enum SavingsAccountService {
         if account.didBackfillHistory == false {
             return true
         }
+        guard !account.requiresPeriodReview else { return false }
         guard let autoCaptureThroughDate = account.autoCaptureThroughDate else {
             return true
         }
@@ -1429,10 +1442,42 @@ enum SavingsAccountService {
             ]
         )
         let entries = (try? modelContext.fetch(descriptor)) ?? []
-        return entries.first { entry in
+        return entries.sorted(by: preferredPeriodClose).first { entry in
             Calendar.current.isDate(entry.periodStartDate ?? .distantPast, inSameDayAs: start)
             && Calendar.current.isDate(entry.periodEndDate ?? .distantPast, inSameDayAs: end)
         }
+    }
+
+    static func preferredPeriodClose(_ lhs: SavingsLedgerEntry, _ rhs: SavingsLedgerEntry) -> Bool {
+        if lhs.reviewedAt != rhs.reviewedAt {
+            return (lhs.reviewedAt ?? .distantPast) > (rhs.reviewedAt ?? .distantPast)
+        }
+        if lhs.createdAt != rhs.createdAt { return lhs.createdAt < rhs.createdAt }
+        return lhs.id.uuidString < rhs.id.uuidString
+    }
+
+    private static func canAutomaticallyPost(
+        account: SavingsAccount,
+        range: (start: Date, end: Date),
+        entries: [SavingsLedgerEntry]
+    ) -> Bool {
+        guard !account.requiresPeriodReview,
+              let boundary = account.automaticPostingStartsAt,
+              range.end > boundary else { return false }
+        let calendar = Calendar.current
+        for entry in entries where entry.kind == .periodClose {
+            guard let start = entry.periodStartDate, let end = entry.periodEndDate else { continue }
+            let sameRange = calendar.isDate(start, inSameDayAs: range.start)
+                && calendar.isDate(end, inSameDayAs: range.end)
+            if sameRange {
+                // Explicit decisions remain fixed until the user replaces them in Period Review.
+                if entry.correctedCloseAmount != nil || entry.reviewedAt != nil { return false }
+            } else if calendar.startOfDay(for: start) <= range.end
+                        && calendar.startOfDay(for: end) >= range.start {
+                return false
+            }
+        }
+        return true
     }
 
     private static func refreshOrInsertPeriodClose(
@@ -1447,6 +1492,10 @@ enum SavingsAccountService {
         allowInsert: Bool = true,
         isBackfill: Bool = false
     ) -> PeriodCloseRefreshMutation {
+        let entries = workspaceSavingsEntries(for: workspace, modelContext: modelContext)
+        guard canAutomaticallyPost(account: account, range: range, entries: entries) else {
+            return .skipped
+        }
         let delta = periodDelta(
             in: range,
             incomes: incomes,
@@ -1520,7 +1569,7 @@ enum SavingsAccountService {
         return .inserted
     }
 
-    private static func periodDelta(
+    static func periodDelta(
         in range: (start: Date, end: Date),
         incomes: [Income],
         plannedExpenses: [PlannedExpense],
@@ -1567,11 +1616,11 @@ enum SavingsAccountService {
         account.updatedAt = .now
     }
 
-    private static func periodCloseNote(start: Date, end: Date) -> String {
+    static func periodCloseNote(start: Date, end: Date) -> String {
         "Period close \(AppDateFormat.abbreviatedDate(start)) - \(AppDateFormat.abbreviatedDate(end))"
     }
 
-    private static func periodRange(containing date: Date, period: BudgetingPeriod) -> (start: Date, end: Date) {
+    static func periodRange(containing date: Date, period: BudgetingPeriod) -> (start: Date, end: Date) {
         let range = period.defaultRange(containing: date, calendar: .current)
         let start = Calendar.current.startOfDay(for: range.start)
         let endStart = Calendar.current.startOfDay(for: range.end)
@@ -1579,7 +1628,7 @@ enum SavingsAccountService {
         return (start: start, end: end)
     }
 
-    private static func nextRange(
+    static func nextRange(
         after current: (start: Date, end: Date),
         period: BudgetingPeriod
     ) -> (start: Date, end: Date)? {
@@ -1639,7 +1688,7 @@ enum SavingsAccountService {
         )
     }
 
-    private static func periodHasActivity(
+    static func periodHasActivity(
         in range: (start: Date, end: Date),
         incomes: [Income],
         plannedExpenses: [PlannedExpense],

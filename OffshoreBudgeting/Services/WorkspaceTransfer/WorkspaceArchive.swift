@@ -273,8 +273,30 @@ struct SavingsAccountPayload: Codable, Equatable {
     var total: Double
     var didBackfillHistory: Bool
     var autoCaptureThroughDate: Date?
+    var requiresPeriodReview: Bool = true
+    var automaticPostingStartsAt: Date? = nil
     var createdAt: Date
     var updatedAt: Date
+}
+
+extension SavingsAccountPayload {
+    private enum CodingKeys: String, CodingKey {
+        case id, name, total, didBackfillHistory, autoCaptureThroughDate
+        case requiresPeriodReview, automaticPostingStartsAt, createdAt, updatedAt
+    }
+
+    init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        name = try container.decode(String.self, forKey: .name)
+        total = try container.decode(Double.self, forKey: .total)
+        didBackfillHistory = try container.decode(Bool.self, forKey: .didBackfillHistory)
+        autoCaptureThroughDate = try container.decodeIfPresent(Date.self, forKey: .autoCaptureThroughDate)
+        requiresPeriodReview = try container.decodeIfPresent(Bool.self, forKey: .requiresPeriodReview) ?? true
+        automaticPostingStartsAt = try container.decodeIfPresent(Date.self, forKey: .automaticPostingStartsAt)
+        createdAt = try container.decode(Date.self, forKey: .createdAt)
+        updatedAt = try container.decode(Date.self, forKey: .updatedAt)
+    }
 }
 
 struct SavingsLedgerEntryPayload: Codable, Equatable {
@@ -287,6 +309,11 @@ struct SavingsLedgerEntryPayload: Codable, Equatable {
     var linkedAllocationSettlementID: UUID?
     var periodStartDate: Date?
     var periodEndDate: Date?
+    var reviewedAt: Date? = nil
+    var reviewedCalculatedAmount: Double? = nil
+    var reviewedInputFingerprint: String? = nil
+    var correctedCloseAmount: Double? = nil
+    var correctionExplanation: String? = nil
     var createdAt: Date
     var updatedAt: Date
     var accountID: UUID?
