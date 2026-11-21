@@ -12,7 +12,6 @@ struct AllocationAccountView: View {
     @AppStorage("sort.sharedBalances.mode") private var sharedBalancesSortModeRaw: String = SharedBalancesSortMode.az.rawValue
 
     @State private var showingAddAllocationAccount: Bool = false
-    @State private var showingEditAllocationAccount: Bool = false
     @State private var editingAllocationAccount: AllocationAccount? = nil
 
     @State private var showingSharedBalanceDeleteConfirm: Bool = false
@@ -154,13 +153,9 @@ struct AllocationAccountView: View {
                 AddAllocationAccountView(workspace: workspace)
             }
         }
-        .appSheet(isPresented: $showingEditAllocationAccount, onDismiss: { editingAllocationAccount = nil }) {
+        .appSheet(item: $editingAllocationAccount) { account in
             NavigationStack {
-                if let editingAllocationAccount {
-                    EditAllocationAccountView(account: editingAllocationAccount)
-                } else {
-                    EmptyView()
-                }
+                EditAllocationAccountView(account: account)
             }
         }
         .onReceive(commandHub.$sequence) { sequence in
@@ -207,7 +202,6 @@ struct AllocationAccountView: View {
     private func editAccountButton(_ account: AllocationAccount) -> some View {
         Button("Edit", systemImage: "pencil") {
             editingAllocationAccount = account
-            showingEditAllocationAccount = true
         }
         .tint(Color("AccentColor"))
     }
@@ -301,6 +295,29 @@ private enum SharedBalancesSortMode: String {
 private struct AllocationAccountTileView: View {
     let account: AllocationAccount
 
+    private var backgroundColor: Color {
+        Color(hex: account.hexColor) ?? .blue
+    }
+
+    private var textColor: Color {
+        let hex = backgroundColor.hexRGBString().trimmingCharacters(in: CharacterSet(charactersIn: "#"))
+        guard let rgb = UInt32(hex, radix: 16) else { return .black }
+
+        func linearComponent(_ value: UInt32) -> Double {
+            let component = Double(value) / 255
+            return component <= 0.04045
+                ? component / 12.92
+                : pow((component + 0.055) / 1.055, 2.4)
+        }
+
+        let luminance = 0.2126 * linearComponent((rgb >> 16) & 0xFF)
+            + 0.7152 * linearComponent((rgb >> 8) & 0xFF)
+            + 0.0722 * linearComponent(rgb & 0xFF)
+        let blackContrast = (luminance + 0.05) / 0.05
+        let whiteContrast = 1.05 / (luminance + 0.05)
+        return blackContrast >= whiteContrast ? .black : .white
+    }
+
     private var balance: Double {
         CurrencyFormatter.normalizedCurrencyDisplayValue(AllocationLedgerService.balance(for: account))
     }
@@ -316,15 +333,49 @@ private struct AllocationAccountTileView: View {
                 .lineLimit(2)
                 .padding(16)
         }
+        .foregroundStyle(textColor)
         .aspectRatio(1.586, contentMode: .fit)
         .frame(maxWidth: .infinity, minHeight: 155, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill((Color(hex: account.hexColor) ?? .blue).opacity(0.25))
+                .fill(backgroundColor)
         )
         .overlay(
             RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .stroke((Color(hex: account.hexColor) ?? .blue).opacity(0.6), lineWidth: 1)
+                .stroke(backgroundColor.opacity(0.6), lineWidth: 1)
         )
     }
+}
+
+#Preview("Reconciliation Colors — Light") {
+    ScrollView {
+        VStack(spacing: 16) {
+            ForEach(["#FFFFFF", "#FFDD00", "#3B82F6", "#CC2222", "#101010"], id: \.self) { hex in
+                AllocationAccountTileView(account: AllocationAccount(name: "Shared household expenses", hexColor: hex))
+            }
+        }
+        .padding()
+    }
+    .preferredColorScheme(.light)
+}
+
+#Preview("Reconciliation Colors — Dark") {
+    ScrollView {
+        VStack(spacing: 16) {
+            ForEach(["#FFFFFF", "#FFDD00", "#3B82F6", "#CC2222", "#101010"], id: \.self) { hex in
+                AllocationAccountTileView(account: AllocationAccount(name: "Shared household expenses", hexColor: hex))
+            }
+        }
+        .padding()
+    }
+    .preferredColorScheme(.dark)
+}
+
+#Preview("Reconciliation — Accessibility") {
+    AllocationAccountTileView(account: AllocationAccount(
+        name: "Shared household expenses and reimbursements",
+        hexColor: "#FFDD00"
+    ))
+    .padding()
+    .environment(\.dynamicTypeSize, .accessibility3)
 }
