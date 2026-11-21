@@ -98,7 +98,7 @@
       <CommandLineArguments>
          <CommandLineArgument
             argument = "-resetSeed"
-            isEnabled = "YES">
+            isEnabled = "NO">
          </CommandLineArgument>
       </CommandLineArguments>
       <EnvironmentVariables>
