@@ -13,6 +13,7 @@ struct HomeEditPinnedCardsView: View {
     let workspaceID: UUID
     let showsTileSizePicker: Bool
     let showsTileSizeFootnote: Bool
+    var isEmbedded: Bool = false
 
     @Binding var pinnedItems: [HomePinnedItem]
 
@@ -20,9 +21,25 @@ struct HomeEditPinnedCardsView: View {
 
     @State private var editMode: EditMode = .inactive
 
-    private var isEditing: Bool { editMode.isEditing }
+    private var isEditing: Bool { isEmbedded || editMode.isEditing }
 
     var body: some View {
+        if isEmbedded {
+            editorList
+        } else {
+            editorList
+                .navigationTitle(
+                    String(
+                        localized: "homeEdit.navigationTitle",
+                        defaultValue: "Edit",
+                        comment: "Navigation title for editing Home pinned items."
+                    )
+                )
+                .toolbar { editorToolbar }
+        }
+    }
+
+    private var editorList: some View {
         List {
 
             // MARK: - Pinned on Home (combined)
@@ -152,67 +169,62 @@ struct HomeEditPinnedCardsView: View {
                 }
             }
         }
-        .navigationTitle(
-            String(
-                localized: "homeEdit.navigationTitle",
-                defaultValue: "Edit",
-                comment: "Navigation title for editing Home pinned items."
-            )
-        )
-        .environment(\.editMode, $editMode)
+        .environment(\.editMode, isEmbedded ? .constant(.active) : $editMode)
         .onDisappear {
             editMode = .inactive
         }
-        .toolbar {
-            #if !targetEnvironment(macCatalyst)
-            ToolbarItem(placement: .topBarLeading) {
-                Button {
-                    dismiss()
-                } label: {
-                    Image(systemName: "xmark")
-                }
+    }
+
+    @ToolbarContentBuilder
+    private var editorToolbar: some ToolbarContent {
+        #if !targetEnvironment(macCatalyst)
+        ToolbarItem(placement: .topBarLeading) {
+            Button {
+                dismiss()
+            } label: {
+                Image(systemName: "xmark")
             }
+        }
 
-            #endif
+        #endif
 
-            ToolbarItem(placement: .topBarTrailing) {
-                if isEditing {
-                    Button {
-                        withAnimation {
-                            editMode = .inactive
-                        }
-                    } label: {
-                        Label(
-                            String(
-                                localized: "common.done",
-                                defaultValue: "Done",
-                                comment: "Generic action label to finish editing."
-                            ),
-                            systemImage: "checkmark"
-                        )
+        ToolbarItem(placement: .topBarTrailing) {
+            if isEditing {
+                Button {
+                    withAnimation {
+                        editMode = .inactive
                     }
-                    .labelStyle(.iconOnly)
-                    .glassProminentButtonStyleCompat()
-                    .tint(.accentColor)
-                    .id("finishEditing")
-                } else {
-                    Button {
-                        withAnimation {
-                            editMode = .active
-                        }
-                    } label: {
-                        Text(
-                            String(
-                                localized: "common.edit",
-                                defaultValue: "Edit",
-                                comment: "Generic action label to start editing."
-                            )
-                        )
-                        .foregroundStyle(.primary)
-                    }
-                    .tint(.primary)
-                    .id("startEditing")
+                } label: {
+                    Label(
+                        String(
+                            localized: "common.done",
+                            defaultValue: "Done",
+                            comment: "Generic action label to finish editing."
+                        ),
+                        systemImage: "checkmark"
+                    )
                 }
+                .labelStyle(.iconOnly)
+                .glassProminentButtonStyleCompat()
+                .tint(.accentColor)
+                .id("finishEditing")
+            } else {
+                Button {
+                    withAnimation {
+                        editMode = .active
+                    }
+                } label: {
+                    Text(
+                        String(
+                            localized: "common.edit",
+                            defaultValue: "Edit",
+                            comment: "Generic action label to start editing."
+                        )
+                    )
+                    .foregroundStyle(.primary)
+                }
+                .tint(.primary)
+                .id("startEditing")
             }
         }
     }
@@ -227,29 +239,36 @@ struct HomeEditPinnedCardsView: View {
         )
 
         HStack(spacing: 10) {
-            Text(title(for: item.wrappedValue))
-                .foregroundStyle(Color("AccentColor"))
+            itemTitle(item.wrappedValue)
+                .frame(maxWidth: .infinity, alignment: .leading)
 
             if showsTileSizePicker {
-                Spacer()
-
-                Picker(
-                    String(
-                        localized: "homeEdit.picker.size",
-                        defaultValue: "Size",
-                        comment: "Label for the home tile size picker."
-                    ),
-                    selection: sizeBinding
-                ) {
-                    ForEach(HomeTileSize.allCases, id: \.self) { size in
-                        Text(size.title).tag(size)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .frame(width: 160)
-                .disabled(!isEditing)
+                tileSizePicker(selection: sizeBinding)
             }
         }
+    }
+
+    private func itemTitle(_ item: HomePinnedItem) -> some View {
+        Text(title(for: item))
+            .foregroundStyle(Color("AccentColor"))
+    }
+
+    private func tileSizePicker(selection: Binding<HomeTileSize>) -> some View {
+        Picker(
+            String(
+                localized: "homeEdit.picker.size",
+                defaultValue: "Size",
+                comment: "Label for the home tile size picker."
+            ),
+            selection: selection
+        ) {
+            ForEach(HomeTileSize.allCases, id: \.self) { size in
+                Text(size.title).tag(size)
+            }
+        }
+        .pickerStyle(.segmented)
+        .frame(width: 160)
+        .disabled(!isEditing)
     }
 
     // MARK: - Helpers

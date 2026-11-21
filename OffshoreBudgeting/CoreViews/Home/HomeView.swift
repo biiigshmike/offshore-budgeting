@@ -254,51 +254,7 @@ struct HomeView: View {
     }
 
     var body: some View {
-        ZStack {
-            HomeBackgroundView()
-
-            GeometryReader { proxy in
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 14) {
-
-                        VStack(spacing: 12) {
-                            if pinnedItems.isEmpty {
-                                HomeTileContainer(
-                                    title: String(localized: "app.section.home", defaultValue: "Home", comment: "Main tab title for the Home section."),
-                                    accent: .primary,
-                                    showsChevron: false
-                                ) {
-                                    Text(String(localized: "home.emptyPinned.message", defaultValue: "Tap Edit to pin widgets and cards to Home.", comment: "Message when no home items are pinned."))
-                                        .foregroundStyle(.secondary)
-                                        .fixedSize(horizontal: false, vertical: true)
-                                }
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                            } else {
-                                pinnedItemsLayout(availableWidth: proxy.size.width)
-                            }
-                        }
-
-                        Spacer(minLength: 22)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, contentHorizontalPadding)
-                    .padding(.bottom, 18)
-                }
-                .safeAreaInset(edge: .bottom, alignment: .trailing, spacing: 0) {
-                    if isPhone, let onReviewToday {
-                        floatingReviewTodayButton(action: onReviewToday)
-                            .padding(.horizontal, 20)
-                            .padding(.vertical, 4)
-                    }
-                }
-                .onAppear {
-                    updateMeasuredUsableWidth(totalWidth: proxy.size.width)
-                }
-                .onChange(of: proxy.size.width) { _, newWidth in
-                    updateMeasuredUsableWidth(totalWidth: newWidth)
-                }
-            }
-        }
+        homeContent
         .navigationDestination(isPresented: $isShowingWhatIfPlanner) {
             WhatIfScenarioPlannerView(
                 workspace: workspace,
@@ -352,7 +308,11 @@ struct HomeView: View {
 
             ToolbarItem(placement: .topBarLeading) {
                 Button {
+                    #if targetEnvironment(macCatalyst)
+                    isEditingWidgets.toggle()
+                    #else
                     isEditingWidgets = true
+                    #endif
                 } label: {
                     Label(
                         String(localized: "homeEdit.navigationTitle", defaultValue: "Edit", comment: "Navigation title for editing Home pinned items."),
@@ -389,21 +349,7 @@ struct HomeView: View {
 
             }
         }
-        #if targetEnvironment(macCatalyst)
-        // Catalyst sheet presentation prevents this list from accepting reorder drops.
-        .navigationDestination(isPresented: $isEditingWidgets) {
-            HomeEditPinnedCardsView(
-                cards: cards,
-                workspaceID: workspace.id,
-                showsTileSizePicker: showsTileSizePicker,
-                showsTileSizeFootnote: isPhone,
-                pinnedItems: $pinnedItems
-            )
-            .onDisappear {
-                persistPinnedItems()
-            }
-        }
-        #else
+        #if !targetEnvironment(macCatalyst)
         .appSheet(isPresented: $isEditingWidgets) {
             NavigationStack {
                 HomeEditPinnedCardsView(
@@ -866,6 +812,124 @@ struct HomeView: View {
             dynamicTypeSize: dynamicTypeSize,
             gridSpacing: gridSpacing
         )
+    }
+
+    @ViewBuilder
+    private var homeContent: some View {
+        #if targetEnvironment(macCatalyst)
+        GeometryReader { proxy in
+            if proxy.size.width < 800 {
+                VStack(spacing: 0) {
+                    homeDashboard
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    if isEditingWidgets {
+                        Divider()
+                        widgetEditingPanel
+                            .frame(height: max(0, (proxy.size.height - 1) / 2))
+                    }
+                }
+            } else {
+                HStack(spacing: 0) {
+                    homeDashboard
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    if isEditingWidgets {
+                        widgetEditingPanel
+                            .frame(width: 380)
+                    }
+                }
+            }
+        }
+        #else
+        homeDashboard
+        #endif
+    }
+
+    #if targetEnvironment(macCatalyst)
+    private var widgetEditingPanel: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Text(
+                    String(
+                        localized: "homeEdit.panel.title",
+                        defaultValue: "Edit Widgets",
+                        comment: "Heading for the docked Home widget editor on Mac."
+                    )
+                )
+                .font(.headline)
+                .accessibilityAddTraits(.isHeader)
+                .accessibilityIdentifier("home.editWidgets.panel")
+                Spacer()
+                Button {
+                    isEditingWidgets = false
+                } label: {
+                    Text(String(localized: "common.done", defaultValue: "Done", comment: "Generic action label to finish editing."))
+                }
+                .glassButtonStyleCompat()
+                .accessibilityIdentifier("home.editWidgets.done")
+            }
+            .padding()
+
+            Divider()
+
+            HomeEditPinnedCardsView(
+                cards: cards,
+                workspaceID: workspace.id,
+                showsTileSizePicker: true,
+                showsTileSizeFootnote: false,
+                isEmbedded: true,
+                pinnedItems: $pinnedItems
+            )
+        }
+        .background(.background)
+    }
+    #endif
+
+    private var homeDashboard: some View {
+        ZStack {
+            HomeBackgroundView()
+
+            GeometryReader { proxy in
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 14) {
+
+                        VStack(spacing: 12) {
+                            if pinnedItems.isEmpty {
+                                HomeTileContainer(
+                                    title: String(localized: "app.section.home", defaultValue: "Home", comment: "Main tab title for the Home section."),
+                                    accent: .primary,
+                                    showsChevron: false
+                                ) {
+                                    Text(String(localized: "home.emptyPinned.message", defaultValue: "Tap Edit to pin widgets and cards to Home.", comment: "Message when no home items are pinned."))
+                                        .foregroundStyle(.secondary)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                }
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                            } else {
+                                pinnedItemsLayout(availableWidth: proxy.size.width)
+                            }
+                        }
+
+                        Spacer(minLength: 22)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, contentHorizontalPadding)
+                    .padding(.bottom, 18)
+                }
+                .safeAreaInset(edge: .bottom, alignment: .trailing, spacing: 0) {
+                    if isPhone, let onReviewToday {
+                        floatingReviewTodayButton(action: onReviewToday)
+                            .padding(.horizontal, 20)
+                            .padding(.vertical, 4)
+                    }
+                }
+                .onAppear {
+                    updateMeasuredUsableWidth(totalWidth: proxy.size.width)
+                }
+                .onChange(of: proxy.size.width) { _, newWidth in
+                    updateMeasuredUsableWidth(totalWidth: newWidth)
+                }
+            }
+        }
     }
 
     private var showsTileSizePicker: Bool {
