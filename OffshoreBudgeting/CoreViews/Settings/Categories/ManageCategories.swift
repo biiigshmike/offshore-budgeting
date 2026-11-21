@@ -18,6 +18,8 @@ struct ManageCategoriesView: View {
     @AppStorage("general_confirmBeforeDeleting") private var confirmBeforeDeleting: Bool = true
     @AppStorage("sort.categories.mode") private var sortModeRaw: String = CategorySortMode.az.rawValue
 
+    @AppStorage("view.categories.mode") private var viewMode: CollectionViewMode = .list
+
     @Query private var categories: [Category]
 
     private enum SheetRoute: Identifiable {
@@ -49,14 +51,166 @@ struct ManageCategoriesView: View {
     }
 
     var body: some View {
+        Group {
+            if viewMode == .list {
+                listContent
+            } else {
+                galleryContent
+            }
+        }
+        .postBoardingTip(
+            key: "tip.categories.v1",
+            title: "Categories Management",
+            items: [
+                PostBoardingTipItem(
+                    systemImage: "tag",
+                    title: "Categories",
+                    detail: "Tap a category to explore its expenses across cards and dates. Swipe a row to the right to edit or archive; swipe left to delete."
+                )
+            ]
+        )
+        .navigationTitle("Categories")
+        .toolbar {
+            if #available(iOS 26.0, macCatalyst 26.0, *) {
+                ToolbarItemGroup(placement: .primaryAction) {
+                    CollectionViewMenu(selection: $viewMode)
+                    sortToolbarButton
+                }
+
+                ToolbarSpacer(.flexible, placement: .primaryAction)
+
+                ToolbarItemGroup(placement: .primaryAction) {
+                    addToolbarButton
+                }
+            } else {
+                ToolbarItem(placement: .topBarTrailing) {
+                    addToolbarButton
+                }
+
+                ToolbarItemGroup(placement: .primaryAction) {
+                    CollectionViewMenu(selection: $viewMode)
+                    sortToolbarButton
+                }
+            }
+        }
+        .appSheet(item: $sheetRoute) { route in
+            switch route {
+            case .add:
+                NavigationStack {
+                    AddCategoryView(workspace: workspace)
+                }
+            case .edit(let category):
+                NavigationStack {
+                    EditCategoryView(workspace: workspace, category: category)
+                }
+            }
+        }
+        .blocksAutomaticExpenseReview(while: showingCategoryDeleteConfirm)
+        .alert("Delete?", isPresented: $showingCategoryDeleteConfirm) {
+            Button("Delete", role: .destructive) {
+                pendingCategoryDelete?()
+                pendingCategoryDelete = nil
+            }
+            Button("Cancel", role: .cancel) {
+                pendingCategoryDelete = nil
+            }
+        }
+        .onAppear {
+            commandHub.activate(.categories)
+        }
+        .onDisappear {
+            commandHub.deactivate(.categories)
+        }
+        .onReceive(commandHub.$sequence) { _ in
+            guard commandHub.surface == .categories else { return }
+            handleCommand(commandHub.latestCommandID)
+        }
+    }
+
+    private var autoConfigureGoalsRow: some View {
+        NavigationLink {
+            CategoryGoalAutoConfigurationSettingsView(workspace: workspace)
+        } label: {
+            Label("Auto-Configure Goals", systemImage: "slider.horizontal.3")
+        }
+        .accessibilityIdentifier("categories.autoConfigureGoals")
+    }
+
+    private var galleryContent: some View {
         List {
             Section {
-                NavigationLink {
-                    CategoryGoalAutoConfigurationSettingsView(workspace: workspace)
-                } label: {
-                    Label("Auto-Configure Goals", systemImage: "slider.horizontal.3")
+                autoConfigureGoalsRow
+            }
+            if categories.isEmpty {
+                ContentUnavailableView(
+                    "No Categories Yet",
+                    systemImage: "tag",
+                    description: Text("Create categories to organize expenses and presets.")
+                )
+            } else {
+                if !activeCategories.isEmpty {
+                    Section {
+                        CollectionGallerySection {
+                            ForEach(activeCategories) { category in
+                                categoryTile(category)
+                            }
+                        }
+                        .navigationLinkIndicatorVisibility(.hidden)
+                        .listRowInsets(EdgeInsets())
+                        .listRowBackground(Color.clear)
+                        .listRowSeparator(.hidden)
+                    }
                 }
-                .accessibilityIdentifier("categories.autoConfigureGoals")
+                if !archivedCategories.isEmpty {
+                    Section("Archived") {
+                        CollectionGallerySection {
+                            ForEach(archivedCategories) { category in
+                                categoryTile(category)
+                            }
+                        }
+                        .navigationLinkIndicatorVisibility(.hidden)
+                        .listRowInsets(EdgeInsets())
+                        .listRowBackground(Color.clear)
+                        .listRowSeparator(.hidden)
+                    }
+                }
+            }
+        }
+    }
+
+    private func categoryTile(_ category: Category) -> some View {
+        NavigationLink {
+            CategoryDetailView(workspace: workspace, category: category).equatable()
+        } label: {
+            CollectionGalleryTile {
+                CategoryGalleryContent(category: category)
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("categories.row.\(category.id.uuidString)")
+        .contextMenu {
+            Button("Edit", systemImage: "pencil") {
+                sheetRoute = .edit(category)
+            }
+            if category.isArchived {
+                Button("Unarchive", systemImage: "arrow.uturn.backward") {
+                    unarchive(category)
+                }
+            } else {
+                Button("Archive", systemImage: "archivebox") {
+                    archive(category)
+                }
+            }
+            Button("Delete", systemImage: "trash", role: .destructive) {
+                deleteCategoryWithOptionalConfirm(category)
+            }
+        }
+    }
+
+    private var listContent: some View {
+        List {
+            Section {
+                autoConfigureGoalsRow
             }
             if activeCategories.isEmpty && archivedCategories.isEmpty {
                 ContentUnavailableView(
@@ -108,71 +262,6 @@ struct ManageCategoriesView: View {
                     }
                 }
             }
-        }
-        .postBoardingTip(
-            key: "tip.categories.v1",
-            title: "Categories Management",
-            items: [
-                PostBoardingTipItem(
-                    systemImage: "tag",
-                    title: "Categories",
-                    detail: "Tap a category to explore its expenses across cards and dates. Swipe a row to the right to edit or archive; swipe left to delete."
-                )
-            ]
-        )
-        .navigationTitle("Categories")
-        .toolbar {
-            if #available(iOS 26.0, macCatalyst 26.0, *) {
-                ToolbarItemGroup(placement: .primaryAction) {
-                    sortToolbarButton
-                }
-
-                ToolbarSpacer(.flexible, placement: .primaryAction)
-
-                ToolbarItemGroup(placement: .primaryAction) {
-                    addToolbarButton
-                }
-            } else {
-                ToolbarItem(placement: .topBarTrailing) {
-                    addToolbarButton
-                }
-
-                ToolbarItem(placement: .primaryAction) {
-                    sortToolbarButton
-                }
-            }
-        }
-        .appSheet(item: $sheetRoute) { route in
-            switch route {
-            case .add:
-                NavigationStack {
-                    AddCategoryView(workspace: workspace)
-                }
-            case .edit(let category):
-                NavigationStack {
-                    EditCategoryView(workspace: workspace, category: category)
-                }
-            }
-        }
-        .blocksAutomaticExpenseReview(while: showingCategoryDeleteConfirm)
-        .alert("Delete?", isPresented: $showingCategoryDeleteConfirm) {
-            Button("Delete", role: .destructive) {
-                pendingCategoryDelete?()
-                pendingCategoryDelete = nil
-            }
-            Button("Cancel", role: .cancel) {
-                pendingCategoryDelete = nil
-            }
-        }
-        .onAppear {
-            commandHub.activate(.categories)
-        }
-        .onDisappear {
-            commandHub.deactivate(.categories)
-        }
-        .onReceive(commandHub.$sequence) { _ in
-            guard commandHub.surface == .categories else { return }
-            handleCommand(commandHub.latestCommandID)
         }
     }
 

@@ -22,6 +22,8 @@ struct AccountsDestinationView: View {
     @State private var showingAddCardFromAccounts: Bool = false
     @State private var showingAddAllocationAccountFromAccounts: Bool = false
 
+    @AppStorage("view.cards.mode") private var cardsViewMode: CollectionViewMode = .gallery
+    @AppStorage("view.sharedBalances.mode") private var sharedBalancesViewMode: CollectionViewMode = .gallery
     @AppStorage("sort.cards.mode") private var cardsSortModeRaw: String = "az"
     @AppStorage("sort.sharedBalances.mode") private var sharedBalancesSortModeRaw: String = "az"
     @AppStorage("sort.savings.mode") private var savingsSortModeRaw: String = SavingsLedgerSortMode.dateDesc.rawValue
@@ -116,6 +118,7 @@ struct AccountsDestinationView: View {
         }
         if #available(iOS 26.0, macCatalyst 26.0, *) {
             ToolbarItemGroup(placement: .primaryAction) {
+                viewToolbarMenu
                 sortToolbarButton
             }
 
@@ -126,9 +129,22 @@ struct AccountsDestinationView: View {
             }
         } else {
             ToolbarItemGroup(placement: .topBarTrailing) {
+                viewToolbarMenu
                 sortToolbarButton
                 addToolbarButton
             }
+        }
+    }
+
+    @ViewBuilder
+    private var viewToolbarMenu: some View {
+        switch selectedSegment {
+        case .cards:
+            CollectionViewMenu(selection: $cardsViewMode)
+        case .sharedBalances:
+            CollectionViewMenu(selection: $sharedBalancesViewMode)
+        case .savings:
+            EmptyView()
         }
     }
 

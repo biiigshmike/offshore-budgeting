@@ -10,10 +10,12 @@ import SwiftData
 
 struct CardsView: View {
 
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.modelContext) private var modelContext
     @Environment(\.appCommandHub) private var commandHub
 
     @AppStorage("general_confirmBeforeDeleting") private var confirmBeforeDeleting: Bool = true
+    @AppStorage("view.cards.mode") private var viewMode: CollectionViewMode = .gallery
     @AppStorage("sort.cards.mode") private var cardsSortModeRaw: String = CardsSortMode.az.rawValue
     @AppStorage(AppShortcutNavigationStore.pendingActionKey) private var pendingShortcutActionRaw: String = ""
     @AppStorage(AppShortcutNavigationStore.pendingImportClipboardTextKey) private var pendingImportClipboardText: String = ""
@@ -25,7 +27,6 @@ struct CardsView: View {
     @State private var showingAddExpenseSheet: Bool = false
     @State private var showingImportExpensesSheet: Bool = false
     @State private var showingAddCard: Bool = false
-    @State private var showingEditCard: Bool = false
     @State private var editingCard: Card? = nil
     @State private var shortcutImportCard: Card? = nil
     @State private var shortcutImportClipboardText: String? = nil
@@ -52,7 +53,9 @@ struct CardsView: View {
     // MARK: - Layout
 
     private var columns: [GridItem] {
-        [GridItem(.adaptive(minimum: 260), spacing: 16)]
+        dynamicTypeSize.isAccessibilitySize
+            ? [GridItem(.flexible())]
+            : [GridItem(.adaptive(minimum: 260), spacing: 16)]
     }
 
     // MARK: - Sorting
@@ -79,57 +82,32 @@ struct CardsView: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 12) {
-                if cards.isEmpty {
-                    ContentUnavailableView(
-                        "No Cards Yet",
-                        systemImage: "creditcard",
-                        description: Text("Create a card to start tracking expenses.")
-                    )
-                    .frame(maxWidth: .infinity)
-                } else {
-                    LazyVGrid(columns: columns, spacing: 16) {
-                        ForEach(sortedCards) { card in
-                            NavigationLink {
-                                CardDetailView(workspace: workspace, card: card)
-                            } label: {
-                                CardVisualView(
-                                    title: card.name,
-                                    theme: CardThemeOption(rawValue: card.theme) ?? .ruby,
-                                    effect: CardEffectOption(rawValue: card.effect) ?? .plastic
-                                )
-                            }
-                            .buttonStyle(.plain)
-                            .contextMenu {
-                                Button {
-                                    editingCard = card
-                                    showingEditCard = true
-                                } label: {
-                                    Label("Edit", systemImage: "pencil")
-                                }
-                                .tint(Color("AccentColor"))
-
-                                Button(role: .destructive) {
-                                    if confirmBeforeDeleting {
-                                        pendingCardDelete = {
-                                            delete(card)
-                                        }
-                                        showingCardDeleteConfirm = true
-                                    } else {
-                                        delete(card)
-                                    }
-                                } label: {
-                                    Label("Delete", systemImage: "trash")
-                                }
-                                .tint(Color("OffshoreDepth"))
-                            }
-                        }
+        Group {
+            if cards.isEmpty {
+                ContentUnavailableView(
+                    "No Cards Yet",
+                    systemImage: "creditcard",
+                    description: Text("Create a card to start tracking expenses.")
+                )
+            } else if viewMode == .list {
+                List(sortedCards) { card in
+                    NavigationLink {
+                        CardDetailView(workspace: workspace, card: card)
+                    } label: {
+                        CardMenuLabel(card: card)
+                            .labelStyle(CardListLabelStyle())
+                    }
+                    .contextMenu { cardActions(card) }
+                    .swipeActions(edge: .leading, allowsFullSwipe: false) {
+                        editCardButton(card)
+                    }
+                    .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                        deleteCardButton(card)
                     }
                 }
+            } else {
+                galleryContent
             }
-            .padding(.horizontal)
-            .padding(.bottom, 8)
         }
         .blocksAutomaticExpenseReview(while: showingCardDeleteConfirm)
         .alert("Delete Card?", isPresented: $showingCardDeleteConfirm) {
@@ -182,13 +160,9 @@ struct CardsView: View {
                 }
             }
         }
-        .appSheet(isPresented: $showingEditCard, onDismiss: { editingCard = nil }) {
+        .appSheet(item: $editingCard) { card in
             NavigationStack {
-                if let editingCard {
-                    EditCardView(workspace: workspace, card: editingCard)
-                } else {
-                    EmptyView()
-                }
+                EditCardView(workspace: workspace, card: card)
             }
         }
         .onAppear {
@@ -211,6 +185,57 @@ struct CardsView: View {
             guard commandHub.surface == .cards else { return }
             handleCommand(commandHub.latestCommandID)
         }
+    }
+
+    private var galleryContent: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 12) {
+                LazyVGrid(columns: columns, spacing: 16) {
+                    ForEach(sortedCards) { card in
+                        NavigationLink {
+                            CardDetailView(workspace: workspace, card: card)
+                        } label: {
+                            CardVisualView(
+                                title: card.name,
+                                theme: CardThemeOption(rawValue: card.theme) ?? .ruby,
+                                effect: CardEffectOption(rawValue: card.effect) ?? .plastic
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .contextMenu {
+                            cardActions(card)
+                        }
+                    }
+                }
+            }
+            .padding(.horizontal)
+            .padding(.bottom, 8)
+        }
+    }
+
+    @ViewBuilder
+    private func cardActions(_ card: Card) -> some View {
+        editCardButton(card)
+        deleteCardButton(card)
+    }
+
+    private func editCardButton(_ card: Card) -> some View {
+        Button("Edit", systemImage: "pencil") {
+            editingCard = card
+        }
+        .tint(Color("AccentColor"))
+    }
+
+    private func deleteCardButton(_ card: Card) -> some View {
+        Button("Delete", systemImage: "trash", role: .destructive) {
+            if confirmBeforeDeleting {
+                pendingCardDelete = { delete(card) }
+                showingCardDeleteConfirm = true
+            } else {
+                delete(card)
+            }
+        }
+        .tint(Color("OffshoreDepth"))
     }
 
     // MARK: - Delete

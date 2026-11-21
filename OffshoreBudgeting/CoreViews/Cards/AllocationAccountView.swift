@@ -3,10 +3,12 @@ import SwiftData
 
 struct AllocationAccountView: View {
 
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.modelContext) private var modelContext
     @Environment(\.appCommandHub) private var commandHub
 
     @AppStorage("general_confirmBeforeDeleting") private var confirmBeforeDeleting: Bool = true
+    @AppStorage("view.sharedBalances.mode") private var viewMode: CollectionViewMode = .gallery
     @AppStorage("sort.sharedBalances.mode") private var sharedBalancesSortModeRaw: String = SharedBalancesSortMode.az.rawValue
 
     @State private var showingAddAllocationAccount: Bool = false
@@ -38,7 +40,9 @@ struct AllocationAccountView: View {
     // MARK: - Layout
 
     private var columns: [GridItem] {
-        [GridItem(.adaptive(minimum: 260), spacing: 16)]
+        dynamicTypeSize.isAccessibilitySize
+            ? [GridItem(.flexible())]
+            : [GridItem(.adaptive(minimum: 260), spacing: 16)]
     }
 
     // MARK: - Sorting
@@ -83,55 +87,43 @@ struct AllocationAccountView: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 12) {
-                if allocationAccounts.isEmpty {
-                    ContentUnavailableView(
-                        "No Reconciliations Yet",
-                        systemImage: "person.2",
-                        description: Text("Create an account to track shared expenses and settlements.")
-                    )
-                    .frame(maxWidth: .infinity)
-                } else {
-                    LazyVGrid(columns: columns, spacing: 16) {
-                        ForEach(sortedAllocationAccounts) { account in
-                            NavigationLink {
-                                AllocationAccountDetailView(workspace: workspace, account: account)
-                            } label: {
-                                AllocationAccountTileView(account: account)
-                            }
-                            .buttonStyle(.plain)
-                            .contextMenu {
-                                Button {
-                                    editingAllocationAccount = account
-                                    showingEditAllocationAccount = true
-                                } label: {
-                                    Label("Edit", systemImage: "pencil")
-                                }
-                                .tint(Color("AccentColor"))
-
-                                if hasSharedBalanceHistory(account) {
-                                    Button(role: .destructive) {
-                                        requestArchiveSharedBalance(account)
-                                    } label: {
-                                        Label("Archive", systemImage: "archivebox")
-                                    }
-                                    .tint(Color("OffshoreDepth"))
-                                } else if canDeleteSharedBalance(account) {
-                                    Button(role: .destructive) {
-                                        requestDeleteSharedBalance(account)
-                                    } label: {
-                                        Label("Delete", systemImage: "trash")
-                                    }
-                                    .tint(Color("OffshoreDepth"))
-                                }
+        Group {
+            if allocationAccounts.isEmpty {
+                ContentUnavailableView(
+                    "No Reconciliations Yet",
+                    systemImage: "person.2",
+                    description: Text("Create an account to track shared expenses and settlements.")
+                )
+            } else if viewMode == .list {
+                List(sortedAllocationAccounts) { account in
+                    NavigationLink {
+                        AllocationAccountDetailView(workspace: workspace, account: account)
+                    } label: {
+                        LabeledContent {
+                            Text(
+                                CurrencyFormatter.normalizedCurrencyDisplayValue(AllocationLedgerService.balance(for: account)),
+                                format: CurrencyFormatter.currencyStyle()
+                            )
+                        } label: {
+                            Label {
+                                Text(account.name)
+                            } icon: {
+                                Image(systemName: "person.2.fill")
+                                    .foregroundStyle(Color(hex: account.hexColor) ?? .blue)
                             }
                         }
                     }
+                    .contextMenu { accountActions(account) }
+                    .swipeActions(edge: .leading, allowsFullSwipe: false) {
+                        editAccountButton(account)
+                    }
+                    .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                        archiveOrDeleteAccountButton(account)
+                    }
                 }
+            } else {
+                galleryContent
             }
-            .padding(.horizontal)
-            .padding(.bottom, 8)
         }
         .blocksAutomaticExpenseReview(while: showingSharedBalanceDeleteConfirm)
         .alert("Delete Reconciliation?", isPresented: $showingSharedBalanceDeleteConfirm) {
@@ -181,6 +173,57 @@ struct AllocationAccountView: View {
             lastHandledCommandSequence = sequence
             guard commandHub.surface == .cards else { return }
             handleCommand(commandHub.latestCommandID)
+        }
+    }
+
+    private var galleryContent: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 12) {
+                LazyVGrid(columns: columns, spacing: 16) {
+                    ForEach(sortedAllocationAccounts) { account in
+                        NavigationLink {
+                            AllocationAccountDetailView(workspace: workspace, account: account)
+                        } label: {
+                            AllocationAccountTileView(account: account)
+                        }
+                        .buttonStyle(.plain)
+                        .contextMenu {
+                            accountActions(account)
+                        }
+                    }
+                }
+            }
+            .padding(.horizontal)
+            .padding(.bottom, 8)
+        }
+    }
+
+    @ViewBuilder
+    private func accountActions(_ account: AllocationAccount) -> some View {
+        editAccountButton(account)
+        archiveOrDeleteAccountButton(account)
+    }
+
+    private func editAccountButton(_ account: AllocationAccount) -> some View {
+        Button("Edit", systemImage: "pencil") {
+            editingAllocationAccount = account
+            showingEditAllocationAccount = true
+        }
+        .tint(Color("AccentColor"))
+    }
+
+    @ViewBuilder
+    private func archiveOrDeleteAccountButton(_ account: AllocationAccount) -> some View {
+        if hasSharedBalanceHistory(account) {
+            Button("Archive", systemImage: "archivebox", role: .destructive) {
+                requestArchiveSharedBalance(account)
+            }
+            .tint(Color("OffshoreDepth"))
+        } else if canDeleteSharedBalance(account) {
+            Button("Delete", systemImage: "trash", role: .destructive) {
+                requestDeleteSharedBalance(account)
+            }
+            .tint(Color("OffshoreDepth"))
         }
     }
 

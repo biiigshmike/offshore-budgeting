@@ -19,6 +19,8 @@ struct ManagePresetsView: View {
     @AppStorage("general_confirmBeforeDeleting") private var confirmBeforeDeleting: Bool = true
     @AppStorage("sort.presets.mode") private var sortModeRaw: String = PresetSortMode.az.rawValue
 
+    @AppStorage("view.presets.mode") private var viewMode: CollectionViewMode = .list
+
     @Query private var presets: [Preset]
 
     // IMPORTANT:
@@ -117,6 +119,165 @@ struct ManagePresetsView: View {
     // MARK: - View
 
     var body: some View {
+        Group {
+            if viewMode == .list {
+                listContent
+            } else {
+                galleryContent
+            }
+        }
+        .postBoardingTip(
+            key: "tip.preset.v1",
+            title: "Preset Management",
+            items: [
+                PostBoardingTipItem(
+                    systemImage: "list.bullet.rectangle",
+                    title: "Presets",
+                    detail: "Save planned expenses you expect to reuse in future budgets."
+                ),
+                PostBoardingTipItem(
+                    systemImage: "text.line.first.and.arrowtriangle.forward",
+                    title: "Planned Amount",
+                    detail: "Enter the minimum or antipated amount that you anticipate this expense debiting."
+                ),
+                PostBoardingTipItem(
+                    systemImage: "calendar",
+                    title: "Recurrences",
+                    detail: "Use the Schedule section, choosing from a wide array of recurrence options, and setup a recurrence for your Preset. This makes it easy to plan for regular, fixed expenses, whenver you expect them to debit."
+                )
+            ]
+        )
+        .navigationTitle("Presets")
+        .toolbar {
+            if #available(iOS 26.0, macCatalyst 26.0, *) {
+                ToolbarItemGroup(placement: .primaryAction) {
+                    CollectionViewMenu(selection: $viewMode)
+                    sortToolbarButton
+                }
+
+                ToolbarSpacer(.flexible, placement: .primaryAction)
+
+                ToolbarItemGroup(placement: .primaryAction) {
+                    addToolbarButton
+                }
+            } else {
+                ToolbarItem(placement: .topBarTrailing) {
+                    addToolbarButton
+                }
+
+                ToolbarItemGroup(placement: .primaryAction) {
+                    CollectionViewMenu(selection: $viewMode)
+                    sortToolbarButton
+                }
+            }
+        }
+        .appSheet(item: $sheetRoute) { route in
+            switch route {
+            case .add:
+                NavigationStack {
+                    AddPresetView(workspace: workspace)
+                }
+            case .edit(let preset):
+                NavigationStack {
+                    EditPresetView(workspace: workspace, preset: preset)
+                }
+            }
+        }
+        .blocksAutomaticExpenseReview(while: showingPresetDeleteConfirm)
+        .alert("Delete?", isPresented: $showingPresetDeleteConfirm) {
+            Button("Delete", role: .destructive) {
+                pendingPresetDelete?()
+                pendingPresetDelete = nil
+            }
+            Button("Cancel", role: .cancel) {
+                pendingPresetDelete = nil
+            }
+        }
+        .onAppear {
+            commandHub.activate(.presets)
+        }
+        .onDisappear {
+            commandHub.deactivate(.presets)
+        }
+        .onReceive(commandHub.$sequence) { _ in
+            guard commandHub.surface == .presets else { return }
+            handleCommand(commandHub.latestCommandID)
+        }
+    }
+
+    // MARK: - Actions
+
+    private var galleryContent: some View {
+        CollectionGallery {
+            if activePresets.isEmpty && archivedPresets.isEmpty {
+                ContentUnavailableView(
+                    "No Presets Yet",
+                    systemImage: "list.bullet.rectangle",
+                    description: Text("Create presets to generate planned expenses when you assign them to budgets.")
+                )
+            } else {
+                if let pinned = highlightedPreset {
+                    CollectionGallerySection(title: String(localized: "Next Planned Expense", defaultValue: "Next Planned Expense", comment: "Section title for the next planned expense preset spotlight.")) {
+                        presetTile(pinned)
+                    }
+                }
+                if !activePresetsWithoutHighlighted.isEmpty {
+                    CollectionGallerySection(title: String(localized: "Active")) {
+                        ForEach(activePresetsWithoutHighlighted) { preset in
+                            presetTile(preset)
+                        }
+                    }
+                }
+                if !archivedPresets.isEmpty {
+                    CollectionGallerySection(title: String(localized: "Archived")) {
+                        ForEach(archivedPresets) { preset in
+                            presetTile(preset)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private func presetTile(_ preset: Preset) -> some View {
+        NavigationLink {
+            PresetDetailView(workspace: workspace, preset: preset).equatable()
+        } label: {
+            CollectionGalleryTile {
+                VStack(alignment: .leading, spacing: 5) {
+                    PresetGalleryContent(
+                        preset: preset,
+                        assignedBudgetsCount: assignedBudgetCountsByPresetID[preset.id, default: 0]
+                    )
+                    if presetIDsMissingLinkedCards.contains(preset.id) {
+                        Text(presetRequiresCardFootnoteText)
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+        }
+        .buttonStyle(.plain)
+        .contextMenu {
+            Button("Edit", systemImage: "pencil") {
+                sheetRoute = .edit(preset)
+            }
+            if preset.isArchived {
+                Button("Unarchive", systemImage: "arrow.uturn.backward") {
+                    unarchive(preset)
+                }
+            } else {
+                Button("Archive", systemImage: "archivebox") {
+                    archive(preset)
+                }
+            }
+            Button("Delete", systemImage: "trash", role: .destructive) {
+                deletePresetWithOptionalConfirm(preset)
+            }
+        }
+    }
+
+    private var listContent: some View {
         List {
             if activePresets.isEmpty && archivedPresets.isEmpty {
                 ContentUnavailableView(
@@ -285,84 +446,7 @@ struct ManagePresetsView: View {
                 }
             }
         }
-        .postBoardingTip(
-            key: "tip.preset.v1",
-            title: "Preset Management",
-            items: [
-                PostBoardingTipItem(
-                    systemImage: "list.bullet.rectangle",
-                    title: "Presets",
-                    detail: "Save planned expenses you expect to reuse in future budgets."
-                ),
-                PostBoardingTipItem(
-                    systemImage: "text.line.first.and.arrowtriangle.forward",
-                    title: "Planned Amount",
-                    detail: "Enter the minimum or antipated amount that you anticipate this expense debiting."
-                ),
-                PostBoardingTipItem(
-                    systemImage: "calendar",
-                    title: "Recurrences",
-                    detail: "Use the Schedule section, choosing from a wide array of recurrence options, and setup a recurrence for your Preset. This makes it easy to plan for regular, fixed expenses, whenver you expect them to debit."
-                )
-            ]
-        )
-        .navigationTitle("Presets")
-        .toolbar {
-            if #available(iOS 26.0, macCatalyst 26.0, *) {
-                ToolbarItemGroup(placement: .primaryAction) {
-                    sortToolbarButton
-                }
-
-                ToolbarSpacer(.flexible, placement: .primaryAction)
-
-                ToolbarItemGroup(placement: .primaryAction) {
-                    addToolbarButton
-                }
-            } else {
-                ToolbarItem(placement: .topBarTrailing) {
-                    addToolbarButton
-                }
-
-                ToolbarItem(placement: .primaryAction) {
-                    sortToolbarButton
-                }
-            }
-        }
-        .appSheet(item: $sheetRoute) { route in
-            switch route {
-            case .add:
-                NavigationStack {
-                    AddPresetView(workspace: workspace)
-                }
-            case .edit(let preset):
-                NavigationStack {
-                    EditPresetView(workspace: workspace, preset: preset)
-                }
-            }
-        }
-        .blocksAutomaticExpenseReview(while: showingPresetDeleteConfirm)
-        .alert("Delete?", isPresented: $showingPresetDeleteConfirm) {
-            Button("Delete", role: .destructive) {
-                pendingPresetDelete?()
-                pendingPresetDelete = nil
-            }
-            Button("Cancel", role: .cancel) {
-                pendingPresetDelete = nil
-            }
-        }
-        .onAppear {
-            commandHub.activate(.presets)
-        }
-        .onDisappear {
-            commandHub.deactivate(.presets)
-        }
-        .onReceive(commandHub.$sequence) { _ in
-            guard commandHub.surface == .presets else { return }
-            handleCommand(commandHub.latestCommandID)
-        }
     }
-
-    // MARK: - Actions
 
     private var sortMode: PresetSortMode {
         PresetSortMode(rawValue: sortModeRaw) ?? .az

@@ -138,6 +138,22 @@ enum UITestSupport {
             context.insert(budget)
             context.insert(BudgetCardLink(budget: budget, card: cardA))
             context.insert(BudgetPresetLink(budget: budget, preset: presetA))
+            if ProcessInfo.processInfo.arguments.contains("-uiTestCompactGalleries") {
+                // Two current-period budgets exercise adjacency within the same gallery section.
+                let secondBudget = Budget(
+                    name: "Compact Gallery Budget", startDate: range.start,
+                    endDate: Calendar.current.date(byAdding: .day, value: -1, to: range.end)!,
+                    workspace: workspace
+                )
+                context.insert(secondBudget)
+                // A linked preset without budget cards also exercises its gallery warning.
+                context.insert(BudgetPresetLink(budget: secondBudget, preset: presetB))
+                presetB.plannedAmount = 1_234_567.89
+                presetB.frequencyRaw = RecurrenceFrequency.weekly.rawValue
+                presetB.interval = 3
+                presetB.weeklyWeekday = 4
+                // Internet and Rent provide two active presets without a spotlight.
+            }
             if ProcessInfo.processInfo.arguments.contains("-uiTestRecordAsPlanned") {
                 context.insert(PlannedExpense(
                     title: "Record Test Bill", plannedAmount: 60, expenseDate: .now,

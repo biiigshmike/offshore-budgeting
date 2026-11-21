@@ -20,6 +20,8 @@ struct BudgetsView: View {
     @AppStorage("general_confirmBeforeDeleting") private var confirmBeforeDeleting: Bool = true
     @AppStorage("sort.budgets.mode") private var sortModeRaw: String = BudgetsListSortMode.dateDesc.rawValue
 
+    @AppStorage("view.budgets.mode") private var viewMode: CollectionViewMode = .list
+
     @Query private var budgets: [Budget]
 
     private enum SheetRoute: Identifiable {
@@ -160,6 +162,135 @@ struct BudgetsView: View {
     // MARK: - View
 
     var body: some View {
+        Group {
+            if viewMode == .list {
+                budgetList
+            } else {
+                budgetGallery
+            }
+        }
+        .postBoardingTip(
+            key: "tip.budgets.v1",
+            title: String(localized: "app.section.budgets", defaultValue: "Budgets", comment: "Main tab title for the Budgets section."),
+            items: [
+                PostBoardingTipItem(
+                    systemImage: "chart.pie.fill",
+                    title: String(localized: "app.section.budgets", defaultValue: "Budgets", comment: "Main tab title for the Budgets section."),
+                    detail: String(localized: "budgets.tip.overview.detail", defaultValue: "Create and view your budgets here. Press a budget and you will be taken to its detail view.", comment: "Tip text describing budgets overview.")
+                ),
+                PostBoardingTipItem(
+                    systemImage: "list.triangle",
+                    title: String(localized: "budgets.tip.viewSort.title", defaultValue: "View & Sort", comment: "Tip title for viewing and sorting budgets."),
+                    detail: String(localized: "budgets.tip.viewSort.detail", defaultValue: "Active • happening now\nUpcoming • starts later\nPast • ended", comment: "Tip detail explaining budget buckets.")
+                ),
+                PostBoardingTipItem(
+                    systemImage: "magnifyingglass",
+                    title: String(localized: "common.search", defaultValue: "Search", comment: "Label for search actions."),
+                    detail: String(localized: "budgets.tip.search.detail", defaultValue: "Use the search bar to search budgets by title or date.", comment: "Tip detail for searching budgets.")
+                )
+            ]
+        )
+        .navigationTitle(String(localized: "app.section.budgets", defaultValue: "Budgets", comment: "Main tab title for the Budgets section."))
+        .searchable(
+            text: $searchText,
+            placement: .navigationBarDrawer(displayMode: .always),
+            prompt: String(localized: "common.search", defaultValue: "Search", comment: "Label for search actions.")
+        )
+        .searchFocused($searchFocused)
+        .toolbar {
+            if #available(iOS 26.0, macCatalyst 26.0, *) {
+                ToolbarItemGroup(placement: .primaryAction) {
+                    CollectionViewMenu(selection: $viewMode)
+                    sortToolbarButton
+                }
+
+                ToolbarSpacer(.flexible, placement: .primaryAction)
+
+                ToolbarItemGroup(placement: .primaryAction) {
+                    addToolbarButton
+                }
+            } else {
+                ToolbarItem(placement: .topBarTrailing) {
+                    addToolbarButton
+                }
+
+                ToolbarItemGroup(placement: .primaryAction) {
+                    CollectionViewMenu(selection: $viewMode)
+                    sortToolbarButton
+                }
+            }
+        }
+        .appSheet(item: $sheetRoute) { route in
+            switch route {
+            case .add:
+                NavigationStack {
+                    AddBudgetView(workspace: workspace)
+                }
+            case .edit(let budget):
+                NavigationStack {
+                    EditBudgetView(workspace: workspace, budget: budget)
+                }
+            }
+        }
+        .blocksAutomaticExpenseReview(while: showingDeleteConfirm)
+        .alert("Delete Budget?", isPresented: $showingDeleteConfirm) {
+            Button("Delete", role: .destructive) {
+                pendingDelete?()
+                pendingDelete = nil
+            }
+            Button("Cancel", role: .cancel) {
+                pendingDelete = nil
+            }
+        }
+        .blocksAutomaticExpenseReview(while: showingDeleteError)
+        .alert("Couldn’t Delete Budget", isPresented: $showingDeleteError) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(deleteErrorMessage)
+        }
+        .onAppear {
+            if shouldSyncCommandSurface {
+                commandHub.activate(.budgets)
+            }
+            if hasLoadedBucketSnapshot == false {
+                hydrateBucketSnapshotIfAvailable()
+                if hasLoadedBucketSnapshot == false {
+                    rebuildBucketSnapshot(reason: "onAppearInitial")
+                    hasLoadedBucketSnapshot = true
+                }
+                needsBucketSnapshotRefresh = false
+            } else if needsBucketSnapshotRefresh {
+                scheduleBucketSnapshotRefresh(reason: "onAppearRefresh")
+            }
+        }
+        .onDisappear {
+            cancelBucketSnapshotRefresh(reason: "onDisappear")
+            if shouldSyncCommandSurface {
+                commandHub.deactivate(.budgets)
+            }
+        }
+        .onReceive(commandHub.$sequence) { _ in
+            guard commandHub.surface == .budgets else { return }
+            handleCommand(commandHub.latestCommandID)
+        }
+        .onChange(of: tabActivationContext) { _, newValue in
+            guard newValue.sectionRawValue == AppSection.budgets.rawValue else { return }
+            if newValue.isSettled, needsBucketSnapshotRefresh {
+                scheduleBucketSnapshotRefresh(reason: "tabActivationSettled")
+            } else if newValue.phase != .active {
+                cancelBucketSnapshotRefresh(reason: "tabPhaseChanged")
+            }
+        }
+        .onChange(of: bucketSnapshotInputs) { _, _ in
+            if tabActivationContext.isSettled {
+                scheduleBucketSnapshotRefresh(reason: "inputsChanged")
+            } else {
+                needsBucketSnapshotRefresh = true
+            }
+        }
+    }
+
+    private var budgetList: some View {
         List {
             if budgets.isEmpty {
                 ContentUnavailableView(
@@ -237,121 +368,61 @@ struct BudgetsView: View {
                 }
             }
         }
-        .postBoardingTip(
-            key: "tip.budgets.v1",
-            title: String(localized: "app.section.budgets", defaultValue: "Budgets", comment: "Main tab title for the Budgets section."),
-            items: [
-                PostBoardingTipItem(
-                    systemImage: "chart.pie.fill",
-                    title: String(localized: "app.section.budgets", defaultValue: "Budgets", comment: "Main tab title for the Budgets section."),
-                    detail: String(localized: "budgets.tip.overview.detail", defaultValue: "Create and view your budgets here. Press a budget and you will be taken to its detail view.", comment: "Tip text describing budgets overview.")
-                ),
-                PostBoardingTipItem(
-                    systemImage: "list.triangle",
-                    title: String(localized: "budgets.tip.viewSort.title", defaultValue: "View & Sort", comment: "Tip title for viewing and sorting budgets."),
-                    detail: String(localized: "budgets.tip.viewSort.detail", defaultValue: "Active • happening now\nUpcoming • starts later\nPast • ended", comment: "Tip detail explaining budget buckets.")
-                ),
-                PostBoardingTipItem(
-                    systemImage: "magnifyingglass",
-                    title: String(localized: "common.search", defaultValue: "Search", comment: "Label for search actions."),
-                    detail: String(localized: "budgets.tip.search.detail", defaultValue: "Use the search bar to search budgets by title or date.", comment: "Tip detail for searching budgets.")
+    }
+
+    private var budgetGallery: some View {
+        CollectionGallery {
+            if budgets.isEmpty {
+                ContentUnavailableView(
+                    String(localized: "budgets.empty.title", defaultValue: "No Budgets Yet", comment: "Empty state title when no budgets exist."),
+                    systemImage: "chart.pie",
+                    description: Text(String(localized: "budgets.empty.message", defaultValue: "Create a budget to start planning spending.", comment: "Empty state message when no budgets exist."))
                 )
-            ]
-        )
-        .navigationTitle(String(localized: "app.section.budgets", defaultValue: "Budgets", comment: "Main tab title for the Budgets section."))
-        .searchable(
-            text: $searchText,
-            placement: .navigationBarDrawer(displayMode: .always),
-            prompt: String(localized: "common.search", defaultValue: "Search", comment: "Label for search actions.")
-        )
-        .searchFocused($searchFocused)
-        .toolbar {
-            if #available(iOS 26.0, macCatalyst 26.0, *) {
-                ToolbarItemGroup(placement: .primaryAction) {
-                    sortToolbarButton
-                }
-
-                ToolbarSpacer(.flexible, placement: .primaryAction)
-
-                ToolbarItemGroup(placement: .primaryAction) {
-                    addToolbarButton
-                }
+            } else if filteredBudgets.isEmpty {
+                ContentUnavailableView(
+                    String(localized: "common.noResults", defaultValue: "No Results", comment: "Empty state title for no search results."),
+                    systemImage: "magnifyingglass",
+                    description: Text(String(localized: "common.tryDifferentSearch", defaultValue: "Try a different search.", comment: "Prompt to try a different search query."))
+                )
             } else {
-                ToolbarItem(placement: .topBarTrailing) {
-                    addToolbarButton
-                }
+                budgetGalleryBucket(activeBudgets, key: "budgets.bucket.active", title: "Active Budgets (%@)", isExpanded: $activeExpanded)
+                budgetGalleryBucket(upcomingBudgets, key: "budgets.bucket.upcoming", title: "Upcoming Budgets (%@)", isExpanded: $upcomingExpanded)
+                budgetGalleryBucket(pastBudgets, key: "budgets.bucket.past", title: "Past Budgets (%@)", isExpanded: $pastExpanded)
+            }
+        }
+    }
 
-                ToolbarItem(placement: .primaryAction) {
-                    sortToolbarButton
+    @ViewBuilder
+    private func budgetGalleryBucket(_ budgets: [Budget], key: String, title: String, isExpanded: Binding<Bool>) -> some View {
+        if !budgets.isEmpty {
+            VStack(alignment: .leading) {
+                BucketDisclosureRow(
+                    title: bucketTitle(key: key, defaultValue: title, count: budgets.count),
+                    isExpanded: isExpanded
+                )
+                .padding(.vertical, 8)
+                if isExpanded.wrappedValue {
+                    CollectionGallerySection {
+                        ForEach(budgets) { budget in
+                            NavigationLink {
+                                BudgetDetailView(workspace: workspace, budget: budget)
+                            } label: {
+                                CollectionGalleryTile {
+                                    BudgetGalleryContent(budget: budget)
+                                }
+                            }
+                            .buttonStyle(.plain)
+                            .contextMenu {
+                                Button("Edit", systemImage: "pencil") {
+                                    sheetRoute = .edit(budget)
+                                }
+                                Button("Delete", systemImage: "trash", role: .destructive) {
+                                    deleteBudgetWithOptionalConfirm(budget)
+                                }
+                            }
+                        }
+                    }
                 }
-            }
-        }
-        .appSheet(item: $sheetRoute) { route in
-            switch route {
-            case .add:
-                NavigationStack {
-                    AddBudgetView(workspace: workspace)
-                }
-            case .edit(let budget):
-                NavigationStack {
-                    EditBudgetView(workspace: workspace, budget: budget)
-                }
-            }
-        }
-        .blocksAutomaticExpenseReview(while: showingDeleteConfirm)
-        .alert("Delete Budget?", isPresented: $showingDeleteConfirm) {
-            Button("Delete", role: .destructive) {
-                pendingDelete?()
-                pendingDelete = nil
-            }
-            Button("Cancel", role: .cancel) {
-                pendingDelete = nil
-            }
-        }
-        .blocksAutomaticExpenseReview(while: showingDeleteError)
-        .alert("Couldn’t Delete Budget", isPresented: $showingDeleteError) {
-            Button("OK", role: .cancel) { }
-        } message: {
-            Text(deleteErrorMessage)
-        }
-        .onAppear {
-            if shouldSyncCommandSurface {
-                commandHub.activate(.budgets)
-            }
-            if hasLoadedBucketSnapshot == false {
-                hydrateBucketSnapshotIfAvailable()
-                if hasLoadedBucketSnapshot == false {
-                    rebuildBucketSnapshot(reason: "onAppearInitial")
-                    hasLoadedBucketSnapshot = true
-                }
-                needsBucketSnapshotRefresh = false
-            } else if needsBucketSnapshotRefresh {
-                scheduleBucketSnapshotRefresh(reason: "onAppearRefresh")
-            }
-        }
-        .onDisappear {
-            cancelBucketSnapshotRefresh(reason: "onDisappear")
-            if shouldSyncCommandSurface {
-                commandHub.deactivate(.budgets)
-            }
-        }
-        .onReceive(commandHub.$sequence) { _ in
-            guard commandHub.surface == .budgets else { return }
-            handleCommand(commandHub.latestCommandID)
-        }
-        .onChange(of: tabActivationContext) { _, newValue in
-            guard newValue.sectionRawValue == AppSection.budgets.rawValue else { return }
-            if newValue.isSettled, needsBucketSnapshotRefresh {
-                scheduleBucketSnapshotRefresh(reason: "tabActivationSettled")
-            } else if newValue.phase != .active {
-                cancelBucketSnapshotRefresh(reason: "tabPhaseChanged")
-            }
-        }
-        .onChange(of: bucketSnapshotInputs) { _, _ in
-            if tabActivationContext.isSettled {
-                scheduleBucketSnapshotRefresh(reason: "inputsChanged")
-            } else {
-                needsBucketSnapshotRefresh = true
             }
         }
     }
@@ -468,14 +539,7 @@ struct BudgetsView: View {
         NavigationLink {
             BudgetDetailView(workspace: workspace, budget: budget)
         } label: {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(budget.name)
-                    .font(.headline)
-
-                Text(formattedDateRange(start: budget.startDate, end: budget.endDate))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
+            budgetLabel(budget)
         }
         .swipeActions(edge: .leading, allowsFullSwipe: false) {
             Button {
@@ -492,6 +556,17 @@ struct BudgetsView: View {
                 Label("Delete", systemImage: "trash")
             }
             .tint(Color("OffshoreDepth"))
+        }
+    }
+
+    private func budgetLabel(_ budget: Budget) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(budget.name)
+                .font(.headline)
+
+            Text(formattedDateRange(start: budget.startDate, end: budget.endDate))
+                .font(.caption)
+                .foregroundStyle(.secondary)
         }
     }
 
@@ -673,6 +748,7 @@ private struct BucketDisclosureRow: View {
                     .rotationEffect(.degrees(isExpanded ? 0 : -90))
                     .animation(.easeInOut(duration: 0.18), value: isExpanded)
             }
+            .frame(minHeight: 44)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
