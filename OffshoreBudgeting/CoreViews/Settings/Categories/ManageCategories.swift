@@ -36,6 +36,7 @@ struct ManageCategoriesView: View {
         }
     }
 
+    @State private var selectedGalleryCategory: Category?
     @State private var sheetRoute: SheetRoute? = nil
     @State private var showingCategoryDeleteConfirm: Bool = false
     @State private var pendingCategoryDelete: (() -> Void)? = nil
@@ -57,6 +58,9 @@ struct ManageCategoriesView: View {
             } else {
                 galleryContent
             }
+        }
+        .navigationDestination(item: $selectedGalleryCategory) { category in
+            CategoryDetailView(workspace: workspace, category: category).equatable()
         }
         .postBoardingTip(
             key: "tip.categories.v1",
@@ -155,7 +159,6 @@ struct ManageCategoriesView: View {
                                 categoryTile(category)
                             }
                         }
-                        .navigationLinkIndicatorVisibility(.hidden)
                         .listRowInsets(EdgeInsets())
                         .listRowBackground(Color.clear)
                         .listRowSeparator(.hidden)
@@ -168,7 +171,6 @@ struct ManageCategoriesView: View {
                                 categoryTile(category)
                             }
                         }
-                        .navigationLinkIndicatorVisibility(.hidden)
                         .listRowInsets(EdgeInsets())
                         .listRowBackground(Color.clear)
                         .listRowSeparator(.hidden)
@@ -179,8 +181,8 @@ struct ManageCategoriesView: View {
     }
 
     private func categoryTile(_ category: Category) -> some View {
-        NavigationLink {
-            CategoryDetailView(workspace: workspace, category: category).equatable()
+        Button {
+            selectedGalleryCategory = category
         } label: {
             CollectionGalleryTile {
                 CategoryGalleryContent(category: category)

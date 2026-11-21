@@ -48,6 +48,31 @@ final class CollectionViewModeUITests: XCTestCase {
         }
     }
 
+    func testCategoryGalleryOpensOnlySelectedCategoryAndReturnsWithOneBack() throws {
+        try XCTSkipUnless(UIDevice.current.userInterfaceIdiom == .phone,
+                          "This regression uses phone Settings navigation.")
+        let app = launchApp(extraArguments: ["-sort.categories.mode", "az"])
+        app.tabBars.buttons["Settings"].tap()
+        openManagement("Manage Categories", title: "Categories", in: app)
+        chooseLayout("Gallery", in: app)
+
+        for (id, title) in [
+            ("C1000000-0000-0000-0000-000000000003", "Other Detail Category"),
+            ("C1000000-0000-0000-0000-000000000002", "Archived Dining")
+        ] {
+            let tile = app.buttons["categories.row.\(id)"]
+            reveal(tile, in: app)
+            tile.tap()
+            XCTAssertTrue(app.navigationBars[title].waitForExistence(timeout: 5))
+            app.navigationBars[title].buttons["Categories"].tap()
+            XCTAssertTrue(app.navigationBars["Categories"].waitForExistence(timeout: 5),
+                          "One Back must return directly from the chosen category to its gallery.")
+            XCTAssertEqual(app.buttons["collection.viewMenu"].label, "View, Gallery")
+        }
+        app.navigationBars["Categories"].buttons["Settings"].tap()
+        XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(timeout: 5))
+    }
+
     func testLayoutPreferenceSurvivesRelaunchWithoutOverridingLaunchDefaults() throws {
         let app = launchApp()
         try XCTSkipUnless(app.tabBars.buttons["Accounts"].exists,
