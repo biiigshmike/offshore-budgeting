@@ -25,7 +25,7 @@ final class WorkspaceProgressUITests: XCTestCase {
         }
         attachScreenshot("Workspace setup checklist at 80 percent", app: app)
 
-        let addIncome = app.buttons["workspaceProgressAdd_income"]
+        let addIncome = app.buttons["workspaceProgressStep_income"]
         reveal(addIncome, in: app)
         addIncome.tap()
         XCTAssertTrue(app.navigationBars["Add Income"].waitForExistence(timeout: 5))
@@ -50,12 +50,52 @@ final class WorkspaceProgressUITests: XCTestCase {
         assertProgress(100, completed: 5, in: app)
         let complete = element("workspaceProgressComplete", in: app)
         reveal(complete, in: app)
-        XCTAssertFalse(app.buttons["workspaceProgressAdd_income"].exists)
+        XCTAssertFalse(app.buttons["workspaceProgressStep_income"].exists)
         let hideGuidance = element("workspaceProgressHideGuidance", in: app)
         reveal(hideGuidance, in: app)
         attachScreenshot("Workspace setup complete", app: app)
         goBack(from: "Workspace Progress", to: "Settings", in: app)
         XCTAssertTrue(element("settingsWorkspaceProgress", in: app).waitForExistence(timeout: 5))
+    }
+
+    func testFreshCardOnlyRowsOpenFormsAcrossTheirWidthAndCancelPreservesProgress() {
+        let app = makeApp(extraArguments: ["-uiTestProgressCardOnly"])
+        app.launch()
+        openSettings(app)
+        openProgress(app)
+        assertProgress(20, completed: 1, in: app)
+        XCTAssertFalse(app.buttons["workspaceProgressStep_card"].exists)
+        XCTAssertFalse(app.staticTexts["Next Steps"].exists)
+
+        for (index, step) in ["category", "preset", "income", "budget"].enumerated() {
+            let row = app.buttons["workspaceProgressStep_\(step)"]
+            reveal(row, in: app)
+            XCTAssertTrue(row.isEnabled)
+            XCTAssertGreaterThanOrEqual(row.frame.height, 44)
+            // isHittable may be true for a sliver above the iPhone tab bar.
+            // Bring the whole row into view before choosing an exact tap coordinate.
+            let bottom = app.tabBars.firstMatch.exists
+                ? app.tabBars.firstMatch.frame.minY : app.frame.maxY
+            for _ in 0..<8 {
+                if row.frame.maxY < bottom - 8 { break }
+                app.swipeUp()
+            }
+            // Alternate between the title area and trailing whitespace.
+            row.coordinate(withNormalizedOffset: CGVector(dx: index.isMultiple(of: 2) ? 0.2 : 0.85, dy: 0.5)).tap()
+            let title = ["category": "Add Category", "preset": "Add Preset",
+                         "income": "Add Income", "budget": "Add Budget"][step]!
+            XCTAssertTrue(app.navigationBars[title].waitForExistence(timeout: 5))
+            if step == "income" {
+                let source = app.textFields["Source"]
+                source.tap()
+                source.typeText("Canceled draft")
+            }
+            app.buttons["Cancel"].tap()
+            XCTAssertTrue(app.navigationBars["Workspace Progress"].waitForExistence(timeout: 5))
+            assertProgress(20, completed: 1, in: app)
+            XCTAssertTrue(app.buttons["workspaceProgressStep_\(step)"].exists)
+        }
+        attachScreenshot("Fresh one-of-five tappable checklist", app: app)
     }
 
     func testHidePreferenceIsWorkspaceScopedAndSurvivesRelaunch() throws {
@@ -106,7 +146,7 @@ final class WorkspaceProgressUITests: XCTestCase {
         openProgress(app)
         assertProgress(60, completed: 3, in: app)
 
-        let addPreset = app.buttons["workspaceProgressAdd_preset"]
+        let addPreset = app.buttons["workspaceProgressStep_preset"]
         reveal(addPreset, in: app)
         XCTAssertFalse(addPreset.isEnabled)
         let restoreCard = app.buttons["workspaceProgressRestoreCard"]
@@ -222,7 +262,7 @@ final class WorkspaceProgressUITests: XCTestCase {
             if element.exists && element.isHittable { return }
             app.swipeUp()
         }
-        XCTAssertTrue(element.exists && element.isHittable)
+        XCTAssertTrue(element.exists && element.isHittable, app.debugDescription)
     }
 
     private func attachScreenshot(_ name: String, app: XCUIApplication) {

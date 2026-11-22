@@ -20,7 +20,7 @@ final class WorkspaceProgressHandoffUITests: XCTestCase {
         let guidance = app.staticTexts["You can return to Workspace Progress in Settings."]
         reveal(guidance, in: app)
 
-        let addIncome = app.buttons["workspaceProgressAdd_income"]
+        let addIncome = app.buttons["workspaceProgressStep_income"]
         reveal(addIncome, in: app)
         addIncome.tap()
         XCTAssertTrue(app.navigationBars["Add Income"].waitForExistence(timeout: 5))
@@ -40,7 +40,7 @@ final class WorkspaceProgressHandoffUITests: XCTestCase {
         amount.typeText("2500")
         app.buttons["Save"].tap()
 
-        assertHandoff(in: app)
+        assertHandoff(in: app, completed: true)
         assertProgress(100, completed: 5, in: app)
         let completion = element("workspaceProgressComplete", in: app)
         reveal(completion, in: app)
@@ -57,6 +57,96 @@ final class WorkspaceProgressHandoffUITests: XCTestCase {
         XCTAssertFalse(app.buttons["Open Help Guide"].exists)
         XCTAssertFalse(guidance.exists)
         assertProgress(100, completed: 5, in: app)
+    }
+
+    func testFreshHandoffPlacesHelpAfterChecklist() {
+        let app = makeApp(extraArguments: ["-uiTestProgressHandoff", "-uiTestProgressCardOnly"])
+        app.launch()
+        assertHandoff(in: app)
+        assertProgress(20, completed: 1, in: app)
+        XCTAssertFalse(app.staticTexts["Next Steps"].exists)
+        let budget = app.buttons["workspaceProgressStep_budget"]
+        reveal(budget, in: app)
+        let help = app.buttons["Open Help Guide"]
+        reveal(help, in: app)
+        XCTAssertLessThanOrEqual(budget.frame.maxY, help.frame.minY)
+        openAndCloseHelpGuide(in: app)
+        assertHandoff(in: app)
+        assertProgress(20, completed: 1, in: app)
+    }
+
+    func testFreshHandoffSavesRemainingStepsAndChangesSkipToDone() {
+        let app = makeApp(extraArguments: ["-uiTestProgressHandoff", "-uiTestProgressCardOnly"])
+        app.launch()
+        assertHandoff(in: app)
+        assertProgress(20, completed: 1, in: app)
+
+        for (index, step) in ["category", "preset", "income", "budget"].enumerated() {
+            let row = app.buttons["workspaceProgressStep_\(step)"]
+            reveal(row, in: app)
+            row.tap()
+            switch step {
+            case "category":
+                XCTAssertTrue(app.navigationBars["Add Category"].waitForExistence(timeout: 5))
+                app.textFields["Name"].tap()
+                app.textFields["Name"].typeText("Household")
+            case "preset":
+                XCTAssertTrue(app.navigationBars["Add Preset"].waitForExistence(timeout: 5))
+                let card = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Choose a Card")).firstMatch
+                card.tap()
+                app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "First Card")).firstMatch.tap()
+                app.textFields["Expense Name"].tap()
+                app.textFields["Expense Name"].typeText("Internet")
+                app.textFields["Planned Amount"].tap()
+                app.textFields["Planned Amount"].typeText("60")
+            case "income":
+                XCTAssertTrue(app.navigationBars["Add Income"].waitForExistence(timeout: 5))
+                app.textFields["Source"].tap()
+                app.textFields["Source"].typeText("Paycheck")
+                app.textFields["Amount"].tap()
+                app.textFields["Amount"].typeText("2500")
+            default:
+                XCTAssertTrue(app.navigationBars["Add Budget"].waitForExistence(timeout: 5))
+                let name = app.textFields["budget.name"]
+                name.tap()
+                name.typeText("First Budget")
+            }
+            let save = app.navigationBars.buttons["Save"]
+            XCTAssertTrue(save.isEnabled)
+            save.tap()
+            assertHandoff(in: app, completed: step == "budget")
+            assertProgress((index + 2) * 20, completed: index + 2, in: app)
+            XCTAssertFalse(app.buttons["workspaceProgressStep_\(step)"].exists)
+        }
+
+        for step in ["card", "category", "preset", "income", "budget"] {
+            XCTAssertFalse(app.buttons["workspaceProgressStep_\(step)"].exists)
+        }
+        let completion = element("workspaceProgressComplete", in: app)
+        reveal(completion, in: app)
+        attachScreenshot("Five-of-five checklist with Done", app: app)
+        app.buttons["workspaceProgressSkip"].tap()
+        assertHome(in: app)
+    }
+
+    func testArabicChecklistLocalizesStatusAndOpensIncome() {
+        let app = makeApp(extraArguments: ["-uiTestProgressHandoff", "-uiTestProgressCardOnly"])
+        app.launchArguments = app.launchArguments.map {
+            $0 == "(en)" ? "(ar)" : ($0 == "en_US" ? "ar_SA" : $0)
+        }
+        app.launch()
+        XCTAssertTrue(app.buttons["workspaceProgressSkip"].waitForExistence(timeout: 15))
+        let income = app.buttons["workspaceProgressStep_income"]
+        reveal(income, in: app)
+        XCTAssertTrue(income.label.contains("غير مكتمل"))
+        XCTAssertGreaterThanOrEqual(income.frame.height, 44)
+        attachScreenshot("Arabic right-to-left checklist", app: app)
+        income.tap()
+        XCTAssertTrue(app.navigationBars["أضف الدخل"].waitForExistence(timeout: 5))
+        app.buttons["يلغي"].tap()
+        XCTAssertTrue(app.buttons["workspaceProgressSkip"].waitForExistence(timeout: 5))
+        reveal(income, in: app)
+        XCTAssertTrue(income.label.contains("غير مكتمل"))
     }
 
     func testCompletedWorkspaceGoesDirectlyHome() throws {
@@ -210,13 +300,13 @@ final class WorkspaceProgressHandoffUITests: XCTestCase {
         app.descendants(matching: .any).matching(identifier: identifier).firstMatch
     }
 
-    private func assertHandoff(in app: XCUIApplication) {
+    private func assertHandoff(in app: XCUIApplication, completed: Bool = false) {
         XCTAssertTrue(app.buttons["workspaceProgressSkip"].waitForExistence(timeout: 15))
         let navigationBar = app.navigationBars["Workspace Progress"]
         XCTAssertTrue(navigationBar.exists)
         let skip = navigationBar.buttons["workspaceProgressSkip"]
         XCTAssertTrue(skip.exists)
-        XCTAssertEqual(skip.label, "Skip")
+        XCTAssertEqual(skip.label, completed ? "Done" : "Skip")
     }
 
     private func assertHome(in app: XCUIApplication) {
@@ -258,7 +348,7 @@ final class WorkspaceProgressHandoffUITests: XCTestCase {
             if element.exists && element.isHittable { return }
             app.swipeUp()
         }
-        XCTAssertTrue(element.exists && element.isHittable)
+        XCTAssertTrue(element.exists && element.isHittable, app.debugDescription)
     }
 
     private func openAndCloseHelpGuide(in app: XCUIApplication) {

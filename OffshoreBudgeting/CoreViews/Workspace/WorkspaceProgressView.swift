@@ -70,15 +70,15 @@ struct WorkspaceProgressView: View {
                 }
             }
 
-            if showsHandoffGuidance {
-                Section {
-                    HelpGuideButton()
-                }
-            }
-
             Section("Checklist") {
                 ForEach(WorkspaceProgressStep.allCases) { step in
                     checklistRow(for: step)
+                }
+            }
+
+            if showsHandoffGuidance {
+                Section {
+                    HelpGuideButton()
                 }
             }
 
@@ -90,12 +90,6 @@ struct WorkspaceProgressView: View {
                         .accessibilityIdentifier("workspaceProgressComplete")
                     Text("You've set up all of the core features. You're ready to start budgeting Offshore.")
                         .foregroundStyle(.secondary)
-                }
-            } else {
-                Section("Next Steps") {
-                    ForEach(incompleteSteps) { step in
-                        nextStepRow(for: step)
-                    }
                 }
             }
 
@@ -179,9 +173,54 @@ struct WorkspaceProgressView: View {
         .accessibilityHidden(true)
     }
 
+    @ViewBuilder
     private func checklistRow(for step: WorkspaceProgressStep) -> some View {
         let isComplete = completedSteps.contains(step)
-        return HStack(alignment: .top, spacing: 12) {
+        let needsCard = step == .preset && cards.isEmpty
+        let status = isComplete ? String(localized: "Completed") : String(localized: "Not completed")
+
+        if isComplete {
+            checklistLabel(for: step, isComplete: true)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("\(step.title), \(status). \(step.explanation)")
+                .accessibilityIdentifier("workspaceProgressStep_\(step.rawValue)")
+        } else {
+            VStack(alignment: .leading, spacing: 6) {
+                Button {
+                    guard !needsCard else { return }
+                    activeStep = step
+                } label: {
+                    checklistLabel(for: step, isComplete: false)
+                }
+                .buttonStyle(.plain)
+                .disabled(needsCard)
+                .accessibilityLabel("\(step.title), \(status). \(step.explanation)")
+                .accessibilityHint(needsCard
+                    ? String(localized: "Add a card first. A preset needs a card for its planned expenses.")
+                    : step.actionTitle)
+                .accessibilityIdentifier("workspaceProgressStep_\(step.rawValue)")
+
+                if needsCard {
+                    Text("Add a card first. A preset needs a card for its planned expenses.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    if completedSteps.contains(.card) {
+                        Button("Add Card", systemImage: "plus.circle") {
+                            activeStep = .card
+                        }
+                        .buttonStyle(.borderless)
+                        .frame(minHeight: 44)
+                        .accessibilityIdentifier("workspaceProgressRestoreCard")
+                    }
+                }
+            }
+        }
+    }
+
+    private func checklistLabel(for step: WorkspaceProgressStep, isComplete: Bool) -> some View {
+        HStack(alignment: .top, spacing: 12) {
             Image(systemName: isComplete ? "checkmark.circle.fill" : "circle")
                 .foregroundStyle(isComplete ? Color.accentColor : Color.secondary)
                 .imageScale(.large)
@@ -195,40 +234,18 @@ struct WorkspaceProgressView: View {
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
-        }
-        .padding(.vertical, 4)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(step.title), \(isComplete ? "Completed" : "Not completed"). \(step.explanation)")
-        .accessibilityIdentifier("workspaceProgressStep_\(step.rawValue)")
-    }
+            .frame(maxWidth: .infinity, alignment: .leading)
 
-    private func nextStepRow(for step: WorkspaceProgressStep) -> some View {
-        let needsCard = step == .preset && cards.isEmpty
-        return VStack(alignment: .leading, spacing: 6) {
-            Button {
-                guard !needsCard else { return }
-                activeStep = step
-            } label: {
-                Label(step.actionTitle, systemImage: "plus.circle")
-            }
-            .disabled(needsCard)
-            .accessibilityIdentifier("workspaceProgressAdd_\(step.rawValue)")
-
-            if needsCard {
-                Text("Add a card first. A preset needs a card for its planned expenses.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-
-                if completedSteps.contains(.card) {
-                    Button("Add Card", systemImage: "plus.circle") {
-                        activeStep = .card
-                    }
-                    .accessibilityIdentifier("workspaceProgressRestoreCard")
-                }
+            if !isComplete {
+                Image(systemName: "chevron.forward")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(.tertiary)
+                    .accessibilityHidden(true)
             }
         }
         .padding(.vertical, 4)
+        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+        .contentShape(Rectangle())
     }
 
     @ViewBuilder

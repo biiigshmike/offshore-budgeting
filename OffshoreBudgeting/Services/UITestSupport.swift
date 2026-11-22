@@ -230,22 +230,29 @@ enum UITestSupport {
             )
             context.insert(workspace)
             context.insert(other)
-            let category = Category(name: "Bills", hexColor: "#3B82F6", workspace: workspace)
-            let budget = Budget(name: "First Budget", startDate: .now, endDate: .now, workspace: workspace)
-            context.insert(category)
-            context.insert(budget)
+            let category = Category(name: "Bills", hexColor: "#3B82F6")
+            let budget = Budget(name: "First Budget", startDate: .now, endDate: .now)
+            let cardOnly = arguments.contains("-uiTestProgressCardOnly")
+            if !cardOnly {
+                category.workspace = workspace
+                budget.workspace = workspace
+                context.insert(category)
+                context.insert(budget)
+            }
             var progressCard: Card?
             if ProcessInfo.processInfo.arguments.contains("-uiTestProgressNoCard") {
                 workspace.setupHasCreatedCard = true
             } else {
                 let card = Card(name: "First Card", workspace: workspace)
                 progressCard = card
-                let preset = Preset(title: "Internet", plannedAmount: 60, workspace: workspace,
-                                    defaultCard: card, defaultCategory: category)
                 context.insert(card)
-                context.insert(preset)
-                context.insert(BudgetCardLink(budget: budget, card: card))
-                context.insert(BudgetPresetLink(budget: budget, preset: preset))
+                if !cardOnly {
+                    let preset = Preset(title: "Internet", plannedAmount: 60, workspace: workspace,
+                                        defaultCard: card, defaultCategory: category)
+                    context.insert(preset)
+                    context.insert(BudgetCardLink(budget: budget, card: card))
+                    context.insert(BudgetPresetLink(budget: budget, preset: preset))
+                }
             }
             if ProcessInfo.processInfo.arguments.contains("-uiTestProgressComplete") {
                 context.insert(Income(source: "First Paycheck", amount: 2_500, date: .now,

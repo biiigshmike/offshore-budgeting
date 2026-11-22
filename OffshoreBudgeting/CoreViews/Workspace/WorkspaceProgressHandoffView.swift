@@ -10,8 +10,14 @@ struct WorkspaceProgressHandoffView: View {
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .topBarTrailing) {
-                        Button("Skip", action: onContinue)
-                            .accessibilityIdentifier("workspaceProgressSkip")
+                        Button(action: onContinue) {
+                            if WorkspaceProgressService.canHideProgress(in: workspace) {
+                                Text("Done")
+                            } else {
+                                Text("Skip")
+                            }
+                        }
+                        .accessibilityIdentifier("workspaceProgressSkip")
                     }
                 }
         }
