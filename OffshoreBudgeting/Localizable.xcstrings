@@ -14644,6 +14644,53 @@
         }
       }
     },
+    "categories.tip.rowActions" : {
+      "comment" : "Categories tip explaining tap navigation and row actions.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "اضغط على فئة لاستعراض المصروفات عبر البطاقات والتواريخ. اضغط مطولًا على الصف لعرض جميع الإجراءات، أو اسحب لإظهارها."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tippe auf eine Kategorie, um Ausgaben über Karten und Zeiträume hinweg zu durchsuchen. Halte eine Zeile gedrückt, um alle Aktionen zu sehen, oder wische, um sie einzublenden."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tap a category to explore expenses across cards and dates. Press and hold a row for all actions, or swipe to reveal them."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Toca una categoría para explorar los gastos de distintas tarjetas y fechas. Mantén pulsada una fila para ver todas las acciones o desliza para mostrarlas."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Touchez une catégorie pour consulter ses dépenses par carte et par date. Maintenez une ligne enfoncée ou balayez-la pour afficher ses actions."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Toque em uma categoria para explorar despesas de vários cartões e datas. Mantenha uma linha pressionada para ver todas as ações ou deslize para exibi-las."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "轻点类别可查看不同卡片和日期的支出。长按一行可查看所有操作，也可以轻扫来显示操作。"
+          }
+        }
+      }
+    },
     "categories.title" : {
       "comment" : "Title for categories section.",
       "localizations" : {
@@ -48463,12 +48510,12 @@
         }
       }
     },
-    "Open Period Review in Offshore Savings to check completed periods. Review Today also links to this dedicated screen and shows how many periods are waiting. Each review shows overlapping budgets, income, expenses, the calculated closing amount, and the change it would make to your available Savings balance.\n\nTap an income or expense to edit it, or swipe for more options. Planned expenses still use their planned amounts until you record an actual amount. If the records don’t tell the whole story, turn on Use a Different Amount. Zero and negative amounts are fine. Add a note if you like; leaving it blank uses the usual period-close text. When you’re ready, turn on Update Savings, then tap Save at the top for a new close or Update for an existing one. Your transactions and existing manual adjustments stay as they are.\n\nChanges after confirmation appear under Needs Review. The posted amount stays in Savings until you confirm again. Posted History also lets you deliberately review older closes; existing closes are not automatically queued when you first use this feature.\n\nReview Before Posting Savings is enabled by default and saved with your workspace in Settings > General. Turning it off enables automatic posting only for periods ending afterward. Older pending periods still need review, and corrected closes remain protected from automatic recalculation." : {
+    "Open Period Review in Offshore Savings to check completed periods. Review Today also links to this dedicated screen and shows how many periods are waiting. Each review shows overlapping budgets, income, expenses, the calculated closing amount, and the change it would make to your available Savings balance.\n\nTap an income or expense to edit it. Press and hold for all row actions, or swipe to reveal them. Planned expenses still use their planned amounts until you record an actual amount. If the records don’t tell the whole story, turn on Use a Different Amount. Zero and negative amounts are fine. Add a note if you like; leaving it blank uses the usual period-close text. When you’re ready, turn on Update Savings, then tap Save at the top for a new close or Update for an existing one. Your transactions and existing manual adjustments stay as they are.\n\nChanges after confirmation appear under Needs Review. The posted amount stays in Savings until you confirm again. Posted History also lets you deliberately review older closes; existing closes are not automatically queued when you first use this feature.\n\nReview Before Posting Savings is enabled by default and saved with your workspace in Settings > General. Turning it off enables automatic posting only for periods ending afterward. Older pending periods still need review, and corrected closes remain protected from automatic recalculation." : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Open Period Review in Offshore Savings to check completed periods. Review Today also links to this dedicated screen and shows how many periods are waiting. Each review shows overlapping budgets, income, expenses, the calculated closing amount, and the change it would make to your available Savings balance.\n\nTap an income or expense to edit it, or swipe for more options. Planned expenses still use their planned amounts until you record an actual amount. If the records don’t tell the whole story, turn on Use a Different Amount. Zero and negative amounts are fine. Add a note if you like; leaving it blank uses the usual period-close text. When you’re ready, turn on Update Savings, then tap Save at the top for a new close or Update for an existing one. Your transactions and existing manual adjustments stay as they are.\n\nChanges after confirmation appear under Needs Review. The posted amount stays in Savings until you confirm again. Posted History also lets you deliberately review older closes; existing closes are not automatically queued when you first use this feature.\n\nReview Before Posting Savings is enabled by default and saved with your workspace in Settings > General. Turning it off enables automatic posting only for periods ending afterward. Older pending periods still need review, and corrected closes remain protected from automatic recalculation."
+            "value" : "Open Period Review in Offshore Savings to check completed periods. Review Today also links to this dedicated screen and shows how many periods are waiting. Each review shows overlapping budgets, income, expenses, the calculated closing amount, and the change it would make to your available Savings balance.\n\nTap an income or expense to edit it. Press and hold for all row actions, or swipe to reveal them. Planned expenses still use their planned amounts until you record an actual amount. If the records don’t tell the whole story, turn on Use a Different Amount. Zero and negative amounts are fine. Add a note if you like; leaving it blank uses the usual period-close text. When you’re ready, turn on Update Savings, then tap Save at the top for a new close or Update for an existing one. Your transactions and existing manual adjustments stay as they are.\n\nChanges after confirmation appear under Needs Review. The posted amount stays in Savings until you confirm again. Posted History also lets you deliberately review older closes; existing closes are not automatically queued when you first use this feature.\n\nReview Before Posting Savings is enabled by default and saved with your workspace in Settings > General. Turning it off enables automatic posting only for periods ending afterward. Older pending periods still need review, and corrected closes remain protected from automatic recalculation."
           }
         }
       }
@@ -66239,22 +66286,94 @@
         }
       }
     },
-    "Tap to edit, or swipe for more options." : {
+    "Tap to edit. Press and hold for all row actions, or swipe to reveal them." : {
       "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "اضغط للتعديل. اضغط مطولًا لعرض جميع إجراءات الصف، أو اسحب لإظهارها."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zum Bearbeiten tippen. Halte die Zeile gedrückt, um alle Aktionen zu sehen, oder wische, um sie einzublenden."
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Tap to edit, or swipe for more options."
+            "value" : "Tap to edit. Press and hold for all row actions, or swipe to reveal them."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Toca para editar. Mantén pulsada la fila para ver todas las acciones o desliza para mostrarlas."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Touchez pour modifier. Maintenez la ligne enfoncée ou balayez-la pour afficher ses actions."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Toque para editar. Mantenha a linha pressionada para ver todas as ações ou deslize para exibi-las."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "轻点即可编辑。长按可查看此行的所有操作，也可以轻扫来显示操作。"
           }
         }
       }
     },
-    "Tap to edit, or swipe for more options. Splits and payments from Savings are already included in the totals above." : {
+    "Tap to edit. Press and hold for all row actions, or swipe to reveal them. Splits and payments from Savings are already included in the totals above." : {
       "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "اضغط للتعديل. اضغط مطولًا لعرض جميع إجراءات الصف، أو اسحب لإظهارها. يشمل الإجمالي أعلاه بالفعل المبالغ المقسّمة والمدفوعات من المدخرات."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zum Bearbeiten tippen. Halte die Zeile gedrückt, um alle Aktionen zu sehen, oder wische, um sie einzublenden. Aufteilungen und Zahlungen aus Ersparnissen sind in den obigen Summen bereits enthalten."
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Tap to edit, or swipe for more options. Splits and payments from Savings are already included in the totals above."
+            "value" : "Tap to edit. Press and hold for all row actions, or swipe to reveal them. Splits and payments from Savings are already included in the totals above."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Toca para editar. Mantén pulsada la fila para ver todas las acciones o desliza para mostrarlas. Los importes repartidos y los pagos desde Ahorros ya se incluyen en los totales de arriba."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Touchez pour modifier. Maintenez la ligne enfoncée ou balayez-la pour afficher ses actions. Les montants partagés et les paiements depuis l’épargne sont déjà inclus dans les totaux ci-dessus."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Toque para editar. Mantenha a linha pressionada para ver todas as ações ou deslize para exibi-las. As divisões e os pagamentos feitos com a Poupança já estão incluídos nos totais acima."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "轻点即可编辑。长按可查看此行的所有操作，也可以轻扫来显示操作。 以上合计已包含分摊金额和储蓄付款。"
           }
         }
       }

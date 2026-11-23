@@ -54,21 +54,12 @@ struct WorkspaceListRows: View {
                     row(workspace)
                 }
                 .buttonStyle(.plain)
-                .swipeActions(edge: .leading, allowsFullSwipe: false) {
-                    Button {
-                        onEdit(workspace)
-                    } label: {
-                        Label("Edit", systemImage: "pencil")
-                    }
-                    .tint(Color("AccentColor"))
-                }
-                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                    Button(role: .destructive) {
-                        onDelete(workspace)
-                    } label: {
-                        Label("Delete", systemImage: "trash")
-                    }
-                    .tint(Color("OffshoreDepth"))
+                .rowActions(allowsFullLeadingSwipe: false) {
+                    Button("Edit", systemImage: "pencil") { onEdit(workspace) }
+                        .tint(Color("AccentColor"))
+                } trailing: {
+                    Button("Delete", systemImage: "trash", role: .destructive) { onDelete(workspace) }
+                        .tint(Color("OffshoreDepth"))
                 }
             }
 
@@ -179,39 +170,22 @@ struct CategoryListRows<Destination: View>: View {
                         categoryLabel(category)
                     }
                 }
-                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                    Button(role: .destructive) {
-                        onDelete(category)
-                    } label: {
-                        Label("Delete", systemImage: "trash")
-                    }
-                    .tint(Color("OffshoreDepth"))
-                }
-                .swipeActions(edge: .leading, allowsFullSwipe: false) {
+                .rowActions(allowsFullLeadingSwipe: false) {
                     if let onUnarchive {
-                        Button {
-                            onUnarchive(category)
-                        } label: {
-                            Label("Unarchive", systemImage: "arrow.uturn.backward")
-                        }
-                        .tint(.green)
+                        Button("Unarchive", systemImage: "arrow.uturn.backward") { onUnarchive(category) }
+                            .tint(.green)
                     }
 
-                    Button {
-                        onEdit(category)
-                    } label: {
-                        Label("Edit", systemImage: "pencil")
-                    }
-                    .tint(Color("AccentColor"))
+                    Button("Edit", systemImage: "pencil") { onEdit(category) }
+                        .tint(Color("AccentColor"))
 
                     if let onArchive {
-                        Button {
-                            onArchive(category)
-                        } label: {
-                            Label("Archive", systemImage: "archivebox")
-                        }
-                        .tint(Color("OffshoreSand"))
+                        Button("Archive", systemImage: "archivebox") { onArchive(category) }
+                            .tint(Color("OffshoreSand"))
                     }
+                } trailing: {
+                    Button("Delete", systemImage: "trash", role: .destructive) { onDelete(category) }
+                        .tint(Color("OffshoreDepth"))
                 }
             }
         }

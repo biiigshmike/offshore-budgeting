@@ -69,7 +69,11 @@ struct ManageCategoriesView: View {
                 PostBoardingTipItem(
                     systemImage: "tag",
                     title: "Categories",
-                    detail: "Tap a category to explore its expenses across cards and dates. Swipe a row to the right to edit or archive; swipe left to delete."
+                    detail: String(
+                        localized: "categories.tip.rowActions",
+                        defaultValue: "Tap a category to explore expenses across cards and dates. Press and hold a row for all actions, or swipe to reveal them.",
+                        comment: "Categories tip explaining tap navigation and row actions."
+                    )
                 )
             ]
         )

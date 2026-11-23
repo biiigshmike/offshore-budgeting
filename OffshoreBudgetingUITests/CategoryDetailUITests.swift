@@ -279,6 +279,17 @@ final class CategoryDetailUITests: XCTestCase {
 
         let archived = row("categories.row.\(archivedID)", in: app)
         reveal(archived, in: app)
+        archived.press(forDuration: 1)
+        let unarchive = app.buttons["Unarchive"].firstMatch
+        XCTAssertTrue(unarchive.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["Delete"].firstMatch.exists)
+        XCTAssertFalse(app.buttons["Archive"].firstMatch.exists)
+        XCTAssertFalse(app.navigationBars["Archived Dining"].exists)
+        app.buttons["Edit"].firstMatch.tap()
+        let editor = app.navigationBars["Edit Category"]
+        XCTAssertTrue(editor.waitForExistence(timeout: 5))
+        editor.buttons["Cancel"].tap()
+        XCTAssertTrue(editor.waitForNonExistence(timeout: 5))
         archived.tap()
         XCTAssertTrue(app.navigationBars["Archived Dining"].waitForExistence(timeout: 5))
         let supper = row("categoryDetail.expense.\(supperID)", in: app)
@@ -293,5 +304,20 @@ final class CategoryDetailUITests: XCTestCase {
         XCTAssertTrue(app.alerts["Delete?"].waitForExistence(timeout: 3))
         app.alerts["Delete?"].buttons["Cancel"].tap()
         XCTAssertTrue(other.exists)
+    }
+
+    func testUnlinkedPlannedExpenseMenuOmitsEditPreset() {
+        let app = launchCategories()
+        openDining(in: app)
+        let planned = row("categoryDetail.expense.planned-E1000000-0000-0000-0000-000000000001", in: app)
+        reveal(planned, in: app)
+        planned.press(forDuration: 1)
+        XCTAssertTrue(app.buttons["As Planned"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["Edit Preset"].exists)
+        let editor = app.navigationBars["Edit Planned Expense"]
+        XCTAssertFalse(editor.exists)
+        app.buttons["Edit"].firstMatch.tap()
+        XCTAssertTrue(editor.waitForExistence(timeout: 5))
+        XCTAssertEqual(app.textFields["Title"].value as? String, "Planned Dinner")
     }
 }

@@ -15,6 +15,7 @@ struct ReviewTodayView: View {
     @State private var editingPreset: Preset?
     @State private var pendingDelete: ReviewTodayActivity.Entry?
     @State private var showingDeleteConfirm = false
+    @State private var showingPlannedExpenseRecordingError = false
     @State private var pendingPeriodCount: Int?
 
     @State private var breakdown: Breakdown = .category
@@ -41,6 +42,7 @@ struct ReviewTodayView: View {
                         Button("Done") { dismiss() }
                     }
                 }
+                .plannedExpenseRecordingAlert(isPresented: $showingPlannedExpenseRecordingError)
                 .blocksAutomaticExpenseReview(while: showingDeleteConfirm)
                 .alert("Delete Expense?", isPresented: $showingDeleteConfirm) {
                     Button("Delete", role: .destructive) {
@@ -219,9 +221,14 @@ struct ReviewTodayView: View {
             }
         }
         .buttonStyle(.plain)
-        .swipeActions(edge: .leading, allowsFullSwipe: allowsFullSwipeEdit(entry)) {
-            if case .planned(let expense) = entry {
-                RecordPlannedExpenseButton(expense: expense, onRecorded: reload)
+        .rowActions(allowsFullLeadingSwipe: allowsFullSwipeEdit(entry)) {
+            if case .planned(let expense) = entry,
+               PlannedExpenseRecordingService.canRecord(expense) {
+                RecordPlannedExpenseButton(
+                    expense: expense,
+                    showingSaveError: $showingPlannedExpenseRecordingError,
+                    onRecorded: reload
+                )
             }
 
             Button {
@@ -241,8 +248,7 @@ struct ReviewTodayView: View {
                 }
                 .tint(Color("OffshoreSand"))
             }
-        }
-        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+        } trailing: {
             Button(role: .destructive) {
                 if confirmBeforeDeleting {
                     pendingDelete = entry

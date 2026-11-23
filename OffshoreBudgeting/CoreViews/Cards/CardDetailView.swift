@@ -66,6 +66,7 @@ struct CardDetailView: View {
     @State private var pendingCardDelete: (() -> Void)? = nil
 
     @State private var showingExpenseDeleteConfirm: Bool = false
+    @State private var showingPlannedExpenseRecordingError = false
     @State private var pendingExpenseDelete: (() -> Void)? = nil
 
     @State private var searchText: String = ""
@@ -539,6 +540,7 @@ struct CardDetailView: View {
             } message: {
                 Text("This deletes the card and all of its expenses.")
             }
+            .plannedExpenseRecordingAlert(isPresented: $showingPlannedExpenseRecordingError)
             .blocksAutomaticExpenseReview(while: showingExpenseDeleteConfirm)
             .alert("Delete Expense?", isPresented: $showingExpenseDeleteConfirm) {
                 Button("Delete", role: .destructive) {
@@ -739,36 +741,46 @@ struct CardDetailView: View {
         _ expense: PlannedExpense,
         presetBySourceID: [UUID: Preset]
     ) -> some View {
-        SharedPlannedExpenseRow(expense: expense)
-            .swipeActions(edge: .leading, allowsFullSwipe: false) {
-                RecordPlannedExpenseButton(expense: expense)
+        Button {
+            openEdit(expense)
+        } label: {
+            SharedPlannedExpenseRow(expense: expense)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .rowActions(allowsFullLeadingSwipe: false) {
+            if PlannedExpenseRecordingService.canRecord(expense) {
+                RecordPlannedExpenseButton(
+                    expense: expense,
+                    showingSaveError: $showingPlannedExpenseRecordingError
+                )
+            }
 
+            Button {
+                openEdit(expense)
+            } label: {
+                Label("Edit", systemImage: "pencil")
+            }
+            .tint(Color("AccentColor"))
+
+            if let presetID = expense.sourcePresetID, let preset = presetBySourceID[presetID] {
                 Button {
-                    openEdit(expense)
+                    openEditPreset(preset)
                 } label: {
-                    Label("Edit", systemImage: "pencil")
+                    Label("Edit Preset", systemImage: "list.bullet.rectangle")
                 }
-                .tint(Color("AccentColor"))
-
-                if let presetID = expense.sourcePresetID, let preset = presetBySourceID[presetID] {
-                    Button {
-                        openEditPreset(preset)
-                    } label: {
-                        Label("Edit Preset", systemImage: "list.bullet.rectangle")
-                    }
-                    .tint(Color("OffshoreSand"))
-                }
+                .tint(Color("OffshoreSand"))
             }
-            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                Button(role: .destructive) {
-                    deleteWithOptionalConfirm {
-                        PlannedExpenseDeletionService.delete(expense, modelContext: modelContext)
-                    }
-                } label: {
-                    Label("Delete", systemImage: "trash")
+        } trailing: {
+            Button(role: .destructive) {
+                deleteWithOptionalConfirm {
+                    PlannedExpenseDeletionService.delete(expense, modelContext: modelContext)
                 }
-                .tint(Color("OffshoreDepth"))
+            } label: {
+                Label("Delete", systemImage: "trash")
             }
+            .tint(Color("OffshoreDepth"))
+        }
     }
 
     @ViewBuilder
@@ -789,15 +801,14 @@ struct CardDetailView: View {
             SharedVariableExpenseRow(expense: expense)
         }
         .buttonStyle(.plain)
-        .swipeActions(edge: .leading, allowsFullSwipe: true) {
+        .rowActions {
             Button {
                 openEdit(expense)
             } label: {
                 Label("Edit", systemImage: "pencil")
             }
             .tint(Color("AccentColor"))
-        }
-        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+        } trailing: {
             Button(role: .destructive) {
                 deleteWithOptionalConfirm {
                     deleteVariableExpense(expense)

@@ -393,26 +393,19 @@ struct SavingsAccountView<TrailingToolbar: ToolbarContent>: View {
                     ForEach(displayRows) { entry in
                         if entry.kind == .manualAdjustment {
                             Button {
-                                editingEntry = entry
-                                showingEntrySheet = true
+                                openEntryEditor(entry)
                             } label: {
                                 SavingsLedgerRow(entry: entry)
                             }
                             .buttonStyle(.plain)
-                            .swipeActions(edge: .leading, allowsFullSwipe: false) {
-                                Button {
-                                    editingEntry = entry
-                                    showingEntrySheet = true
-                                } label: {
-                                    Label("Edit", systemImage: "pencil")
+                            .rowActions(allowsFullLeadingSwipe: false) {
+                                Button("Edit", systemImage: "pencil") {
+                                    openEntryEditor(entry)
                                 }
                                 .tint(Color("AccentColor"))
-                            }
-                            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                                Button(role: .destructive) {
+                            } trailing: {
+                                Button("Delete", systemImage: "trash", role: .destructive) {
                                     requestDelete(entry)
-                                } label: {
-                                    Label("Delete", systemImage: "trash")
                                 }
                                 .tint(Color("OffshoreDepth"))
                             }
@@ -790,6 +783,11 @@ struct SavingsAccountView<TrailingToolbar: ToolbarContent>: View {
         SavingsAccountService.recalculateAccountTotal(account)
         try? modelContext.save()
         rebuildGraphSnapshot(reason: "entrySaved")
+    }
+
+    private func openEntryEditor(_ entry: SavingsLedgerEntry) {
+        editingEntry = entry
+        showingEntrySheet = true
     }
 
     private func requestDelete(_ entry: SavingsLedgerEntry) {

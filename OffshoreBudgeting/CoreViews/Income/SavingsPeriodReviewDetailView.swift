@@ -13,6 +13,7 @@ struct SavingsPeriodReviewDetailView: View {
     @State private var editingPreset: Preset?
     @State private var pendingDeletion: ((ModelContext) throws -> Void)?
     @State private var showingDeleteConfirm = false
+    @State private var showingPlannedExpenseRecordingError = false
     @State private var summary: SavingsPeriodReviewSummary
     @State private var acknowledged = false
     @State private var usesCorrectedAmount: Bool
@@ -89,6 +90,7 @@ struct SavingsPeriodReviewDetailView: View {
         .appSheet(item: $editingPreset, onDismiss: reload) { preset in
             NavigationStack { EditPresetView(workspace: workspace, preset: preset) }
         }
+        .plannedExpenseRecordingAlert(isPresented: $showingPlannedExpenseRecordingError)
         .blocksAutomaticExpenseReview(while: showingError || showingDeleteConfirm)
         .alert("Delete Entry?", isPresented: $showingDeleteConfirm) {
             Button("Delete", role: .destructive) {
@@ -178,15 +180,14 @@ struct SavingsPeriodReviewDetailView: View {
                         }
                     }
                     .buttonStyle(.plain)
-                    .swipeActions(edge: .leading, allowsFullSwipe: true) {
+                    .rowActions {
                         Button {
                             editingIncome = income
                         } label: {
                             Label("Edit", systemImage: "pencil")
                         }
                             .tint(Color("AccentColor"))
-                    }
-                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                    } trailing: {
                         Button(role: .destructive) {
                             requestDeleteIncome(income)
                         } label: {
@@ -199,7 +200,7 @@ struct SavingsPeriodReviewDetailView: View {
         } header: {
             Text("Income")
         } footer: {
-            Text("Tap to edit, or swipe for more options.")
+            Text("Tap to edit. Press and hold for all row actions, or swipe to reveal them.")
         }
     }
 
@@ -217,8 +218,14 @@ struct SavingsPeriodReviewDetailView: View {
                         SharedPlannedExpenseRow(expense: expense, showsCardName: true)
                     }
                     .buttonStyle(.plain)
-                    .swipeActions(edge: .leading, allowsFullSwipe: false) {
-                        RecordPlannedExpenseButton(expense: expense, onRecorded: reload)
+                    .rowActions(allowsFullLeadingSwipe: false) {
+                        if PlannedExpenseRecordingService.canRecord(expense) {
+                            RecordPlannedExpenseButton(
+                                expense: expense,
+                                showingSaveError: $showingPlannedExpenseRecordingError,
+                                onRecorded: reload
+                            )
+                        }
                         Button {
                             editingPlannedExpense = expense
                         } label: {
@@ -234,8 +241,7 @@ struct SavingsPeriodReviewDetailView: View {
                             }
                                 .tint(Color("OffshoreSand"))
                         }
-                    }
-                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                    } trailing: {
                         Button(role: .destructive) {
                             requestDeletePlannedExpense(expense)
                         } label: {
@@ -248,7 +254,7 @@ struct SavingsPeriodReviewDetailView: View {
         } header: {
             Text("Planned Expenses")
         } footer: {
-            Text("Tap to edit, or swipe for more options. Splits and payments from Savings are already included in the totals above.")
+            Text("Tap to edit. Press and hold for all row actions, or swipe to reveal them. Splits and payments from Savings are already included in the totals above.")
         }
     }
 
@@ -262,15 +268,14 @@ struct SavingsPeriodReviewDetailView: View {
                         SharedVariableExpenseRow(expense: expense, showsCardName: true)
                     }
                     .buttonStyle(.plain)
-                    .swipeActions(edge: .leading, allowsFullSwipe: true) {
+                    .rowActions {
                         Button {
                             editingVariableExpense = expense
                         } label: {
                             Label("Edit", systemImage: "pencil")
                         }
                             .tint(Color("AccentColor"))
-                    }
-                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                    } trailing: {
                         Button(role: .destructive) {
                             requestDeleteVariableExpense(expense)
                         } label: {
@@ -283,7 +288,7 @@ struct SavingsPeriodReviewDetailView: View {
         } header: {
             Text("Variable Expenses")
         } footer: {
-            Text("Tap to edit, or swipe for more options.")
+            Text("Tap to edit. Press and hold for all row actions, or swipe to reveal them.")
         }
     }
 

@@ -101,6 +101,7 @@ struct BudgetDetailView: View {
     // MARK: - Expense Delete Flow
     
     @State private var showingExpenseDeleteConfirm: Bool = false
+    @State private var showingPlannedExpenseRecordingError = false
     @State private var pendingExpenseDelete: (() -> Void)? = nil
     
     // MARK: - UI State
@@ -704,6 +705,7 @@ struct BudgetDetailView: View {
             Text(budgetMutationErrorMessage)
         }
 
+        .plannedExpenseRecordingAlert(isPresented: $showingPlannedExpenseRecordingError)
         .blocksAutomaticExpenseReview(while: showingExpenseDeleteConfirm)
         .alert("Delete?", isPresented: $showingExpenseDeleteConfirm) {
             Button("Delete", role: .destructive) {
@@ -1036,34 +1038,44 @@ struct BudgetDetailView: View {
         _ expense: PlannedExpense,
         presetBySourceID: [UUID: Preset]
     ) -> some View {
-        BudgetPlannedExpenseRow(expense: expense, showsCardName: true)
-            .swipeActions(edge: .leading, allowsFullSwipe: false) {
-                RecordPlannedExpenseButton(expense: expense)
-
-                Button {
-                    openEdit(expense)
-                } label: {
-                    Label("Edit", systemImage: "pencil")
-                }
-                .tint(Color("AccentColor"))
-
-                if let presetID = expense.sourcePresetID, let preset = presetBySourceID[presetID] {
-                    Button {
-                        openEditPreset(preset)
-                    } label: {
-                        Label("Edit Preset", systemImage: "list.bullet.rectangle")
-                    }
-                    .tint(Color("OffshoreSand"))
-                }
+        Button {
+            openEdit(expense)
+        } label: {
+            BudgetPlannedExpenseRow(expense: expense, showsCardName: true)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .rowActions(allowsFullLeadingSwipe: false) {
+            if PlannedExpenseRecordingService.canRecord(expense) {
+                RecordPlannedExpenseButton(
+                    expense: expense,
+                    showingSaveError: $showingPlannedExpenseRecordingError
+                )
             }
-            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                Button {
-                    deletePlannedExpense(expense)
-                } label: {
-                    Label("Delete", systemImage: "trash")
-                }
-                .tint(Color("OffshoreDepth"))
+
+            Button {
+                openEdit(expense)
+            } label: {
+                Label("Edit", systemImage: "pencil")
             }
+            .tint(Color("AccentColor"))
+
+            if let presetID = expense.sourcePresetID, let preset = presetBySourceID[presetID] {
+                Button {
+                    openEditPreset(preset)
+                } label: {
+                    Label("Edit Preset", systemImage: "list.bullet.rectangle")
+                }
+                .tint(Color("OffshoreSand"))
+            }
+        } trailing: {
+            Button {
+                deletePlannedExpense(expense)
+            } label: {
+                Label("Delete", systemImage: "trash")
+            }
+            .tint(Color("OffshoreDepth"))
+        }
     }
 
     private func variableExpenseRow(_ expense: VariableExpense) -> some View {
@@ -1073,15 +1085,14 @@ struct BudgetDetailView: View {
             BudgetVariableExpenseRow(expense: expense, showsCardName: true)
         }
         .buttonStyle(.plain)
-        .swipeActions(edge: .leading, allowsFullSwipe: true) {
+        .rowActions {
             Button {
                 openEdit(expense)
             } label: {
                 Label("Edit", systemImage: "pencil")
             }
             .tint(Color("AccentColor"))
-        }
-        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+        } trailing: {
             Button {
                 deleteVariableExpense(expense)
             } label: {

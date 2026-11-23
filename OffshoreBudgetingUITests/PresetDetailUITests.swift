@@ -56,6 +56,19 @@ final class PresetDetailUITests: XCTestCase {
         XCTAssertTrue(internet.label.contains("60.00"))
         XCTAssertTrue(internet.label.contains("Assigned Budgets"))
         attachScreenshot(app, named: "Preset rows at largest accessibility text size")
+
+        internet.press(forDuration: 1)
+        let presetEditAction = app.buttons["Edit"].firstMatch
+        XCTAssertTrue(presetEditAction.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["Archive"].firstMatch.exists)
+        XCTAssertTrue(app.buttons["Delete"].firstMatch.exists)
+        XCTAssertFalse(app.navigationBars["Internet"].exists)
+        presetEditAction.tap()
+        let editor = app.navigationBars["Edit Preset"]
+        XCTAssertTrue(editor.waitForExistence(timeout: 5))
+        editor.buttons["Cancel"].tap()
+        XCTAssertTrue(editor.waitForNonExistence(timeout: 5))
+
         internet.tap()
         XCTAssertTrue(app.navigationBars["Internet"].waitForExistence(timeout: 5))
         attachScreenshot(app, named: "Preset detail at largest accessibility text size")

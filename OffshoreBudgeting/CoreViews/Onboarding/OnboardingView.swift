@@ -1399,7 +1399,7 @@ private struct OnboardingPresetsStep: View {
                             }
                         }
                         .padding(.vertical, 4)
-                        .swipeActions(edge: .leading, allowsFullSwipe: false) {
+                        .rowActions(allowsFullLeadingSwipe: false) {
                             Button {
                                 sheetRoute = .edit(preset)
                             } label: {
@@ -1424,8 +1424,7 @@ private struct OnboardingPresetsStep: View {
                                 }
                                 .tint(Color("OffshoreSand"))
                             }
-                        }
-                        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                        } trailing: {
                             Button(role: .destructive) {
                                 deletePresetWithOptionalConfirm(preset)
                             } label: {

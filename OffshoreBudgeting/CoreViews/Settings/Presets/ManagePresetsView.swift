@@ -259,21 +259,13 @@ struct ManagePresetsView: View {
         }
         .buttonStyle(.plain)
         .contextMenu {
-            Button("Edit", systemImage: "pencil") {
-                sheetRoute = .edit(preset)
-            }
+            editPresetButton(preset)
             if preset.isArchived {
-                Button("Unarchive", systemImage: "arrow.uturn.backward") {
-                    unarchive(preset)
-                }
+                unarchivePresetButton(preset)
             } else {
-                Button("Archive", systemImage: "archivebox") {
-                    archive(preset)
-                }
+                archivePresetButton(preset)
             }
-            Button("Delete", systemImage: "trash", role: .destructive) {
-                deletePresetWithOptionalConfirm(preset)
-            }
+            deletePresetButton(preset)
         }
     }
 
@@ -290,56 +282,7 @@ struct ManagePresetsView: View {
 
                 if let pinned = highlightedPreset {
                     Section(String(localized: "Next Planned Expense", defaultValue: "Next Planned Expense", comment: "Section title for the next planned expense preset spotlight.")) {
-                        let assignedCount = assignedBudgetCountsByPresetID[pinned.id, default: 0]
-
-                        NavigationLink {
-                            PresetDetailView(workspace: workspace, preset: pinned).equatable()
-                        } label: {
-                            VStack(alignment: .leading, spacing: 5) {
-                                PresetRowView(
-                                    preset: pinned,
-                                    assignedBudgetsCount: assignedCount
-                                )
-
-                                if presetIDsMissingLinkedCards.contains(pinned.id) {
-                                    Text(presetRequiresCardFootnoteText)
-                                        .font(.footnote)
-                                        .foregroundStyle(.secondary)
-                                }
-                            }
-                        }
-                        .padding(.vertical, 4)
-                        .overlay(alignment: .leading) {
-                            Capsule()
-                                .fill(pinnedPresetStroke(for: pinned))
-                                .frame(width: 3)
-                                .padding(.vertical, 8)
-                                .offset(x: -10)
-                                .accessibilityHidden(true)
-                        }
-                        .swipeActions(edge: .leading, allowsFullSwipe: false) {
-                            Button {
-                                sheetRoute = .edit(pinned)
-                            } label: {
-                                Label("Edit", systemImage: "pencil")
-                            }
-                            .tint(Color("AccentColor"))
-
-                            Button {
-                                archive(pinned)
-                            } label: {
-                                Label("Archive", systemImage: "archivebox")
-                            }
-                            .tint(Color("OffshoreSand"))
-                        }
-                        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                            Button(role: .destructive) {
-                                deletePresetWithOptionalConfirm(pinned)
-                            } label: {
-                                Label("Delete", systemImage: "trash")
-                            }
-                            .tint(Color("OffshoreDepth"))
-                        }
+                        presetRow(pinned, isHighlighted: true)
                     }
                 }
 
@@ -347,47 +290,7 @@ struct ManagePresetsView: View {
 
                 Section {
                     ForEach(activePresetsWithoutHighlighted) { preset in
-                        let assignedCount = assignedBudgetCountsByPresetID[preset.id, default: 0]
-
-                        NavigationLink {
-                            PresetDetailView(workspace: workspace, preset: preset).equatable()
-                        } label: {
-                            VStack(alignment: .leading, spacing: 5) {
-                                PresetRowView(
-                                    preset: preset,
-                                    assignedBudgetsCount: assignedCount
-                                )
-
-                                if presetIDsMissingLinkedCards.contains(preset.id) {
-                                    Text(presetRequiresCardFootnoteText)
-                                        .font(.footnote)
-                                        .foregroundStyle(.secondary)
-                                }
-                            }
-                        }
-                        .swipeActions(edge: .leading, allowsFullSwipe: false) {
-                            Button {
-                                sheetRoute = .edit(preset)
-                            } label: {
-                                Label("Edit", systemImage: "pencil")
-                            }
-                            .tint(Color("AccentColor"))
-
-                            Button {
-                                archive(preset)
-                            } label: {
-                                Label("Archive", systemImage: "archivebox")
-                            }
-                            .tint(Color("OffshoreSand"))
-                        }
-                        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                            Button(role: .destructive) {
-                                deletePresetWithOptionalConfirm(preset)
-                            } label: {
-                                Label("Delete", systemImage: "trash")
-                            }
-                            .tint(Color("OffshoreDepth"))
-                        }
+                        presetRow(preset)
                     }
                 } header: {
                     if !activePresetsWithoutHighlighted.isEmpty {
@@ -400,52 +303,81 @@ struct ManagePresetsView: View {
                 if archivedPresets.isEmpty == false {
                     Section("Archived") {
                         ForEach(archivedPresets) { preset in
-                            let assignedCount = assignedBudgetCountsByPresetID[preset.id, default: 0]
-
-                            NavigationLink {
-                                PresetDetailView(workspace: workspace, preset: preset).equatable()
-                            } label: {
-                                VStack(alignment: .leading, spacing: 5) {
-                                    PresetRowView(
-                                        preset: preset,
-                                        assignedBudgetsCount: assignedCount
-                                    )
-
-                                    if presetIDsMissingLinkedCards.contains(preset.id) {
-                                        Text(presetRequiresCardFootnoteText)
-                                            .font(.footnote)
-                                            .foregroundStyle(.secondary)
-                                    }
-                                }
-                            }
-                            .swipeActions(edge: .leading, allowsFullSwipe: false) {
-                                Button {
-                                    unarchive(preset)
-                                } label: {
-                                    Label("Unarchive", systemImage: "arrow.uturn.backward")
-                                }
-                                .tint(.green)
-
-                                Button {
-                                    sheetRoute = .edit(preset)
-                                } label: {
-                                    Label("Edit", systemImage: "pencil")
-                                }
-                                .tint(Color("AccentColor"))
-                            }
-                            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                                Button(role: .destructive) {
-                                    deletePresetWithOptionalConfirm(preset)
-                                } label: {
-                                    Label("Delete", systemImage: "trash")
-                                }
-                                .tint(Color("OffshoreDepth"))
-                            }
+                            presetRow(preset)
                         }
                     }
                 }
             }
         }
+    }
+
+    private func presetRow(_ preset: Preset, isHighlighted: Bool = false) -> some View {
+        NavigationLink {
+            PresetDetailView(workspace: workspace, preset: preset).equatable()
+        } label: {
+            VStack(alignment: .leading, spacing: 5) {
+                PresetRowView(
+                    preset: preset,
+                    assignedBudgetsCount: assignedBudgetCountsByPresetID[preset.id, default: 0]
+                )
+
+                if presetIDsMissingLinkedCards.contains(preset.id) {
+                    Text(presetRequiresCardFootnoteText)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+        .padding(.vertical, isHighlighted ? 4 : 0)
+        .overlay(alignment: .leading) {
+            if isHighlighted {
+                Capsule()
+                    .fill(pinnedPresetStroke(for: preset))
+                    .frame(width: 3)
+                    .padding(.vertical, 8)
+                    .offset(x: -10)
+                    .accessibilityHidden(true)
+            }
+        }
+        .rowActions(allowsFullLeadingSwipe: false) {
+            if preset.isArchived {
+                unarchivePresetButton(preset)
+            }
+            editPresetButton(preset)
+            if !preset.isArchived {
+                archivePresetButton(preset)
+            }
+        } trailing: {
+            deletePresetButton(preset)
+        }
+    }
+
+    private func editPresetButton(_ preset: Preset) -> some View {
+        Button("Edit", systemImage: "pencil") {
+            sheetRoute = .edit(preset)
+        }
+        .tint(Color("AccentColor"))
+    }
+
+    private func archivePresetButton(_ preset: Preset) -> some View {
+        Button("Archive", systemImage: "archivebox") {
+            archive(preset)
+        }
+        .tint(Color("OffshoreSand"))
+    }
+
+    private func unarchivePresetButton(_ preset: Preset) -> some View {
+        Button("Unarchive", systemImage: "arrow.uturn.backward") {
+            unarchive(preset)
+        }
+        .tint(.green)
+    }
+
+    private func deletePresetButton(_ preset: Preset) -> some View {
+        Button("Delete", systemImage: "trash", role: .destructive) {
+            deletePresetWithOptionalConfirm(preset)
+        }
+        .tint(Color("OffshoreDepth"))
     }
 
     private var sortMode: PresetSortMode {

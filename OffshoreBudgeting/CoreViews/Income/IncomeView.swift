@@ -630,12 +630,16 @@ struct IncomeView: View {
     private func incomeRowButton(for income: Income, receiptRecorded: Bool, canUseExisting: Bool) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Button {
-                incomeSheet = .edit(income)
+                openIncomeEditor(income)
             } label: {
                 IncomeRowView(income: income)
             }
             .buttonStyle(.plain)
             .accessibilityHint(income.isPlanned ? Text("Opens Edit Planned Income") : Text("Opens Edit Income"))
+            .contextMenu {
+                editIncomeAction(income)
+                deleteIncomeAction(income)
+            }
 
             if income.isPlanned && receiptRecorded {
                 Label("Received", systemImage: "checkmark")
@@ -647,21 +651,29 @@ struct IncomeView: View {
             }
         }
         .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-            Button(role: .destructive) {
-                requestDeleteIncome(income)
-            } label: {
-                Label("Delete", systemImage: "trash")
-            }
-            .tint(Color("OffshoreDepth"))
+            deleteIncomeAction(income)
         }
         .swipeActions(edge: .leading) {
-            Button {
-                incomeSheet = .edit(income)
-            } label: {
-                Label("Edit", systemImage: "pencil")
-            }
-            .tint(Color("AccentColor"))
+            editIncomeAction(income)
         }
+    }
+
+    private func openIncomeEditor(_ income: Income) {
+        incomeSheet = .edit(income)
+    }
+
+    private func editIncomeAction(_ income: Income) -> some View {
+        Button("Edit", systemImage: "pencil") {
+            openIncomeEditor(income)
+        }
+        .tint(Color("AccentColor"))
+    }
+
+    private func deleteIncomeAction(_ income: Income) -> some View {
+        Button("Delete", systemImage: "trash", role: .destructive) {
+            requestDeleteIncome(income)
+        }
+        .tint(Color("OffshoreDepth"))
     }
 
     private func receiptActions(for income: Income, canUseExisting: Bool) -> some View {

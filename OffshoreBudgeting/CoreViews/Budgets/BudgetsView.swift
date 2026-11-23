@@ -413,12 +413,8 @@ struct BudgetsView: View {
                             }
                             .buttonStyle(.plain)
                             .contextMenu {
-                                Button("Edit", systemImage: "pencil") {
-                                    sheetRoute = .edit(budget)
-                                }
-                                Button("Delete", systemImage: "trash", role: .destructive) {
-                                    deleteBudgetWithOptionalConfirm(budget)
-                                }
+                                editBudgetButton(budget)
+                                deleteBudgetButton(budget)
                             }
                         }
                     }
@@ -541,22 +537,25 @@ struct BudgetsView: View {
         } label: {
             budgetLabel(budget)
         }
-        .swipeActions(edge: .leading, allowsFullSwipe: false) {
-            Button {
-                sheetRoute = .edit(budget)
-            } label: {
-                Label("Edit", systemImage: "pencil")
-            }
-            .tint(Color("AccentColor"))
+        .rowActions(allowsFullLeadingSwipe: false) {
+            editBudgetButton(budget)
+        } trailing: {
+            deleteBudgetButton(budget)
         }
-        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-            Button(role: .destructive) {
-                deleteBudgetWithOptionalConfirm(budget)
-            } label: {
-                Label("Delete", systemImage: "trash")
-            }
-            .tint(Color("OffshoreDepth"))
+    }
+
+    private func editBudgetButton(_ budget: Budget) -> some View {
+        Button("Edit", systemImage: "pencil") {
+            sheetRoute = .edit(budget)
         }
+        .tint(Color("AccentColor"))
+    }
+
+    private func deleteBudgetButton(_ budget: Budget) -> some View {
+        Button("Delete", systemImage: "trash", role: .destructive) {
+            deleteBudgetWithOptionalConfirm(budget)
+        }
+        .tint(Color("OffshoreDepth"))
     }
 
     private func budgetLabel(_ budget: Budget) -> some View {

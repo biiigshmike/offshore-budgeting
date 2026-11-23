@@ -39,6 +39,7 @@ struct CategoryDetailView: View, Equatable {
     @State private var modal: ModalRoute?
     @State private var pendingDeletion: CategoryDetailExpenseItem?
     @State private var showingDeleteConfirm = false
+    @State private var showingPlannedExpenseRecordingError = false
 
     init(workspace: Workspace, category: Category) {
         self.workspace = workspace
@@ -142,6 +143,7 @@ struct CategoryDetailView: View, Equatable {
                 )
             }
         }
+        .plannedExpenseRecordingAlert(isPresented: $showingPlannedExpenseRecordingError)
         .blocksAutomaticExpenseReview(while: showingDeleteConfirm)
         .alert("Delete Expense?", isPresented: $showingDeleteConfirm) {
             Button("Delete", role: .destructive) {
@@ -218,29 +220,36 @@ struct CategoryDetailView: View, Equatable {
     private func expenseRow(_ item: CategoryDetailExpenseItem) -> some View {
         switch item {
         case .planned(let expense):
-            SharedPlannedExpenseRow(expense: expense, showsCardName: true)
-                .swipeActions(edge: .leading, allowsFullSwipe: false) {
-                    RecordPlannedExpenseButton(expense: expense)
-
-                    Button("Edit", systemImage: "pencil") { modal = .editPlanned(expense) }
-                        .tint(Color("AccentColor"))
-                    if let presetID = expense.sourcePresetID,
-                       let preset = workspacePresets.first(where: { $0.id == presetID }) {
-                        Button("Edit Preset", systemImage: "list.bullet.rectangle") { modal = .editPreset(preset) }
-                            .tint(Color("OffshoreSand"))
-                    }
+            Button { modal = .editPlanned(expense) } label: {
+                SharedPlannedExpenseRow(expense: expense, showsCardName: true)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .rowActions(allowsFullLeadingSwipe: false) {
+                if PlannedExpenseRecordingService.canRecord(expense) {
+                    RecordPlannedExpenseButton(
+                        expense: expense,
+                        showingSaveError: $showingPlannedExpenseRecordingError
+                    )
                 }
-                .swipeActions(edge: .trailing, allowsFullSwipe: true) { deleteButton(item) }
+
+                Button("Edit", systemImage: "pencil") { modal = .editPlanned(expense) }
+                    .tint(Color("AccentColor"))
+                if let presetID = expense.sourcePresetID,
+                   let preset = workspacePresets.first(where: { $0.id == presetID }) {
+                    Button("Edit Preset", systemImage: "list.bullet.rectangle") { modal = .editPreset(preset) }
+                        .tint(Color("OffshoreSand"))
+                }
+            } trailing: { deleteButton(item) }
         case .variable(let expense):
             Button { modal = .editVariable(expense) } label: {
                 SharedVariableExpenseRow(expense: expense, showsCardName: true)
             }
             .buttonStyle(.plain)
-            .swipeActions(edge: .leading, allowsFullSwipe: true) {
+            .rowActions {
                 Button("Edit", systemImage: "pencil") { modal = .editVariable(expense) }
                     .tint(Color("AccentColor"))
-            }
-            .swipeActions(edge: .trailing, allowsFullSwipe: true) { deleteButton(item) }
+            } trailing: { deleteButton(item) }
         }
     }
 

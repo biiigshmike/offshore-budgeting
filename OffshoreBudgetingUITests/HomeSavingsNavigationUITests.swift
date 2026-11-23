@@ -118,6 +118,43 @@ final class HomeSavingsNavigationUITests: XCTestCase {
         app.terminate()
     }
 
+    func testWhatIfIncomeCanBeEditedAndResetFromBothGestures() {
+        continueAfterFailure = false
+        let app = makeReceiptApp()
+        app.launch()
+
+        let tile = app.buttons["What If?"].firstMatch
+        reveal(tile, in: app)
+        tile.tap()
+        XCTAssertTrue(app.navigationBars["What If?"].waitForExistence(timeout: 5))
+
+        let row = app.descendants(matching: .any).matching(NSPredicate(
+            format: "label == %@ AND value BEGINSWITH %@", "Income", "Planned"
+        )).firstMatch
+        app.collectionViews.firstMatch.swipeUp()
+        reveal(row, in: app)
+        let baseline = row.value as? String
+        let plannedField = row.textFields.firstMatch
+        XCTAssertTrue(plannedField.isHittable)
+        plannedField.tap()
+        plannedField.typeText("123")
+        XCTAssertTrue((row.value as? String ?? "").contains("123"))
+        app.swipeDown()
+        reveal(row, in: app)
+
+        row.coordinate(withNormalizedOffset: CGVector(dx: 0.24, dy: 0.2)).press(forDuration: 1)
+        let reset = app.buttons["Reset"].firstMatch
+        XCTAssertTrue(reset.waitForExistence(timeout: 5))
+        reset.tap()
+        XCTAssertTrue(reset.waitForNonExistence(timeout: 5))
+        XCTAssertEqual(row.value as? String, baseline)
+
+        row.swipeLeft()
+        XCTAssertTrue(reset.waitForExistence(timeout: 5))
+        reset.tap()
+        XCTAssertTrue(reset.waitForNonExistence(timeout: 5))
+    }
+
     func testSavingsOutlookExplanationsStackAtAccessibilityTextSize() throws {
         let app = makeReceiptApp()
         app.launchArguments += ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"]
@@ -175,6 +212,15 @@ final class HomeSavingsNavigationUITests: XCTestCase {
         let plannedEditBar = app.navigationBars["Edit Planned Income"]
         XCTAssertTrue(plannedEditBar.waitForExistence(timeout: 5))
         assertFixedIncomeType("Planned", in: app)
+        plannedEditBar.buttons["Cancel"].tap()
+
+        plan.press(forDuration: 1)
+        let menuEdit = app.buttons["Edit"]
+        XCTAssertTrue(menuEdit.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["Delete"].exists)
+        XCTAssertFalse(plannedEditBar.exists)
+        menuEdit.tap()
+        XCTAssertTrue(plannedEditBar.waitForExistence(timeout: 5))
         plannedEditBar.buttons["Cancel"].tap()
 
         record.tap()

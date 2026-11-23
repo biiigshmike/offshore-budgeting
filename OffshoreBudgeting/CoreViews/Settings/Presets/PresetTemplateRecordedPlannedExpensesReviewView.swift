@@ -40,11 +40,9 @@ struct PresetTemplateRecordedPlannedExpensesReviewView: View {
                 } else {
                     ForEach(recordedExpenses, id: \.id) { expense in
                         row(expense)
-                            .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                                Button(role: .destructive) {
+                            .rowActions(allowsFullTrailingSwipe: false) {
+                                Button("Delete", systemImage: "trash", role: .destructive) {
                                     requestDeleteExpense(expense)
-                                } label: {
-                                    Label("Delete", systemImage: "trash")
                                 }
                                 .tint(Color("OffshoreDepth"))
                             }

@@ -503,56 +503,52 @@ struct AllocationAccountDetailView: View {
                 DetailListEmptyRow(message: emptyLedgerMessage)
             } else {
                 ForEach(derived.filteredLedgerRows) { row in
-                    ledgerRowView(row)
-                        .swipeActions(edge: .leading, allowsFullSwipe: false) {
-                            if let settlementID = row.settlementID, !account.isArchived {
-                                Button {
-                                    guard let settlement = settlement(for: settlementID) else {
-                                        showEntryUnavailableError()
-                                        return
-                                    }
-                                    editingSheetEntry = .settlement(settlement)
-                                } label: {
-                                    Label("Edit", systemImage: "pencil")
-                                }
-                                .tint(Color("AccentColor"))
-                            }
-                            if isEditableChargeRow(row), !account.isArchived {
-                                Button {
-                                    guard let allocationID = row.allocationID,
-                                          let allocation = allocation(for: allocationID) else {
-                                        showEntryUnavailableError()
-                                        return
-                                    }
-                                    editingSheetEntry = .allocation(allocation)
-                                } label: {
-                                    Label("Edit", systemImage: "pencil")
-                                }
-                                .tint(Color("AccentColor"))
-                            }
-                        }
-                        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                            if let settlementID = row.settlementID, !account.isArchived {
-                                Button(role: .destructive) {
-                                    requestDeleteSettlement(id: settlementID)
-                                } label: {
-                                    Label("Delete", systemImage: "trash")
-                                }
-                            }
-                            if isEditableChargeRow(row), !account.isArchived, let allocationID = row.allocationID {
-                                Button(role: .destructive) {
-                                    requestDeleteChargeAllocation(id: allocationID)
-                                } label: {
-                                    Label("Delete", systemImage: "trash")
-                                }
-                            }
-                        }
+                    editableLedgerRow(row)
                 }
             }
         } header: {
             Text("Period Activity • \(derived.filteredAmountValue, format: CurrencyFormatter.currencyStyle())")
         } footer: {
             Text("Shows filtered charge activity for the selected date range and categories.")
+        }
+    }
+
+    @ViewBuilder
+    private func editableLedgerRow(_ row: AllocationLedgerService.LedgerRow) -> some View {
+        if !account.isArchived, let settlementID = row.settlementID {
+            ledgerRowView(row)
+                .rowActions(allowsFullLeadingSwipe: false, allowsFullTrailingSwipe: false) {
+                    Button("Edit", systemImage: "pencil") {
+                        guard let settlement = settlement(for: settlementID) else {
+                            showEntryUnavailableError()
+                            return
+                        }
+                        editingSheetEntry = .settlement(settlement)
+                    }
+                    .tint(Color("AccentColor"))
+                } trailing: {
+                    Button("Delete", systemImage: "trash", role: .destructive) {
+                        requestDeleteSettlement(id: settlementID)
+                    }
+                }
+        } else if !account.isArchived, isEditableChargeRow(row), let allocationID = row.allocationID {
+            ledgerRowView(row)
+                .rowActions(allowsFullLeadingSwipe: false, allowsFullTrailingSwipe: false) {
+                    Button("Edit", systemImage: "pencil") {
+                        guard let allocation = allocation(for: allocationID) else {
+                            showEntryUnavailableError()
+                            return
+                        }
+                        editingSheetEntry = .allocation(allocation)
+                    }
+                    .tint(Color("AccentColor"))
+                } trailing: {
+                    Button("Delete", systemImage: "trash", role: .destructive) {
+                        requestDeleteChargeAllocation(id: allocationID)
+                    }
+                }
+        } else {
+            ledgerRowView(row)
         }
     }
 

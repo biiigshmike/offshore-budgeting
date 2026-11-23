@@ -34,7 +34,7 @@ final class SavingsRefreshUITests: XCTestCase {
             XCTAssertEqual(toggle.value as? String, "1")
         }
         app.buttons["Save"].tap()
-        XCTAssertTrue(app.navigationBars["Offshore Savings"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["dateRange.editor"].waitForExistence(timeout: 5))
     }
 
     private func ledgerRow(_ note: String, in app: XCUIApplication) -> XCUIElement {
@@ -57,7 +57,7 @@ final class SavingsRefreshUITests: XCTestCase {
         XCTAssertTrue(app.navigationBars["Home"].waitForExistence(timeout: 15))
         app.tabBars.buttons["Accounts"].tap()
         app.buttons["accounts.destination.savings"].tap()
-        XCTAssertTrue(app.navigationBars["Offshore Savings"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["dateRange.editor"].waitForExistence(timeout: 5))
         assertBalance("0.00", in: app)
         XCTAssertFalse(app.buttons["Refresh Savings"].exists)
         XCTAssertFalse(app.staticTexts["Offshore Savings is up to date."].exists)
@@ -91,7 +91,12 @@ final class SavingsRefreshUITests: XCTestCase {
 
         let reserved = ledgerRow("Reserved balance entry", in: app)
         XCTAssertTrue(reserved.exists)
-        reserved.tap()
+        reserved.press(forDuration: 1)
+        let menuEdit = app.buttons["Edit"]
+        XCTAssertTrue(menuEdit.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["Delete"].exists)
+        XCTAssertFalse(app.navigationBars["Edit Savings Entry"].exists)
+        menuEdit.tap()
         XCTAssertTrue(app.navigationBars["Edit Savings Entry"].waitForExistence(timeout: 5))
         XCTAssertEqual(app.switches["Set Aside as Savings"].value as? String, "1")
         app.buttons["Save"].tap()

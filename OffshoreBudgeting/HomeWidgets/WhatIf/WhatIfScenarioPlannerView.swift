@@ -290,7 +290,7 @@ struct WhatIfScenarioPlannerView: View {
                         )
                     }
                     .padding(.vertical, 4)
-                    .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                    .rowActions(allowsFullTrailingSwipe: false) {
                         Button {
                             resetIncomeToBaseline()
                         } label: {
@@ -330,7 +330,7 @@ struct WhatIfScenarioPlannerView: View {
                                 onEditingBegan: { scrollCategoryIntoView(category.id, with: proxy) }
                             )
                             .id(category.id)
-                            .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                            .rowActions(allowsFullTrailingSwipe: false) {
                                 Button {
                                     resetCategoryToBaseline(category.id)
                                 } label: {

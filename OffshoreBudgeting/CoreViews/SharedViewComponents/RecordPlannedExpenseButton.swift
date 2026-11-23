@@ -3,26 +3,16 @@ import SwiftUI
 
 struct RecordPlannedExpenseButton: View {
     let expense: PlannedExpense
+    @Binding var showingSaveError: Bool
     var onRecorded: () -> Void = { }
 
     @Environment(\.modelContext) private var modelContext
-    @State private var showingSaveError = false
 
     var body: some View {
-        Group {
-            if PlannedExpenseRecordingService.canRecord(expense) {
-                Button("As Planned", systemImage: "checkmark", action: record)
-                    .tint(.green)
-                    .accessibilityHint("Sets the actual amount to the planned amount.")
-                    .accessibilityIdentifier("plannedExpense.recordAsPlanned.\(expense.id.uuidString)")
-            }
-        }
-        .blocksAutomaticExpenseReview(while: showingSaveError)
-        .alert("Couldn’t Record Expense", isPresented: $showingSaveError) {
-            Button("OK", role: .cancel) { }
-        } message: {
-            Text("The actual amount couldn’t be saved. Please try again.")
-        }
+        Button("As Planned", systemImage: "checkmark", action: record)
+            .tint(.green)
+            .accessibilityHint("Sets the actual amount to the planned amount.")
+            .accessibilityIdentifier("plannedExpense.recordAsPlanned.\(expense.id.uuidString)")
     }
 
     private func record() {
@@ -32,5 +22,16 @@ struct RecordPlannedExpenseButton: View {
         } catch {
             showingSaveError = true
         }
+    }
+}
+
+extension View {
+    func plannedExpenseRecordingAlert(isPresented: Binding<Bool>) -> some View {
+        blocksAutomaticExpenseReview(while: isPresented.wrappedValue)
+            .alert("Couldn’t Record Expense", isPresented: isPresented) {
+                Button("OK", role: .cancel) { }
+            } message: {
+                Text("The actual amount couldn’t be saved. Please try again.")
+            }
     }
 }
