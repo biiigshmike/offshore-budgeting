@@ -229,9 +229,7 @@ struct AddPresetView: View {
                     Button {
                         apply(preset, to: selectedBudgets)
                     } label: {
-                        if eligibleBudgets.count == 1, let budget = eligibleBudgets.first {
-                            Text("Add to \(budget.name)")
-                        } else if selectedBudgets.count > 1 {
+                        if selectedBudgets.count > 1 {
                             Text("Add to Budgets")
                         } else {
                             Text("Add to Budget")

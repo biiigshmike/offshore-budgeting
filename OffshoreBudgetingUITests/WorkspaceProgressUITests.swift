@@ -28,7 +28,7 @@ final class WorkspaceProgressUITests: XCTestCase {
         savePreset(named: "Rent", in: app)
 
         let apply = app.buttons["applySavedPreset"]
-        XCTAssertEqual(apply.label, "Add to First Budget")
+        XCTAssertEqual(apply.label, "Add to Budget")
         apply.tap()
         XCTAssertTrue(app.navigationBars["Workspace Progress"].waitForExistence(timeout: 5))
         assertProgress(100, completed: 5, in: app)
@@ -100,6 +100,7 @@ final class WorkspaceProgressUITests: XCTestCase {
         app.buttons["Deselect All"].tap()
         XCTAssertFalse(apply.isEnabled)
         first.tap()
+        XCTAssertEqual(apply.label, "Add to Budget")
         ended.tap()
         XCTAssertTrue(apply.isEnabled)
         XCTAssertEqual(apply.label, "Add to Budgets")
