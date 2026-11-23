@@ -127,7 +127,7 @@ struct HomeSavingsOutlookAmounts: View {
                 title: "Actual Savings",
                 value: actual,
                 valueColor: actualColor,
-                explanation: "What’s left from income received after spending, bills still expected, and savings adjustments."
+                explanation: "Includes planned expenses you haven't marked yet."
             )
         }
     }

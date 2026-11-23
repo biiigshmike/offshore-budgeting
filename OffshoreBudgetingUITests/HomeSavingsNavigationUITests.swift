@@ -162,20 +162,38 @@ final class HomeSavingsNavigationUITests: XCTestCase {
         let outlook = app.buttons["Savings Outlook"].firstMatch
         XCTAssertTrue(outlook.waitForExistence(timeout: 15))
         reveal(outlook, in: app)
+        let actualCopy = "Includes planned expenses you haven't marked yet."
+        let actualCopyPredicate = NSPredicate(format: "label CONTAINS %@ OR value CONTAINS %@", actualCopy, actualCopy)
+        XCTAssertFalse(app.descendants(matching: .any).matching(actualCopyPredicate).firstMatch.exists)
         outlook.tap()
 
         let projectedCopy = "Expected income minus your share of planned expenses."
-        let actualCopy = "What’s left from income received after spending, bills still expected, and savings adjustments."
         let projected = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", projectedCopy)).firstMatch
-        let actual = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", actualCopy)).firstMatch
+        let actual = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "Actual Savings,")).firstMatch
         XCTAssertTrue(projected.waitForExistence(timeout: 5))
         XCTAssertTrue(actual.exists)
+        XCTAssertEqual(actual.label.components(separatedBy: ", ").dropFirst(2), [actualCopy])
         XCTAssertEqual(projected.frame.minX, actual.frame.minX, accuracy: 1)
         XCTAssertGreaterThan(actual.frame.minY, projected.frame.maxY)
         XCTAssertLessThanOrEqual(actual.frame.maxX, app.frame.maxX)
         try app.performAccessibilityAudit(for: .textClipped) { issue in
             let label = issue.element?.label ?? ""
             return !label.contains(projectedCopy) && !label.contains(actualCopy)
+        }
+
+        let helpButton = app.buttons["How is this calculated?"]
+        reveal(helpButton, in: app)
+        helpButton.tap()
+        XCTAssertTrue(app.navigationBars["How is this calculated?"].waitForExistence(timeout: 5))
+        for text in [
+            "Actual Income",
+            "Planned expenses counted here",
+            "Variable expenses counted here",
+            "Changes you’ve entered",
+            "For each planned expense, an actual amount entered above zero takes the place of the planned amount. Otherwise, the planned amount still counts."
+        ] {
+            let label = NSPredicate(format: "label == %@", text)
+            reveal(app.staticTexts.matching(label).firstMatch, in: app)
         }
         app.terminate()
     }

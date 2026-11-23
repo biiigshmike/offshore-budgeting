@@ -138,7 +138,7 @@ struct HomeIncomeMetricsView: View {
                     : "Income you’ve received during these dates, grouped by where it comes from.",
                 rows: sourceRows + [.init(id: "total", title: title, amount: sum(isPlanned: isPlanned, from: start, to: end), isTotal: true)],
                 notes: isPlanned
-                    ? ["Progress shows how much of your Planned Income you’ve received. Receiving half of the amount you planned means 50%. A percentage appears when Planned Income is above zero."]
+                    ? [String(localized: "Progress shows how much of your Planned Income you’ve received. Receiving half of the amount you planned means \(0.5.formatted(.percent)). A percentage appears when Planned Income is above zero.")]
                     : ["Actual Income is money you’ve received. Planned Income is money you expect. These amounts are shown separately rather than added together."]
             )
         }

@@ -29,9 +29,9 @@ enum SpendingCalculationExplanation {
         for category in categories {
             let net = category.planned + category.variable
             let percentage = (total > 0 ? net / total : 0).formatted(.percent.precision(.fractionLength(0)))
-            var notes = [String(localized: "Category share: \(percentage). This category’s total divided by Total Spent gives its percentage. If Total Spent is zero or less, the share is 0%.")]
+            var notes = [String(localized: "Category share: \(percentage). This category’s total divided by Total Spent gives its percentage. If Total Spent is zero or less, the share is \(0.0.formatted(.percent)).")]
             notes.append(net > 0
-                ? String(localized: "The chart shows only categories with a total above zero. Refunds in other categories can lower Total Spent and make a displayed share greater than 100%.")
+                ? String(localized: "The chart shows only categories with a total above zero. Refunds in other categories can lower Total Spent and make a displayed share greater than \(1.0.formatted(.percent)).")
                 : String(localized: "This category is not shown in the chart because its total is zero or less. It still counts toward Total Spent, so refunds here can lower that total."))
             sections.append(FinancialCalculationSection(
                 id: "category-\(category.id?.uuidString ?? "uncategorized")", title: String(localized: "Category Spending"),
