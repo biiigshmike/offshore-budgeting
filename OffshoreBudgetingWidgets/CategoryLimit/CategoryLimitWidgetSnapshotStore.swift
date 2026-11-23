@@ -21,6 +21,20 @@ nonisolated struct CategoryLimitWidgetSnapshot: Codable, Equatable {
     let date: Date
     let validUntil: Date
     let metrics: [CategoryLimitWidgetMetric]
+
+    var topCategory: CategoryLimitWidgetMetric? {
+        var leader: (metric: CategoryLimitWidgetMetric, spent: Double)?
+        for metric in metrics {
+            guard let limit = metric.limitAmount, limit.isFinite, limit > 0,
+                  let spent = metric.spentAmount, spent.isFinite, spent > 0 else { continue }
+            if let leader {
+                guard spent > leader.spent ||
+                    (spent == leader.spent && metric.id.uuidString < leader.metric.id.uuidString) else { continue }
+            }
+            leader = (metric, spent)
+        }
+        return leader?.metric
+    }
 }
 
 nonisolated struct CategoryLimitWidgetSnapshotSet: Codable {

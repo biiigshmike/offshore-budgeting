@@ -35,6 +35,12 @@ struct CategoryLimitWidgetCategory: AppEntity {
         Self(id: "__choose_category__", name: widgetLocalized("Choose a Category"))
     }
 
+    static let topCategoryID = "__top_category__"
+
+    static var topCategory: Self {
+        Self(id: topCategoryID, name: widgetLocalized("Top Category"))
+    }
+
     static var noLimits: Self {
         Self(id: "__no_limits__", name: widgetLocalized("No limits in current budget"))
     }
@@ -47,11 +53,11 @@ struct CategoryLimitWidgetCategory: AppEntity {
 struct CategoryLimitWidgetCategoryQuery: EntityQuery {
     func suggestedEntities() async throws -> [CategoryLimitWidgetCategory] {
         guard let options = CategoryLimitWidgetSnapshotStore.loadSelectedPickerOptions() else {
-            return [.openOffshore]
+            return [.topCategory, .openOffshore]
         }
 
         let categories = Self.eligibleCategories(in: options, asOf: .now)
-        return categories.isEmpty ? [.noLimits] : categories
+        return [.topCategory] + (categories.isEmpty ? [.noLimits] : categories)
     }
 
     static func eligibleCategories(
@@ -71,6 +77,8 @@ struct CategoryLimitWidgetCategoryQuery: EntityQuery {
         let categoryNames = CategoryLimitWidgetSnapshotStore.loadSelectedPickerOptions()?.categoryNames ?? [:]
         return identifiers.compactMap { identifier in
             switch identifier {
+            case CategoryLimitWidgetCategory.topCategoryID:
+                return .topCategory
             case CategoryLimitWidgetCategory.unconfigured.id:
                 return .unconfigured
             case CategoryLimitWidgetCategory.noLimits.id:

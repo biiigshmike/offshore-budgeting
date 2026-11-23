@@ -98,6 +98,53 @@ struct CategoryLimitWidgetSnapshotBuilderTests {
         #expect(metric.limitAmount == nil)
         #expect(metric.spentAmount == nil)
         #expect(metric.remainingAmount == nil)
+        #expect(snapshot.days.first?.topCategory == nil)
+    }
+
+    @Test func topCategoryChangesAcrossBudgetsAndRanksSpendingByDollars() {
+        let fixture = Fixture()
+        let transit = Category(name: "Transit", hexColor: "#000000", workspace: fixture.workspace)
+        let shopping = Category(name: "Shopping", hexColor: "#000000", workspace: fixture.workspace)
+        fixture.workspace.categories = [fixture.category, transit, shopping]
+        let first = fixture.budget(day: 1, maximum: 200)
+        let second = fixture.budget(day: 2, maximum: 200)
+        for budget in [first, second] {
+            budget.categoryLimits?.append(BudgetCategoryLimit(maxAmount: 25, budget: budget, category: transit))
+        }
+        fixture.workspace.budgets = [first, second]
+        fixture.workspace.variableExpenses = [
+            fixture.expense(80, day: 1),
+            fixture.expense(30, day: 1, category: transit),
+            fixture.expense(500, day: 1, category: shopping),
+            fixture.expense(20, day: 2),
+            fixture.expense(40, day: 2, category: transit)
+        ]
+
+        let snapshots = fixture.snapshots()
+        #expect(snapshots.prefix(3).map { $0.topCategory?.id } == [fixture.category.id, transit.id, nil])
+    }
+
+    @Test func topCategoryBreaksTiesByIDAndRequiresPositiveFiniteSpending() {
+        let first = CategoryLimitWidgetMetric(
+            id: UUID(uuid: (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1)),
+            name: "Transit", fractionUsed: 0.5, limitAmount: 100, spentAmount: 50
+        )
+        let second = CategoryLimitWidgetMetric(
+            id: UUID(uuid: (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2)),
+            name: "Dining", fractionUsed: 1, limitAmount: 50, spentAmount: 50
+        )
+        let date = Date(timeIntervalSinceReferenceDate: 0)
+        let validUntil = date.addingTimeInterval(86_400)
+        for metrics in [[first, second], [second, first]] {
+            let snapshot = CategoryLimitWidgetSnapshot(date: date, validUntil: validUntil, metrics: metrics)
+            #expect(snapshot.topCategory == first)
+        }
+
+        let invalidMetrics = [0, -10, Double.infinity, Double.nan].map { spent in
+            CategoryLimitWidgetMetric(id: UUID(), name: "Invalid", fractionUsed: 0, limitAmount: 100, spentAmount: spent)
+        }
+        let snapshot = CategoryLimitWidgetSnapshot(date: date, validUntil: validUntil, metrics: invalidMetrics)
+        #expect(snapshot.topCategory == nil)
     }
 
     @Test func snapshotMoneyValuesRoundTripWithoutLosingPrecision() throws {
@@ -212,13 +259,13 @@ struct CategoryLimitWidgetSnapshotBuilderTests {
             return budget
         }
 
-        func expense(_ amount: Double, day: Int) -> VariableExpense {
+        func expense(_ amount: Double, day: Int, category: Offshore.Category? = nil) -> VariableExpense {
             VariableExpense(
                 descriptionText: "Dining",
                 amount: amount,
                 transactionDate: date(day: day),
                 workspace: workspace,
-                category: category
+                category: category ?? self.category
             )
         }
 

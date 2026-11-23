@@ -23,6 +23,11 @@ private struct CategoryLimitWidgetEntry: TimelineEntry {
 }
 
 private struct CategoryLimitWidgetProvider: AppIntentTimelineProvider {
+    private enum Selection {
+        case topCategory
+        case fixed(UUID)
+    }
+
     func placeholder(in context: Context) -> CategoryLimitWidgetEntry {
         CategoryLimitWidgetEntry(date: .now, metric: nil, hasSelection: false)
     }
@@ -33,13 +38,14 @@ private struct CategoryLimitWidgetProvider: AppIntentTimelineProvider {
     ) async -> CategoryLimitWidgetEntry {
         let now = Date()
         if context.isPreview,
+           configuration.category?.id != CategoryLimitWidgetCategory.topCategoryID,
            let options = CategoryLimitWidgetSnapshotStore.loadSelectedPickerOptions(),
            let first = CategoryLimitWidgetCategoryQuery.eligibleCategories(in: options, asOf: now).first,
            let id = UUID(uuidString: first.id) {
             let current = CategoryLimitWidgetSnapshotStore.loadSelected()?.days.first {
                 $0.date <= now && now < $0.validUntil
             }
-            return entry(for: current, categoryID: id, date: now)
+            return entry(for: current, selection: .fixed(id), date: now)
         }
         return makeTimeline(for: configuration, now: now).entries[0]
     }
@@ -55,7 +61,12 @@ private struct CategoryLimitWidgetProvider: AppIntentTimelineProvider {
         for configuration: CategoryLimitWidgetConfigurationIntent,
         now: Date
     ) -> Timeline<CategoryLimitWidgetEntry> {
-        guard let category = configuration.category, let id = UUID(uuidString: category.id) else {
+        let selection: Selection
+        if configuration.category?.id == CategoryLimitWidgetCategory.topCategoryID {
+            selection = .topCategory
+        } else if let category = configuration.category, let id = UUID(uuidString: category.id) {
+            selection = .fixed(id)
+        } else {
             let entry = CategoryLimitWidgetEntry(date: now, metric: nil, hasSelection: false)
             return Timeline(entries: [entry], policy: .never)
         }
@@ -63,9 +74,9 @@ private struct CategoryLimitWidgetProvider: AppIntentTimelineProvider {
         let snapshots = CategoryLimitWidgetSnapshotStore.loadSelected()?.days ?? []
         let current = snapshots.first { $0.date <= now && now < $0.validUntil }
         let future = snapshots.filter { $0.date > now }
-        var entries = [entry(for: current, categoryID: id, date: now)]
+        var entries = [entry(for: current, selection: selection, date: now)]
         for snapshot in future {
-            let upcoming = entry(for: snapshot, categoryID: id, date: snapshot.date)
+            let upcoming = entry(for: snapshot, selection: selection, date: snapshot.date)
             if entries.last?.metric != upcoming.metric {
                 entries.append(upcoming)
             }
@@ -83,10 +94,16 @@ private struct CategoryLimitWidgetProvider: AppIntentTimelineProvider {
 
     private func entry(
         for snapshot: CategoryLimitWidgetSnapshot?,
-        categoryID: UUID,
+        selection: Selection,
         date: Date
     ) -> CategoryLimitWidgetEntry {
-        CategoryLimitWidgetEntry(date: date, metric: snapshot?.metrics.first { $0.id == categoryID })
+        let metric = switch selection {
+        case .topCategory:
+            snapshot?.topCategory
+        case .fixed(let categoryID):
+            snapshot?.metrics.first { $0.id == categoryID }
+        }
+        return CategoryLimitWidgetEntry(date: date, metric: metric)
     }
 }
 
