@@ -69,9 +69,14 @@ struct SettingsReleaseLogsView: View {
     }
 
     static var currentReleaseSection: ReleaseSection? {
-        releaseSections.first {
+        let current = releaseSections.first {
             $0.version == appVersion && $0.build == appBuild
         }
+        #if DEBUG
+        // Exercise release notes even when the current development build has no entry yet.
+        if UITestSupport.testsPendingProgressPrompts { return current ?? releaseSections.first }
+        #endif
+        return current
     }
 
     // MARK: - Sections

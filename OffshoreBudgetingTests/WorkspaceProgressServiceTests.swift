@@ -21,6 +21,29 @@ struct WorkspaceProgressServiceTests {
         return ModelContext(try ModelContainer(for: makeSchema(), configurations: configuration))
     }
 
+    @Test func homeTipResolvesOnlyTheSavedBudgetInTheCurrentWorkspace() throws {
+        let context = try makeContext()
+        let workspace = Workspace(name: "Personal", hexColor: "#3B82F6")
+        let otherWorkspace = Workspace(name: "Work", hexColor: "#10B981")
+        context.insert(workspace)
+        context.insert(otherWorkspace)
+        let saved = Budget(name: "November", startDate: .now, endDate: .now, workspace: workspace)
+        let sameName = Budget(name: saved.name, startDate: .now, endDate: .now, workspace: otherWorkspace)
+        context.insert(saved)
+        context.insert(sameName)
+        try context.save()
+        let budgets = [sameName, saved]
+        let savedID = saved.id
+
+        #expect(HomeView.setupBudget(id: savedID, workspaceID: workspace.id, in: budgets)?.id == savedID)
+        #expect(HomeView.setupBudget(id: savedID, workspaceID: otherWorkspace.id, in: budgets) == nil)
+        #expect(HomeView.setupBudget(id: nil, workspaceID: workspace.id, in: budgets) == nil)
+        context.delete(saved)
+        #expect(HomeView.setupBudget(id: savedID, workspaceID: workspace.id, in: budgets) == nil)
+        try context.save()
+        #expect(HomeView.setupBudget(id: savedID, workspaceID: workspace.id, in: budgets) == nil)
+    }
+
     @Test func eachPermanentMilestoneAddsTwentyPercentExactlyOnce() {
         let workspace = Workspace(name: "Personal", hexColor: "#3B82F6")
         #expect(WorkspaceProgressService.completedSteps(in: workspace).isEmpty)

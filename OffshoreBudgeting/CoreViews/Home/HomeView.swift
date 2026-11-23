@@ -11,8 +11,12 @@ import Foundation
 
 struct HomeView: View {
 
+    static let tipKey = "tip.home.v1"
+
     let workspace: Workspace
     private let onReviewToday: (() -> Void)?
+    @Binding private var setupBudgetID: UUID?
+    @State private var setupBudgetDestinationID: UUID?
 
     @Query private var budgets: [Budget]
     @Query private var cards: [Card]
@@ -171,8 +175,9 @@ struct HomeView: View {
         isPhone == false
     }
 
-    init(workspace: Workspace, onReviewToday: (() -> Void)? = nil) {
+    init(workspace: Workspace, setupBudgetID: Binding<UUID?> = .constant(nil), onReviewToday: (() -> Void)? = nil) {
         self.workspace = workspace
+        self._setupBudgetID = setupBudgetID
         self.onReviewToday = onReviewToday
         let workspaceID = workspace.id
         let defaults = UserDefaults.standard
@@ -253,6 +258,28 @@ struct HomeView: View {
         )
     }
 
+    private var setupBudgetTipAction: PostBoardingTipAction? {
+        guard let budget = Self.setupBudget(id: setupBudgetID, workspaceID: workspace.id, in: budgets) else {
+            return nil
+        }
+        let budgetID = budget.id
+        return PostBoardingTipAction(
+            title: String(localized: "home.tip.viewBudget", defaultValue: "View My Budget", comment: "Home tips button that opens the budget just created."),
+            perform: {
+                guard setupBudgetID == budgetID,
+                      Self.setupBudget(id: budgetID, workspaceID: workspace.id, in: budgets) != nil else { return }
+                setupBudgetDestinationID = budgetID
+            }
+        )
+    }
+
+    static func setupBudget(id: UUID?, workspaceID: UUID, in budgets: [Budget]) -> Budget? {
+        guard let id else { return nil }
+        return budgets.first {
+            $0.modelContext != nil && !$0.isDeleted && $0.id == id && $0.workspace?.id == workspaceID
+        }
+    }
+
     var body: some View {
         homeContent
         .navigationDestination(isPresented: $isShowingWhatIfPlanner) {
@@ -271,7 +298,7 @@ struct HomeView: View {
             )
         }
         .postBoardingTip(
-            key: "tip.home.v1",
+            key: Self.tipKey,
             title: String(localized: "app.section.home", defaultValue: "Home", comment: "Main tab title for the Home section."),
             items: [
                 PostBoardingTipItem(
@@ -289,8 +316,16 @@ struct HomeView: View {
                     title: String(localized: "home.tip.dateRange.title", defaultValue: "Date Range", comment: "Home tip title for date range controls."),
                     detail: String(localized: "home.tip.dateRange.detail", defaultValue: "Use the date controls at the top to change the time period shown across all widgets.", comment: "Home tip detail for date range controls.")
                 )
-            ]
+            ],
+            buttonTitle: String(localized: "Done"),
+            secondaryAction: setupBudgetTipAction,
+            onDismiss: { setupBudgetID = nil }
         )
+        .navigationDestination(item: $setupBudgetDestinationID) { budgetID in
+            if let budget = Self.setupBudget(id: budgetID, workspaceID: workspace.id, in: budgets) {
+                BudgetDetailView(workspace: workspace, budget: budget)
+            }
+        }
         .modifier(DateRangeNavigationHeader(
             title: String(localized: "app.section.home", defaultValue: "Home", comment: "Main tab title for the Home section."),
             startDate: appliedStartDate,

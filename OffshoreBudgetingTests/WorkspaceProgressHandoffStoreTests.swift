@@ -15,6 +15,7 @@ struct WorkspaceProgressHandoffStoreTests {
     @Test func ordinaryLaunchHasNoPendingRequest() throws {
         try withStore { store, _ in
             #expect(store.pendingWorkspaceID == nil)
+            #expect(!store.offersBudgetShortcut)
             #expect(!store.consume(workspaceID: UUID()))
         }
     }
@@ -22,12 +23,14 @@ struct WorkspaceProgressHandoffStoreTests {
     @Test func requestSurvivesStoreRecreationUntilPresentationClaimsIt() throws {
         try withStore { store, defaults in
             let workspaceID = UUID()
-            store.enqueue(workspaceID: workspaceID)
+            store.enqueue(workspaceID: workspaceID, offersBudgetShortcut: true)
 
             let reloaded = WorkspaceProgressHandoffStore(defaults: defaults)
             #expect(reloaded.pendingWorkspaceID == workspaceID)
+            #expect(reloaded.offersBudgetShortcut)
             #expect(reloaded.consume(workspaceID: workspaceID))
             #expect(store.pendingWorkspaceID == nil)
+            #expect(!store.offersBudgetShortcut)
             #expect(defaults.string(forKey: WorkspaceProgressHandoffStore.pendingWorkspaceIDKey) == nil)
         }
     }
@@ -90,11 +93,13 @@ struct WorkspaceProgressHandoffStoreTests {
 
             #expect(store.pendingWorkspaceID == nil)
             #expect(!defaults.bool(forKey: OnboardingResetService.didCompleteOnboardingKey))
+            #expect(defaults.bool(forKey: OnboardingResetService.isRepeatingKey))
             #expect(defaults.bool(forKey: OnboardingResetService.didChooseDataSourceKey))
 
             let workspaceID = UUID()
             store.enqueue(workspaceID: workspaceID)
             #expect(store.pendingWorkspaceID == workspaceID)
+            #expect(!store.offersBudgetShortcut)
         }
     }
 

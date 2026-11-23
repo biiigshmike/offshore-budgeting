@@ -174,17 +174,20 @@ struct AppRootView: View {
     let workspace: Workspace
     @Binding var selectedWorkspaceID: String
     let initialSectionOverride: AppSection?
+    @Binding private var setupBudgetID: UUID?
     let onTabInteraction: ((AppSection) -> Void)?
 
     init(
         workspace: Workspace,
         selectedWorkspaceID: Binding<String>,
         initialSectionOverride: AppSection? = nil,
+        setupBudgetID: Binding<UUID?> = .constant(nil),
         onTabInteraction: ((AppSection) -> Void)? = nil
     ) {
         self.workspace = workspace
         self._selectedWorkspaceID = selectedWorkspaceID
         self.initialSectionOverride = initialSectionOverride
+        self._setupBudgetID = setupBudgetID
         self.onTabInteraction = onTabInteraction
     }
 
@@ -866,7 +869,7 @@ struct AppRootView: View {
     }
 
     private var homeRootView: some View {
-        HomeView(workspace: workspace) {
+        HomeView(workspace: workspace, setupBudgetID: $setupBudgetID) {
             activeQuickLinkSheet = .reviewToday
         }
     }

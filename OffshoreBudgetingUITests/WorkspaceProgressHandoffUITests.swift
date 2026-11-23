@@ -75,6 +75,112 @@ final class WorkspaceProgressHandoffUITests: XCTestCase {
         assertProgress(20, completed: 1, in: app)
     }
 
+    func testFirstSetupBudgetOpensFromHomeTipsAndKeepsHiddenExpensesInTotals() {
+        let app = launchWithFirstBudgetSetup(arguments: [
+            "-uiTestProgressBudgetExpenses",
+            "-general_defaultBudgetingPeriod", "yearly",
+            "-general_hideFutureVariableExpenses", "NO",
+            "-general_excludeFutureVariableExpensesFromCalculations", "NO"
+        ])
+        openFirstBudgetForm(in: app)
+        let budgetName = app.textFields["budget.name"].value as? String ?? ""
+        app.navigationBars["Add Budget"].buttons["Save"].tap()
+        addMatchingRentPreset(in: app)
+        finishSetupAndWaitForTips(in: app)
+
+        let viewBudget = app.buttons["homeTips.viewBudget"]
+        XCTAssertEqual(viewBudget.label, "View My Budget")
+        viewBudget.tap()
+        XCTAssertTrue(app.buttons["Budget Actions"].waitForExistence(timeout: 8))
+        XCTAssertTrue(app.navigationBars[budgetName].exists)
+        XCTAssertFalse(app.staticTexts["Dashboard"].exists)
+        XCTAssertFalse(app.navigationBars["Budgets"].exists)
+
+        reveal(app.staticTexts["Grocery entry"], in: app)
+        let futureExpense = app.staticTexts["Future grocery entry"]
+        reveal(futureExpense, in: app)
+        let total = app.staticTexts["All Expenses • $64.00"]
+        XCTAssertTrue(total.exists)
+        app.buttons["Expense Display"].tap()
+        app.buttons["Variable Expense Display"].tap()
+        app.buttons["Hide Future Variable Expenses"].tap()
+        XCTAssertTrue(futureExpense.waitForNonExistence(timeout: 5))
+        XCTAssertTrue(total.exists)
+    }
+
+    func testSetupTipsDoneAndSwipeLeaveHome() {
+        for useDone in [true, false] {
+            let app = launchWithFirstBudgetSetup()
+            openFirstBudgetForm(in: app)
+            app.navigationBars["Add Budget"].buttons["Save"].tap()
+            finishSetupAndWaitForTips(in: app)
+            XCTAssertTrue(app.buttons["homeTips.viewBudget"].exists)
+            if useDone {
+                app.buttons["Done"].tap()
+            } else {
+                app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.12))
+                    .press(forDuration: 0.1, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.95)))
+            }
+            XCTAssertTrue(app.staticTexts["Dashboard"].waitForNonExistence(timeout: 5))
+            assertHome(in: app)
+            XCTAssertFalse(app.buttons["Budget Actions"].exists)
+            app.terminate()
+        }
+    }
+
+    func testSetupTipsOpensFirstBudgetFromRepeatPreview() {
+        let app = launchWithFirstBudgetSetup()
+        openFirstBudgetForm(in: app)
+        let repeatPicker = app.buttons["budget.repeat"]
+        reveal(repeatPicker, in: app)
+        repeatPicker.tap()
+        app.buttons["Monthly"].tap()
+        let firstBudget = app.textFields["budget.name"].value as? String ?? ""
+        XCTAssertFalse(firstBudget.isEmpty)
+        app.navigationBars["Add Budget"].buttons["Preview"].tap()
+        XCTAssertTrue(app.navigationBars["Preview"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["2 budgets"].exists)
+        let previewTexts = app.staticTexts.allElementsBoundByIndex.map(\.label)
+        let section = previewTexts.firstIndex(of: "Budgets to Create")
+        XCTAssertNotNil(section)
+        guard let section, section + 1 < previewTexts.count else { return }
+        XCTAssertTrue(previewTexts[section + 1].hasPrefix(firstBudget))
+        app.buttons["budget.confirmBatch"].tap()
+        finishSetupAndWaitForTips(in: app)
+        let viewBudget = app.buttons["homeTips.viewBudget"]
+        XCTAssertEqual(viewBudget.label, "View My Budget")
+        viewBudget.tap()
+        XCTAssertTrue(app.buttons["Budget Actions"].waitForExistence(timeout: 8))
+        XCTAssertTrue(app.navigationBars[firstBudget].exists)
+    }
+
+    func testSetupTipsHasNoShortcutAfterCancelOrOnUpdate() {
+        let fresh = launchWithFirstBudgetSetup()
+        openFirstBudgetForm(in: fresh)
+        fresh.navigationBars["Add Budget"].buttons["Cancel"].tap()
+        finishSetupAndWaitForTips(in: fresh)
+        XCTAssertFalse(fresh.buttons["homeTips.viewBudget"].exists)
+        fresh.buttons["Done"].tap()
+        assertHome(in: fresh)
+        fresh.terminate()
+
+        let existing = makeApp(extraArguments: [
+            "-uiTestProgressHandoff", "-uiTestProgressCardOnly", "-uiTestProgressPendingPrompts"
+        ], pendingTips: true)
+        existing.launch()
+        assertHandoff(in: existing)
+        openFirstBudgetForm(in: existing)
+        existing.navigationBars["Add Budget"].buttons["Save"].tap()
+        existing.buttons["workspaceProgressSkip"].tap()
+        let releaseTitle = existing.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "What’s New in ")).firstMatch
+        XCTAssertTrue(releaseTitle.waitForExistence(timeout: 10))
+        existing.buttons["Continue"].firstMatch.tap()
+        XCTAssertTrue(existing.staticTexts["Dashboard"].waitForExistence(timeout: 10))
+        XCTAssertFalse(existing.buttons["homeTips.viewBudget"].exists)
+        existing.buttons["Done"].tap()
+        assertHome(in: existing)
+    }
+
     func testFreshHandoffSavesRemainingStepsAndChangesSkipToDone() {
         let app = makeApp(extraArguments: ["-uiTestProgressHandoff", "-uiTestProgressCardOnly"])
         app.launch()
@@ -232,16 +338,16 @@ final class WorkspaceProgressHandoffUITests: XCTestCase {
         app.buttons["workspaceProgressSkip"].tap()
         XCTAssertTrue(releaseTitle.waitForExistence(timeout: 10))
         app.buttons["Continue"].firstMatch.tap()
-        XCTAssertTrue(app.staticTexts["Dashboard"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["Dashboard"].waitForExistence(timeout: 10), app.debugDescription)
         XCTAssertFalse(app.navigationBars["Review Expenses"].exists)
         let helpButton = app.buttons["Open Help Guide"]
-        let continueButton = app.buttons["Continue"].firstMatch
+        let continueButton = app.buttons["Done"].firstMatch
         XCTAssertTrue(helpButton.isHittable)
         XCTAssertLessThanOrEqual(helpButton.frame.maxY, continueButton.frame.minY)
         openAndCloseHelpGuide(in: app)
         XCTAssertTrue(helpButton.isHittable)
         XCTAssertTrue(app.staticTexts["Dashboard"].exists)
-        app.buttons["Continue"].firstMatch.tap()
+        continueButton.tap()
         let review = app.navigationBars["Review Expenses"]
         XCTAssertTrue(review.waitForExistence(timeout: 10))
         let reviewedExpense = app.descendants(matching: .any)
@@ -290,11 +396,55 @@ final class WorkspaceProgressHandoffUITests: XCTestCase {
         }
     }
 
+    private func launchWithFirstBudgetSetup(arguments: [String] = []) -> XCUIApplication {
+        let app = makeApp(extraArguments: [
+            "-uiTestProgressFinishOnboarding", "-uiTestProgressCardOnly"
+        ] + arguments, pendingTips: true)
+        app.launch()
+        let done = app.buttons["Done"]
+        XCTAssertTrue(done.waitForExistence(timeout: 10))
+        done.tap()
+        assertHandoff(in: app)
+        return app
+    }
+
+    private func openFirstBudgetForm(in app: XCUIApplication) {
+        let step = app.buttons["workspaceProgressStep_budget"]
+        reveal(step, in: app)
+        step.tap()
+        XCTAssertTrue(app.navigationBars["Add Budget"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["budget.cards"].label.contains("First Card"))
+    }
+
+    private func addMatchingRentPreset(in app: XCUIApplication) {
+        let step = app.buttons["workspaceProgressStep_preset"]
+        reveal(step, in: app)
+        step.tap()
+        XCTAssertTrue(app.navigationBars["Add Preset"].waitForExistence(timeout: 5))
+        app.buttons["Choose a Card"].tap()
+        app.buttons["First Card"].tap()
+        app.textFields["Expense Name"].tap()
+        app.textFields["Expense Name"].typeText("Rent")
+        app.textFields["Planned Amount"].tap()
+        app.textFields["Planned Amount"].typeText("1200")
+        app.navigationBars["Add Preset"].buttons["Save"].tap()
+        XCTAssertTrue(app.navigationBars["Preset Saved"].waitForExistence(timeout: 5))
+        XCTAssertEqual(app.buttons["applySavedPreset"].label, "Add to Budget")
+        app.buttons["Not Now"].tap()
+    }
+
+    private func finishSetupAndWaitForTips(in app: XCUIApplication) {
+        let finish = app.buttons["workspaceProgressSkip"]
+        XCTAssertTrue(finish.waitForExistence(timeout: 5))
+        finish.tap()
+        XCTAssertTrue(app.staticTexts["Dashboard"].waitForExistence(timeout: 10))
+    }
+
     private func makeApp(extraArguments: [String], pendingTips: Bool = false) -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments = [
             "-uiTesting", "-uiTestingReset", "-uiTestScenarioWorkspaceProgress",
-            "-tips_seenKeys", pendingTips ? "" : "tip.home.v1,tip.budgets.v1,tip.cards.v1,tip.income.v1,tip.budgetdetail.v1",
+            "-tips_seenKeys", pendingTips ? "tip.budgetdetail.v1" : "tip.home.v1,tip.budgets.v1,tip.cards.v1,tip.income.v1,tip.budgetdetail.v1",
             "-tips_resetToken", "0", "-tips_seen_lastResetToken", "0",
             "-AppleLanguages", "(en)", "-AppleLocale", "en_US"
         ] + extraArguments

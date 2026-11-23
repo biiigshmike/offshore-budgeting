@@ -29,6 +29,7 @@ enum AppResetService {
 
         try modelContext.save()
         WorkspaceProgressHandoffStore(defaults: defaults).cancel()
+        defaults.removeObject(forKey: OnboardingResetService.isRepeatingKey)
     }
 
     // MARK: - Private

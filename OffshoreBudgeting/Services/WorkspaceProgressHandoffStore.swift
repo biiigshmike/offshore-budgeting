@@ -5,6 +5,7 @@ import Foundation
 @MainActor
 struct WorkspaceProgressHandoffStore {
     nonisolated static let pendingWorkspaceIDKey = "onboarding_pendingWorkspaceProgressID"
+    private static let budgetShortcutWorkspaceIDKey = "onboarding_pendingProgressBudgetShortcutWorkspaceID"
 
     private let defaults: UserDefaults
 
@@ -17,7 +18,13 @@ struct WorkspaceProgressHandoffStore {
         return UUID(uuidString: rawValue)
     }
 
-    func enqueue(workspaceID: UUID) {
+    var offersBudgetShortcut: Bool {
+        guard let pendingWorkspaceID else { return false }
+        return defaults.string(forKey: Self.budgetShortcutWorkspaceIDKey) == pendingWorkspaceID.uuidString
+    }
+
+    func enqueue(workspaceID: UUID, offersBudgetShortcut: Bool = false) {
+        defaults.set(offersBudgetShortcut ? workspaceID.uuidString : nil, forKey: Self.budgetShortcutWorkspaceIDKey)
         defaults.set(workspaceID.uuidString, forKey: Self.pendingWorkspaceIDKey)
     }
 
@@ -30,5 +37,6 @@ struct WorkspaceProgressHandoffStore {
 
     func cancel() {
         defaults.removeObject(forKey: Self.pendingWorkspaceIDKey)
+        defaults.removeObject(forKey: Self.budgetShortcutWorkspaceIDKey)
     }
 }

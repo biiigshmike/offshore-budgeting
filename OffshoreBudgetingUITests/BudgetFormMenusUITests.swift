@@ -110,4 +110,95 @@ final class BudgetFormMenusUITests: XCTestCase {
         dismissMenu(app, formTitle: "Edit Budget")
         app.buttons["Cancel"].tap()
     }
+
+    func testFirstBudgetCardDefaultCanBeClearedAndDoesNotChangeCopiedOrLaterBudgets() {
+        let app = launchFirstBudgetForm()
+        let cards = app.buttons["budget.cards"]
+        let addBudget = app.navigationBars["Add Budget"]
+        XCTAssertTrue(cards.label.contains("First Card"))
+        cards.tap()
+        app.buttons["Clear All"].tap()
+        XCTAssertTrue(app.buttons["Select All"].waitForExistence(timeout: 3))
+        XCTAssertFalse(app.buttons["Done"].exists)
+        dismissMenu(app, formTitle: "Add Budget")
+        XCTAssertTrue(app.buttons["Select All"].waitForNonExistence(timeout: 3))
+
+        let endDate = app.buttons["budget.endDate"]
+        let initialDate = endDate.label
+        endDate.coordinate(withNormalizedOffset: CGVector(dx: 0.85, dy: 0.5)).tap()
+        let datePicker = app.navigationBars["End Date"]
+        XCTAssertTrue(datePicker.waitForExistence(timeout: 5))
+        let calendar = Calendar.current
+        let month = calendar.dateInterval(of: .month, for: .now)!.start
+        let changedDay = calendar.date(byAdding: .day, value: 19, to: month)!
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US")
+        formatter.dateFormat = "EEEE, MMMM d"
+        app.buttons[formatter.string(from: changedDay)].tap()
+        datePicker.buttons["Done"].tap()
+        XCTAssertNotEqual(endDate.label, initialDate)
+        XCTAssertTrue(cards.label.contains("None selected"))
+
+        app.buttons["budget.categoryGoals"].tap()
+        let goals = app.navigationBars["Category Goals"]
+        XCTAssertTrue(goals.waitForExistence(timeout: 5))
+        goals.buttons["Done"].tap()
+        XCTAssertTrue(cards.label.contains("None selected"))
+
+        let name = app.textFields["budget.name"].value as? String ?? ""
+        addBudget.buttons["Save"].tap()
+        let budgets = app.navigationBars["Budgets"]
+        XCTAssertTrue(budgets.waitForExistence(timeout: 5))
+        app.buttons["Add Budget"].tap()
+        XCTAssertTrue(addBudget.waitForExistence(timeout: 5))
+        XCTAssertTrue(cards.label.contains("None selected"))
+        addBudget.buttons["Cancel"].tap()
+
+        let savedBudget = app.staticTexts[name].firstMatch
+        if !savedBudget.exists {
+            let pastBudgets = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Past Budgets")).firstMatch
+            XCTAssertTrue(pastBudgets.waitForExistence(timeout: 5))
+            pastBudgets.tap()
+        }
+        XCTAssertTrue(savedBudget.waitForExistence(timeout: 5))
+        savedBudget.tap()
+        app.buttons["Budget Actions"].tap()
+        app.buttons["Edit Budget"].tap()
+        let editBudget = app.navigationBars["Edit Budget"]
+        XCTAssertTrue(editBudget.waitForExistence(timeout: 5))
+        XCTAssertTrue(cards.label.contains("None selected"))
+        let copy = app.buttons["budget.createFollowing"]
+        for _ in 0..<4 where !copy.isHittable { app.swipeUp() }
+        copy.tap()
+        XCTAssertTrue(addBudget.waitForExistence(timeout: 5))
+        let copiedCards = app.buttons.matching(identifier: "budget.cards").allElementsBoundByIndex.last(where: \.isHittable)
+        XCTAssertTrue(copiedCards?.label.contains("None selected") == true)
+    }
+
+    func testFirstBudgetWithZeroOrMultipleCardsHasNoDefault() {
+        let scenarios = [("-uiTestProgressNoCard", "No cards available"), ("-uiTestProgressTwoCards", "None selected")]
+        for (argument, summary) in scenarios {
+            let app = launchFirstBudgetForm(extraArguments: [argument])
+            let cards = app.buttons["budget.cards"]
+            XCTAssertTrue(cards.label.contains(summary))
+            XCTAssertEqual(cards.isEnabled, argument == "-uiTestProgressTwoCards")
+            app.terminate()
+        }
+    }
+
+    private func launchFirstBudgetForm(extraArguments: [String] = []) -> XCUIApplication {
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "-uiTesting", "-uiTestingReset", "-uiTestScenarioWorkspaceProgress", "-uiTestProgressCardOnly",
+            "-tips_seenKeys", "tip.home.v1,tip.budgets.v1,tip.budgetdetail.v1",
+            "-general_defaultBudgetingPeriod", "monthly",
+            "-AppleLanguages", "(en)", "-AppleLocale", "en_US"
+        ] + extraArguments
+        app.launch()
+        XCTAssertTrue(app.navigationBars["Home"].waitForExistence(timeout: 15))
+        app.tabBars.buttons["Budgets"].tap()
+        app.buttons["Add Budget"].tap()
+        XCTAssertTrue(app.navigationBars["Add Budget"].waitForExistence(timeout: 5))
+        return app
+    }
 }

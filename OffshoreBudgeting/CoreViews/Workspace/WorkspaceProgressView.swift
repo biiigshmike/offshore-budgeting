@@ -4,6 +4,7 @@ import SwiftData
 struct WorkspaceProgressView: View {
     let workspace: Workspace
     let showsHandoffGuidance: Bool
+    private let onBudgetCreated: ((UUID) -> Void)?
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.scenePhase) private var scenePhase
@@ -16,9 +17,10 @@ struct WorkspaceProgressView: View {
     @State private var activeStep: WorkspaceProgressStep?
     @State private var showingRefreshError = false
 
-    init(workspace: Workspace, showsHandoffGuidance: Bool = false) {
+    init(workspace: Workspace, showsHandoffGuidance: Bool = false, onBudgetCreated: ((UUID) -> Void)? = nil) {
         self.workspace = workspace
         self.showsHandoffGuidance = showsHandoffGuidance
+        self.onBudgetCreated = onBudgetCreated
         let workspaceID = workspace.id
 
         var cardDescriptor = FetchDescriptor<Card>(predicate: #Predicate { $0.workspace?.id == workspaceID })
@@ -260,7 +262,7 @@ struct WorkspaceProgressView: View {
         case .income:
             AddIncomeView(workspace: workspace, initialDate: Calendar.current.startOfDay(for: .now))
         case .budget:
-            AddBudgetView(workspace: workspace)
+            AddBudgetView(workspace: workspace, onCreated: onBudgetCreated)
         }
     }
 

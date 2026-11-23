@@ -33,6 +33,11 @@ struct PostBoardingTipItem: Identifiable, Equatable {
     }
 }
 
+struct PostBoardingTipAction {
+    let title: String
+    let perform: () -> Void
+}
+
 /// Full-page “tips & hints” sheet shown once per key, until SettingsGeneralView resets them.
 ///
 /// Usage:
@@ -54,13 +59,17 @@ extension View {
         key: String,
         title: String,
         items: [PostBoardingTipItem],
-        buttonTitle: String = "Continue"
+        buttonTitle: String = "Continue",
+        secondaryAction: PostBoardingTipAction? = nil,
+        onDismiss: (() -> Void)? = nil
     ) -> some View {
         modifier(PostBoardingTipModifier(
             key: key,
             title: title,
             items: items,
-            buttonTitle: buttonTitle
+            buttonTitle: buttonTitle,
+            secondaryAction: secondaryAction,
+            onDismiss: onDismiss
         ))
     }
 }
@@ -73,6 +82,8 @@ private struct PostBoardingTipModifier: ViewModifier {
     let title: String
     let items: [PostBoardingTipItem]
     let buttonTitle: String
+    let secondaryAction: PostBoardingTipAction?
+    let onDismiss: (() -> Void)?
 
     @AppStorage("didCompleteOnboarding") private var didCompleteOnboarding: Bool = false
 
@@ -86,6 +97,7 @@ private struct PostBoardingTipModifier: ViewModifier {
 
     @State private var showingTip: Bool = false
     @State private var didAcknowledgeTip: Bool = false
+    @State private var didChooseSecondaryAction = false
     @State private var ownsPresentation = false
     @State private var reservationID = UUID()
     @State private var dismissedForCurrentActivation = false
@@ -106,6 +118,7 @@ private struct PostBoardingTipModifier: ViewModifier {
                 if deferred {
                     showingTip = false
                     didAcknowledgeTip = false
+                    didChooseSecondaryAction = false
                 } else if postBoardingTipPresenterIsActive {
                     refreshPresentationForCurrentEligibility(deferPresentation: true)
                 }
@@ -139,6 +152,7 @@ private struct PostBoardingTipModifier: ViewModifier {
                 } else {
                     showingTip = false
                     didAcknowledgeTip = false
+                    didChooseSecondaryAction = false
                 }
             }
 
@@ -149,6 +163,12 @@ private struct PostBoardingTipModifier: ViewModifier {
                         title: title,
                         items: items,
                         buttonTitle: buttonTitle,
+                        secondaryButtonTitle: secondaryAction?.title,
+                        onSecondary: {
+                            didChooseSecondaryAction = true
+                            didAcknowledgeTip = true
+                            showingTip = false
+                        },
                         onContinue: {
                             didAcknowledgeTip = true
                             showingTip = false
@@ -195,11 +215,16 @@ private struct PostBoardingTipModifier: ViewModifier {
         // A forced deferral retains eligibility for after the handoff instead.
         if !automaticLaunchPromptsDeferred {
             dismissedForCurrentActivation = true
+            if didChooseSecondaryAction {
+                secondaryAction?.perform()
+            }
+            onDismiss?()
         }
         if didAcknowledgeTip {
             markSeen()
         }
         didAcknowledgeTip = false
+        didChooseSecondaryAction = false
         releasePresentation()
     }
 
@@ -242,6 +267,8 @@ private struct TipSheet: View {
     let title: String
     let items: [PostBoardingTipItem]
     let buttonTitle: String
+    let secondaryButtonTitle: String?
+    let onSecondary: () -> Void
     let onContinue: () -> Void
 
     var body: some View {
@@ -274,16 +301,44 @@ private struct TipSheet: View {
             VStack(spacing: 4) {
                 HelpGuideButton()
 
-                if #available(iOS 26.0, *) {
-                    continueButton.glassProminentButtonStyleCompat()
+                if let secondaryButtonTitle {
+                    ViewThatFits(in: .horizontal) {
+                        HStack(spacing: 8) {
+                            secondaryButton(secondaryButtonTitle).fixedSize(horizontal: true, vertical: false)
+                            primaryButton
+                        }
+                        VStack(spacing: 4) {
+                            secondaryButton(secondaryButtonTitle)
+                            primaryButton
+                        }
+                    }
                 } else {
-                    continueButton.buttonStyle(.borderedProminent)
+                    primaryButton
                 }
             }
             .padding(.horizontal, 22)
             .padding(.bottom, 18)
         }
         .presentationDetents([.large])
+    }
+
+    @ViewBuilder
+    private var primaryButton: some View {
+        if #available(iOS 26.0, *) {
+            continueButton.glassProminentButtonStyleCompat()
+        } else {
+            continueButton.buttonStyle(.borderedProminent)
+        }
+    }
+
+    private func secondaryButton(_ title: String) -> some View {
+        Button(action: onSecondary) {
+            Text(title)
+                .multilineTextAlignment(.center)
+                .frame(minHeight: 44)
+        }
+        .buttonStyle(.bordered)
+        .accessibilityIdentifier("homeTips.viewBudget")
     }
 
     private var continueButton: some View {

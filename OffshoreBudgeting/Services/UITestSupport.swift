@@ -22,6 +22,10 @@ enum UITestSupport {
         isEnabled && ProcessInfo.processInfo.arguments.contains("-uiTestingUseLocalCloudStore")
     }
 
+    static var testsPendingProgressPrompts: Bool {
+        isEnabled && ProcessInfo.processInfo.arguments.contains("-uiTestProgressPendingPrompts")
+    }
+
     enum Scenario {
         case iCloudHasExistingWorkspace
         case iCloudEmpty
@@ -70,7 +74,8 @@ enum UITestSupport {
         defaults.set(false, forKey: "onboarding_didChooseDataSource")
         defaults.set(false, forKey: "onboarding_didPressGetStarted")
         defaults.set(0, forKey: "onboarding_step")
-        defaults.removeObject(forKey: WorkspaceProgressHandoffStore.pendingWorkspaceIDKey)
+        WorkspaceProgressHandoffStore(defaults: defaults).cancel()
+        defaults.removeObject(forKey: OnboardingResetService.isRepeatingKey)
         for key in [AppShortcutNavigationStore.pendingSectionKey,
                     AppShortcutNavigationStore.pendingAccountsSegmentKey,
                     AppShortcutNavigationStore.pendingActionKey,
@@ -296,6 +301,9 @@ enum UITestSupport {
                 let card = Card(name: "First Card", workspace: workspace)
                 progressCard = card
                 context.insert(card)
+                if arguments.contains("-uiTestProgressTwoCards") {
+                    context.insert(Card(name: "Second Card", workspace: workspace))
+                }
                 if !cardOnly {
                     context.insert(BudgetCardLink(budget: budget, card: card))
                     if testsPresetOffer {
@@ -347,10 +355,19 @@ enum UITestSupport {
             defaults.set(workspace.id.uuidString, forKey: "selectedWorkspaceID")
             defaults.set(false, forKey: "privacy_requireBiometrics")
             defaults.set(false, forKey: "general_reviewUncategorizedExpensesOnOpen")
-            if arguments.contains("-uiTestProgressPendingPrompts"), let progressCard {
+            if testsPendingProgressPrompts, let progressCard {
                 context.insert(VariableExpense(descriptionText: "Handoff review expense", amount: 12,
                     transactionDate: .now, workspace: workspace, card: progressCard, category: nil))
                 defaults.set(true, forKey: "general_reviewUncategorizedExpensesOnOpen")
+            }
+            if arguments.contains("-uiTestProgressBudgetExpenses"), let progressCard {
+                let calendar = Calendar.current
+                let monthStart = calendar.dateInterval(of: .month, for: .now)!.start
+                let tomorrow = calendar.date(byAdding: .day, value: 1, to: calendar.startOfDay(for: .now))!
+                context.insert(VariableExpense(descriptionText: "Grocery entry", amount: 23,
+                    transactionDate: monthStart, workspace: workspace, card: progressCard))
+                context.insert(VariableExpense(descriptionText: "Future grocery entry", amount: 41,
+                    transactionDate: tomorrow, workspace: workspace, card: progressCard))
             }
             defaults.set(false, forKey: WorkspaceProgressPreferences.hiddenKey(workspaceID: workspace.id))
             defaults.set(false, forKey: WorkspaceProgressPreferences.hiddenKey(workspaceID: other.id))
@@ -360,7 +377,7 @@ enum UITestSupport {
             } else {
                 WorkspaceProgressHandoffStore(defaults: defaults).cancel()
             }
-            if arguments.contains("-uiTestProgressPendingPrompts") {
+            if testsPendingProgressPrompts {
                 defaults.set("", forKey: "releaseLogs_seenReleaseIDs")
             } else if let release = SettingsReleaseLogsView.currentReleaseSection {
                 defaults.set(release.id, forKey: "releaseLogs_seenReleaseIDs")

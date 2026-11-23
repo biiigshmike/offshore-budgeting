@@ -9,7 +9,7 @@ struct BudgetBatchPreviewView: View {
     let categories: [Category]
     let categoryGoalDrafts: [UUID: CategoryGoalDraft]
     let excludedArchivedPresetNames: [String]
-    let onCreated: () -> Void
+    let onCreated: (UUID) -> Void
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
@@ -105,7 +105,7 @@ struct BudgetBatchPreviewView: View {
         guard !isSaving else { return }
         isSaving = true
         do {
-            _ = try BudgetBatchCreationService.create(
+            let budgets = try BudgetBatchCreationService.create(
                 workspace: workspace, preview: preview, cards: cards, presets: presets,
                 categories: categories, categoryGoalDrafts: categoryGoalDrafts,
                 allowOverlaps: allowOverlaps, modelContext: modelContext
@@ -115,7 +115,9 @@ struct BudgetBatchPreviewView: View {
                     modelContext: modelContext, workspaceID: workspace.id
                 )
             }
-            onCreated()
+            if let firstBudget = budgets.first {
+                onCreated(firstBudget.id)
+            }
         } catch {
             isSaving = false
             errorMessage = error.localizedDescription

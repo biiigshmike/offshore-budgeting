@@ -6,9 +6,11 @@ enum OnboardingResetService {
     static let didPressGetStartedKey = "onboarding_didPressGetStarted"
     static let didChooseDataSourceKey = "onboarding_didChooseDataSource"
     static let didCompleteOnboardingKey = "didCompleteOnboarding"
+    static let isRepeatingKey = "onboarding_isRepeating"
 
     static func repeatOnboarding(defaults: UserDefaults = .standard) {
         WorkspaceProgressHandoffStore(defaults: defaults).cancel()
+        defaults.set(true, forKey: isRepeatingKey)
         defaults.set(0, forKey: onboardingStepKey)
         defaults.set(false, forKey: didPressGetStartedKey)
         defaults.set(false, forKey: didCompleteOnboardingKey)

@@ -12,6 +12,7 @@ struct AddBudgetView: View {
 
     let workspace: Workspace
     let templateBudget: Budget?
+    private let onCreated: ((UUID) -> Void)?
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
@@ -51,9 +52,10 @@ struct AddBudgetView: View {
     @State private var budgetSaveErrorMessage: String = ""
     @State private var showingBudgetSaveError: Bool = false
 
-    init(workspace: Workspace, templateBudget: Budget? = nil) {
+    init(workspace: Workspace, templateBudget: Budget? = nil, onCreated: ((UUID) -> Void)? = nil) {
         self.workspace = workspace
         self.templateBudget = templateBudget
+        self.onCreated = onCreated
         let workspaceID = workspace.id
 
         _cards = Query(
@@ -150,6 +152,7 @@ struct AddBudgetView: View {
             } else {
                 seedInitialDatesAndName()
                 applyScreenshotPrefillIfNeeded()
+                selectOnlyCardForFirstBudget()
             }
         }
         .onChange(of: defaultBudgetingPeriodRaw) { _, _ in
@@ -178,7 +181,8 @@ struct AddBudgetView: View {
                         presets: presets.filter { selectedPresetIDs.contains($0.id) },
                         categories: categories, categoryGoalDrafts: categoryGoalDrafts,
                         excludedArchivedPresetNames: excludedArchivedPresetNames
-                    ) {
+                    ) { firstBudgetID in
+                        onCreated?(firstBudgetID)
                         showingBatchPreview = false
                         dismiss()
                     }
@@ -213,6 +217,15 @@ struct AddBudgetView: View {
         userEditedName = false
         applyDefaultPeriodRange()
         autoFillNameIfNeeded(force: true)
+    }
+
+    private func selectOnlyCardForFirstBudget() {
+        guard selectedCardIDs.isEmpty, cards.count == 1, let card = cards.first,
+              !WorkspaceProgressService.completedSteps(in: workspace).contains(.budget) else { return }
+        let workspaceID = workspace.id
+        let descriptor = FetchDescriptor<Budget>(predicate: #Predicate { $0.workspace?.id == workspaceID })
+        guard (try? modelContext.fetchCount(descriptor)) == 0 else { return }
+        selectedCardIDs.insert(card.id)
     }
 
     private func applyScreenshotPrefillIfNeeded() {
@@ -421,6 +434,7 @@ struct AddBudgetView: View {
             )
         }
 
+        onCreated?(budget.id)
         dismiss()
     }
 

@@ -88,6 +88,8 @@ struct ContentView: View {
     @State private var progressHandoffOwnerID = UUID()
     @State private var progressHandoffWorkspace: Workspace?
     @State private var progressHandoffForcesHome = false
+    @State private var progressHandoffOffersBudgetShortcut = false
+    @State private var setupBudgetID: UUID?
 
     private var defersAutomaticLaunchPrompts: Bool {
         !pendingWorkspaceProgressID.isEmpty || progressHandoffCoordinator.isPresenting
@@ -133,6 +135,7 @@ struct ContentView: View {
     @Query private var allVariableExpenses: [VariableExpense]
 
     @Environment(\.modelContext) private var modelContext
+    @Environment(PostBoardingTipsStore.self) private var postBoardingTipsStore
     @Environment(\.scenePhase) private var scenePhase
     @StateObject private var notificationService = LocalNotificationService()
 
@@ -148,6 +151,7 @@ struct ContentView: View {
                         workspace: selected,
                         selectedWorkspaceID: $selectedWorkspaceID,
                         initialSectionOverride: !pendingWorkspaceProgressID.isEmpty || progressHandoffForcesHome ? .home : initialSectionOverride,
+                        setupBudgetID: $setupBudgetID,
                         onTabInteraction: handleTabInteraction
                     )
                     .modifier(UncategorizedExpenseReviewPresenter(
@@ -171,7 +175,12 @@ struct ContentView: View {
                 }
             }
             .appSheet(item: $progressHandoffWorkspace, onDismiss: finishProgressHandoff) { workspace in
-                WorkspaceProgressHandoffView(workspace: workspace) {
+                WorkspaceProgressHandoffView(workspace: workspace, onBudgetCreated: { budgetID in
+                    guard progressHandoffOffersBudgetShortcut, setupBudgetID == nil,
+                          !postBoardingTipsStore.hasSeen(HomeView.tipKey),
+                          selectedWorkspaceID == workspace.id.uuidString else { return }
+                    setupBudgetID = budgetID
+                }) {
                     progressHandoffWorkspace = nil
                 }
             }
@@ -238,6 +247,7 @@ struct ContentView: View {
                 syncICloudPreferenceSnapshots()
             }
             .onChange(of: selectedWorkspaceID) { _, newValue in
+                setupBudgetID = nil
                 if progressHandoffCoordinator.ownerID == progressHandoffOwnerID,
                    progressHandoffCoordinator.workspaceID != UUID(uuidString: newValue) {
                     progressHandoffWorkspace = nil
@@ -400,6 +410,7 @@ struct ContentView: View {
                 )
             } else {
                 progressHandoffWorkspace = nil
+                setupBudgetID = nil
                 cancelDeferredResumeRefresh()
             }
         }
@@ -414,6 +425,9 @@ struct ContentView: View {
                let presentedID = progressHandoffCoordinator.workspaceID,
                !currentIDs.contains(presentedID) {
                 progressHandoffWorkspace = nil
+            }
+            if let selectedID = UUID(uuidString: selectedWorkspaceID), !currentIDs.contains(selectedID) {
+                setupBudgetID = nil
             }
         }
         .onDisappear {
@@ -461,11 +475,14 @@ struct ContentView: View {
             store.consume(workspaceID: requestedID)
             return
         }
+        let offersBudgetShortcut = store.offersBudgetShortcut
         guard progressHandoffCoordinator.claim(workspaceID: requestedID, ownerID: progressHandoffOwnerID, store: store) else { return }
+        progressHandoffOffersBudgetShortcut = offersBudgetShortcut
         progressHandoffWorkspace = workspace
     }
 
     private func finishProgressHandoff() {
+        progressHandoffOffersBudgetShortcut = false
         progressHandoffCoordinator.finish(ownerID: progressHandoffOwnerID)
     }
 

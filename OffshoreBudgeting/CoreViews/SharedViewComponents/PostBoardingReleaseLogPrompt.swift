@@ -35,7 +35,7 @@ private struct PostBoardingReleaseLogPromptModifier: ViewModifier {
     }
 
     func body(content: Content) -> some View {
-        let base = content
+        content
             .onAppear {
                 refreshPresentation()
             }
@@ -48,22 +48,20 @@ private struct PostBoardingReleaseLogPromptModifier: ViewModifier {
             .onChange(of: scenePhase) { _, phase in
                 if phase == .active { refreshPresentation() }
             }
-
-        Group {
-            if shouldAttachSheet {
-                base.appSheet(isPresented: $showingReleasePrompt, onDismiss: releasePresentation) {
-                    if let section = currentSection {
-                        CurrentReleaseLogSheet(section: section) {
-                            markCurrentReleaseSeen()
-                            showingReleasePrompt = false
+            .background {
+                // Keep the tab tree mounted as release notes hand off to other launch sheets.
+                if shouldAttachSheet {
+                    Color.clear.appSheet(isPresented: $showingReleasePrompt, onDismiss: releasePresentation) {
+                        if let section = currentSection {
+                            CurrentReleaseLogSheet(section: section) {
+                                markCurrentReleaseSeen()
+                                showingReleasePrompt = false
+                            }
                         }
                     }
                 }
-            } else {
-                base
             }
-        }
-        .onDisappear(perform: releasePresentation)
+            .onDisappear(perform: releasePresentation)
     }
 
     private var shouldAttachSheet: Bool {

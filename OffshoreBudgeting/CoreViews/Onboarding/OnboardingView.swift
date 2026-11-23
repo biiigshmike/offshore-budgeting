@@ -167,7 +167,7 @@ struct OnboardingView: View {
         }
         .alert("Existing iCloud Data Detected", isPresented: $showingSkipPrompt) {
             Button("Continue Setup", role: .cancel) { }
-            Button("Skip Onboarding", role: .destructive) { completeOnboarding() }
+            Button("Skip Onboarding", role: .destructive) { completeOnboarding(skippingToExistingData: true) }
         } message: {
             Text(skipPromptMessage)
         }
@@ -501,11 +501,16 @@ struct OnboardingView: View {
     
     // MARK: - Completion
     
-    private func completeOnboarding() {
+    private func completeOnboarding(skippingToExistingData: Bool = false) {
         let handoffStore = WorkspaceProgressHandoffStore()
+        let defaults = UserDefaults.standard
+        let isRepeating = defaults.bool(forKey: OnboardingResetService.isRepeatingKey)
         if let workspace = currentWorkspace {
             selectedWorkspaceID = workspace.id.uuidString
-            handoffStore.enqueue(workspaceID: workspace.id)
+            handoffStore.enqueue(
+                workspaceID: workspace.id,
+                offersBudgetShortcut: !isRepeating && !skippingToExistingData
+            )
         } else {
             selectedWorkspaceID = ""
             handoffStore.cancel()
@@ -513,6 +518,7 @@ struct OnboardingView: View {
         
         didCompleteOnboarding = true
         onboardingStep = 0
+        defaults.removeObject(forKey: OnboardingResetService.isRepeatingKey)
     }
     
     // MARK: - Workspace Create

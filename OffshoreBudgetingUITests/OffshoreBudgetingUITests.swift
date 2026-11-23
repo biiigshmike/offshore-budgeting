@@ -140,6 +140,7 @@ final class OffshoreBudgetingUITests: XCTestCase {
         let app = makeAppForUITesting(
             scenario: "-uiTestScenarioICloudEmpty"
         )
+        app.launchArguments += ["-tips_seenKeys", "tip.home.v1,tip.budgets.v1"]
         app.launch()
 
         app.buttons["Get Started"].tap()
@@ -166,7 +167,7 @@ final class OffshoreBudgetingUITests: XCTestCase {
 
         app.buttons["Add Card"].tap()
 
-        let cardNameField = app.textFields["Apple Card"].firstMatch
+        let cardNameField = app.textFields["Credit Card, Checking, or Cash"].firstMatch
         XCTAssertTrue(cardNameField.waitForExistence(timeout: 5))
         cardNameField.tap()
         cardNameField.typeText("Checking")
@@ -181,6 +182,21 @@ final class OffshoreBudgetingUITests: XCTestCase {
         app.buttons["Next"].tap()
         XCTAssertTrue(onboardingStepTitle("Presets", in: app).waitForExistence(timeout: 5))
         app.buttons["Done"].tap()
+
+        let skip = app.buttons["workspaceProgressSkip"]
+        XCTAssertTrue(skip.waitForExistence(timeout: 10))
+        let addBudget = app.buttons["workspaceProgressStep_budget"]
+        for _ in 0..<4 where !addBudget.isHittable { app.swipeUp() }
+        addBudget.tap()
+        let budgetForm = app.navigationBars["Add Budget"]
+        XCTAssertTrue(budgetForm.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["budget.cards"].label.contains("Checking"))
+        budgetForm.buttons["Cancel"].tap()
+        skip.tap()
+        let releaseTitle = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "What’s New in ")).firstMatch
+        if releaseTitle.waitForExistence(timeout: 3) {
+            app.buttons["Continue"].firstMatch.tap()
+        }
 
         let budgetsTab = app.tabBars.buttons["Budgets"].firstMatch
         XCTAssertTrue(budgetsTab.waitForExistence(timeout: 5))

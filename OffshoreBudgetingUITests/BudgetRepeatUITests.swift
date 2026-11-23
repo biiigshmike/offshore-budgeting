@@ -181,7 +181,6 @@ final class BudgetRepeatUITests: XCTestCase {
         app.navigationBars["Edit Budget"].coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
         reveal(following, in: app)
         XCTAssertFalse(following.isEnabled)
-        XCTAssertTrue(app.staticTexts["Save or discard your changes before creating following budgets."].exists)
         app.navigationBars["Edit Budget"].buttons["Cancel"].tap()
 
         app.buttons["Budget Actions"].tap()
@@ -191,6 +190,8 @@ final class BudgetRepeatUITests: XCTestCase {
         XCTAssertTrue(following.isEnabled)
         following.tap()
         XCTAssertTrue(app.navigationBars["Add Budget"].waitForExistence(timeout: 5))
+        let copiedCards = app.buttons.matching(identifier: "budget.cards").allElementsBoundByIndex.last(where: \.isHittable)
+        XCTAssertTrue(copiedCards?.label.contains("Ruby Card") == true)
         // The template's current month remains unchanged; only new months are created.
         app.navigationBars["Add Budget"].buttons["Preview"].tap()
         XCTAssertTrue(app.navigationBars["Preview"].waitForExistence(timeout: 5))
