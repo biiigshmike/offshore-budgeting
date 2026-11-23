@@ -18,6 +18,7 @@ struct IncomeView: View {
     @AppStorage(AppShortcutNavigationStore.pendingImportClipboardTextKey) private var pendingImportClipboardText: String = ""
 
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.appCommandHub) private var commandHub
     @Environment(\.appTabActivationContext) private var tabActivationContext
     @Environment(DetailViewSnapshotCache.self) private var detailSnapshotCache
@@ -76,12 +77,9 @@ struct IncomeView: View {
 
     // MARK: - Sheets
 
-    @State private var addIncomeSheet: AddIncomeSheet? = nil
+    @State private var incomeSheet: IncomeSheet? = nil
     @State private var showingImportIncomeSheet: Bool = false
     @State private var shortcutImportClipboardText: String? = nil
-
-    @State private var showingEditIncome: Bool = false
-    @State private var editingIncome: Income? = nil
 
     @State private var showingShortcutDeletePicker: Bool = false
     @State private var shortcutDeleteCandidates: [Income] = []
@@ -363,13 +361,26 @@ struct IncomeView: View {
 
     private func contentView(proxy: GeometryProxy) -> some View {
         configuredIncomeView(proxy: proxy)
-            .appSheet(item: $addIncomeSheet) { sheet in
+            .appSheet(item: $incomeSheet) { sheet in
                 NavigationStack {
-                    AddIncomeView(
-                        workspace: workspace,
-                        initialDate: sheet.initialDate,
-                        initialIsPlanned: sheet.initialIsPlanned
-                    )
+                    switch sheet {
+                    case .add(let date, let isPlanned, _):
+                        AddIncomeView(workspace: workspace, initialDate: date, initialIsPlanned: isPlanned)
+                    case .edit(let income):
+                        EditIncomeView(workspace: workspace, income: income)
+                    case .receipt(let income):
+                        AddIncomeView(
+                            workspace: workspace, plannedIncome: income, canUseExistingIncome: hasUnlinkedActualIncome
+                        )
+                    case .link(let income):
+                        ExistingReceivedIncomeView(
+                            workspaceID: workspace.id,
+                            plannedIncome: income,
+                            incomes: ExistingReceivedIncomeView.candidates(in: incomes, around: income.date)
+                        ) {
+                            incomeSheet = nil
+                        }
+                    }
                 }
             }
             .appSheet(isPresented: $showingImportIncomeSheet) {
@@ -378,15 +389,6 @@ struct IncomeView: View {
                         workspace: workspace,
                         initialClipboardText: shortcutImportClipboardText
                     )
-                }
-            }
-            .appSheet(isPresented: $showingEditIncome, onDismiss: { editingIncome = nil }) {
-                NavigationStack {
-                    if let editingIncome {
-                        EditIncomeView(workspace: workspace, income: editingIncome)
-                    } else {
-                        EmptyView()
-                    }
                 }
             }
             .onAppear(perform: handleContentAppear)
@@ -497,7 +499,7 @@ struct IncomeView: View {
         ToolbarItem(placement: .topBarTrailing) {
             Menu {
                 Button {
-                    addIncomeSheet = AddIncomeSheet(initialDate: selectedDayStart, initialIsPlanned: false)
+                    incomeSheet = .add(date: selectedDayStart, isPlanned: false)
                 } label: {
                     Label("Add Income", systemImage: "plus")
                 }
@@ -578,15 +580,27 @@ struct IncomeView: View {
         }
     }
 
+    private var hasUnlinkedActualIncome: Bool {
+        incomes.contains {
+            !$0.isPlanned && $0.sourcePlannedIncomeID == nil
+        }
+    }
+
     @ViewBuilder
     private var incomeRowsSection: some View {
+        let recordedPlanIDs = Set(incomes.compactMap { $0.isPlanned ? nil : $0.sourcePlannedIncomeID })
+        let canUseExisting = hasUnlinkedActualIncome
         Section(header: incomeSectionHeader) {
             if incomeRows.isEmpty {
                 Text(isIncomeSearchActive ? "No matching income." : "No income for \(CalendarGridHelper.shortDateFormatter.string(from: selectedDayStart)).")
                     .foregroundStyle(.secondary)
             } else {
                 ForEach(incomeRows) { income in
-                    incomeRowButton(for: income)
+                    incomeRowButton(
+                        for: income,
+                        receiptRecorded: recordedPlanIDs.contains(income.id),
+                        canUseExisting: canUseExisting
+                    )
                 }
             }
         }
@@ -613,14 +627,25 @@ struct IncomeView: View {
         }
     }
 
-    private func incomeRowButton(for income: Income) -> some View {
-        Button {
-            editingIncome = income
-            showingEditIncome = true
-        } label: {
-            IncomeRowView(income: income)
+    private func incomeRowButton(for income: Income, receiptRecorded: Bool, canUseExisting: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Button {
+                incomeSheet = .edit(income)
+            } label: {
+                IncomeRowView(income: income)
+            }
+            .buttonStyle(.plain)
+            .accessibilityHint(income.isPlanned ? Text("Opens Edit Planned Income") : Text("Opens Edit Income"))
+
+            if income.isPlanned && receiptRecorded {
+                Label("Received", systemImage: "checkmark")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .padding(.top, 4)
+            } else if income.isPlanned {
+                receiptActions(for: income, canUseExisting: canUseExisting)
+            }
         }
-        .buttonStyle(.plain)
         .swipeActions(edge: .trailing, allowsFullSwipe: true) {
             Button(role: .destructive) {
                 requestDeleteIncome(income)
@@ -631,12 +656,35 @@ struct IncomeView: View {
         }
         .swipeActions(edge: .leading) {
             Button {
-                editingIncome = income
-                showingEditIncome = true
+                incomeSheet = .edit(income)
             } label: {
                 Label("Edit", systemImage: "pencil")
             }
             .tint(Color("AccentColor"))
+        }
+    }
+
+    private func receiptActions(for income: Income, canUseExisting: Bool) -> some View {
+        let layout = dynamicTypeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 4))
+            : AnyLayout(HStackLayout(spacing: 8))
+
+        return layout {
+            CompactGlassActionButton(
+                title: "Record Income", fillsAvailableWidth: canUseExisting
+            ) {
+                incomeSheet = .receipt(income)
+            }
+            .accessibilityHint(Text("Records a payment for \(income.source)"))
+
+            if canUseExisting {
+                CompactGlassActionButton(
+                    title: "Use Existing Income", fillsAvailableWidth: true
+                ) {
+                    incomeSheet = .link(income)
+                }
+                .accessibilityHint(Text("Links a recorded payment to \(income.source)"))
+            }
         }
     }
 
@@ -795,11 +843,11 @@ struct IncomeView: View {
     // MARK: - Actions
 
     private func openNewActualIncome() {
-        addIncomeSheet = AddIncomeSheet(initialDate: selectedDayStart, initialIsPlanned: false)
+        incomeSheet = .add(date: selectedDayStart, isPlanned: false)
     }
 
     private func openNewPlannedIncome() {
-        addIncomeSheet = AddIncomeSheet(initialDate: selectedDayStart, initialIsPlanned: true)
+        incomeSheet = .add(date: selectedDayStart, isPlanned: true)
     }
 
     private func deleteActualIncomeFromCommand() {
@@ -888,9 +936,8 @@ struct IncomeView: View {
 
     private func deleteIncome(_ income: Income) {
         modelContext.delete(income)
-        if editingIncome?.id == income.id {
-            showingEditIncome = false
-            editingIncome = nil
+        if incomeSheet?.incomeID == income.id {
+            incomeSheet = nil
         }
     }
 
@@ -903,7 +950,7 @@ struct IncomeView: View {
             shortcutImportClipboardText = clipboard.isEmpty ? nil : clipboard
             showingImportIncomeSheet = true
         } else if pending == AppShortcutNavigationStore.PendingAction.openQuickAddIncome.rawValue {
-            addIncomeSheet = AddIncomeSheet(initialDate: selectedDayStart, initialIsPlanned: false)
+            incomeSheet = .add(date: selectedDayStart, isPlanned: false)
         }
 
         pendingShortcutActionRaw = ""
@@ -913,10 +960,27 @@ struct IncomeView: View {
 
 // MARK: - Sheet Models
 
-private struct AddIncomeSheet: Identifiable {
-    let id = UUID()
-    let initialDate: Date
-    let initialIsPlanned: Bool
+private enum IncomeSheet: Identifiable {
+    case add(date: Date, isPlanned: Bool, id: UUID = UUID())
+    case edit(Income)
+    case receipt(Income)
+    case link(Income)
+
+    var id: String {
+        switch self {
+        case .add(_, _, let id): "add-\(id)"
+        case .edit(let income): "edit-\(income.id)"
+        case .receipt(let income): "receipt-\(income.id)"
+        case .link(let income): "link-\(income.id)"
+        }
+    }
+
+    var incomeID: UUID? {
+        switch self {
+        case .add: nil
+        case .edit(let income), .receipt(let income), .link(let income): income.id
+        }
+    }
 }
 
 // MARK: - Row Views
@@ -942,6 +1006,8 @@ private struct IncomeRowView: View {
                 .foregroundStyle(income.isPlanned ? .orange : .blue)
                 .font(.headline)
         }
+        .frame(minHeight: 44)
+        .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
     }
 }

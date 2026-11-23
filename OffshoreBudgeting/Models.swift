@@ -1343,6 +1343,7 @@ final class Income {
     var date: Date = Date.now
     var isPlanned: Bool = false
     var isException: Bool = false
+    var sourcePlannedIncomeID: UUID? = nil
 
     @Relationship(inverse: \Workspace.incomes)
     var workspace: Workspace? = nil
@@ -1363,7 +1364,8 @@ final class Income {
         isException: Bool = false,
         workspace: Workspace? = nil,
         series: IncomeSeries? = nil,
-        card: Card? = nil
+        card: Card? = nil,
+        sourcePlannedIncomeID: UUID? = nil
     ) {
         self.id = id
         self.source = source
@@ -1374,5 +1376,6 @@ final class Income {
         self.workspace = workspace
         self.series = series
         self.card = card
+        self.sourcePlannedIncomeID = sourcePlannedIncomeID
     }
 }

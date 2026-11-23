@@ -12,6 +12,9 @@ final class TransactionEntryService {
         case missingDescription
         case invalidAmount
         case missingIncomeSource
+        case invalidIncomePlan
+        case receiptAlreadyRecorded
+        case receivedIncomeUnavailable
 
         var errorDescription: String? {
             switch self {
@@ -21,6 +24,12 @@ final class TransactionEntryService {
                 return "Amount must be greater than 0."
             case .missingIncomeSource:
                 return "Please provide an income source."
+            case .invalidIncomePlan:
+                return String(localized: "This planned income is no longer available.")
+            case .receiptAlreadyRecorded:
+                return String(localized: "This planned income already has a recorded receipt.")
+            case .receivedIncomeUnavailable:
+                return String(localized: "This Actual income is no longer available to link.")
             }
         }
     }
@@ -86,6 +95,28 @@ final class TransactionEntryService {
 
     // MARK: - Income
 
+    func possibleReceivedIncomeDuplicates(
+        source: String,
+        amount: Double,
+        date: Date,
+        workspaceID: UUID,
+        modelContext: ModelContext
+    ) throws -> [Income] {
+        guard let day = Calendar.current.dateInterval(of: .day, for: date) else { return [] }
+        let start = day.start
+        let end = day.end
+        let descriptor = FetchDescriptor<Income>(
+            predicate: #Predicate<Income> {
+                $0.workspace?.id == workspaceID && !$0.isPlanned && $0.date >= start && $0.date < end
+            },
+            sortBy: [SortDescriptor(\Income.date, order: .reverse)]
+        )
+        let normalizedSource = MerchantNormalizer.normalizeKey(source)
+        return try modelContext.fetch(descriptor).filter {
+            abs($0.amount - amount) < 0.0001 || MerchantNormalizer.normalizeKey($0.source) == normalizedSource
+        }
+    }
+
     @discardableResult
     func addIncome(
         source: String,
@@ -93,6 +124,7 @@ final class TransactionEntryService {
         date: Date,
         isPlanned: Bool,
         workspace: Workspace,
+        plannedIncome: Income? = nil,
         modelContext: ModelContext
     ) throws -> Income {
 
@@ -105,6 +137,11 @@ final class TransactionEntryService {
             throw ValidationError.invalidAmount
         }
 
+        if let plannedIncome {
+            guard !isPlanned else { throw ValidationError.invalidIncomePlan }
+            try validateReceiptPlan(plannedIncome, workspaceID: workspace.id, modelContext: modelContext)
+        }
+
         let normalizedDate = Calendar.current.startOfDay(for: date)
         let income = Income(
             source: trimmedSource,
@@ -114,7 +151,8 @@ final class TransactionEntryService {
             isException: false,
             workspace: workspace,
             series: nil,
-            card: nil
+            card: nil,
+            sourcePlannedIncomeID: plannedIncome?.id
         )
 
         modelContext.insert(income)
@@ -127,5 +165,39 @@ final class TransactionEntryService {
             throw error
         }
         return income
+    }
+
+    func linkReceivedIncome(
+        _ receipt: Income,
+        to plannedIncome: Income,
+        workspaceID: UUID,
+        modelContext: ModelContext
+    ) throws {
+        try validateReceiptPlan(plannedIncome, workspaceID: workspaceID, modelContext: modelContext)
+        guard !receipt.isPlanned, !receipt.isDeleted, receipt.workspace?.id == workspaceID,
+              receipt.sourcePlannedIncomeID == nil else {
+            throw ValidationError.receivedIncomeUnavailable
+        }
+        receipt.sourcePlannedIncomeID = plannedIncome.id
+        do {
+            try modelContext.save()
+        } catch {
+            receipt.sourcePlannedIncomeID = nil
+            throw error
+        }
+    }
+
+    private func validateReceiptPlan(_ plan: Income, workspaceID: UUID, modelContext: ModelContext) throws {
+        guard plan.isPlanned, !plan.isDeleted, plan.workspace?.id == workspaceID else {
+            throw ValidationError.invalidIncomePlan
+        }
+        let planID = plan.id
+        var existing = FetchDescriptor<Income>(predicate: #Predicate {
+            $0.workspace?.id == workspaceID && !$0.isPlanned && $0.sourcePlannedIncomeID == planID
+        })
+        existing.fetchLimit = 1
+        guard try modelContext.fetch(existing).isEmpty else {
+            throw ValidationError.receiptAlreadyRecorded
+        }
     }
 }

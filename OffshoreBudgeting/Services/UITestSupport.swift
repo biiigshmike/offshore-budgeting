@@ -94,6 +94,54 @@ enum UITestSupport {
 
     // MARK: - Data
 
+    static var isIncomeReceiptScenario: Bool {
+        isEnabled && ProcessInfo.processInfo.arguments.contains("-uiTestScenarioIncomeReceipt")
+    }
+
+    @MainActor
+    static func seedIncomeReceiptScenario(context: ModelContext) {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: .now)
+        let period = BudgetingPeriod.weekly.defaultRange(containing: today, calendar: calendar)
+        let planDate = calendar.date(byAdding: .day, value: today == period.start ? 1 : -1, to: today)!
+        let previousPlanDate = calendar.date(byAdding: .day, value: -7, to: planDate)!
+        let workspace = Workspace(name: "Receipt Test Workspace", hexColor: "#3B82F6")
+        let card = Card(name: "Test Checking", theme: "ruby", effect: "plastic", workspace: workspace)
+        let budget = Budget(name: "Paycheck Test Budget", startDate: period.start,
+                            endDate: period.end, workspace: workspace)
+        let series = IncomeSeries(
+            source: "Payroll", amount: 1_500, isPlanned: true,
+            frequencyRaw: RecurrenceFrequency.weekly.rawValue, interval: 1,
+            weeklyWeekday: calendar.component(.weekday, from: planDate),
+            monthlyDayOfMonth: 1, monthlyIsLastDay: false, yearlyMonth: 1, yearlyDayOfMonth: 1,
+            startDate: previousPlanDate, endDate: planDate, workspace: workspace
+        )
+
+        context.insert(workspace)
+        context.insert(card)
+        context.insert(budget)
+        context.insert(BudgetCardLink(budget: budget, card: card))
+        context.insert(PlannedExpense(title: "Rent", plannedAmount: 1_000, actualAmount: 1_000,
+            expenseDate: today, workspace: workspace, card: card, sourceBudgetID: budget.id))
+        context.insert(VariableExpense(descriptionText: "Groceries", amount: 45, transactionDate: today,
+                                       workspace: workspace, card: card))
+        context.insert(series)
+        for occurrence in IncomeScheduleEngine.occurrences(for: series, calendar: calendar) {
+            context.insert(Income(source: series.source, amount: series.amount, date: occurrence,
+                                  isPlanned: true, workspace: workspace, series: series))
+        }
+        if ProcessInfo.processInfo.arguments.contains("-uiTestIncomeReceiptHasDeposit") {
+            let depositDate = calendar.date(byAdding: .day, value: -4, to: planDate)!
+            context.insert(Income(source: "Bank deposit", amount: 1_430, date: depositDate,
+                                  isPlanned: false, workspace: workspace))
+        }
+        do {
+            try context.save()
+        } catch {
+            assertionFailure("Could not seed receipt scenario: \(error)")
+        }
+    }
+
     static func applyScenarioDataIfNeeded(container: ModelContainer) {
         guard isEnabled else { return }
 

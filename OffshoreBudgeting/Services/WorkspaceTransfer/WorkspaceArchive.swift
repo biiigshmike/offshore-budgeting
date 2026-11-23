@@ -364,6 +364,7 @@ struct IncomePayload: Codable, Equatable {
     var isException: Bool
     var seriesID: UUID?
     var cardID: UUID?
+    var sourcePlannedIncomeID: UUID? = nil
 }
 
 struct WorkspaceArchivePayloadCounts: Equatable {

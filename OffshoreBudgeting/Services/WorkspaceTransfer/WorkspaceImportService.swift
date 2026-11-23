@@ -59,6 +59,7 @@ struct WorkspaceImportService {
         let allocationSettlementIDMap = try makeIDMap(archive.allocationSettlements.map(\.id))
         let savingsAccountIDMap = try makeIDMap(archive.savingsAccounts.map(\.id))
         let incomeSeriesIDMap = try makeIDMap(archive.incomeSeries.map(\.id))
+        let incomeIDMap = try makeIDMap(archive.incomes.map(\.id))
 
         let importedWorkspace = Workspace(
             id: UUID(),
@@ -235,8 +236,9 @@ struct WorkspaceImportService {
             }
 
             for payload in archive.incomes {
+                guard let newID = incomeIDMap[payload.id] else { continue }
                 let income = Income(
-                    id: UUID(),
+                    id: newID,
                     source: payload.source,
                     amount: payload.amount,
                     date: payload.date,
@@ -244,7 +246,8 @@ struct WorkspaceImportService {
                     isException: payload.isException,
                     workspace: importedWorkspace,
                     series: object(payload.seriesID, in: incomeSeriesByOldID),
-                    card: object(payload.cardID, in: cardsByOldID)
+                    card: object(payload.cardID, in: cardsByOldID),
+                    sourcePlannedIncomeID: payload.sourcePlannedIncomeID.flatMap { incomeIDMap[$0] }
                 )
                 modelContext.insert(income)
             }

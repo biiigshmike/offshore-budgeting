@@ -248,7 +248,8 @@ struct WorkspaceExportService {
                     isPlanned: $0.isPlanned,
                     isException: $0.isException,
                     seriesID: $0.series?.id,
-                    cardID: $0.card?.id
+                    cardID: $0.card?.id,
+                    sourcePlannedIncomeID: $0.sourcePlannedIncomeID
                 )
             }
         )

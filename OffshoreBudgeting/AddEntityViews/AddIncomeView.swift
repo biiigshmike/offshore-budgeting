@@ -10,9 +10,15 @@ import SwiftData
 
 struct AddIncomeView: View {
 
+    private struct ExistingIncomeSelection: Identifiable {
+        let id = UUID()
+        let incomes: [Income]
+    }
+
     let workspace: Workspace
-    let initialDate: Date
-    let initialIsPlanned: Bool
+    private let plannedIncome: Income?
+    private let canUseExistingIncome: Bool
+    private var isRecordingReceipt: Bool { plannedIncome != nil }
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
@@ -34,18 +40,36 @@ struct AddIncomeView: View {
 
     @State private var showingInvalidAmountAlert: Bool = false
     @State private var showingInvalidRepeatAlert: Bool = false
+    @State private var showingPossibleDuplicate = false
+    @State private var duplicateDetails = ""
+    @State private var showingReceiptSaveError = false
+    @State private var receiptValidationError: TransactionEntryService.ValidationError?
+    @State private var isSavingReceipt = false
+    @State private var existingIncomeSelection: ExistingIncomeSelection?
+    @State private var didLinkExistingIncome = false
 
     init(workspace: Workspace, initialDate: Date, initialIsPlanned: Bool = false) {
         self.workspace = workspace
-        self.initialDate = initialDate
-        self.initialIsPlanned = initialIsPlanned
+        plannedIncome = nil
+        canUseExistingIncome = false
         _date = State(initialValue: initialDate)
         _isPlanned = State(initialValue: initialIsPlanned)
     }
 
-    var body: some View {
+    init(workspace: Workspace, plannedIncome: Income, canUseExistingIncome: Bool) {
+        self.workspace = workspace
+        self.plannedIncome = plannedIncome
+        self.canUseExistingIncome = canUseExistingIncome
+        _source = State(initialValue: plannedIncome.source)
+        _amountText = State(initialValue: CurrencyFormatter.editingString(from: plannedIncome.amount))
+        _date = State(initialValue: Calendar.current.startOfDay(for: .now))
+    }
+
+    private var incomeForm: some View {
         IncomeFormView(
             detailsTitle: "Details",
+            mode: isRecordingReceipt ? .receipt : .standard,
+            onUseExistingIncome: canUseExistingIncome ? { openExistingIncomePicker() } : nil,
             source: $source,
             amountText: $amountText,
             date: $date,
@@ -59,7 +83,16 @@ struct AddIncomeView: View {
             yearlyDayOfMonth: $yearlyDayOfMonth,
             endDate: $endDate
         )
-        .navigationTitle("Add Income")
+    }
+
+    var body: some View {
+        incomeForm
+        .navigationTitle(isRecordingReceipt ? Text("Record Income") : Text("Add Income"))
+        .appSheet(item: $existingIncomeSelection, onDismiss: {
+            if didLinkExistingIncome { dismiss() }
+        }) { selection in
+            existingIncomePicker(selection.incomes)
+        }
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
                 Button("Cancel") { dismiss() }
@@ -67,14 +100,14 @@ struct AddIncomeView: View {
             if #available(iOS 26.0, *) {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Save") { save() }
-                        .disabled(!canSave)
+                        .disabled(saveDisabled)
                         .tint(.accentColor)
                         .glassProminentButtonStyleCompat()
                 }
             } else {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Save") { save() }
-                        .disabled(!canSave)
+                        .disabled(saveDisabled)
                         .tint(.accentColor)
                         .controlSize(.large)
                         .buttonStyle(.plain)
@@ -93,8 +126,24 @@ struct AddIncomeView: View {
         } message: {
             Text("When Repeat is set, you must also set an End Date (and it cannot be before the start date).")
         }
+        .blocksAutomaticExpenseReview(while: showingPossibleDuplicate || showingReceiptSaveError)
+        .alert("Possible duplicate", isPresented: $showingPossibleDuplicate) {
+            Button("Cancel", role: .cancel) { }
+            Button("Record Anyway") { saveReceipt() }
+        } message: {
+            Text("Actual income with the same source or amount is already recorded on this date.\n\n\(duplicateDetails)")
+        }
+        .alert("Couldn’t save received income", isPresented: $showingReceiptSaveError) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            if let receiptValidationError {
+                Text(receiptValidationError.localizedDescription)
+            } else {
+                Text("Your entries are still in the form. Try saving again.")
+            }
+        }
         .onAppear {
-            guard DebugScreenshotFormDefaults.isEnabled else { return }
+            guard !isRecordingReceipt, DebugScreenshotFormDefaults.isEnabled else { return }
 
             if trimmedSource.isEmpty {
                 source = DebugScreenshotFormDefaults.incomeSource
@@ -103,6 +152,20 @@ struct AddIncomeView: View {
             let trimmedAmount = amountText.trimmingCharacters(in: .whitespacesAndNewlines)
             if trimmedAmount.isEmpty {
                 amountText = DebugScreenshotFormDefaults.incomeAmountText
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func existingIncomePicker(_ incomes: [Income]) -> some View {
+        if let plannedIncome {
+            NavigationStack {
+                ExistingReceivedIncomeView(
+                    workspaceID: workspace.id, plannedIncome: plannedIncome, incomes: incomes
+                ) {
+                    didLinkExistingIncome = true
+                    existingIncomeSelection = nil
+                }
             }
         }
     }
@@ -124,6 +187,7 @@ struct AddIncomeView: View {
     private var canSave: Bool {
         guard !trimmedSource.isEmpty else { return false }
         guard let amt = parsedAmount, amt > 0 else { return false }
+        if isRecordingReceipt { return amt.isFinite }
 
         if frequency != .none {
             guard let endDate else { return false }
@@ -133,9 +197,19 @@ struct AddIncomeView: View {
         return true
     }
 
+    private var saveDisabled: Bool {
+        !canSave || isSavingReceipt || showingPossibleDuplicate || showingReceiptSaveError
+    }
+
     // MARK: - Save
 
     private func save() {
+        guard !saveDisabled else { return }
+        if isRecordingReceipt {
+            checkForDuplicateReceipt()
+            return
+        }
+
         guard let amt = parsedAmount, amt > 0 else {
             showingInvalidAmountAlert = true
             return
@@ -208,5 +282,61 @@ struct AddIncomeView: View {
         }
 
         dismiss()
+    }
+
+    private func openExistingIncomePicker() {
+        guard let plannedIncome else { return }
+        do {
+            let workspaceID = workspace.id
+            let descriptor = FetchDescriptor<Income>(predicate: #Predicate {
+                $0.workspace?.id == workspaceID && !$0.isPlanned
+            })
+            let candidates = try ExistingReceivedIncomeView.candidates(
+                in: modelContext.fetch(descriptor), around: plannedIncome.date
+            )
+            existingIncomeSelection = ExistingIncomeSelection(incomes: candidates)
+        } catch {
+            receiptValidationError = nil
+            showingReceiptSaveError = true
+        }
+    }
+
+    private func checkForDuplicateReceipt() {
+        guard let amount = parsedAmount else { return }
+        do {
+            let matches = try TransactionEntryService().possibleReceivedIncomeDuplicates(
+                source: trimmedSource, amount: amount, date: date,
+                workspaceID: workspace.id, modelContext: modelContext
+            )
+            if matches.isEmpty {
+                saveReceipt()
+            } else {
+                duplicateDetails = matches.map { income in
+                    let day = income.date.formatted(.dateTime.month(.abbreviated).day().year())
+                    let amount = CurrencyFormatter.string(from: income.amount)
+                    return String(localized: "\(income.source) · \(day) · \(amount)")
+                }.joined(separator: "\n")
+                showingPossibleDuplicate = true
+            }
+        } catch {
+            receiptValidationError = nil
+            showingReceiptSaveError = true
+        }
+    }
+
+    private func saveReceipt() {
+        guard !isSavingReceipt, let plannedIncome, let amount = parsedAmount, amount.isFinite, amount > 0 else { return }
+        isSavingReceipt = true
+        do {
+            try TransactionEntryService().addIncome(
+                source: trimmedSource, amount: amount, date: date, isPlanned: false,
+                workspace: workspace, plannedIncome: plannedIncome, modelContext: modelContext
+            )
+            dismiss()
+        } catch {
+            isSavingReceipt = false
+            receiptValidationError = error as? TransactionEntryService.ValidationError
+            showingReceiptSaveError = true
+        }
     }
 }

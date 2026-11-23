@@ -77,21 +77,12 @@ struct HomeSavingsOutlookTile: View {
             ) {
                 VStack(alignment: .leading, spacing: 12) {
 
-                    HStack(alignment: .firstTextBaseline, spacing: 14) {
-                        metricBlock(
-                            title: String(localized: "budgetDetail.summary.projectedSavings", defaultValue: "Projected Savings", comment: "Budget detail summary row for projected savings."),
-                            value: projectedSavings,
-                            valueColor: .primary
-                        )
-
-                        Spacer(minLength: 0)
-
-                        metricBlock(
-                            title: String(localized: "budgetDetail.summary.actualSavings", defaultValue: "Actual Savings", comment: "Budget detail summary row for actual savings."),
-                            value: actualSavings,
-                            valueColor: actualValueColor
-                        )
-                    }
+                    HomeSavingsOutlookAmounts(
+                        projected: projectedSavings,
+                        actual: actualSavings,
+                        valueFont: .headline.weight(.semibold),
+                        actualColor: actualValueColor
+                    )
 
                     HomeSavingsGaugeRow(
                         percentText: percentText,
@@ -105,23 +96,67 @@ struct HomeSavingsOutlookTile: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel(String(localized: "homeWidget.savingsOutlook", defaultValue: "Savings Outlook", comment: "Pinned home widget title for Offshore Savings outlook."))
+        .accessibilityValue(Text("Projected Savings \(CurrencyFormatter.string(from: projectedSavings)), Actual Savings \(CurrencyFormatter.string(from: actualSavings))"))
         .accessibilityHint(String(localized: "homeSavingsOutlook.openHint", defaultValue: "Opens savings metrics", comment: "Accessibility hint for opening savings outlook metrics."))
     }
 
-    // MARK: - UI Helpers
+}
 
-    private func metricBlock(title: String, value: Double, valueColor: Color) -> some View {
+struct HomeSavingsOutlookAmounts: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
+    let projected: Double
+    let actual: Double
+    let valueFont: Font
+    var actualColor: Color = .primary
+    var showsExplanations = false
+
+    var body: some View {
+        let layout = dynamicTypeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 12))
+            : AnyLayout(HStackLayout(alignment: .top, spacing: 14))
+
+        layout {
+            metricBlock(
+                title: "Projected Savings",
+                value: projected,
+                valueColor: .primary,
+                explanation: "Expected income minus your share of planned expenses."
+            )
+            metricBlock(
+                title: "Actual Savings",
+                value: actual,
+                valueColor: actualColor,
+                explanation: "What’s left from income received after spending, bills still expected, and savings adjustments."
+            )
+        }
+    }
+
+    private func metricBlock(
+        title: LocalizedStringKey,
+        value: Double,
+        valueColor: Color,
+        explanation: LocalizedStringKey
+    ) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(title)
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
 
             Text(value, format: CurrencyFormatter.currencyStyle())
-                .font(.headline.weight(.semibold))
+                .font(valueFont)
                 .foregroundStyle(valueColor)
-        }
-    }
 
+            if showsExplanations {
+                Text(explanation)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .fixedSize(horizontal: false, vertical: true)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .combine)
+    }
 }
 
 // MARK: - Gauge Row

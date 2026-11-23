@@ -85,10 +85,6 @@ struct HomeSavingsOutlookMetricsView: View {
                     progressLine: progressInfo.lineText
                 )
 
-                Text("Actual Savings still allows for planned expenses whose actual amount has not been recorded. Offshore Savings is the separate running balance available for future expenses.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-
                 Button("How is this calculated?", systemImage: "info.circle") {
                     showingCalculationHelp = true
                 }
@@ -157,28 +153,16 @@ struct HomeSavingsOutlookMetricsView: View {
         progressLine: String
     ) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .firstTextBaseline) {
-                summaryMetric(title: String(localized: "homeSavingsOutlook.projected", defaultValue: "Projected", comment: "Short label for projected value."), value: projectedTotal)
-
-                Spacer(minLength: 0)
-
-                summaryMetric(title: String(localized: "homeSavingsOutlook.actual", defaultValue: "Actual", comment: "Short label for actual value."), value: actualTotal)
-            }
+            HomeSavingsOutlookAmounts(
+                projected: projectedTotal,
+                actual: actualTotal,
+                valueFont: .title3.weight(.semibold),
+                showsExplanations: true
+            )
 
             Text(progressLine)
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(.secondary)
-        }
-    }
-
-    private func summaryMetric(title: String, value: Double) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(title)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-
-            Text(value, format: CurrencyFormatter.currencyStyle())
-                .font(.title3.weight(.semibold))
         }
     }
 

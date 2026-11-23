@@ -46,6 +46,7 @@ struct HomeIncomeTile: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel(String(localized: "homeWidget.income", defaultValue: "Income", comment: "Pinned home widget title for income metrics."))
+        .accessibilityValue(Text("Planned Income \(CurrencyFormatter.string(from: plannedTotal)), Actual Income \(CurrencyFormatter.string(from: actualTotal))"))
         .accessibilityHint(String(localized: "homeWidget.income.accessibilityHint", defaultValue: "Opens income metrics", comment: "Accessibility hint for opening income widget details."))
     }
 

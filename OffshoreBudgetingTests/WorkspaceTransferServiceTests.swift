@@ -128,6 +128,10 @@ struct WorkspaceTransferServiceTests {
         let context = try makeContext()
         let source = try seedTransferWorkspace(in: context)
         let sourceWorkspace = source.workspace
+        let plan = try #require(sourceWorkspace.incomes?.first)
+        let receipt = Income(source: "Bank deposit", amount: 1_930, date: date(2026, 6, 14),
+                             isPlanned: false, workspace: sourceWorkspace, sourcePlannedIncomeID: plan.id)
+        context.insert(receipt)
 
         let archive = try WorkspaceExportService().exportArchive(
             for: sourceWorkspace,
@@ -154,7 +158,7 @@ struct WorkspaceTransferServiceTests {
         #expect(archive.assistantAliasRules.isEmpty)
         #expect(!archive.selectedSections.contains(.marinaAliases))
         #expect(archive.incomeSeries.count == 1)
-        #expect(archive.incomes.count == 1)
+        #expect(archive.incomes.count == 2)
 
         let data = try WorkspaceArchiveCoding.encode(archive)
         let decoded = try WorkspaceArchiveCoding.decode(data)
@@ -244,8 +248,12 @@ struct WorkspaceTransferServiceTests {
         let importedIncomeSeries = try fetchAll(IncomeSeries.self, in: context).filter { $0.workspace?.id == imported.id }
         let importedSeries = try #require(importedIncomeSeries.first)
         let importedIncomes = try fetchAll(Income.self, in: context).filter { $0.workspace?.id == imported.id }
-        #expect(importedIncomes.first?.series?.id == importedSeries.id)
-        #expect(importedIncomes.first?.card?.id == importedCard.id)
+        let importedPlan = try #require(importedIncomes.first { $0.isPlanned })
+        let importedReceipt = try #require(importedIncomes.first { !$0.isPlanned })
+        #expect(importedPlan.series?.id == importedSeries.id)
+        #expect(importedPlan.card?.id == importedCard.id)
+        #expect(importedPlan.id != plan.id)
+        #expect(importedReceipt.sourcePlannedIncomeID == importedPlan.id)
     }
 
     @Test func savingsSetAsideFlagSurvivesArchiveRoundTrip() throws {

@@ -61,6 +61,11 @@ struct OffshoreBudgetingApp: App {
         if Self.isUnitTestHost {
             return Self.makeModelContainer(useICloud: false, inMemoryOnly: true)
         }
+        if UITestSupport.isIncomeReceiptScenario {
+            let container = Self.makeModelContainer(useICloud: false, inMemoryOnly: true)
+            UITestSupport.seedIncomeReceiptScenario(context: container.mainContext)
+            return container
+        }
         UITestSupport.applyResetIfNeeded()
         #endif
 
