@@ -11,12 +11,14 @@ import SwiftData
 struct AddPresetView: View {
 
     let workspace: Workspace
+    let offersBudgetAfterSave: Bool
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
 
     @Query private var cards: [Card]
     @Query private var categories: [Category]
+    @Query private var budgets: [Budget]
 
     // MARK: - Form State
 
@@ -40,9 +42,16 @@ struct AddPresetView: View {
 
     @State private var showingInvalidAmountAlert: Bool = false
     @State private var showingMissingCardAlert: Bool = false
+    @State private var showingSaveError = false
+    @State private var showingApplyError = false
+    @State private var savedPreset: Preset?
+    @State private var selectedBudgetIDs: Set<UUID> = []
+    @State private var budgetSearchText = ""
+    @State private var budgetUnavailable = false
 
-    init(workspace: Workspace) {
+    init(workspace: Workspace, offersBudgetAfterSave: Bool = false) {
         self.workspace = workspace
+        self.offersBudgetAfterSave = offersBudgetAfterSave
         let workspaceID = workspace.id
 
         _cards = Query(
@@ -53,6 +62,11 @@ struct AddPresetView: View {
         _categories = Query(
             filter: #Predicate<Category> { $0.workspace?.id == workspaceID && $0.isArchived == false },
             sort: [SortDescriptor(\Category.name, order: .forward)]
+        )
+
+        _budgets = Query(
+            filter: #Predicate<Budget> { $0.workspace?.id == workspaceID },
+            sort: [SortDescriptor(\Budget.startDate, order: .reverse), SortDescriptor(\Budget.name)]
         )
     }
 
@@ -81,6 +95,27 @@ struct AddPresetView: View {
     }
 
     var body: some View {
+        Group {
+            if let savedPreset {
+                budgetOffer(for: savedPreset)
+            } else {
+                presetForm
+            }
+        }
+        .blocksAutomaticExpenseReview(while: showingSaveError || showingApplyError)
+        .alert("Unable to Save Preset", isPresented: $showingSaveError) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text("Try saving the preset again.")
+        }
+        .alert("Unable to Add Preset", isPresented: $showingApplyError) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text("Try adding the preset again.")
+        }
+    }
+
+    private var presetForm: some View {
         PresetFormView(
             workspace: workspace,
             cards: sortedCards,
@@ -152,8 +187,127 @@ struct AddPresetView: View {
         }
     }
 
+    private func budgetOffer(for preset: Preset) -> some View {
+        let eligibleBudgets = budgets.filter {
+            BudgetPresetApplicationService.isEligibleForOffer(preset, in: $0, workspace: workspace)
+        }
+        let eligibleIDs = Set(eligibleBudgets.map(\.id))
+        let selectedBudgets = eligibleBudgets.filter { selectedBudgetIDs.contains($0.id) }
+
+        return Group {
+            if eligibleBudgets.isEmpty {
+                List {
+                    budgetOfferGuidance(for: preset, hasEligibleBudgets: false)
+                }
+            } else {
+                budgetChecklist(for: preset, budgets: eligibleBudgets)
+            }
+        }
+        .listStyle(.insetGrouped)
+        .navigationTitle("Preset Saved")
+        .onAppear {
+            if eligibleBudgets.count == 1 {
+                selectedBudgetIDs = eligibleIDs
+            }
+        }
+        .onChange(of: eligibleIDs) { _, newIDs in
+            if !selectedBudgetIDs.isSubset(of: newIDs) {
+                selectedBudgetIDs.formIntersection(newIDs)
+                budgetUnavailable = true
+            }
+        }
+        .toolbar {
+            if eligibleBudgets.isEmpty {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { dismiss() }
+                }
+            } else {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Not Now") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button {
+                        apply(preset, to: selectedBudgets)
+                    } label: {
+                        if eligibleBudgets.count == 1, let budget = eligibleBudgets.first {
+                            Text("Add to \(budget.name)")
+                        } else if selectedBudgets.count > 1 {
+                            Text("Add to Budgets")
+                        } else {
+                            Text("Add to Budget")
+                        }
+                    }
+                    .disabled(selectedBudgets.isEmpty)
+                    .accessibilityIdentifier("applySavedPreset")
+                }
+                if eligibleBudgets.count > 1 {
+                    ToolbarItemGroup(placement: .bottomBar) {
+                        Button("Select All") { selectedBudgetIDs = eligibleIDs }
+                            .disabled(selectedBudgetIDs == eligibleIDs)
+                        Spacer()
+                        Button("Deselect All") { selectedBudgetIDs.removeAll() }
+                            .disabled(selectedBudgetIDs.isEmpty)
+                    }
+                }
+            }
+        }
+    }
+
+    private func budgetChecklist(for preset: Preset, budgets: [Budget]) -> some View {
+        let query = budgetSearchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        let filteredBudgets = budgets.filter { query.isEmpty || $0.name.localizedStandardContains(query) }
+
+        return List(selection: $selectedBudgetIDs) {
+            budgetOfferGuidance(for: preset, hasEligibleBudgets: true)
+            Section("Choose Budgets") {
+                ForEach(filteredBudgets) { budget in
+                    budgetLabel(budget)
+                        .tag(budget.id)
+                        .accessibilityValue(selectedBudgetIDs.contains(budget.id) ? Text("Selected") : Text("Not selected"))
+                        .accessibilityIdentifier("presetOfferBudget")
+                }
+                if filteredBudgets.isEmpty {
+                    ContentUnavailableView.search(text: query)
+                        .selectionDisabled()
+                }
+            }
+        }
+        .environment(\.editMode, .constant(.active))
+        .tint(.accentColor)
+        .searchable(text: $budgetSearchText, placement: .navigationBarDrawer(displayMode: .automatic), prompt: "Search Budgets")
+    }
+
+    private func budgetOfferGuidance(for preset: Preset, hasEligibleBudgets: Bool) -> some View {
+        Section {
+            Text("This preset is a reusable template. It hasn’t been added to a budget yet.")
+                .selectionDisabled()
+            if budgetUnavailable {
+                Text("Budget availability changed. Review your selection and try again.")
+                    .selectionDisabled()
+            }
+            if !hasEligibleBudgets {
+                Text("You can select this preset when you create a budget.")
+                if preset.frequency == .none {
+                    Text("This preset doesn’t repeat, so it generates no scheduled bills.")
+                }
+            }
+        }
+    }
+
+    private func budgetLabel(_ budget: Budget) -> some View {
+        let format = Date.IntervalFormatStyle(date: .abbreviated, time: .omitted)
+        let range = budget.startDate..<max(budget.startDate, budget.endDate)
+        return VStack(alignment: .leading, spacing: 4) {
+            Text(budget.name)
+            Text(format.format(range))
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+        }
+        .accessibilityElement(children: .combine)
+    }
+
     private func save() {
-        guard !trimmedTitle.isEmpty else { return }
+        guard savedPreset == nil, !trimmedTitle.isEmpty else { return }
         guard let amt = parsedPlannedAmount, amt > 0 else {
             showingInvalidAmountAlert = true
             return
@@ -181,7 +335,47 @@ struct AddPresetView: View {
         )
 
         modelContext.insert(preset)
-        WorkspaceProgressService.markCompleted(.preset, in: workspace)
-        dismiss()
+        do {
+            try WorkspaceProgressService.saveCompleting([.preset], in: workspace) {
+                try modelContext.save()
+            }
+        } catch {
+            modelContext.delete(preset)
+            showingSaveError = true
+            return
+        }
+
+        if offersBudgetAfterSave {
+            savedPreset = preset
+        } else {
+            dismiss()
+        }
+    }
+
+    private func apply(_ preset: Preset, to selectedBudgets: [Budget]) {
+        do {
+            let result = try BudgetPresetApplicationService.apply(
+                preset, to: selectedBudgets, in: workspace, requiresMatchingCardAndDates: true, modelContext: modelContext
+            )
+            switch result {
+            case .applied:
+                Task {
+                    await LocalNotificationService.syncFromUserDefaultsIfPossible(
+                        modelContext: modelContext, workspaceID: workspace.id
+                    )
+                }
+                dismiss()
+            case .alreadyLinked:
+                dismiss()
+            case .ineligible:
+                let remainingIDs = selectedBudgets.filter {
+                    BudgetPresetApplicationService.isEligibleForOffer(preset, in: $0, workspace: workspace)
+                }.map(\.id)
+                selectedBudgetIDs.formIntersection(remainingIDs)
+                budgetUnavailable = true
+            }
+        } catch {
+            showingApplyError = true
+        }
     }
 }

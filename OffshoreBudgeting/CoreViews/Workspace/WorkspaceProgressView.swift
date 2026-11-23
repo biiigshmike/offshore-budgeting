@@ -256,7 +256,7 @@ struct WorkspaceProgressView: View {
         case .category:
             AddCategoryView(workspace: workspace)
         case .preset:
-            AddPresetView(workspace: workspace)
+            AddPresetView(workspace: workspace, offersBudgetAfterSave: true)
         case .income:
             AddIncomeView(workspace: workspace, initialDate: Calendar.current.startOfDay(for: .now))
         case .budget:

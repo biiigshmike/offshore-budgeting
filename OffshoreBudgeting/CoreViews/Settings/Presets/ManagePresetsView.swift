@@ -175,7 +175,7 @@ struct ManagePresetsView: View {
             switch route {
             case .add:
                 NavigationStack {
-                    AddPresetView(workspace: workspace)
+                    AddPresetView(workspace: workspace, offersBudgetAfterSave: true)
                 }
             case .edit(let preset):
                 NavigationStack {

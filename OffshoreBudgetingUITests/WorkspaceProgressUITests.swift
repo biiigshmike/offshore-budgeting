@@ -4,6 +4,122 @@ import XCTest
 final class WorkspaceProgressUITests: XCTestCase {
     override func setUpWithError() throws { continueAfterFailure = false }
 
+    func testPresetOfferWithNoBudgetReturnsToSettingsPresets() {
+        let app = makeApp(extraArguments: ["-uiTestProgressCardOnly"])
+        app.launch()
+        openPresets(app)
+        app.buttons["Add Preset"].tap()
+        savePreset(named: "Rent", in: app)
+
+        XCTAssertTrue(app.staticTexts["You can select this preset when you create a budget."].exists)
+        XCTAssertFalse(app.buttons["applySavedPreset"].exists)
+        app.buttons["Done"].tap()
+        XCTAssertTrue(app.navigationBars["Presets"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Rent"].exists)
+    }
+
+    func testWorkspaceProgressPresetOfferAppliesToOnlyBudget() {
+        let app = makeApp(extraArguments: ["-uiTestProgressPresetOffer", "-uiTestProgressComplete"])
+        app.launch()
+        openSettings(app)
+        openProgress(app)
+        assertProgress(80, completed: 4, in: app)
+        addPresetFromProgress(in: app)
+        savePreset(named: "Rent", in: app)
+
+        let apply = app.buttons["applySavedPreset"]
+        XCTAssertEqual(apply.label, "Add to First Budget")
+        apply.tap()
+        XCTAssertTrue(app.navigationBars["Workspace Progress"].waitForExistence(timeout: 5))
+        assertProgress(100, completed: 5, in: app)
+        openBudget("First Budget", in: app)
+        reveal(app.staticTexts["Rent"].firstMatch, in: app)
+        assertPreset("Rent", isLinked: true, in: app)
+        app.navigationBars["Linked Presets"].buttons.firstMatch.tap()
+
+        app.buttons["Add Expense"].tap()
+        XCTAssertTrue(app.navigationBars["Add Expense"].waitForExistence(timeout: 5))
+        let cardPicker = app.buttons["Choose a Card"]
+        if cardPicker.exists {
+            cardPicker.tap()
+            app.buttons["First Card"].tap()
+        }
+        let description = app.textFields["Description"]
+        description.tap()
+        description.typeText("Coffee")
+        let amount = app.textFields["Amount"]
+        amount.tap()
+        amount.typeText("5")
+        app.buttons["Save"].tap()
+        XCTAssertTrue(app.navigationBars["Add Expense"].waitForNonExistence(timeout: 5))
+        reveal(app.staticTexts["Coffee"].firstMatch, in: app)
+    }
+
+    func testWorkspaceProgressNotNowKeepsTemplateAndMilestoneAfterRelaunch() {
+        let app = makeApp(extraArguments: ["-uiTestProgressPresetOffer", "-uiTestProgressComplete"])
+        app.launch()
+        openSettings(app)
+        openProgress(app)
+        addPresetFromProgress(in: app)
+        savePreset(named: "Rent", in: app)
+        app.buttons["Not Now"].tap()
+        XCTAssertTrue(app.navigationBars["Workspace Progress"].waitForExistence(timeout: 5))
+        assertProgress(100, completed: 5, in: app)
+
+        app.terminate()
+        app.launchArguments.removeAll { $0 == "-uiTestingReset" }
+        app.launchArguments.append("-uiTestPreserveScenarioData")
+        app.launch()
+        openSettings(app)
+        openProgress(app)
+        assertProgress(100, completed: 5, in: app)
+        openBudget("First Budget", in: app)
+        assertPreset("Rent", isLinked: false, in: app)
+    }
+
+    func testSettingsPresetOfferAppliesToEachSelectedBudget() {
+        let app = makeApp(extraArguments: ["-uiTestProgressPresetOffer", "-uiTestProgressOverlappingPresetOffer"])
+        app.launch()
+        openPresets(app)
+        app.buttons["Add Preset"].tap()
+        savePreset(named: "Internet", in: app)
+        app.buttons["Not Now"].tap()
+        XCTAssertTrue(app.navigationBars["Presets"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Internet"].exists)
+
+        app.buttons["Add Preset"].tap()
+        savePreset(named: "Rent", in: app)
+        let apply = app.buttons["applySavedPreset"]
+        XCTAssertFalse(apply.isEnabled)
+        let budgetRows = app.descendants(matching: .any).matching(identifier: "presetOfferBudget")
+        let first = budgetRows.matching(NSPredicate(format: "label BEGINSWITH %@", "First Budget")).firstMatch
+        let ended = budgetRows.matching(NSPredicate(format: "label BEGINSWITH %@", "Ended Budget")).firstMatch
+        XCTAssertTrue(first.exists && ended.exists)
+        app.buttons["Select All"].tap()
+        XCTAssertEqual(apply.label, "Add to Budgets")
+        app.buttons["Deselect All"].tap()
+        XCTAssertFalse(apply.isEnabled)
+        first.tap()
+        ended.tap()
+        XCTAssertTrue(apply.isEnabled)
+        XCTAssertEqual(apply.label, "Add to Budgets")
+        apply.tap()
+        XCTAssertTrue(app.navigationBars["Presets"].waitForExistence(timeout: 5))
+
+        openBudget("Unselected Budget", in: app)
+        assertPreset("Rent", isLinked: false, in: app)
+        app.navigationBars["Linked Presets"].buttons.firstMatch.tap()
+        goBack(from: "Unselected Budget", to: "Budgets", in: app)
+        openBudget("First Budget", in: app)
+        assertPreset("Internet", isLinked: false, in: app)
+        assertPreset("Rent", isLinked: true, in: app, openSheet: false)
+        app.navigationBars["Linked Presets"].buttons.firstMatch.tap()
+        goBack(from: "First Budget", to: "Budgets", in: app)
+        openBudget("Ended Budget", in: app)
+        reveal(app.staticTexts["Rent"].firstMatch, in: app)
+        assertPreset("Rent", isLinked: true, in: app)
+    }
+
     func testIncomeCancelPreservesProgressAndSaveCompletesSetup() throws {
         let app = makeApp()
         app.launch()
@@ -207,6 +323,61 @@ final class WorkspaceProgressUITests: XCTestCase {
         XCTAssertTrue(row.waitForExistence(timeout: 5))
         row.tap()
         XCTAssertTrue(app.navigationBars["Workspace Progress"].waitForExistence(timeout: 5))
+    }
+
+    private func openPresets(_ app: XCUIApplication) {
+        openSettings(app)
+        let presets = element("settings_managePresets", in: app)
+        reveal(presets, in: app)
+        presets.tap()
+        XCTAssertTrue(app.navigationBars["Presets"].waitForExistence(timeout: 5))
+    }
+
+    private func addPresetFromProgress(in app: XCUIApplication) {
+        let add = app.buttons["workspaceProgressStep_preset"]
+        reveal(add, in: app)
+        add.tap()
+    }
+
+    private func savePreset(named name: String, in app: XCUIApplication) {
+        XCTAssertTrue(app.navigationBars["Add Preset"].waitForExistence(timeout: 5))
+        app.buttons["Choose a Card"].tap()
+        app.buttons["First Card"].tap()
+        let title = app.textFields["Expense Name"]
+        title.tap()
+        title.typeText(name)
+        let amount = app.textFields["Planned Amount"]
+        amount.tap()
+        amount.typeText("1200")
+        app.buttons["Save"].tap()
+        XCTAssertTrue(app.navigationBars["Preset Saved"].waitForExistence(timeout: 5))
+    }
+
+    private func openBudget(_ name: String, in app: XCUIApplication) {
+        if !app.navigationBars["Budgets"].exists {
+            app.tabBars.buttons["Budgets"].tap()
+        }
+        XCTAssertTrue(app.navigationBars["Budgets"].waitForExistence(timeout: 5))
+        let budget = app.staticTexts[name].firstMatch
+        if name == "Ended Budget", !budget.exists {
+            let pastBudgets = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Past Budgets")).firstMatch
+            reveal(pastBudgets, in: app)
+            pastBudgets.tap()
+        }
+        reveal(budget, in: app)
+        budget.tap()
+        XCTAssertTrue(app.navigationBars[name].waitForExistence(timeout: 5))
+    }
+
+    private func assertPreset(_ name: String, isLinked: Bool, in app: XCUIApplication, openSheet: Bool = true) {
+        if openSheet {
+            app.buttons["Budget Actions"].tap()
+            app.buttons["Manage Presets"].tap()
+        }
+        XCTAssertTrue(app.navigationBars["Linked Presets"].waitForExistence(timeout: 5))
+        let toggle = app.switches.matching(NSPredicate(format: "label BEGINSWITH %@", name)).firstMatch
+        XCTAssertTrue(toggle.waitForExistence(timeout: 5))
+        XCTAssertEqual(toggle.value as? String, isLinked ? "1" : "0")
     }
 
     private func openMaintenance(_ app: XCUIApplication) {

@@ -19,6 +19,7 @@ struct ManagePresetsForBudgetSheet: View {
     
     @State private var showingUnlinkDeleteConfirm: Bool = false
     @State private var pendingUnlinkDelete: (() -> Void)? = nil
+    @State private var showingApplyError = false
     
     @Query private var presets: [Preset]
     
@@ -109,14 +110,18 @@ struct ManagePresetsForBudgetSheet: View {
                 pendingUnlinkDelete = nil
             }
         }
+        .blocksAutomaticExpenseReview(while: showingApplyError)
+        .alert("Unable to Add Preset", isPresented: $showingApplyError) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text("Try adding the preset again.")
+        }
     }
     
     // MARK: - Guardrails
     
     private func canLink(_ preset: Preset) -> Bool {
-        guard let budgetWorkspaceID = budget.workspace?.id else { return false }
-        guard let presetWorkspaceID = preset.workspace?.id else { return false }
-        return budgetWorkspaceID == workspace.id && presetWorkspaceID == workspace.id
+        BudgetPresetApplicationService.canLink(preset, to: budget, in: workspace)
     }
 
     private var visiblePresets: [Preset] {
@@ -128,11 +133,11 @@ struct ManagePresetsForBudgetSheet: View {
     // MARK: - Link Helpers
 
     private func isLinked(_ preset: Preset) -> Bool {
-        (budget.presetLinks ?? []).contains { $0.preset?.id == preset.id }
+        BudgetPresetApplicationService.isLinked(preset, to: budget)
     }
     
     private var linkedCardIDs: Set<UUID> {
-        Set((budget.cardLinks ?? []).compactMap { $0.card?.id })
+        BudgetPlannedExpenseStore.linkedCardIDs(for: budget)
     }
     
     private func bindingForPreset(_ preset: Preset) -> Binding<Bool> {
@@ -157,24 +162,18 @@ struct ManagePresetsForBudgetSheet: View {
     }
     
     private func link(_ preset: Preset) {
-        guard canLink(preset) else { return }
-        guard preset.isArchived == false else { return }
-        guard !isLinked(preset) else { return }
-        
-        let link = BudgetPresetLink(budget: budget, preset: preset)
-        modelContext.insert(link)
-        
-        materializePlannedExpenses(
-            for: budget,
-            selectedPresets: [preset],
-            selectedCardIDs: linkedCardIDs
-        )
-
-        Task {
-            await LocalNotificationService.syncFromUserDefaultsIfPossible(
-                modelContext: modelContext,
-                workspaceID: workspace.id
+        do {
+            let result = try BudgetPresetApplicationService.apply(
+                preset, to: budget, in: workspace, requiresMatchingCardAndDates: false, modelContext: modelContext
             )
+            guard result == .applied else { return }
+            Task {
+                await LocalNotificationService.syncFromUserDefaultsIfPossible(
+                    modelContext: modelContext, workspaceID: workspace.id
+                )
+            }
+        } catch {
+            showingApplyError = true
         }
     }
     
@@ -218,62 +217,6 @@ struct ManagePresetsForBudgetSheet: View {
         let orphans = (budget.presetLinks ?? []).filter { $0.preset == nil || $0.budget == nil }
         for link in orphans {
             modelContext.delete(link)
-        }
-    }
-    
-    // MARK: - Materialize (copied from AddBudgetView behavior)
-    
-    private func materializePlannedExpenses(
-        for budget: Budget,
-        selectedPresets: [Preset],
-        selectedCardIDs: Set<UUID>
-    ) {
-        for preset in selectedPresets {
-            let dates = PresetScheduleEngine.occurrences(for: preset, in: budget)
-            
-            let defaultCard: Card? = {
-                guard let card = preset.defaultCard else { return nil }
-                return selectedCardIDs.contains(card.id) ? card : nil
-            }()
-            
-            for date in dates {
-                if plannedExpenseExists(budgetID: budget.id, presetID: preset.id, date: date) {
-                    continue
-                }
-                
-                let planned = PlannedExpense(
-                    title: preset.title,
-                    plannedAmount: preset.plannedAmount,
-                    actualAmount: 0,
-                    expenseDate: date,
-                    workspace: workspace,
-                    card: defaultCard,
-                    category: preset.defaultCategory,
-                    sourcePresetID: preset.id,
-                    sourceBudgetID: budget.id
-                )
-                
-                modelContext.insert(planned)
-            }
-        }
-    }
-    
-    private func plannedExpenseExists(budgetID: UUID, presetID: UUID, date: Date) -> Bool {
-        let day = Calendar.current.startOfDay(for: date)
-        
-        let descriptor = FetchDescriptor<PlannedExpense>(
-            predicate: #Predicate { expense in
-                expense.sourceBudgetID == budgetID &&
-                expense.sourcePresetID == presetID &&
-                expense.expenseDate == day
-            }
-        )
-        
-        do {
-            let matches = try modelContext.fetch(descriptor)
-            return !matches.isEmpty
-        } catch {
-            return false
         }
     }
     

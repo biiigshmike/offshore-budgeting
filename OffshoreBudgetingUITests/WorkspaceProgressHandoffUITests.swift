@@ -114,6 +114,11 @@ final class WorkspaceProgressHandoffUITests: XCTestCase {
             let save = app.navigationBars.buttons["Save"]
             XCTAssertTrue(save.isEnabled)
             save.tap()
+            if step == "preset" {
+                let confirmation = app.navigationBars["Preset Saved"]
+                XCTAssertTrue(confirmation.waitForExistence(timeout: 5))
+                confirmation.buttons["Done"].tap()
+            }
             assertHandoff(in: app, completed: step == "budget")
             assertProgress((index + 2) * 20, completed: index + 2, in: app)
             XCTAssertFalse(app.buttons["workspaceProgressStep_\(step)"].exists)

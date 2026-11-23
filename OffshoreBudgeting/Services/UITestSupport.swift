@@ -281,6 +281,8 @@ enum UITestSupport {
             let category = Category(name: "Bills", hexColor: "#3B82F6")
             let budget = Budget(name: "First Budget", startDate: .now, endDate: .now)
             let cardOnly = arguments.contains("-uiTestProgressCardOnly")
+            let testsPresetOffer = arguments.contains("-uiTestProgressPresetOffer")
+            let hasOverlappingBudget = arguments.contains("-uiTestProgressOverlappingPresetOffer")
             if !cardOnly {
                 category.workspace = workspace
                 budget.workspace = workspace
@@ -295,11 +297,35 @@ enum UITestSupport {
                 progressCard = card
                 context.insert(card)
                 if !cardOnly {
-                    let preset = Preset(title: "Internet", plannedAmount: 60, workspace: workspace,
-                                        defaultCard: card, defaultCategory: category)
-                    context.insert(preset)
                     context.insert(BudgetCardLink(budget: budget, card: card))
-                    context.insert(BudgetPresetLink(budget: budget, preset: preset))
+                    if testsPresetOffer {
+                        let calendar = Calendar.current
+                        let month = calendar.dateInterval(of: .month, for: .now)!
+                        budget.startDate = month.start
+                        budget.endDate = calendar.date(byAdding: .day, value: -1, to: month.end)!
+                        if hasOverlappingBudget {
+                            let previousMonth = calendar.date(byAdding: .month, value: -1, to: month.start)!
+                            let endedBudget = Budget(
+                                name: "Ended Budget", startDate: previousMonth,
+                                endDate: calendar.date(byAdding: .day, value: -1, to: month.start)!,
+                                workspace: workspace
+                            )
+                            budget.startDate = previousMonth
+                            context.insert(endedBudget)
+                            context.insert(BudgetCardLink(budget: endedBudget, card: card))
+                            let unselectedBudget = Budget(
+                                name: "Unselected Budget", startDate: month.start, endDate: budget.endDate,
+                                workspace: workspace
+                            )
+                            context.insert(unselectedBudget)
+                            context.insert(BudgetCardLink(budget: unselectedBudget, card: card))
+                        }
+                    } else {
+                        let preset = Preset(title: "Internet", plannedAmount: 60, workspace: workspace,
+                                            defaultCard: card, defaultCategory: category)
+                        context.insert(preset)
+                        context.insert(BudgetPresetLink(budget: budget, preset: preset))
+                    }
                 }
             }
             if ProcessInfo.processInfo.arguments.contains("-uiTestProgressComplete") {
