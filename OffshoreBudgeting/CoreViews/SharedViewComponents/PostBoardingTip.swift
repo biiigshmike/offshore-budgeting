@@ -344,7 +344,7 @@ private struct TipSheet: View {
     private var continueButton: some View {
         Button(action: onContinue) {
             Text(buttonTitle)
-                .frame(maxWidth: .infinity, minHeight: 52)
+                .frame(maxWidth: .infinity, minHeight: 44)
         }
         .tint(.accentColor)
     }

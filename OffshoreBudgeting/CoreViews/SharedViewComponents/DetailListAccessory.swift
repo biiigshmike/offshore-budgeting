@@ -314,7 +314,7 @@ struct DetailListAccessory<SortMode: Hashable>: View {
         .padding(.horizontal, compact ? 6 : 12)
         .frame(minWidth: TintedGlassNavigationButton.minimumSize,
                maxWidth: equalWidths ? .infinity : nil,
-               minHeight: TintedGlassNavigationButton.minimumGlassHeight)
+               minHeight: TintedGlassNavigationButton.minimumSize)
         .contentShape(.interaction, Capsule())
         .contentShape(.contextMenuPreview, Capsule())
     }
@@ -409,7 +409,7 @@ private struct DetailCategoryAccessoryLabel: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .frame(height: max(overflowLineHeight + 8, TintedGlassNavigationButton.minimumGlassHeight))
+        .frame(height: max(overflowLineHeight + 8, TintedGlassNavigationButton.minimumSize))
         .accessibilityHidden(true)
     }
 }

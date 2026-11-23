@@ -257,7 +257,7 @@ struct OnboardingView: View {
                     getStartedTapped()
                 } label: {
                     Text("Get Started")
-                        .frame(maxWidth: .infinity, minHeight: 52)
+                        .frame(maxWidth: .infinity, minHeight: 44)
                 }
                 .glassProminentButtonStyleCompat()
                 .tint(.accentColor)
@@ -269,7 +269,7 @@ struct OnboardingView: View {
                     getStartedTapped()
                 } label: {
                     Text("Get Started")
-                        .frame(maxWidth: .infinity, minHeight: 52)
+                        .frame(maxWidth: .infinity, minHeight: 44)
                 }
                 .buttonStyle(.borderedProminent)
                 .tint(.accentColor)

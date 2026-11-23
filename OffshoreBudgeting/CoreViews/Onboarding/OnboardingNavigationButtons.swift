@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct OnboardingNavigationButtons: View {
-    nonisolated fileprivate static let glassButtonSize = TintedGlassNavigationButton.minimumGlassHeight
+    nonisolated fileprivate static let glassButtonSize = TintedGlassNavigationButton.minimumSize
 
     let isFinalStep: Bool
     let onBack: () -> Void

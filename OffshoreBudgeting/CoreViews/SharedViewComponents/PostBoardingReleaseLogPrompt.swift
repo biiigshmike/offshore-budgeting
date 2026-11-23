@@ -144,7 +144,7 @@ private struct CurrentReleaseLogSheet: View {
             if #available(iOS 26.0, *) {
                 Button(action: onContinue) {
                     Text("Continue")
-                        .frame(maxWidth: .infinity, minHeight: 52)
+                        .frame(maxWidth: .infinity, minHeight: 44)
                 }
                 .glassProminentButtonStyleCompat()
                 .tint(.accentColor)
@@ -153,7 +153,7 @@ private struct CurrentReleaseLogSheet: View {
             } else {
                 Button(action: onContinue) {
                     Text("Continue")
-                        .frame(maxWidth: .infinity, minHeight: 52)
+                        .frame(maxWidth: .infinity, minHeight: 44)
                 }
                 .buttonStyle(.borderedProminent)
                 .tint(.accentColor)

@@ -2,7 +2,6 @@ import SwiftUI
 
 struct TintedGlassNavigationButton: View {
     nonisolated static let minimumSize: CGFloat = 44
-    nonisolated static let minimumGlassHeight: CGFloat = 48
 
     let title: Text
     let tint: Color
@@ -17,7 +16,7 @@ struct TintedGlassNavigationButton: View {
                     .frame(
                         minWidth: Self.minimumSize,
                         maxWidth: .infinity,
-                        minHeight: Self.minimumGlassHeight
+                        minHeight: Self.minimumSize
                     )
                     .glassEffect(.clear.tint(tint.opacity(0.9)).interactive(), in: .capsule)
                     .contentShape(.capsule)
