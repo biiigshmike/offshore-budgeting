@@ -221,7 +221,7 @@ struct CategoryDetailView: View, Equatable {
         switch item {
         case .planned(let expense):
             Button { modal = .editPlanned(expense) } label: {
-                SharedPlannedExpenseRow(expense: expense, showsCardName: true)
+                SharedPlannedExpenseRow(expense: expense, showsCard: true, showsPlannedLabel: scope == .unified)
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
@@ -243,7 +243,7 @@ struct CategoryDetailView: View, Equatable {
             } trailing: { deleteButton(item) }
         case .variable(let expense):
             Button { modal = .editVariable(expense) } label: {
-                SharedVariableExpenseRow(expense: expense, showsCardName: true)
+                SharedVariableExpenseRow(expense: expense, showsCard: true)
             }
             .buttonStyle(.plain)
             .rowActions {

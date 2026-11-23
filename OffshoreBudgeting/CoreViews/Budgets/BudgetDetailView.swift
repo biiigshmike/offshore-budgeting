@@ -1036,12 +1036,13 @@ struct BudgetDetailView: View {
 
     private func plannedExpenseRow(
         _ expense: PlannedExpense,
-        presetBySourceID: [UUID: Preset]
+        presetBySourceID: [UUID: Preset],
+        showsPlannedLabel: Bool = false
     ) -> some View {
         Button {
             openEdit(expense)
         } label: {
-            BudgetPlannedExpenseRow(expense: expense, showsCardName: true)
+            SharedPlannedExpenseRow(expense: expense, showsCard: true, showsPlannedLabel: showsPlannedLabel)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -1082,7 +1083,7 @@ struct BudgetDetailView: View {
         Button {
             openEdit(expense)
         } label: {
-            BudgetVariableExpenseRow(expense: expense, showsCardName: true)
+            SharedVariableExpenseRow(expense: expense, showsCard: true)
         }
         .buttonStyle(.plain)
         .rowActions {
@@ -1109,7 +1110,7 @@ struct BudgetDetailView: View {
     ) -> some View {
         switch item {
         case .planned(let expense):
-            plannedExpenseRow(expense, presetBySourceID: presetBySourceID)
+            plannedExpenseRow(expense, presetBySourceID: presetBySourceID, showsPlannedLabel: true)
         case .variable(let expense):
             variableExpenseRow(expense)
         }
@@ -1657,232 +1658,6 @@ private struct BudgetSummaryBucketCard: View {
             Text(valueText)
                 .font(.subheadline.weight(.semibold))
         }
-    }
-}
-
-// MARK: - Rows
-
-private struct BudgetPlannedExpenseRow: View {
-    let expense: PlannedExpense
-    let showsCardName: Bool
-
-    private enum SharedBalancePresentation {
-        case none
-        case split
-        case offset
-    }
-
-    private var amountToShow: Double {
-        SavingsMathService.grossEffectiveAmount(for: expense)
-    }
-
-    private var offsetAmount: Double {
-        max(0, -(expense.offsetSettlement?.amount ?? 0))
-    }
-
-    private var splitAmount: Double {
-        max(0, expense.allocation?.allocatedAmount ?? 0)
-    }
-
-    private var presentation: SharedBalancePresentation {
-        if offsetAmount > 0 { return .offset }
-        if splitAmount > 0 { return .split }
-        return .none
-    }
-
-    private var indicatorSymbolName: String? {
-        switch presentation {
-        case .none:
-            return nil
-        case .split:
-            return "arrow.trianglehead.branch"
-        case .offset:
-            return "arrow.trianglehead.2.clockwise"
-        }
-    }
-
-    private var indicatorAccessibilityLabel: String {
-        switch presentation {
-        case .none:
-            return ""
-        case .split:
-            return "Shared balance split"
-        case .offset:
-            return "Shared balance offset"
-        }
-    }
-
-    private var categoryColor: Color {
-        if let hex = expense.category?.hexColor, let color = Color(hex: hex) {
-            return color
-        }
-        return Color.secondary.opacity(0.40)
-    }
-
-    var body: some View {
-        HStack(alignment: .top, spacing: 12) {
-
-            VStack(spacing: 4) {
-                Circle()
-                    .fill(categoryColor)
-                    .frame(width: 10, height: 10)
-
-                if let indicatorSymbolName {
-                    Image(systemName: indicatorSymbolName)
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                        .accessibilityLabel(indicatorAccessibilityLabel)
-                }
-            }
-            .frame(width: 12)
-            .padding(.top, 6)
-
-            // LEFT SIDE
-            VStack(alignment: .leading, spacing: 4) {
-                Text(expense.title)
-                    .font(.body)
-
-                HStack(spacing: 8) {
-                    Text(expense.displaySubtitle(includeCardName: showsCardName))
-                }
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-            }
-
-            Spacer(minLength: 0)
-
-            // RIGHT SIDE (CardDetailView styling)
-            Text(amountToShow, format: CurrencyFormatter.currencyStyle())
-                .font(.headline.weight(.semibold))
-                .foregroundStyle(.primary)
-                .multilineTextAlignment(.trailing)
-        }
-        .padding(.vertical, 4)
-    }
-}
-
-private struct BudgetVariableExpenseRow: View {
-    let expense: VariableExpense
-    let showsCardName: Bool
-
-    private enum SharedBalancePresentation {
-        case none
-        case split
-        case offset
-    }
-
-    private var offsetAmount: Double {
-        max(0, -(expense.offsetSettlement?.amount ?? 0))
-    }
-
-    private var splitAmount: Double {
-        max(0, expense.allocation?.allocatedAmount ?? 0)
-    }
-
-    private var originalChargeAmount: Double {
-        expense.ledgerDisplayAmount()
-    }
-
-    private var presentation: SharedBalancePresentation {
-        if offsetAmount > 0 { return .offset }
-        if splitAmount > 0 { return .split }
-        return .none
-    }
-
-    private var indicatorSymbolName: String? {
-        switch presentation {
-        case .none:
-            return nil
-        case .split:
-            return "arrow.trianglehead.branch"
-        case .offset:
-            return "arrow.trianglehead.2.clockwise"
-        }
-    }
-
-    private var indicatorAccessibilityLabel: String {
-        switch presentation {
-        case .none:
-            return ""
-        case .split:
-            return "Shared balance split"
-        case .offset:
-            return "Shared balance offset"
-        }
-    }
-
-    private var secondaryAmountSummary: String? {
-        switch presentation {
-        case .none:
-            return nil
-        case .split:
-            return "Split \(CurrencyFormatter.string(from: splitAmount))"
-        case .offset:
-            let offset = CurrencyFormatter.string(from: offsetAmount)
-            return "Offset \(offset)"
-        }
-    }
-
-    private var categoryColor: Color {
-        if let hex = expense.category?.hexColor, let color = Color(hex: hex) {
-            return color
-        }
-        return Color.secondary.opacity(0.40)
-    }
-
-    var body: some View {
-        HStack(alignment: .top, spacing: 12) {
-
-            VStack(spacing: 4) {
-                Circle()
-                    .fill(categoryColor)
-                    .frame(width: 10, height: 10)
-
-                if let indicatorSymbolName {
-                    Image(systemName: indicatorSymbolName)
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                        .accessibilityLabel(indicatorAccessibilityLabel)
-                }
-            }
-            .frame(width: 12)
-            .padding(.top, 6)
-
-            // LEFT SIDE
-            VStack(alignment: .leading, spacing: 4) {
-                Text(expense.descriptionText)
-                    .font(.body)
-
-                HStack(spacing: 8) {
-                    Text("\(AppDateFormat.abbreviatedDate(expense.transactionDate)) • \(expense.kind.displayTitle)")
-
-                    if showsCardName, let cardName = expense.card?.name {
-                        Text("•")
-                        Text(cardName)
-                    }
-                }
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-            }
-
-            Spacer(minLength: 0)
-
-            // RIGHT SIDE (CardDetailView styling)
-            VStack(alignment: .trailing, spacing: 2) {
-                Text(originalChargeAmount, format: CurrencyFormatter.currencyStyle())
-                    .font(.headline.weight(.semibold))
-                    .foregroundStyle(expense.kind == .credit ? .green : .primary)
-                    .multilineTextAlignment(.trailing)
-
-                if let secondaryAmountSummary {
-                    Text(secondaryAmountSummary)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.trailing)
-                }
-            }
-        }
-        .padding(.vertical, 4)
     }
 }
 

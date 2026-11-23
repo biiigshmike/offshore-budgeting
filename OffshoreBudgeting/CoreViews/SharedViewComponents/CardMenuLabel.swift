@@ -33,3 +33,35 @@ struct CardMenuLabel: View {
         }
     }
 }
+
+/// The expense picker artwork at a size suitable for a list row.
+struct SharedRowCardArtwork: View {
+    let name: String
+    let themeRaw: String
+    let effectRaw: String
+
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.displayScale) private var displayScale
+
+    var body: some View {
+        Group {
+            if let image = EntityMenuImageCache.card(
+                themeRaw: themeRaw,
+                effectRaw: effectRaw,
+                colorScheme: colorScheme,
+                scale: displayScale
+            ) {
+                Image(uiImage: image)
+                    .renderingMode(.original)
+                    .resizable()
+                    .scaledToFit()
+            } else {
+                Image(systemName: "creditcard")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .frame(width: 20, height: 13)
+        .accessibilityLabel(Text("Card: \(name)"))
+    }
+}

@@ -739,12 +739,13 @@ struct CardDetailView: View {
 
     private func plannedExpenseRow(
         _ expense: PlannedExpense,
-        presetBySourceID: [UUID: Preset]
+        presetBySourceID: [UUID: Preset],
+        showsPlannedLabel: Bool = false
     ) -> some View {
         Button {
             openEdit(expense)
         } label: {
-            SharedPlannedExpenseRow(expense: expense)
+            SharedPlannedExpenseRow(expense: expense, showsPlannedLabel: showsPlannedLabel)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -828,7 +829,7 @@ struct CardDetailView: View {
             ForEach(derived.unifiedExpensesFiltered, id: \.id) { item in
                 switch item {
                 case .planned(let expense):
-                    plannedExpenseRow(expense, presetBySourceID: derived.presetBySourceID)
+                    plannedExpenseRow(expense, presetBySourceID: derived.presetBySourceID, showsPlannedLabel: true)
                 case .variable(let expense):
                     variableExpenseRow(expense)
                 }

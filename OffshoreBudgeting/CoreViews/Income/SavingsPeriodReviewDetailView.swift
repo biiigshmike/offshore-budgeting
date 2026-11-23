@@ -215,7 +215,7 @@ struct SavingsPeriodReviewDetailView: View {
                 }
                 ForEach(summary.plannedExpenses) { expense in
                     Button { editingPlannedExpense = expense } label: {
-                        SharedPlannedExpenseRow(expense: expense, showsCardName: true)
+                        SharedPlannedExpenseRow(expense: expense, showsCard: true)
                     }
                     .buttonStyle(.plain)
                     .rowActions(allowsFullLeadingSwipe: false) {
@@ -265,7 +265,7 @@ struct SavingsPeriodReviewDetailView: View {
             } else {
                 ForEach(summary.variableExpenses) { expense in
                     Button { editingVariableExpense = expense } label: {
-                        SharedVariableExpenseRow(expense: expense, showsCardName: true)
+                        SharedVariableExpenseRow(expense: expense, showsCard: true)
                     }
                     .buttonStyle(.plain)
                     .rowActions {

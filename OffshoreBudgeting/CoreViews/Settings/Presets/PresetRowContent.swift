@@ -32,7 +32,7 @@ struct PresetRowContent: View {
 
             Text(scheduleText)
                 .fixedSize(horizontal: false, vertical: true)
-            Text("Assigned Budgets: \(assignedBudgetsCount)")
+            Self.assignedBudgetsText(assignedBudgetsCount)
 
             if let dueDate {
                 Text("Due \(AppDateFormat.abbreviatedDate(dueDate))")
@@ -45,5 +45,9 @@ struct PresetRowContent: View {
         .foregroundStyle(.secondary)
         .padding(.vertical, 4)
         .accessibilityElement(children: .combine)
+    }
+
+    static func assignedBudgetsText(_ count: Int) -> Text {
+        Text(String(localized: "preset.row.assignedBudgets", defaultValue: "\(count) assigned budgets", comment: "Number of budgets assigned to a preset."))
     }
 }

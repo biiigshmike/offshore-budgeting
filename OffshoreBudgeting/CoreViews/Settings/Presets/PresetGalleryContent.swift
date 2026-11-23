@@ -18,15 +18,9 @@ struct PresetGalleryContent: View {
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
-            Group {
-                if assignedBudgetsCount == 1 {
-                    Text("1 budget")
-                } else {
-                    Text("\(assignedBudgetsCount) budgets")
-                }
-            }
-            .font(.footnote)
-            .foregroundStyle(.secondary)
+            PresetRowContent.assignedBudgetsText(assignedBudgetsCount)
+                .font(.footnote)
+                .foregroundStyle(.secondary)
         }
         .foregroundStyle(.primary)
         .accessibilityElement(children: .combine)

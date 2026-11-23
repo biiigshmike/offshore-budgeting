@@ -7,169 +7,89 @@
 
 import SwiftUI
 
-// MARK: - Shared Planned Expense Row
-
 struct SharedPlannedExpenseRow: View {
     let expense: PlannedExpense
-    let showsCardName: Bool
-
-    init(expense: PlannedExpense, showsCardName: Bool = false) {
-        self.expense = expense
-        self.showsCardName = showsCardName
-    }
-
-    private enum SharedBalancePresentation {
-        case none
-        case split
-        case offset
-    }
-
-    private var amountToShow: Double {
-        SavingsMathService.grossEffectiveAmount(for: expense)
-    }
-
-    private var offsetAmount: Double {
-        max(0, -(expense.offsetSettlement?.amount ?? 0))
-    }
-
-    private var splitAmount: Double {
-        max(0, expense.allocation?.allocatedAmount ?? 0)
-    }
-
-    private var presentation: SharedBalancePresentation {
-        if offsetAmount > 0 { return .offset }
-        if splitAmount > 0 { return .split }
-        return .none
-    }
-
-    private var indicatorSymbolName: String? {
-        switch presentation {
-        case .none:
-            return nil
-        case .split:
-            return "arrow.trianglehead.branch"
-        case .offset:
-            return "arrow.trianglehead.2.clockwise"
-        }
-    }
-
-    private var indicatorAccessibilityLabel: String {
-        switch presentation {
-        case .none:
-            return ""
-        case .split:
-            return "Shared balance split"
-        case .offset:
-            return "Shared balance offset"
-        }
-    }
+    var showsCard = false
+    var showsPlannedLabel = false
+    var showsRecordedAmount = false
 
     var body: some View {
+        let balance = SharedExpenseBalance(
+            settlementAmount: expense.offsetSettlement?.amount,
+            allocationAmount: expense.allocation?.allocatedAmount
+        )
+        let grossAmount = SavingsMathService.grossEffectiveAmount(for: expense)
+        let amount = showsRecordedAmount ? expense.actualAmount : grossAmount
+        let isRecorded = expense.actualAmount > 0
+        let statusLabel = if !isRecorded {
+            String(localized: "Planned")
+        } else if CurrencyFormatter.roundedToCurrency(grossAmount) == CurrencyFormatter.roundedToCurrency(expense.plannedAmount) {
+            String(localized: "As Planned")
+        } else {
+            String(localized: "Recorded")
+        }
+
         SharedExpenseRowContent(
             title: expense.title,
-            subtitle: expense.displaySubtitle(includeCardName: showsCardName),
-            amount: CurrencyFormatter.string(from: amountToShow),
-            categoryColorHex: expense.category?.hexColor,
-            indicatorSymbolName: indicatorSymbolName,
-            indicatorAccessibilityLabel: indicatorAccessibilityLabel
+            date: expense.expenseDate,
+            amount: CurrencyFormatter.string(from: amount),
+            category: expense.category,
+            card: showsCard ? expense.card : nil,
+            typeLabel: showsPlannedLabel ? statusLabel : nil,
+            typeLabelShowsCheckmark: isRecorded,
+            accessibilityOnlyTypeLabel: showsPlannedLabel ? nil : statusLabel,
+            secondaryAmountSummary: balance.amountSummary
         )
     }
-
 }
-
-// MARK: - Shared Variable Expense Row
 
 struct SharedVariableExpenseRow: View {
     let expense: VariableExpense
-    let showsCardName: Bool
-
-    init(expense: VariableExpense, showsCardName: Bool = false) {
-        self.expense = expense
-        self.showsCardName = showsCardName
-    }
-
-    private enum SharedBalancePresentation {
-        case none
-        case split
-        case offset
-    }
-
-    private var offsetAmount: Double {
-        max(0, -(expense.offsetSettlement?.amount ?? 0))
-    }
-
-    private var splitAmount: Double {
-        max(0, expense.allocation?.allocatedAmount ?? 0)
-    }
-
-    private var originalChargeAmount: Double {
-        expense.ledgerDisplayAmount()
-    }
-
-    private var presentation: SharedBalancePresentation {
-        if offsetAmount > 0 { return .offset }
-        if splitAmount > 0 { return .split }
-        return .none
-    }
-
-    private var indicatorSymbolName: String? {
-        switch presentation {
-        case .none:
-            return nil
-        case .split:
-            return "arrow.trianglehead.branch"
-        case .offset:
-            return "arrow.trianglehead.2.clockwise"
-        }
-    }
-
-    private var indicatorAccessibilityLabel: String {
-        switch presentation {
-        case .none:
-            return ""
-        case .split:
-            return "Shared balance split"
-        case .offset:
-            return "Shared balance offset"
-        }
-    }
-
-    private var secondaryAmountSummary: String? {
-        switch presentation {
-        case .none:
-            return nil
-        case .split:
-            return "Split \(CurrencyFormatter.string(from: splitAmount))"
-        case .offset:
-            let offset = CurrencyFormatter.string(from: offsetAmount)
-            return "Offset \(offset)"
-        }
-    }
-
-    private var subtitle: String {
-        var parts = [
-            expense.transactionDate.formatted(date: .abbreviated, time: .omitted),
-            expense.kind.displayTitle
-        ]
-        if showsCardName, let cardName = expense.card?.name {
-            parts.append(cardName)
-        }
-        return parts.joined(separator: " • ")
-    }
+    var showsCard = false
 
     var body: some View {
+        let balance = SharedExpenseBalance(
+            settlementAmount: expense.offsetSettlement?.amount,
+            allocationAmount: expense.allocation?.allocatedAmount
+        )
+        let isDebit = expense.kind == .debit
+
         SharedExpenseRowContent(
             title: expense.descriptionText,
-            subtitle: subtitle,
-            amount: CurrencyFormatter.string(from: originalChargeAmount),
-            categoryColorHex: expense.category?.hexColor,
+            date: expense.transactionDate,
+            amount: CurrencyFormatter.string(from: expense.ledgerDisplayAmount()),
+            category: expense.category,
+            card: showsCard ? expense.card : nil,
             isCredit: expense.kind == .credit,
-            indicatorSymbolName: indicatorSymbolName,
-            indicatorAccessibilityLabel: indicatorAccessibilityLabel,
-            secondaryAmountSummary: secondaryAmountSummary
+            typeLabel: isDebit ? nil : expense.kind.displayTitle,
+            accessibilityOnlyTypeLabel: isDebit ? expense.kind.displayTitle : nil,
+            secondaryAmountSummary: balance.amountSummary
         )
     }
+}
 
+private enum SharedExpenseBalance {
+    case none
+    case split(Double)
+    case offset(Double)
+
+    init(settlementAmount: Double?, allocationAmount: Double?) {
+        if let settlementAmount, settlementAmount < 0 {
+            self = .offset(-settlementAmount)
+        } else if let allocationAmount, allocationAmount > 0 {
+            self = .split(allocationAmount)
+        } else {
+            self = .none
+        }
+    }
+
+    var amountSummary: String? {
+        switch self {
+        case .none: nil
+        case .split(let amount): String(localized: "Split \(CurrencyFormatter.string(from: amount))")
+        case .offset(let amount): String(localized: "Offset \(CurrencyFormatter.string(from: amount))")
+        }
+    }
 }
 
 // MARK: - Shared Category Dot

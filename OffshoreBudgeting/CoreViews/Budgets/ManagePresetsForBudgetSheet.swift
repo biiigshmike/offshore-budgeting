@@ -59,10 +59,9 @@ struct ManagePresetsForBudgetSheet: View {
                                         }
                                     }
                                     
-                                    HStack(spacing: 8) {
+                                    VStack(alignment: .leading, spacing: 2) {
                                         Text(preset.plannedAmount, format: CurrencyFormatter.currencyStyle())
-                                        Text("•")
-                                        Text(scheduleString(for: preset))
+                                        Text(PresetScheduleFormatter.humanReadableSchedule(for: preset))
                                     }
                                     .font(.footnote)
                                     .foregroundStyle(.secondary)
@@ -225,60 +224,5 @@ struct ManagePresetsForBudgetSheet: View {
     private var presetRowFootnoteText: String {
         let hasAnyCardsInSystem = (workspace.cards ?? []).isEmpty == false
         return hasAnyCardsInSystem ? "Card Unassigned" : "No Cards Available"
-    }
-    
-    private func scheduleString(for preset: Preset) -> String {
-        switch preset.frequency {
-        case .none: return "This preset does not repeat."
-            
-        case .daily:
-            return preset.interval == 1 ? "Daily" : "Every \(localizedInt(preset.interval)) days"
-            
-        case .weekly:
-            let day = weekdayName(preset.weeklyWeekday)
-            if preset.interval == 1 { return "Weekly • \(day)" }
-            return "Every \(localizedInt(preset.interval)) weeks • \(day)"
-            
-        case .monthly:
-            if preset.monthlyIsLastDay {
-                return preset.interval == 1 ? "Monthly • Last day" : "Every \(localizedInt(preset.interval)) months • Last day"
-            } else {
-                let day = ordinalDay(preset.monthlyDayOfMonth)
-                return preset.interval == 1 ? "Monthly • \(day)" : "Every \(localizedInt(preset.interval)) months • \(day)"
-            }
-            
-        case .yearly:
-            let month = monthName(preset.yearlyMonth)
-            let day = ordinalDay(preset.yearlyDayOfMonth)
-            if preset.interval == 1 { return "Yearly • \(month) \(day)" }
-            return "Every \(localizedInt(preset.interval)) years • \(month) \(day)"
-        }
-    }
-    
-    private func weekdayName(_ weekday: Int) -> String {
-        let clamped = min(7, max(1, weekday))
-        let symbols = Calendar.current.weekdaySymbols
-        return symbols[clamped - 1]
-    }
-    
-    private func monthName(_ month: Int) -> String {
-        let clamped = min(12, max(1, month))
-        let symbols = Calendar.current.monthSymbols
-        return symbols[clamped - 1]
-    }
-    
-    private func ordinalDay(_ day: Int) -> String {
-        let clamped = min(31, max(1, day))
-        if Locale.current.identifier.hasPrefix("es") {
-            return localizedInt(clamped)
-        }
-        let formatter = NumberFormatter()
-        formatter.numberStyle = .ordinal
-        formatter.locale = .current
-        return formatter.string(from: NSNumber(value: clamped)) ?? localizedInt(clamped)
-    }
-
-    private func localizedInt(_ value: Int) -> String {
-        AppNumberFormat.integer(value)
     }
 }

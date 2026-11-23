@@ -105,26 +105,7 @@ struct PresetRecordedPlannedExpensesReviewView: View {
     // MARK: - Row
 
     private func row(_ expense: PlannedExpense) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-
-            HStack(alignment: .firstTextBaseline) {
-                Text(expense.title)
-                    .font(.body)
-
-                Spacer(minLength: 0)
-
-                Text(expense.actualAmount, format: CurrencyFormatter.currencyStyle())
-                    .font(.headline.weight(.semibold))
-                    .foregroundStyle(.primary)
-            }
-
-            HStack(spacing: 8) {
-                Text(expense.displaySubtitle())
-            }
-            .font(.footnote)
-            .foregroundStyle(.secondary)
-        }
-        .padding(.vertical, 4)
+        SharedPlannedExpenseRow(expense: expense, showsCard: true, showsRecordedAmount: true)
     }
 
     // MARK: - Data

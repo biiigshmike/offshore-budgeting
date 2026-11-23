@@ -1,65 +1,64 @@
 import SwiftUI
 
-/// The common expense layout accepts display values so saved conversations do not
-/// depend on live SwiftData records or change when an expense is edited later.
 struct SharedExpenseRowContent: View {
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-
     let title: String
-    let subtitle: String
+    let date: Date
     let amount: String
-    var categoryColorHex: String?
+    let category: Category?
+    var card: Card?
     var isCredit = false
-    var indicatorSymbolName: String?
-    var indicatorAccessibilityLabel = ""
+    var typeLabel: String?
+    var typeLabelShowsCheckmark = false
+    var accessibilityOnlyTypeLabel: String?
     var secondaryAmountSummary: String?
 
+    private var accessibilitySummary: String {
+        let categoryName = category?.name ?? String(localized: "Uncategorized")
+        return [
+            title,
+            AppDateFormat.abbreviatedDate(date),
+            amount,
+            typeLabel ?? accessibilityOnlyTypeLabel,
+            secondaryAmountSummary,
+            String(localized: "Category: \(categoryName)"),
+            card.map { String(localized: "Card: \($0.name)") }
+        ].compactMap { $0 }.joined(separator: ", ")
+    }
+
     var body: some View {
-        HStack(alignment: .top, spacing: 12) {
-            VStack(spacing: 4) {
-                Circle()
-                    .fill(categoryColorHex.flatMap { Color(hex: $0) } ?? Color.secondary.opacity(0.35))
-                    .frame(width: 10, height: 10)
-                    .accessibilityHidden(true)
-                if let indicatorSymbolName {
-                    Image(systemName: indicatorSymbolName)
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                        .accessibilityLabel(indicatorAccessibilityLabel)
-                }
-            }
-            .frame(width: 12)
-            .padding(.top, 6)
-
-            let layout = dynamicTypeSize.isAccessibilitySize
-                ? AnyLayout(VStackLayout(alignment: .leading, spacing: 6))
-                : AnyLayout(HStackLayout(alignment: .top, spacing: 12))
-            layout {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(title)
-                        .font(.body)
-                    Text(subtitle)
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-
-                VStack(alignment: dynamicTypeSize.isAccessibilitySize ? .leading : .trailing, spacing: 2) {
-                    Text(amount)
-                        .font(.headline.weight(.semibold))
-                        .foregroundStyle(isCredit ? .green : .primary)
-                        .fixedSize(horizontal: false, vertical: true)
-                    if let secondaryAmountSummary {
-                        Text(secondaryAmountSummary)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+        DatedAmountRowLayout(
+            title: title,
+            titleFont: .body,
+            date: date,
+            dateFont: .footnote,
+            category: category,
+            showsCategory: true,
+            card: card
+        ) {
+            Text(amount)
+                .font(.headline.weight(.semibold))
+                .foregroundStyle(isCredit ? .green : .primary)
+                .fixedSize(horizontal: false, vertical: true)
+        } details: { alignment in
+            VStack(alignment: alignment, spacing: 2) {
+                if let typeLabel {
+                    HStack(alignment: .firstTextBaseline, spacing: 4) {
+                        if typeLabelShowsCheckmark {
+                            Image(systemName: "checkmark")
+                                .accessibilityHidden(true)
+                        }
+                        Text(typeLabel)
                     }
                 }
-                .multilineTextAlignment(dynamicTypeSize.isAccessibilitySize ? .leading : .trailing)
+                if let secondaryAmountSummary {
+                    Text(secondaryAmountSummary)
+                }
             }
+            .font(.caption)
+            .foregroundStyle(.secondary)
         }
         .padding(.vertical, 4)
         .accessibilityElement(children: .combine)
+        .accessibilityLabel(Text(accessibilitySummary))
     }
 }

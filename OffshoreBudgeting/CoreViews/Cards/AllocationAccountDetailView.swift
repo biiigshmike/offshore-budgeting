@@ -586,45 +586,54 @@ struct AllocationAccountDetailView: View {
     }
 
     private func ledgerRowView(_ row: AllocationLedgerService.LedgerRow) -> some View {
-        HStack(alignment: .top, spacing: 12) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(row.title)
-                    .font(.headline)
+        let artwork = linkedExpenseArtwork(for: row)
+        let runningBalance = CurrencyFormatter.normalizedCurrencyDisplayValue(row.runningBalance)
 
-                HStack(spacing: 6) {
-                    Text(row.type.rawValue)
-                    Text("•")
-                    Text(row.date, format: Date.FormatStyle(date: .abbreviated, time: .omitted))
-                }
-                .font(.caption)
-                .foregroundStyle(.secondary)
+        return DatedAmountRowLayout(
+            title: row.title,
+            titleFont: .headline,
+            date: row.date,
+            dateFont: .caption,
+            category: artwork?.category,
+            showsCategory: artwork != nil,
+            card: artwork?.card
+        ) {
+            Text(
+                CurrencyFormatter.normalizedCurrencyDisplayValue(row.amount),
+                format: CurrencyFormatter.currencyStyle()
+            )
+            .font(.body.weight(.semibold))
+            .fixedSize(horizontal: false, vertical: true)
+        } details: { alignment in
+            VStack(alignment: alignment, spacing: 2) {
+                Text(runningBalance, format: CurrencyFormatter.currencyStyle())
+                    .foregroundStyle(runningBalanceColor(for: row.runningBalance))
+                    .accessibilityLabel(
+                        Text("Running balance \(runningBalance, format: CurrencyFormatter.currencyStyle())")
+                    )
 
-                if let subtitle = row.subtitle, !subtitle.isEmpty {
-                    Text(subtitle)
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
-
+                Text(row.type == .charge ? String(localized: "Charge") : String(localized: "Settlement"))
+                    .foregroundStyle(.secondary)
             }
-
-            Spacer(minLength: 12)
-
-            VStack(alignment: .trailing, spacing: 2) {
-                Text(
-                    CurrencyFormatter.normalizedCurrencyDisplayValue(row.amount),
-                    format: CurrencyFormatter.currencyStyle()
-                )
-                .font(.body.weight(.semibold))
-
-                Text(
-                    CurrencyFormatter.normalizedCurrencyDisplayValue(row.runningBalance),
-                    format: CurrencyFormatter.currencyStyle()
-                )
-                .font(.caption)
-                .foregroundStyle(runningBalanceColor(for: row.runningBalance))
-            }
+            .font(.caption)
+            .fixedSize(horizontal: false, vertical: true)
         }
         .padding(.vertical, 2)
+        .accessibilityElement(children: .combine)
+    }
+
+    private func linkedExpenseArtwork(
+        for row: AllocationLedgerService.LedgerRow
+    ) -> (card: Card?, category: Category?)? {
+        let allocation = allocation(for: row.allocationID)
+        let settlement = settlement(for: row.settlementID)
+        if let expense = allocation?.expense ?? settlement?.expense {
+            return (expense.card, expense.category)
+        }
+        if let plannedExpense = allocation?.plannedExpense ?? settlement?.plannedExpense {
+            return (plannedExpense.card, plannedExpense.category)
+        }
+        return nil
     }
 
     private func runningBalanceColor(for balance: Double) -> Color {

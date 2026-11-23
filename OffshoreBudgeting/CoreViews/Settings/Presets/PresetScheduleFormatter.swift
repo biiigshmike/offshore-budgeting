@@ -3,40 +3,44 @@ import Foundation
 enum PresetScheduleFormatter {
 
     static func humanReadableSchedule(for preset: Preset) -> String {
-        let freq = preset.frequency
         let interval = max(1, preset.interval)
+        let count = AppNumberFormat.integer(interval)
 
-        switch freq {
+        switch preset.frequency {
         case .none:
-            return "None"
+            return String(localized: "preset.schedule.none", defaultValue: "Does not repeat")
 
         case .daily:
-            if interval == 1 { return "Daily" }
-            return "Every \(localizedInt(interval)) days"
+            if interval == 1 { return preset.frequency.displayName }
+            return String(localized: "Every \(count) days")
 
         case .weekly:
             let weekday = weekdayName(for: preset.weeklyWeekday)
-            if interval == 1 { return "Weekly • \(weekday)" }
-            return "Every \(localizedInt(interval)) weeks • \(weekday)"
+            if interval == 1 {
+                return String(localized: "preset.schedule.weekly", defaultValue: "Every \(weekday)")
+            }
+            return String(localized: "preset.schedule.weeklyInterval", defaultValue: "Every \(count) weeks on \(weekday)")
 
         case .monthly:
-            let anchor: String
             if preset.monthlyIsLastDay {
-                anchor = "Last day"
-            } else {
-                anchor = ordinalDay(preset.monthlyDayOfMonth)
+                if interval == 1 {
+                    return String(localized: "preset.schedule.monthlyLastDay", defaultValue: "On the last day of each month")
+                }
+                return String(localized: "preset.schedule.monthlyLastDayInterval", defaultValue: "Every \(count) months on the last day")
             }
-
-            if interval == 1 { return "Monthly • \(anchor)" }
-            return "Every \(localizedInt(interval)) months • \(anchor)"
+            let day = ordinalDay(preset.monthlyDayOfMonth)
+            if interval == 1 {
+                return String(localized: "preset.schedule.monthly", defaultValue: "On the \(day) of each month")
+            }
+            return String(localized: "preset.schedule.monthlyInterval", defaultValue: "Every \(count) months on the \(day)")
 
         case .yearly:
             let month = monthAbbreviation(for: preset.yearlyMonth)
-            let day = ordinalDay(preset.yearlyDayOfMonth)
-            let anchor = "\(month) \(day)"
-
-            if interval == 1 { return "Yearly • \(anchor)" }
-            return "Every \(localizedInt(interval)) years • \(anchor)"
+            let day = AppNumberFormat.integer(max(1, min(31, preset.yearlyDayOfMonth)))
+            if interval == 1 {
+                return String(localized: "preset.schedule.yearly", defaultValue: "Every year on \(month) \(day)")
+            }
+            return String(localized: "preset.schedule.yearlyInterval", defaultValue: "Every \(count) years on \(month) \(day)")
         }
     }
 
@@ -56,16 +60,12 @@ enum PresetScheduleFormatter {
 
     private static func ordinalDay(_ day: Int) -> String {
         let d = max(1, min(31, day))
-        if Locale.current.identifier.hasPrefix("es") {
-            return localizedInt(d)
+        if Locale.current.language.languageCode?.identifier == "es" {
+            return AppNumberFormat.integer(d)
         }
         let formatter = NumberFormatter()
         formatter.numberStyle = .ordinal
         formatter.locale = .current
-        return formatter.string(from: NSNumber(value: d)) ?? localizedInt(d)
-    }
-
-    private static func localizedInt(_ value: Int) -> String {
-        AppNumberFormat.integer(value)
+        return formatter.string(from: NSNumber(value: d)) ?? AppNumberFormat.integer(d)
     }
 }

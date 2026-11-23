@@ -215,9 +215,9 @@ struct ReviewTodayView: View {
         } label: {
             switch entry {
             case .variable(let expense):
-                SharedVariableExpenseRow(expense: expense, showsCardName: true)
+                SharedVariableExpenseRow(expense: expense, showsCard: true)
             case .planned(let expense):
-                SharedPlannedExpenseRow(expense: expense, showsCardName: true)
+                SharedPlannedExpenseRow(expense: expense, showsCard: true, showsPlannedLabel: true)
             }
         }
         .buttonStyle(.plain)

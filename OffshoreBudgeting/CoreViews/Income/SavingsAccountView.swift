@@ -871,29 +871,52 @@ private struct SavingsChartPoint: Identifiable {
 }
 
 struct SavingsLedgerRow: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
     let entry: SavingsLedgerEntry
 
-    private var subtitle: String {
-        entry.ledgerKindLabel
+    private var entryKindLabel: String? {
+        let title = entry.ledgerDisplayTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        let kind = entry.ledgerKindLabel
+        if let match = title.range(of: kind, options: [.anchored, .caseInsensitive]),
+           title[match.upperBound...].first.map({ $0.isWhitespace || $0.isPunctuation }) ?? true {
+            return nil
+        }
+        return kind
     }
 
     var body: some View {
-        HStack(spacing: 12) {
+        let layout = dynamicTypeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 6))
+            : AnyLayout(HStackLayout(alignment: .top, spacing: 12))
+
+        layout {
             VStack(alignment: .leading, spacing: 4) {
                 Text(entry.ledgerDisplayTitle)
                     .font(.headline)
+                    .fixedSize(horizontal: false, vertical: true)
 
-                Text("\(subtitle) • \(AppDateFormat.abbreviatedDate(entry.date))")
+                Text(AppDateFormat.abbreviatedDate(entry.date))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
 
-            Spacer()
+            VStack(alignment: dynamicTypeSize.isAccessibilitySize ? .leading : .trailing, spacing: 2) {
+                Text(entry.amount, format: CurrencyFormatter.currencyStyle())
+                    .font(.headline)
+                    .foregroundStyle(entry.amount >= 0 ? .green : .red)
 
-            Text(entry.amount, format: CurrencyFormatter.currencyStyle())
-                .font(.headline)
-                .foregroundStyle(entry.amount >= 0 ? .green : .red)
+                if let entryKindLabel {
+                    Text(entryKindLabel)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .multilineTextAlignment(dynamicTypeSize.isAccessibilitySize ? .leading : .trailing)
+            .fixedSize(horizontal: false, vertical: true)
         }
+        .accessibilityElement(children: .combine)
     }
 }
 

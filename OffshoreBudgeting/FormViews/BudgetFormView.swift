@@ -17,7 +17,6 @@ struct BudgetFormView: View {
     let presets: [Preset]
     let categories: [Category]
     
-    let scheduleString: (Preset) -> String
     var reconfiguresExistingGoals = false
     var plannedGoalContributions: [UUID: Double]? = nil
     var maximumGoalSuggestionProvider: (() throws -> [UUID: CategoryGoalSuggestion])? = nil
@@ -85,7 +84,7 @@ struct BudgetFormView: View {
             ForEach(presets) { preset in
                 Toggle(isOn: bindingForPreset(preset)) {
                     Text(verbatim: presetMenuTitle(preset))
-                    Text(scheduleString(preset))
+                    Text(PresetScheduleFormatter.humanReadableSchedule(for: preset))
                 }
                 .menuActionDismissBehavior(.disabled)
             }
@@ -234,7 +233,7 @@ struct BudgetFormView: View {
                                     .foregroundStyle(.secondary)
                             }
                         }
-                        Text(scheduleString(preset))
+                        Text(PresetScheduleFormatter.humanReadableSchedule(for: preset))
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                     }

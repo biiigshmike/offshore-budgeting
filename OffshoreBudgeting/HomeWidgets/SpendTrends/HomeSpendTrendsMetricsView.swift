@@ -548,9 +548,9 @@ private struct SpendTrendsBucketBreakdownView: View {
     private func row(for item: HomeSpendTrendsAggregator.ExpenseItem) -> some View {
         switch item {
         case .planned(let expense):
-            SharedPlannedExpenseRow(expense: expense, showsCardName: showsCardName)
+            SharedPlannedExpenseRow(expense: expense, showsCard: showsCardName, showsPlannedLabel: true)
         case .variable(let expense):
-            SharedVariableExpenseRow(expense: expense, showsCardName: showsCardName)
+            SharedVariableExpenseRow(expense: expense, showsCard: showsCardName)
         }
     }
 

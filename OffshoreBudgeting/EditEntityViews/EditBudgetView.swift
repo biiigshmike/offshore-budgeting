@@ -92,7 +92,6 @@ struct EditBudgetView: View {
             cards: cards,
             presets: visiblePresets,
             categories: goalCategories,
-            scheduleString: scheduleString(for:),
             reconfiguresExistingGoals: true,
             plannedGoalContributions: BudgetCategoryGoalStore.plannedContributions(
                 presets: presets, selectedPresetIDs: selectedPresetIDs, selectedCardIDs: selectedCardIDs,
@@ -416,27 +415,5 @@ struct EditBudgetView: View {
         } catch {
             return false
         }
-    }
-
-    // MARK: - Display
-
-    private func scheduleString(for preset: Preset) -> String {
-        guard preset.interval > 1 else { return preset.frequency.displayName }
-        switch preset.frequency {
-        case .none:
-            return preset.frequency.displayName
-        case .daily:
-            return String(localized: "Every \(localizedInt(preset.interval)) days")
-        case .weekly:
-            return String(localized: "Every \(localizedInt(preset.interval)) weeks")
-        case .monthly:
-            return String(localized: "Every \(localizedInt(preset.interval)) months")
-        case .yearly:
-            return String(localized: "Every \(localizedInt(preset.interval)) years")
-        }
-    }
-
-    private func localizedInt(_ value: Int) -> String {
-        AppNumberFormat.integer(value)
     }
 }
