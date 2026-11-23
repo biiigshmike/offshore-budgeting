@@ -235,18 +235,21 @@ struct SettingsView: View {
         } label: {
             if row.id == .about {
                 aboutRow
-            } else {
+            } else if row.id == .workspaceProgress {
+                let percentage = WorkspaceProgressService.percentage(in: workspace)
+                let appearance = WorkspaceProgressAppearance(percentage: percentage)
                 HStack {
                     SettingsRow(
                         title: row.title,
-                        systemImage: row.id == .workspaceProgress ? WorkspaceProgressService.settingsSymbol(in: workspace) : row.systemImage,
-                        tint: row.tint
+                        systemImage: WorkspaceProgressService.settingsSymbol(in: workspace),
+                        tint: appearance.tint,
+                        iconForeground: appearance.gaugeForeground
                     )
-                    if row.id == .workspaceProgress {
-                        Text(Double(WorkspaceProgressService.percentage(in: workspace)) / 100, format: .percent.precision(.fractionLength(0)))
-                            .foregroundStyle(.secondary)
-                    }
+                    Text(Double(percentage) / 100, format: .percent.precision(.fractionLength(0)))
+                        .foregroundStyle(.secondary)
                 }
+            } else {
+                SettingsRow(title: row.title, systemImage: row.systemImage, tint: row.tint)
             }
         }
         .accessibilityIdentifier(row.id == .workspaceProgress ? "settingsWorkspaceProgress" : "settings_\(row.id)")
@@ -297,7 +300,7 @@ struct SettingsView: View {
                 id: "about",
                 rows: [
                     SettingsRowModel(id: .about, title: appDisplayName, systemImage: "", tint: .clear),
-                    SettingsRowModel(id: .workspaceProgress, title: String(localized: "Workspace Progress"), systemImage: WorkspaceProgressService.settingsSymbol(in: workspace), tint: .green),
+                    SettingsRowModel(id: .workspaceProgress, title: String(localized: "Workspace Progress"), systemImage: "", tint: .clear),
                     SettingsRowModel(
                         id: .help,
                         title: String(localized: "help.title", defaultValue: "Help", comment: "Title for help screen."),
@@ -460,6 +463,7 @@ private struct SettingsRow: View {
     let title: String
     let systemImage: String
     let tint: Color
+    var iconForeground: Color = .white
 
     var body: some View {
         HStack(spacing: 12) {
@@ -469,7 +473,7 @@ private struct SettingsRow: View {
 
                 Image(systemName: systemImage)
                     .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(iconForeground)
             }
             .frame(width: 28, height: 28)
 

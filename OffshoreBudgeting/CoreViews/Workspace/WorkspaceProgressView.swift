@@ -126,15 +126,16 @@ struct WorkspaceProgressView: View {
     }
 
     private var progressSummary: some View {
+        let percentage = WorkspaceProgressService.percentage(in: workspace)
         let layout = dynamicTypeSize.isAccessibilitySize
             ? AnyLayout(VStackLayout(alignment: .leading, spacing: 16))
             : AnyLayout(HStackLayout(alignment: .center, spacing: 16))
 
         return layout {
             VStack(spacing: 12) {
-                progressRing
+                progressRing(percentage: percentage)
 
-                Text(Double(WorkspaceProgressService.percentage(in: workspace)) / 100, format: .percent.precision(.fractionLength(0)))
+                Text(Double(percentage) / 100, format: .percent.precision(.fractionLength(0)))
                     .font(.title.weight(.semibold))
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
@@ -156,17 +157,17 @@ struct WorkspaceProgressView: View {
         .padding(.vertical, 12)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Workspace progress for \(workspace.name)")
-        .accessibilityValue("\(WorkspaceProgressService.percentage(in: workspace)) percent, \(completedSteps.count) of 5 completed")
+        .accessibilityValue("\(percentage) percent, \(completedSteps.count) of 5 completed")
         .accessibilityIdentifier("workspaceProgressSummary")
     }
 
-    private var progressRing: some View {
-        let tint = Color(hex: workspace.hexColor) ?? .accentColor
+    private func progressRing(percentage: Int) -> some View {
+        let tint = WorkspaceProgressAppearance(percentage: percentage).tint
         return ZStack {
             Circle()
                 .stroke(tint.opacity(0.18), lineWidth: 10)
             Circle()
-                .trim(from: 0, to: Double(completedSteps.count) / 5)
+                .trim(from: 0, to: Double(percentage) / 100)
                 .stroke(tint, style: StrokeStyle(lineWidth: 10, lineCap: .round))
                 .rotationEffect(.degrees(-90))
         }
