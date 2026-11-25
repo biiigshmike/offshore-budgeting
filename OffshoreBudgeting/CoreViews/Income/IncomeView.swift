@@ -18,7 +18,6 @@ struct IncomeView: View {
     @AppStorage(AppShortcutNavigationStore.pendingImportClipboardTextKey) private var pendingImportClipboardText: String = ""
 
     @Environment(\.modelContext) private var modelContext
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.appCommandHub) private var commandHub
     @Environment(\.appTabActivationContext) private var tabActivationContext
     @Environment(DetailViewSnapshotCache.self) private var detailSnapshotCache
@@ -353,6 +352,11 @@ struct IncomeView: View {
         [
             PostBoardingTipItem(systemImage: "calendar", title: "Income Calendar", detail: "View income in a calendar to visualize earnings, almost like a timesheet."),
             PostBoardingTipItem(systemImage: "calendar.badge.plus", title: "Planned Income", detail: "Add income you expect to earn but haven’t received yet."),
+            PostBoardingTipItem(
+                systemImage: "hand.draw",
+                title: String(localized: "income.tip.rowActions.title", defaultValue: "Income Row Actions", comment: "Tip title for swipe actions on Income rows."),
+                detail: String(localized: "income.tip.rowActions.detail", defaultValue: "Swipe right on a planned income entry to record a new payment, link one you’ve already entered when available, or edit the entry. You can also tap any income entry to edit it or swipe left to delete it.", comment: "Explains the Income row actions. Swipe directions mirror in right-to-left languages.")
+            ),
             PostBoardingTipItem(systemImage: "calendar.badge.checkmark", title: "Actual Income", detail: "Log income you’ve actually received."),
             PostBoardingTipItem(systemImage: "calendar.badge.clock", title: "Recurring Income", detail: "Planned and actual income can be setup to be a recurring series."),
             PostBoardingTipItem(systemImage: "magnifyingglass", title: "Search Income", detail: "Search by source, card, date, or amount using the search bar.")
@@ -441,7 +445,7 @@ struct IncomeView: View {
                 viewWidth = newValue
             }
             .postBoardingTip(
-                key: "tip.income.v1",
+                key: "tip.income.v2",
                 title: "Income",
                 items: incomeTipItems
             )
@@ -628,7 +632,9 @@ struct IncomeView: View {
     }
 
     private func incomeRowButton(for income: Income, receiptRecorded: Bool, canUseExisting: Bool) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
+        let canRecord = income.isPlanned && !receiptRecorded
+
+        return VStack(alignment: .leading, spacing: 4) {
             Button {
                 openIncomeEditor(income)
             } label: {
@@ -636,25 +642,31 @@ struct IncomeView: View {
             }
             .buttonStyle(.plain)
             .accessibilityHint(income.isPlanned ? Text("Opens Edit Planned Income") : Text("Opens Edit Income"))
-            .contextMenu {
-                editIncomeAction(income)
-                deleteIncomeAction(income)
-            }
 
             if income.isPlanned && receiptRecorded {
                 Label("Received", systemImage: "checkmark")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .padding(.top, 4)
-            } else if income.isPlanned {
-                receiptActions(for: income, canUseExisting: canUseExisting)
             }
         }
-        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-            deleteIncomeAction(income)
-        }
-        .swipeActions(edge: .leading) {
+        .rowActions(allowsFullLeadingSwipe: !canRecord) {
+            if canRecord {
+                Button("Record Income", systemImage: "checkmark.circle") {
+                    incomeSheet = .receipt(income)
+                }
+                .tint(.green)
+
+                if canUseExisting {
+                    Button("Use Existing", systemImage: "link") {
+                        incomeSheet = .link(income)
+                    }
+                    .tint(.blue)
+                }
+            }
             editIncomeAction(income)
+        } trailing: {
+            deleteIncomeAction(income)
         }
     }
 
@@ -674,30 +686,6 @@ struct IncomeView: View {
             requestDeleteIncome(income)
         }
         .tint(Color("OffshoreDepth"))
-    }
-
-    private func receiptActions(for income: Income, canUseExisting: Bool) -> some View {
-        let layout = dynamicTypeSize.isAccessibilitySize
-            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 4))
-            : AnyLayout(HStackLayout(spacing: 8))
-
-        return layout {
-            CompactGlassActionButton(
-                title: "Record Income", fillsAvailableWidth: canUseExisting
-            ) {
-                incomeSheet = .receipt(income)
-            }
-            .accessibilityHint(Text("Records a payment for \(income.source)"))
-
-            if canUseExisting {
-                CompactGlassActionButton(
-                    title: "Use Existing Income", fillsAvailableWidth: true
-                ) {
-                    incomeSheet = .link(income)
-                }
-                .accessibilityHint(Text("Links a recorded payment to \(income.source)"))
-            }
-        }
     }
 
     private func buildRootSnapshot() -> IncomeRootSnapshot {

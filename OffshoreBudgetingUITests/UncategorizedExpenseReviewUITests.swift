@@ -8,7 +8,7 @@ final class UncategorizedExpenseReviewUITests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments = [
             "-uiTesting", "-uiTestingReset", "-uiTestScenarioUncategorizedReview",
-            "-tips_seenKeys", extraArguments.contains("-uiTestReviewTipsFirst") ? "" : "tip.home.v1,tip.budgets.v1,tip.cards.v1,tip.income.v1",
+            "-tips_seenKeys", extraArguments.contains("-uiTestReviewTipsFirst") ? "" : "tip.home.v1,tip.budgets.v1,tip.cards.v1,tip.income.v2",
             "-AppleLanguages", "(en)", "-AppleLocale", "en_US"
         ] + extraArguments
         return app
