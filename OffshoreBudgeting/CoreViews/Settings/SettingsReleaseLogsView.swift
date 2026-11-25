@@ -83,6 +83,42 @@ struct SettingsReleaseLogsView: View {
 
     static let releaseSections: [ReleaseSection] = [
         ReleaseSection(
+            version: "2.5.3",
+            build: "28",
+            items: [
+                ReleaseItem(
+                    systemImage: "square.grid.2x2",
+                    title: "List and Gallery Views",
+                    description: "Switch between List and Gallery in Budgets, Cards, Reconciliations, Categories, and Presets. Each screen remembers your choice."
+                ),
+                ReleaseItem(
+                    systemImage: "checkmark.circle",
+                    title: "Record Planned Income as Received",
+                    description: "Record a new payment or link one you’ve already entered. Your planned income entry will show as Received."
+                ),
+                ReleaseItem(
+                    systemImage: "calendar.badge.checkmark",
+                    title: "Savings Period Review",
+                    description: "Review how a completed period’s savings were calculated, correct the closing amount if needed, and confirm it before it updates Offshore Savings."
+                ),
+                ReleaseItem(
+                    systemImage: "list.bullet.rectangle",
+                    title: "Apply Presets to Budgets",
+                    description: "When you save a preset, add it to one or more eligible budgets to generate its scheduled planned expenses."
+                ),
+                ReleaseItem(
+                    systemImage: "widget.small",
+                    title: "Top Category on the Lock Screen",
+                    description: "The Category Limit widget can automatically show the category with the highest spending among those with a budget limit."
+                ),
+                ReleaseItem(
+                    systemImage: "sparkles.2",
+                    title: "Additional Improvements",
+                    description: "Improved workspace setup, refined expense actions and preset schedules, clarified Home calculations, and polished widgets and the Mac Home editor."
+                )
+            ]
+        ),
+        ReleaseSection(
             version: "2.5.2",
             build: "27",
             items: [
