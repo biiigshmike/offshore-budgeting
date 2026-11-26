@@ -92,6 +92,9 @@ enum DebugSeeder {
             throw ScreenshotStartupError.missingSampleData
         }
         applyPinnedHomeOrder(workspaceID: workspace.id, checkingCardID: checkingCardID, appleCardID: appleCardID, amexCardID: amexCardID)
+        if (workspace.budgets ?? []).contains(where: { $0.name == "November 27 Payday" }) {
+            applyAppStoreHomeOrder(workspaceID: workspace.id)
+        }
     }
 
     private static func refreshScreenshotSavingsForExistingWorkspace(context: ModelContext, now: Date) throws {
@@ -99,6 +102,9 @@ enum DebugSeeder {
         guard let workspace = pickPinnedWorkspace(from: workspaces) else {
             throw ScreenshotStartupError.missingSampleData
         }
+        // The fixed App Store story has its own ledger. Do not regenerate it
+        // against the current calendar or add unrelated period-review fixtures.
+        if (workspace.budgets ?? []).contains(where: { $0.name == "November 27 Payday" }) { return }
         try seedScreenshotSavingsLedger(context: context, workspace: workspace, now: now)
     }
 
@@ -165,6 +171,17 @@ enum DebugSeeder {
 
     private static func makeMixedDebugImportCSV(modelContext: ModelContext) -> String {
         let workspace = workspaceForDebugCSV(context: modelContext)
+        if (workspace?.budgets ?? []).contains(where: { $0.name == "November 27 Payday" }) {
+            return """
+            Transaction Date,Posted Date,Description,Merchant,Category,Type,Amount
+            11/26/2026,11/26/2026,Trader Joe's,Trader Joe's,Groceries,Purchase,-64.82
+            11/26/2026,11/26/2026,Target,Target,Shopping,Purchase,-32.48
+            11/26/2026,11/26/2026,Coffee Shop,Coffee Shop,Dining,Purchase,-6.50
+            11/26/2026,11/26/2026,Metro,Metro,Transportation,Purchase,-25.00
+            11/26/2026,11/26/2026,Internet,Internet,Utilities,Purchase,-80.00
+            11/26/2026,11/26/2026,Pharmacy,Pharmacy,Health,Purchase,-18.75
+            """ + "\n"
+        }
         let duplicateExpense = firstDuplicateExpenseSeed(for: workspace)
         let duplicateIncome = firstDuplicateIncomeSeed(for: workspace)
 
@@ -344,6 +361,10 @@ enum DebugSeeder {
     // MARK: - Seed Data
 
     private static func seedSampleData(context: ModelContext) throws {
+        if ProcessInfo.processInfo.arguments.contains("-appStoreRefresh") {
+            try seedAppStoreRefreshData(context: context)
+            return
+        }
         let cal = Calendar.current
         let now = Date()
         // Workspace
@@ -625,6 +646,115 @@ enum DebugSeeder {
 
         try seedScreenshotSavingsLedger(context: context, workspace: workspace, now: now)
         seedExcursionModeActive(now: now)
+    }
+
+    // MARK: - Approved November 2026 App Store story
+
+    /// Called only inside the isolated screenshot-store setup (or in-memory tests).
+    /// Historical dashboard activity ends before the cross-month payday budget.
+    static func seedAppStoreRefreshData(context: ModelContext) throws {
+        let cal = Calendar.current
+        func date(_ month: Int, _ day: Int) -> Date {
+            safeDate(year: 2026, month: month, day: day, calendar: cal)
+        }
+        let workspace = Workspace(name: "Personal", hexColor: "#3B82F6")
+        context.insert(workspace)
+        let housing = Category(name: "Housing", hexColor: "#6366F1", workspace: workspace)
+        let groceries = Category(name: "Groceries", hexColor: "#22C55E", workspace: workspace)
+        let dining = Category(name: "Dining", hexColor: "#F97316", workspace: workspace)
+        let shopping = Category(name: "Shopping", hexColor: "#F59E0B", workspace: workspace)
+        let transport = Category(name: "Transportation", hexColor: "#0EA5E9", workspace: workspace)
+        let utilities = Category(name: "Utilities", hexColor: "#14B8A6", workspace: workspace)
+        let health = Category(name: "Health", hexColor: "#10B981", workspace: workspace)
+        let entertainment = Category(name: "Entertainment", hexColor: "#E11D48", workspace: workspace)
+        [housing, groceries, dining, shopping, transport, utilities, health, entertainment].forEach { context.insert($0) }
+        let checking = Card(name: "Checking", theme: "sunset", effect: "plastic", workspace: workspace)
+        let apple = Card(name: "Apple Card", theme: "periwinkle", effect: "glass", workspace: workspace)
+        // Retain the existing screenshot session's required compatibility card.
+        let amex = Card(name: "AmEx", theme: "aster", effect: "holographic", workspace: workspace)
+        [checking, apple, amex].forEach { context.insert($0) }
+
+        let payday = Budget(name: "November 27 Payday", startDate: date(11, 27), endDate: date(12, 10), workspace: workspace)
+        let history = Budget(name: "November at a Glance", startDate: date(11, 1), endDate: date(11, 26), workspace: workspace)
+        for budget in [payday, history] {
+            context.insert(budget)
+            context.insert(BudgetCardLink(budget: budget, card: checking))
+            context.insert(BudgetCardLink(budget: budget, card: apple))
+        }
+        context.insert(Income(source: "Paycheck", amount: 3500, date: date(11, 27), isPlanned: true, workspace: workspace, card: checking))
+        let upcoming: [(String, Double, Int, Int, Category, Card)] = [
+            ("Groceries", 320, 11, 28, groceries, apple),
+            ("Rent", 1000, 12, 1, housing, checking),
+            ("Car Insurance", 135, 12, 3, transport, checking),
+            ("Phone", 65, 12, 5, utilities, checking),
+            ("Internet", 80, 12, 7, utilities, checking),
+            ("Gym", 45, 12, 8, health, apple),
+            ("Streaming", 15, 12, 9, entertainment, apple)
+        ]
+        for (title, amount, month, day, category, card) in upcoming {
+            let preset = Preset(title: title, plannedAmount: amount, workspace: workspace)
+            preset.defaultCard = card
+            preset.defaultCategory = category
+            context.insert(preset)
+            context.insert(BudgetPresetLink(budget: payday, preset: preset))
+            context.insert(PlannedExpense(title: title, plannedAmount: amount, expenseDate: date(month, day), workspace: workspace, card: card, category: category, sourcePresetID: preset.id, sourceBudgetID: payday.id))
+        }
+        applyCategoryLimits(context: context, budget: payday, limits: [
+            (groceries, 400), (dining, 150), (shopping, 200), (transport, 200),
+            (utilities, 160), (health, 100), (entertainment, 80)
+        ])
+
+        for day in [1, 15] {
+            for planned in [true, false] {
+                context.insert(Income(source: "Paycheck", amount: 2500, date: date(11, day), isPlanned: planned, workspace: workspace, card: checking))
+            }
+        }
+        context.insert(PlannedExpense(title: "Rent", plannedAmount: 1000, actualAmount: 1000, expenseDate: date(11, 1), workspace: workspace, card: checking, category: housing, sourceBudgetID: history.id))
+        for (title, amount, day, category) in [
+            ("Phone", 65.0, 5, utilities), ("Internet", 80.0, 7, utilities),
+            ("Gym", 45.0, 8, health), ("Streaming", 15.0, 9, entertainment)
+        ] {
+            context.insert(PlannedExpense(title: title, plannedAmount: amount, actualAmount: amount, expenseDate: date(11, day), workspace: workspace, card: checking, category: category, sourceBudgetID: history.id))
+        }
+        let transactions: [(String, Double, Int, Category)] = [
+            ("Trader Joe's", 58.24, 3, groceries), ("Coffee Shop", 6.50, 5, dining),
+            ("Target", 32.48, 8, shopping), ("Metro", 25, 10, transport),
+            ("Trader Joe's", 72.18, 12, groceries), ("Lunch", 18.75, 16, dining),
+            ("Target", 24.99, 19, shopping), ("Coffee Shop", 6.50, 22, dining),
+            ("Trader Joe's", 48.36, 24, groceries),
+            ("Costco", 115.32, 6, groceries), ("Whole Foods", 162.48, 14, groceries),
+            ("Trader Joe's", 98.15, 21, groceries),
+            ("Dinner", 44.80, 4, dining), ("Weekend Brunch", 62.40, 11, dining),
+            ("Takeout", 38.25, 18, dining), ("Dinner with Friends", 56.75, 23, dining),
+            ("Target", 124.60, 7, shopping), ("Home Supplies", 84.95, 13, shopping),
+            ("Bookstore", 49.50, 20, shopping),
+            ("Gas", 72.30, 2, transport), ("Metro", 42, 15, transport),
+            ("Parking", 35, 25, transport),
+            ("Pharmacy", 28.40, 10, health), ("Health Supplies", 19.75, 17, health),
+            ("Movie Night", 24, 12, entertainment), ("Music", 16, 22, entertainment)
+        ]
+        for (merchant, amount, day, category) in transactions {
+            context.insert(VariableExpense(descriptionText: merchant, amount: amount, transactionDate: date(11, day), workspace: workspace, card: apple, category: category))
+        }
+        applyCategoryLimits(context: context, budget: history, limits: [
+            (groceries, 1000), (dining, 350), (shopping, 400), (transport, 400),
+            (utilities, 350), (health, 180), (entertainment, 120)
+        ])
+        let savings = SavingsAccountService.ensureSavingsAccount(for: workspace, modelContext: context)
+        context.insert(SavingsLedgerEntry(date: date(10, 31), amount: 2400, note: "Savings carried forward", kindRaw: SavingsLedgerEntryKind.manualAdjustment.rawValue, workspace: workspace, account: savings))
+        savings.didBackfillHistory = true
+        savings.autoCaptureThroughDate = date(10, 31)
+        SavingsAccountService.recalculateAccountTotal(savings)
+        applyPinnedHomeOrder(workspaceID: workspace.id, checkingCardID: checking.id, appleCardID: apple.id, amexCardID: amex.id)
+        applyAppStoreHomeOrder(workspaceID: workspace.id)
+    }
+
+    private static func applyAppStoreHomeOrder(workspaceID: UUID) {
+        HomePinnedItemsStore(workspaceID: workspaceID).save([
+            .widget(.income, .small), .widget(.nextPlannedExpense, .small),
+            .widget(.categoryAvailability, .small), .widget(.savingsOutlook, .small),
+            .widget(.spendTrends, .wide), .widget(.categorySpotlight, .wide)
+        ])
     }
 
     // MARK: - Budgets helpers

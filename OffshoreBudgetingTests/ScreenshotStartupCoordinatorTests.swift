@@ -14,6 +14,47 @@ final class ScreenshotStartupCoordinatorTests: XCTestCase {
         return try ModelContainer(for: schema, configurations: configuration)
     }
 
+    func testAppStorePaydayStoryHasExactTotalsWithoutHistoricalActivityLeakingIn() throws {
+        let container = try makeContainer()
+        let context = ModelContext(container)
+        try DebugSeeder.seedAppStoreRefreshData(context: context)
+        try context.save()
+        let budget = try XCTUnwrap(context.fetch(FetchDescriptor<Budget>()).first { $0.name == "November 27 Payday" })
+        let workspaceID = try XCTUnwrap(budget.workspace?.id)
+        let range = DateRange(start: budget.startDate, end: budget.endDate, calendar: .current)
+        let income = try context.fetch(FetchDescriptor<Income>()).filter {
+            $0.workspace?.id == workspaceID && $0.isPlanned && $0.date >= range.start && $0.date <= range.end
+        }.reduce(0) { $0 + $1.amount }
+        let planned = BudgetPlannedExpenseStore.plannedExpenses(
+            try context.fetch(FetchDescriptor<PlannedExpense>()),
+            budgetID: budget.id,
+            linkedCardIDs: Set((budget.cardLinks ?? []).compactMap { $0.card?.id }),
+            range: range
+        )
+        XCTAssertEqual(income, 3500, accuracy: 0.001)
+        XCTAssertEqual(planned.count, 7)
+        XCTAssertEqual(planned.first(where: { $0.title == "Rent" })?.plannedAmount, 1000)
+        XCTAssertEqual(Set(planned.compactMap { $0.category?.id }).count, 6)
+        XCTAssertEqual(planned.reduce(0) { $0 + $1.plannedAmount }, 1660, accuracy: 0.001)
+        XCTAssertEqual(income - planned.reduce(0) { $0 + $1.plannedAmount }, 1840, accuracy: 0.001)
+        XCTAssertEqual(Calendar.current.component(.month, from: budget.startDate), 11)
+        XCTAssertEqual(Calendar.current.component(.day, from: budget.startDate), 27)
+        XCTAssertEqual(Calendar.current.component(.month, from: budget.endDate), 12)
+        XCTAssertEqual(Calendar.current.component(.day, from: budget.endDate), 10)
+        let futureTransactions = try context.fetch(FetchDescriptor<VariableExpense>()).filter {
+            $0.workspace?.id == workspaceID && $0.transactionDate >= range.start && $0.transactionDate <= range.end
+        }
+        XCTAssertTrue(futureTransactions.isEmpty)
+        let allIncomes = try context.fetch(FetchDescriptor<Income>()).filter { $0.workspace?.id == workspaceID }
+        let allPlanned = try context.fetch(FetchDescriptor<PlannedExpense>()).filter { $0.workspace?.id == workspaceID }
+        let allVariable = try context.fetch(FetchDescriptor<VariableExpense>()).filter { $0.workspace?.id == workspaceID }
+        let received = allIncomes.filter { !$0.isPlanned }.reduce(0) { $0 + $1.amount }
+        let spending = allPlanned.reduce(0) { $0 + SavingsMathService.plannedBudgetImpactAmount(for: $1) }
+            + allVariable.reduce(0) { $0 + SavingsMathService.variableBudgetImpactAmount(for: $1) }
+        XCTAssertGreaterThan(received - spending, 0, "The full dashboard range must retain positive actual savings")
+        XCTAssertGreaterThanOrEqual(Set(allVariable.compactMap { $0.category?.id }).count, 6)
+    }
+
     func testOpenFailureDoesNotPrepareOrPublishContainer() {
         var didPrepare = false
         let coordinator = ScreenshotStartupCoordinator(

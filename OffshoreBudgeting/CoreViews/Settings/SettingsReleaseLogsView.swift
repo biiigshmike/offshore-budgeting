@@ -84,7 +84,7 @@ struct SettingsReleaseLogsView: View {
     static let releaseSections: [ReleaseSection] = [
         ReleaseSection(
             version: "2.5.3",
-            build: "28",
+            build: "29",
             items: [
                 ReleaseItem(
                     systemImage: "square.grid.2x2",
