@@ -242,8 +242,7 @@ struct SettingsView: View {
                     SettingsRow(
                         title: row.title,
                         systemImage: WorkspaceProgressService.settingsSymbol(in: workspace),
-                        tint: appearance.tint,
-                        iconForeground: appearance.gaugeForeground
+                        tint: appearance.tint
                     )
                     Text(Double(percentage) / 100, format: .percent.precision(.fractionLength(0)))
                         .foregroundStyle(.secondary)
@@ -463,7 +462,6 @@ private struct SettingsRow: View {
     let title: String
     let systemImage: String
     let tint: Color
-    var iconForeground: Color = .white
 
     var body: some View {
         HStack(spacing: 12) {
@@ -473,7 +471,7 @@ private struct SettingsRow: View {
 
                 Image(systemName: systemImage)
                     .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(iconForeground)
+                    .foregroundStyle(.white)
             }
             .frame(width: 28, height: 28)
 

@@ -1,6 +1,5 @@
 import Foundation
 import SwiftData
-import SwiftUI
 import Testing
 @testable import Offshore
 
@@ -71,18 +70,17 @@ struct WorkspaceProgressServiceTests {
     }
 
     @Test(arguments: [
-        (0, "#E51E38", Color.white),
-        (20, "#FA7200", Color.black),
-        (40, "#FFA600", Color.black),
-        (60, "#E6C600", Color.black),
-        (80, "#8CD500", Color.black),
-        (100, "#00B64D", Color.black)
+        (0, "#E51E38"),
+        (20, "#FA7200"),
+        (40, "#FFA600"),
+        (60, "#E6C600"),
+        (80, "#8CD500"),
+        (100, "#00B64D")
     ])
-    func appearanceMatchesCompletionLevel(percentage: Int, hex: String, gaugeForeground: Color) {
+    func appearanceMatchesCompletionLevel(percentage: Int, hex: String) {
         let appearance = WorkspaceProgressAppearance(percentage: percentage)
 
         #expect(appearance.tint.hexRGBString() == hex)
-        #expect(appearance.gaugeForeground == gaugeForeground)
     }
 
     @Test func failedSaveRestoresOnlyNewMilestonesAndPreservesUnrelatedEdits() {
