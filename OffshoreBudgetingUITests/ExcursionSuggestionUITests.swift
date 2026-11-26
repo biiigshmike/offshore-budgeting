@@ -81,7 +81,7 @@ final class ExcursionSuggestionUITests: XCTestCase {
             "-uiTestExcursionRoute", mode,
             "-debug_tabFlickerDiagnosticsEnabled", "YES",
             "-debug_tabFlickerVerboseEventsEnabled", "YES",
-            "-tips_seenKeys", "tip.home.v1,tip.budgets.v1,tip.cards.v1,tip.income.v2,tip.budgetdetail.v1",
+            "-tips_seenKeys", "tip.home.v1,tip.budgets.v1,tip.cards.v1,tip.income.v1,tip.budgetdetail.v1",
             "-tips_resetToken", "0", "-tips_seen_lastResetToken", "0",
             "-AppleLanguages", "(en)", "-AppleLocale", "en_US"
         ]

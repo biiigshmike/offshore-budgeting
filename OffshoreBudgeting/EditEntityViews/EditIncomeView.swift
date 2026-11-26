@@ -68,7 +68,6 @@ struct EditIncomeView: View {
     var body: some View {
         IncomeFormView(
             detailsTitle: "Details",
-            mode: income.isPlanned ? .plannedEdit : .standard,
             source: $source,
             amountText: $amountText,
             date: $date,
@@ -82,7 +81,7 @@ struct EditIncomeView: View {
             yearlyDayOfMonth: $yearlyDayOfMonth,
             endDate: $endDate
         )
-        .navigationTitle(income.isPlanned ? Text("Edit Planned Income") : Text("Edit Income"))
+        .navigationTitle("Edit Income")
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
                 Button("Cancel") { dismiss() }

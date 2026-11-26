@@ -23,7 +23,7 @@ final class ExcursionPreferencesUITests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments = ["-uiTesting", "-uiTestingReset", "-uiTestScenarioWorkspaceProgress",
                                "-appearance_theme", "heather",
-                               "-tips_seenKeys", "tip.home.v1,tip.budgets.v1,tip.cards.v1,tip.income.v2,tip.budgetdetail.v1",
+                               "-tips_seenKeys", "tip.home.v1,tip.budgets.v1,tip.cards.v1,tip.income.v1,tip.budgetdetail.v1",
                                "-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
         app.launch()
         openPreferences(app)
@@ -43,7 +43,7 @@ final class ExcursionPreferencesUITests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments = ["-uiTesting", "-uiTestingReset", "-uiTestScenarioWorkspaceProgress",
                                "-appearance_theme", theme,
-                               "-tips_seenKeys", "tip.home.v1,tip.budgets.v1,tip.cards.v1,tip.income.v2,tip.budgetdetail.v1",
+                               "-tips_seenKeys", "tip.home.v1,tip.budgets.v1,tip.cards.v1,tip.income.v1,tip.budgetdetail.v1",
                                "-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
         app.launch()
         try XCTSkipIf(app.tabBars.firstMatch.exists, "Sidebar rendering requires iPad or Mac Catalyst.")
@@ -198,7 +198,7 @@ final class ExcursionPreferencesUITests: XCTestCase {
         app.launchArguments = [
             "-uiTesting", "-uiTestingReset", "-uiTestScenarioWorkspaceProgress",
             "-appearance_theme", theme,
-            "-tips_seenKeys", "tip.home.v1,tip.budgets.v1,tip.cards.v1,tip.income.v2,tip.budgetdetail.v1",
+            "-tips_seenKeys", "tip.home.v1,tip.budgets.v1,tip.cards.v1,tip.income.v1,tip.budgetdetail.v1",
             "-tips_resetToken", "0", "-tips_seen_lastResetToken", "0",
             "-AppleLanguages", "(en)", "-AppleLocale", "en_US"
         ] + additionalArguments

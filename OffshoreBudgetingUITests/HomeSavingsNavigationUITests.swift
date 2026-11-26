@@ -2,25 +2,26 @@ import XCTest
 
 @MainActor
 final class HomeSavingsNavigationUITests: XCTestCase {
-    private func makeReceiptApp(incomeTipSeenKey: String = "tip.income.v2") -> XCUIApplication {
+    private func makeIncomeOverviewApp() -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments = [
-            "-uiTesting", "-uiTestScenarioIncomeReceipt",
+            "-uiTesting", "-uiTestScenarioIncomeOverview",
             "-didCompleteOnboarding", "YES", "-onboarding_didChooseDataSource", "YES",
             "-didSeedDefaultWorkspaces", "YES", "-privacy_requireBiometrics", "NO",
             "-general_defaultBudgetingPeriod", "weekly", "-general_reviewUncategorizedExpensesOnOpen", "NO",
             "-general_excludeFuturePlannedExpensesFromCalculations", "NO",
-            "-general_currencyCode", "USD",
+            "-general_currencyCode", "USD", "-general_confirmBeforeDeleting", "YES",
             "-view.budgets.mode", "list",
-            "-tips_seenKeys", "tip.home.v1,tip.cards.v1,\(incomeTipSeenKey),tip.budgets.v1,tip.budgetdetail.v1",
+            "-releaseLogs_seenReleaseIDs", "2.5.3-28",
+            "-tips_seenKeys", "tip.home.v1,tip.cards.v1,tip.income.v1,tip.budgets.v1,tip.budgetdetail.v1",
             "-AppleLanguages", "(en)", "-AppleLocale", "en_US"
         ]
         return app
     }
 
-    func testReceivingPaycheckPreservesThePlanAndSavingsOutlook() throws {
+    func testAddingActualIncomePreservesTheSeparateRecurringPlanAndSavingsOutlook() throws {
         continueAfterFailure = false
-        let app = makeReceiptApp()
+        let app = makeIncomeOverviewApp()
         app.launch()
 
         let outlook = app.buttons["Savings Outlook"].firstMatch
@@ -28,54 +29,10 @@ final class HomeSavingsNavigationUITests: XCTestCase {
         XCTAssertTrue((outlook.value as? String ?? "").contains("Projected Savings $500"))
 
         app.tabBars.buttons["Income"].tap()
-        var calendar = Calendar(identifier: .gregorian)
-        calendar.locale = Locale(identifier: "en_US")
-        let isStartOfWeek = calendar.component(.weekday, from: .now) == calendar.firstWeekday
-        app.buttons[isStartOfWeek ? "Next Day" : "Previous Day"].tap()
-        app.swipeUp()
-
-        let record = app.buttons["Record Income"].firstMatch
-        let useExisting = app.buttons["Use Existing"].firstMatch
-        let edit = app.buttons["Edit"].firstMatch
-        let plan = app.buttons.matching(NSPredicate(format: "label CONTAINS %@ AND label CONTAINS %@",
-                                                     "Payroll", "Planned")).firstMatch
-        reveal(plan, in: app)
-        XCTAssertFalse(record.exists)
-        XCTAssertFalse(useExisting.exists)
-        plan.tap()
-        XCTAssertTrue(app.navigationBars["Edit Planned Income"].waitForExistence(timeout: 5))
-        XCTAssertFalse(app.segmentedControls.firstMatch.exists)
-        app.navigationBars["Edit Planned Income"].buttons["Cancel"].tap()
-
-        plan.swipeRight()
-        XCTAssertTrue(record.waitForExistence(timeout: 5))
-        XCTAssertTrue(edit.isHittable)
-        XCTAssertFalse(useExisting.exists)
-        record.tap()
-        let receiptBar = app.navigationBars["Record Income"]
-        XCTAssertTrue(receiptBar.waitForExistence(timeout: 5))
-        XCTAssertTrue(app.staticTexts["Your planned amount stays for comparison."].exists)
-        XCTAssertFalse(app.buttons["Use Existing Income"].exists)
-        XCTAssertFalse(app.staticTexts["Repeat"].exists)
-        XCTAssertEqual(app.textFields["Source"].value as? String, "Payroll")
-        let amount = app.textFields["Amount"]
-        let prefill = try XCTUnwrap(amount.value as? String)
-        XCTAssertEqual(prefill.filter(\.isNumber).prefix(4), "1500")
-        receiptBar.buttons["Cancel"].tap()
-        XCTAssertTrue(receiptBar.waitForNonExistence(timeout: 5))
-        plan.swipeRight()
-        XCTAssertTrue(record.waitForExistence(timeout: 5))
-
-        record.tap()
-        amount.tap()
-        let existingAmount = try XCTUnwrap(amount.value as? String)
-        amount.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: existingAmount.count) + "1430")
-        receiptBar.buttons["Save"].doubleTap()
-        XCTAssertTrue(app.staticTexts["Received"].waitForExistence(timeout: 5))
-        let plannedEditBar = app.navigationBars["Edit Planned Income"]
-        openEditorBySwipingRight(on: plan, editor: plannedEditBar, in: app)
-        plannedEditBar.buttons["Cancel"].tap()
+        addIncome(source: "Payroll", amount: "1430", isPlanned: false, in: app)
         assertAmounts("$1,500.00", "$1,430.00", in: app)
+        XCTAssertFalse(app.staticTexts["Received"].exists)
+        XCTAssertFalse(app.staticTexts["Linked to Planned"].exists)
 
         app.tabBars.buttons["Home"].tap()
         XCTAssertTrue(outlook.waitForExistence(timeout: 5))
@@ -122,23 +79,67 @@ final class HomeSavingsNavigationUITests: XCTestCase {
                                                        "Payroll", "Actual")).firstMatch
         reveal(actual, in: app)
         XCTAssertTrue(actual.label.contains("$1,430.00"))
+        XCTAssertFalse(app.staticTexts["Linked to Planned"].exists)
         let actualEditBar = app.navigationBars["Edit Income"]
-        openEditorBySwipingRight(on: actual, editor: actualEditBar, in: app)
-        actualEditBar.buttons["Cancel"].tap()
+        openEditorBySwipingRight(on: actual, in: app)
+        XCTAssertTrue(app.segmentedControls.buttons["Actual"].isSelected)
+        XCTAssertTrue(app.staticTexts["Repeat"].exists)
+        let source = app.textFields["Source"]
+        source.tap()
+        source.typeText(" Deposit")
+        actualEditBar.buttons["Update"].tap()
+        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label CONTAINS %@ AND label CONTAINS %@",
+                                                       "Payroll Deposit", "Actual")).firstMatch.waitForExistence(timeout: 5))
 
-        let plannedResults = app.buttons.matching(NSPredicate(format: "label CONTAINS %@ AND label CONTAINS %@",
-                                                               "Payroll", "Planned"))
-        let olderPlan = plannedResults.element(boundBy: 1)
-        reveal(olderPlan, in: app)
-        XCTAssertFalse(record.exists)
-        olderPlan.swipeRight()
-        XCTAssertTrue(record.waitForExistence(timeout: 5))
-        app.terminate()
+
+        let plan = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@ AND label CONTAINS %@",
+                                                     "Payroll, Planned", "$1,500.00")).firstMatch
+        reveal(plan, in: app)
+        plan.tap()
+        let editor = app.navigationBars["Edit Income"]
+        XCTAssertTrue(editor.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.segmentedControls.buttons["Planned"].isSelected)
+        XCTAssertTrue(app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", "Weekly")).firstMatch.exists)
+        editor.buttons["Update"].tap()
+        let applyChanges = app.alerts["Apply changes to…"]
+        XCTAssertTrue(applyChanges.waitForExistence(timeout: 5))
+        applyChanges.buttons["Just This Income"].tap()
+        XCTAssertTrue(editor.waitForNonExistence(timeout: 5))
+    }
+
+    func testAddingPlannedIncomeUsesNormalEditorAndSwipeActions() {
+        continueAfterFailure = false
+        let app = makeIncomeOverviewApp()
+        app.launch()
+        XCTAssertTrue(app.tabBars.buttons["Income"].waitForExistence(timeout: 15))
+        app.tabBars.buttons["Income"].tap()
+        addIncome(source: "Independent Plan", amount: "250", isPlanned: true, in: app)
+
+        let plan = app.buttons.matching(NSPredicate(format: "label CONTAINS %@ AND label CONTAINS %@",
+                                                     "Independent Plan", "Planned")).firstMatch
+        app.swipeUp()
+        reveal(plan, in: app)
+        XCTAssertFalse(app.staticTexts["Received"].exists)
+        openEditorBySwipingRight(on: plan, in: app)
+        XCTAssertTrue(app.segmentedControls.buttons["Planned"].isSelected)
+        XCTAssertTrue(app.staticTexts["Repeat"].exists)
+        app.navigationBars["Edit Income"].buttons["Cancel"].tap()
+        plan.swipeLeft()
+        let confirmation = app.alerts["Delete?"]
+        if !confirmation.exists {
+            let delete = app.buttons["Delete"].firstMatch
+            if delete.exists {
+                delete.tap()
+            }
+        }
+        XCTAssertTrue(confirmation.waitForExistence(timeout: 5))
+        confirmation.buttons["Cancel"].tap()
+        XCTAssertTrue(plan.exists)
     }
 
     func testWhatIfIncomeCanBeEditedAndResetFromBothGestures() {
         continueAfterFailure = false
-        let app = makeReceiptApp()
+        let app = makeIncomeOverviewApp()
         app.launch()
 
         let tile = app.buttons["What If?"].firstMatch
@@ -167,14 +168,23 @@ final class HomeSavingsNavigationUITests: XCTestCase {
         XCTAssertTrue(reset.waitForNonExistence(timeout: 5))
         XCTAssertEqual(row.value as? String, baseline)
 
-        row.swipeLeft()
+        plannedField.tap()
+        plannedField.typeText("456")
+        XCTAssertTrue((row.value as? String ?? "").contains("456"))
+        app.swipeDown()
+        reveal(row, in: app)
+
+        let trailing = row.coordinate(withNormalizedOffset: CGVector(dx: 0.85, dy: 0.20))
+        let leading = row.coordinate(withNormalizedOffset: CGVector(dx: 0.20, dy: 0.20))
+        trailing.press(forDuration: 0.05, thenDragTo: leading)
         XCTAssertTrue(reset.waitForExistence(timeout: 5))
         reset.tap()
         XCTAssertTrue(reset.waitForNonExistence(timeout: 5))
+        XCTAssertEqual(row.value as? String, baseline)
     }
 
     func testSavingsOutlookExplanationsStackAtAccessibilityTextSize() throws {
-        let app = makeReceiptApp()
+        let app = makeIncomeOverviewApp()
         app.launchArguments += ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"]
         app.launch()
         let outlook = app.buttons["Savings Outlook"].firstMatch
@@ -216,104 +226,25 @@ final class HomeSavingsNavigationUITests: XCTestCase {
         app.terminate()
     }
 
-    func testUsingAnOlderDepositMarksThePlanReceived() {
-        continueAfterFailure = false
-        let app = makeReceiptApp()
-        app.launchArguments.append("-uiTestIncomeReceiptHasDeposit")
-        app.launch()
-        XCTAssertTrue(app.navigationBars["Home"].waitForExistence(timeout: 15))
-        let incomeTab = app.descendants(matching: .any)
-            .matching(NSPredicate(format: "identifier == %@ AND label == %@", "calendar", "Income")).firstMatch
-        XCTAssertTrue(incomeTab.waitForExistence(timeout: 5))
-        incomeTab.tap()
-        var calendar = Calendar(identifier: .gregorian)
-        calendar.locale = Locale(identifier: "en_US")
-        let isStartOfWeek = calendar.component(.weekday, from: .now) == calendar.firstWeekday
-        app.buttons[isStartOfWeek ? "Next Day" : "Previous Day"].tap()
-        app.swipeUp()
-
-        let record = app.buttons["Record Income"].firstMatch
-        let useExisting = app.buttons["Use Existing"].firstMatch
-        let plan = app.buttons.matching(NSPredicate(format: "label CONTAINS %@ AND label CONTAINS %@",
-                                                     "Payroll", "Planned")).firstMatch
-        reveal(plan, in: app)
-        XCTAssertFalse(record.exists)
-        XCTAssertFalse(useExisting.exists)
-        plan.tap()
-        let plannedEditBar = app.navigationBars["Edit Planned Income"]
-        XCTAssertTrue(plannedEditBar.waitForExistence(timeout: 5))
-        assertFixedIncomeType("Planned", in: app)
-        plannedEditBar.buttons["Cancel"].tap()
-
-        plan.press(forDuration: 1)
-        let menuEdit = app.buttons["Edit"]
-        XCTAssertTrue(menuEdit.waitForExistence(timeout: 5))
-        XCTAssertTrue(record.isHittable)
-        XCTAssertTrue(useExisting.isHittable)
-        XCTAssertTrue(app.buttons["Delete"].exists)
-        XCTAssertFalse(plannedEditBar.exists)
-        menuEdit.tap()
-        XCTAssertTrue(plannedEditBar.waitForExistence(timeout: 5))
-        plannedEditBar.buttons["Cancel"].tap()
-
-        plan.swipeRight()
-        XCTAssertTrue(record.waitForExistence(timeout: 5))
-        XCTAssertTrue(useExisting.isHittable)
-        XCTAssertTrue(menuEdit.isHittable)
-        XCTAssertLessThan(record.frame.midX, useExisting.frame.midX)
-        XCTAssertLessThan(useExisting.frame.midX, menuEdit.frame.midX)
-        let swipeActions = XCTAttachment(screenshot: app.screenshot())
-        swipeActions.name = "Income leading swipe actions"
-        swipeActions.lifetime = .keepAlways
-        add(swipeActions)
-
-        record.tap()
-        let receiptBar = app.navigationBars["Record Income"]
-        XCTAssertTrue(receiptBar.waitForExistence(timeout: 5))
-        assertFixedIncomeType("Actual", in: app)
-        app.buttons["Use Existing Income"].firstMatch.tap()
-        let pickerBar = app.navigationBars["Use Existing Income"]
-        XCTAssertTrue(pickerBar.waitForExistence(timeout: 5))
-        pickerBar.buttons["Cancel"].tap()
-        receiptBar.buttons["Cancel"].tap()
-
-        XCTAssertTrue(receiptBar.waitForNonExistence(timeout: 5))
-        plan.swipeRight()
-        XCTAssertTrue(useExisting.waitForExistence(timeout: 5))
-        useExisting.tap()
-        XCTAssertTrue(pickerBar.waitForExistence(timeout: 5))
-        let deposit = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Bank deposit")).firstMatch
-        XCTAssertTrue(deposit.waitForExistence(timeout: 5), app.debugDescription)
-        deposit.tap()
-        let confirmation = app.alerts["Use this Actual income?"]
-        XCTAssertTrue(confirmation.waitForExistence(timeout: 5))
-        confirmation.buttons["Use Income"].tap()
-
-        XCTAssertTrue(app.staticTexts["Received"].waitForExistence(timeout: 5))
-        openEditorBySwipingRight(on: plan, editor: plannedEditBar, in: app)
-        app.terminate()
+    private func addIncome(source: String, amount: String, isPlanned: Bool, in app: XCUIApplication) {
+        app.buttons["income.addMenu"].tap()
+        app.buttons["Add Income"].firstMatch.tap()
+        let editor = app.navigationBars["Add Income"]
+        XCTAssertTrue(editor.waitForExistence(timeout: 5))
+        let type = app.segmentedControls.buttons[isPlanned ? "Planned" : "Actual"]
+        type.tap()
+        XCTAssertTrue(type.isSelected)
+        let sourceField = app.textFields["Source"]
+        sourceField.tap()
+        sourceField.typeText(source)
+        let amountField = app.textFields["Amount"]
+        amountField.tap()
+        amountField.typeText(amount)
+        editor.buttons["Save"].tap()
+        XCTAssertTrue(editor.waitForNonExistence(timeout: 5))
     }
 
-    func testUpdatedIncomeTipShowsOnceAfterDismissingPreviousVersion() {
-        continueAfterFailure = false
-        let app = makeReceiptApp(incomeTipSeenKey: "tip.income.v1")
-        app.launch()
-
-        let tabs = app.tabBars.firstMatch
-        XCTAssertTrue(tabs.waitForExistence(timeout: 15))
-        tabs.buttons["Income"].tap()
-
-        let tip = app.staticTexts["Income Row Actions"]
-        XCTAssertTrue(tip.waitForExistence(timeout: 5))
-        app.buttons["Continue"].tap()
-        XCTAssertTrue(tip.waitForNonExistence(timeout: 5))
-
-        tabs.buttons["Home"].tap()
-        tabs.buttons["Income"].tap()
-        XCTAssertFalse(tip.waitForExistence(timeout: 2))
-    }
-
-    private func openEditorBySwipingRight(on row: XCUIElement, editor: XCUIElement, in app: XCUIApplication) {
+    private func openEditorBySwipingRight(on row: XCUIElement, in app: XCUIApplication) {
         row.swipeRight()
         XCTAssertFalse(app.buttons["Record Income"].exists)
         XCTAssertFalse(app.buttons["Use Existing"].exists)
@@ -321,23 +252,12 @@ final class HomeSavingsNavigationUITests: XCTestCase {
         if edit.exists {
             edit.tap()
         }
-        XCTAssertTrue(editor.waitForExistence(timeout: 5))
-    }
-
-    private func assertFixedIncomeType(_ expectedType: String, in app: XCUIApplication) {
-        let incomeType = app.descendants(matching: .any).matching(identifier: "fixedIncomeType").firstMatch
-        XCTAssertTrue(incomeType.label.contains(expectedType))
-        XCTAssertFalse(app.buttons["fixedIncomeType"].exists)
-        XCTAssertFalse(app.segmentedControls.firstMatch.exists)
+        XCTAssertTrue(app.navigationBars["Edit Income"].waitForExistence(timeout: 5))
     }
 
     func testSavingsAccountBackReturnsToOutlookOnHome() {
-        let app = XCUIApplication()
-        app.launchArguments = [
-            "-uiTesting", "-uiTestingReset", "-uiTestScenarioBudgetMenus",
-            "-tips_seenKeys", "tip.home.v1,tip.cards.v1,tip.income.v2",
-            "-AppleLanguages", "(en)", "-AppleLocale", "en_US"
-        ]
+        continueAfterFailure = false
+        let app = makeIncomeOverviewApp()
         app.launch()
         XCTAssertTrue(app.navigationBars["Home"].waitForExistence(timeout: 15))
         let outlook = app.buttons["Savings Outlook"].firstMatch
@@ -347,13 +267,14 @@ final class HomeSavingsNavigationUITests: XCTestCase {
         let openSavings = app.buttons["Open Offshore Savings"].firstMatch
         reveal(openSavings, in: app)
         openSavings.tap()
-        XCTAssertTrue(app.navigationBars["Offshore Savings"].waitForExistence(timeout: 5))
+        let savingsBar = app.navigationBars["Savings"]
+        XCTAssertTrue(savingsBar.waitForExistence(timeout: 5))
         XCTAssertTrue(app.buttons["Add Savings Entry"].exists)
-        app.navigationBars["Offshore Savings"].buttons.element(boundBy: 0).tap()
+        savingsBar.buttons.element(boundBy: 0).tap()
 
         XCTAssertTrue(openSavings.waitForExistence(timeout: 5))
         XCTAssertTrue(app.tabBars.buttons["Home"].isSelected)
-        XCTAssertFalse(app.navigationBars["Offshore Savings"].exists)
+        XCTAssertFalse(savingsBar.exists)
     }
 
     private func reveal(_ element: XCUIElement, in app: XCUIApplication) {

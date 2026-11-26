@@ -444,7 +444,7 @@ final class WorkspaceProgressHandoffUITests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments = [
             "-uiTesting", "-uiTestingReset", "-uiTestScenarioWorkspaceProgress",
-            "-tips_seenKeys", pendingTips ? "tip.budgetdetail.v1" : "tip.home.v1,tip.budgets.v1,tip.cards.v1,tip.income.v2,tip.budgetdetail.v1",
+            "-tips_seenKeys", pendingTips ? "tip.budgetdetail.v1" : "tip.home.v1,tip.budgets.v1,tip.cards.v1,tip.income.v1,tip.budgetdetail.v1",
             "-tips_resetToken", "0", "-tips_seen_lastResetToken", "0",
             "-AppleLanguages", "(en)", "-AppleLocale", "en_US"
         ] + extraArguments

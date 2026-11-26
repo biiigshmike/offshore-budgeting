@@ -99,18 +99,18 @@ enum UITestSupport {
 
     // MARK: - Data
 
-    static var isIncomeReceiptScenario: Bool {
-        isEnabled && ProcessInfo.processInfo.arguments.contains("-uiTestScenarioIncomeReceipt")
+    static var isIncomeOverviewScenario: Bool {
+        isEnabled && ProcessInfo.processInfo.arguments.contains("-uiTestScenarioIncomeOverview")
     }
 
     @MainActor
-    static func seedIncomeReceiptScenario(context: ModelContext) {
+    static func seedIncomeOverviewScenario(context: ModelContext) {
         let calendar = Calendar.current
         let today = calendar.startOfDay(for: .now)
         let period = BudgetingPeriod.weekly.defaultRange(containing: today, calendar: calendar)
         let planDate = calendar.date(byAdding: .day, value: today == period.start ? 1 : -1, to: today)!
         let previousPlanDate = calendar.date(byAdding: .day, value: -7, to: planDate)!
-        let workspace = Workspace(name: "Receipt Test Workspace", hexColor: "#3B82F6")
+        let workspace = Workspace(name: "Income Overview Test Workspace", hexColor: "#3B82F6")
         let card = Card(name: "Test Checking", theme: "ruby", effect: "plastic", workspace: workspace)
         let budget = Budget(name: "Paycheck Test Budget", startDate: period.start,
                             endDate: period.end, workspace: workspace)
@@ -135,15 +135,10 @@ enum UITestSupport {
             context.insert(Income(source: series.source, amount: series.amount, date: occurrence,
                                   isPlanned: true, workspace: workspace, series: series))
         }
-        if ProcessInfo.processInfo.arguments.contains("-uiTestIncomeReceiptHasDeposit") {
-            let depositDate = calendar.date(byAdding: .day, value: -4, to: planDate)!
-            context.insert(Income(source: "Bank deposit", amount: 1_430, date: depositDate,
-                                  isPlanned: false, workspace: workspace))
-        }
         do {
             try context.save()
         } catch {
-            assertionFailure("Could not seed receipt scenario: \(error)")
+            assertionFailure("Could not seed income overview scenario: \(error)")
         }
     }
 

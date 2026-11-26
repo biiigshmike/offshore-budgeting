@@ -92,11 +92,6 @@ struct SettingsReleaseLogsView: View {
                     description: "Switch between List and Gallery in Budgets, Cards, Reconciliations, Categories, and Presets. Each screen remembers your choice."
                 ),
                 ReleaseItem(
-                    systemImage: "checkmark.circle",
-                    title: "Record Planned Income as Received",
-                    description: "Record a new payment or link one you’ve already entered. Your planned income entry will show as Received."
-                ),
-                ReleaseItem(
                     systemImage: "calendar.badge.checkmark",
                     title: "Savings Period Review",
                     description: "Review how a completed period’s savings were calculated, correct the closing amount if needed, and confirm it before it updates Offshore Savings."

@@ -352,11 +352,6 @@ struct IncomeView: View {
         [
             PostBoardingTipItem(systemImage: "calendar", title: "Income Calendar", detail: "View income in a calendar to visualize earnings, almost like a timesheet."),
             PostBoardingTipItem(systemImage: "calendar.badge.plus", title: "Planned Income", detail: "Add income you expect to earn but haven’t received yet."),
-            PostBoardingTipItem(
-                systemImage: "hand.draw",
-                title: String(localized: "income.tip.rowActions.title", defaultValue: "Income Row Actions", comment: "Tip title for swipe actions on Income rows."),
-                detail: String(localized: "income.tip.rowActions.detail", defaultValue: "Swipe right on a planned income entry to record a new payment, link one you’ve already entered when available, or edit the entry. You can also tap any income entry to edit it or swipe left to delete it.", comment: "Explains the Income row actions. Swipe directions mirror in right-to-left languages.")
-            ),
             PostBoardingTipItem(systemImage: "calendar.badge.checkmark", title: "Actual Income", detail: "Log income you’ve actually received."),
             PostBoardingTipItem(systemImage: "calendar.badge.clock", title: "Recurring Income", detail: "Planned and actual income can be setup to be a recurring series."),
             PostBoardingTipItem(systemImage: "magnifyingglass", title: "Search Income", detail: "Search by source, card, date, or amount using the search bar.")
@@ -372,18 +367,6 @@ struct IncomeView: View {
                         AddIncomeView(workspace: workspace, initialDate: date, initialIsPlanned: isPlanned)
                     case .edit(let income):
                         EditIncomeView(workspace: workspace, income: income)
-                    case .receipt(let income):
-                        AddIncomeView(
-                            workspace: workspace, plannedIncome: income, canUseExistingIncome: hasUnlinkedActualIncome
-                        )
-                    case .link(let income):
-                        ExistingReceivedIncomeView(
-                            workspaceID: workspace.id,
-                            plannedIncome: income,
-                            incomes: ExistingReceivedIncomeView.candidates(in: incomes, around: income.date)
-                        ) {
-                            incomeSheet = nil
-                        }
                     }
                 }
             }
@@ -445,7 +428,7 @@ struct IncomeView: View {
                 viewWidth = newValue
             }
             .postBoardingTip(
-                key: "tip.income.v2",
+                key: "tip.income.v1",
                 title: "Income",
                 items: incomeTipItems
             )
@@ -516,6 +499,7 @@ struct IncomeView: View {
             } label: {
                 Image(systemName: "plus")
             }
+            .accessibilityIdentifier("income.addMenu")
         }
     }
 
@@ -584,27 +568,15 @@ struct IncomeView: View {
         }
     }
 
-    private var hasUnlinkedActualIncome: Bool {
-        incomes.contains {
-            !$0.isPlanned && $0.sourcePlannedIncomeID == nil
-        }
-    }
-
     @ViewBuilder
     private var incomeRowsSection: some View {
-        let recordedPlanIDs = Set(incomes.compactMap { $0.isPlanned ? nil : $0.sourcePlannedIncomeID })
-        let canUseExisting = hasUnlinkedActualIncome
         Section(header: incomeSectionHeader) {
             if incomeRows.isEmpty {
                 Text(isIncomeSearchActive ? "No matching income." : "No income for \(CalendarGridHelper.shortDateFormatter.string(from: selectedDayStart)).")
                     .foregroundStyle(.secondary)
             } else {
                 ForEach(incomeRows) { income in
-                    incomeRowButton(
-                        for: income,
-                        receiptRecorded: recordedPlanIDs.contains(income.id),
-                        canUseExisting: canUseExisting
-                    )
+                    incomeRowButton(for: income)
                 }
             }
         }
@@ -631,39 +603,15 @@ struct IncomeView: View {
         }
     }
 
-    private func incomeRowButton(for income: Income, receiptRecorded: Bool, canUseExisting: Bool) -> some View {
-        let canRecord = income.isPlanned && !receiptRecorded
-
-        return VStack(alignment: .leading, spacing: 4) {
-            Button {
-                openIncomeEditor(income)
-            } label: {
-                IncomeRowView(income: income)
-            }
-            .buttonStyle(.plain)
-            .accessibilityHint(income.isPlanned ? Text("Opens Edit Planned Income") : Text("Opens Edit Income"))
-
-            if income.isPlanned && receiptRecorded {
-                Label("Received", systemImage: "checkmark")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .padding(.top, 4)
-            }
+    private func incomeRowButton(for income: Income) -> some View {
+        Button {
+            openIncomeEditor(income)
+        } label: {
+            IncomeRowView(income: income)
         }
-        .rowActions(allowsFullLeadingSwipe: !canRecord) {
-            if canRecord {
-                Button("Record Income", systemImage: "checkmark.circle") {
-                    incomeSheet = .receipt(income)
-                }
-                .tint(.green)
-
-                if canUseExisting {
-                    Button("Use Existing", systemImage: "link") {
-                        incomeSheet = .link(income)
-                    }
-                    .tint(.blue)
-                }
-            }
+        .buttonStyle(.plain)
+        .accessibilityHint(Text("Opens Edit Income"))
+        .rowActions {
             editIncomeAction(income)
         } trailing: {
             deleteIncomeAction(income)
@@ -963,22 +911,18 @@ struct IncomeView: View {
 private enum IncomeSheet: Identifiable {
     case add(date: Date, isPlanned: Bool, id: UUID = UUID())
     case edit(Income)
-    case receipt(Income)
-    case link(Income)
 
     var id: String {
         switch self {
         case .add(_, _, let id): "add-\(id)"
         case .edit(let income): "edit-\(income.id)"
-        case .receipt(let income): "receipt-\(income.id)"
-        case .link(let income): "link-\(income.id)"
         }
     }
 
     var incomeID: UUID? {
         switch self {
         case .add: nil
-        case .edit(let income), .receipt(let income), .link(let income): income.id
+        case .edit(let income): income.id
         }
     }
 }
