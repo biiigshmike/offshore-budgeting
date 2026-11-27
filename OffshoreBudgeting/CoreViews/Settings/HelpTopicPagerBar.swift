@@ -6,6 +6,14 @@ struct HelpTopicPagerBar: View {
     let onBack: () -> Void
     let onNext: () -> Void
 
+    private var verticalPadding: CGFloat {
+        if #available(iOS 26.0, macCatalyst 26.0, *) {
+            4
+        } else {
+            14
+        }
+    }
+
     var body: some View {
         let back = String(localized: "common.back", defaultValue: "Back", comment: "Back action label.")
         let next = String(localized: "common.next", defaultValue: "Next", comment: "Next action label.")
@@ -29,6 +37,6 @@ struct HelpTopicPagerBar: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.horizontal, 20)
-        .padding(.vertical, 4)
+        .padding(.vertical, verticalPadding)
     }
 }

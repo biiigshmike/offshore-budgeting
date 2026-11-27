@@ -459,7 +459,7 @@ struct HelpTopicDetailView: View {
 
     var body: some View {
         ScrollViewReader { proxy in
-            ScrollView {
+            let topicScrollView = ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
                     Color.clear
                         .frame(height: 0)
@@ -474,6 +474,20 @@ struct HelpTopicDetailView: View {
                 }
                 .padding()
             }
+
+            Group {
+                if #available(iOS 26.0, macCatalyst 26.0, *) {
+                    topicScrollView.safeAreaInset(edge: .bottom, spacing: 0) {
+                        pagerBar
+                    }
+                } else {
+                    VStack(spacing: 0) {
+                        topicScrollView
+                        pagerBar
+                            .background(Color(.systemBackground))
+                    }
+                }
+            }
             .navigationTitle(currentTopic.title)
             .task {
                 guard !hasAppliedInitialScroll else { return }
@@ -483,14 +497,6 @@ struct HelpTopicDetailView: View {
                 hasAppliedInitialScroll = true
                 let targetID = currentTopic.sections.first { $0.id == initialSectionID }?.id
                 proxy.scrollTo(targetID ?? topAnchorID, anchor: .top)
-            }
-            .safeAreaInset(edge: .bottom, spacing: 0) {
-                HelpTopicPagerBar(
-                    previousTitle: previousTopic?.title,
-                    nextTitle: nextTopic?.title,
-                    onBack: goToPreviousTopic,
-                    onNext: goToNextTopic
-                )
             }
             .onChange(of: currentTopicID) { _, _ in
                 selectedMediaIDsBySectionID = [:]
@@ -505,6 +511,15 @@ struct HelpTopicDetailView: View {
                 HelpSectionFullscreenViewer(topicTitle: currentTopic.title, presentation: presentation)
             }
         }
+    }
+
+    private var pagerBar: some View {
+        HelpTopicPagerBar(
+            previousTitle: previousTopic?.title,
+            nextTitle: nextTopic?.title,
+            onBack: goToPreviousTopic,
+            onNext: goToNextTopic
+        )
     }
 
     // MARK: - Section UI
