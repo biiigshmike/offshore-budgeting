@@ -25,10 +25,13 @@ enum SafeSpendTodayCalculator {
     static func calculate(
         workspace: Workspace,
         budgetingPeriod: BudgetingPeriod,
+        weeklyInterval: Int = 1,
         now: Date = .now,
         calendar: Calendar = .current
     ) -> Summary {
-        let resolvedRange = budgetingPeriod.defaultRange(containing: now, calendar: calendar)
+        let resolvedRange = budgetingPeriod.defaultRange(
+            containing: now, calendar: calendar, weeklyInterval: weeklyInterval
+        )
         let rangeStart = calendar.startOfDay(for: resolvedRange.start)
         let rangeEnd = endOfDay(resolvedRange.end, calendar: calendar)
 

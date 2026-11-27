@@ -1530,10 +1530,10 @@ enum DebugSeeder {
                                        transactionDate: changedRange.start, workspace: workspace, card: card))
     }
 
-    private static func screenshotBudgetingPeriod() -> BudgetingPeriod {
+    private static func screenshotBudgetingPeriod() -> DefaultBudgetingPeriod {
         let raw = UserDefaults.standard.string(forKey: "general_defaultBudgetingPeriod")
             ?? BudgetingPeriod.monthly.rawValue
-        return BudgetingPeriod(rawValue: raw) ?? .monthly
+        return DefaultBudgetingPeriod(rawValue: raw)
     }
 
     private static func screenshotSavingsEntryDates(

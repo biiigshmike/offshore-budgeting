@@ -44,7 +44,7 @@ enum SavingsGraphSnapshotService {
         now: Date = .now,
         calendar: Calendar = .current
     ) -> (start: Date, end: Date) {
-        let period = BudgetingPeriod(rawValue: defaultBudgetingPeriodRaw) ?? .monthly
+        let period = DefaultBudgetingPeriod(rawValue: defaultBudgetingPeriodRaw)
         let range = period.defaultRange(containing: now, calendar: calendar)
         return (
             start: calendar.startOfDay(for: range.start),

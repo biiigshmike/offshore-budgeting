@@ -317,7 +317,7 @@ struct CategoryDetailView: View, Equatable {
     }
 
     private func applyDefaultPeriod() {
-        let period = BudgetingPeriod(rawValue: defaultBudgetingPeriodRaw) ?? .monthly
+        let period = DefaultBudgetingPeriod(rawValue: defaultBudgetingPeriodRaw)
         let range = period.defaultRange(containing: .now, calendar: .current)
         applyDates(range.start, range.end)
     }

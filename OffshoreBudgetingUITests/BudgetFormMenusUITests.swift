@@ -175,15 +175,32 @@ final class BudgetFormMenusUITests: XCTestCase {
         XCTAssertTrue(copiedCards?.label.contains("None selected") == true)
     }
 
-    func testFirstBudgetWithZeroOrMultipleCardsHasNoDefault() {
-        let scenarios = [("-uiTestProgressNoCard", "No cards available"), ("-uiTestProgressTwoCards", "None selected")]
-        for (argument, summary) in scenarios {
-            let app = launchFirstBudgetForm(extraArguments: [argument])
-            let cards = app.buttons["budget.cards"]
-            XCTAssertTrue(cards.label.contains(summary))
-            XCTAssertEqual(cards.isEnabled, argument == "-uiTestProgressTwoCards")
-            app.terminate()
-        }
+    func testEmptyCardsRowCreatesACardAndReturnsToTheBudgetDraft() {
+        let app = launchFirstBudgetForm(extraArguments: ["-uiTestProgressNoCard"])
+        let cards = app.buttons["budget.cards"]
+        let draftName = app.textFields["budget.name"].value as? String
+        XCTAssertTrue(cards.label.contains("Create Card"))
+        cards.tap()
+
+        let cardForm = app.navigationBars["Add Card"]
+        XCTAssertTrue(cardForm.waitForExistence(timeout: 5))
+        let name = app.textFields["Credit Card, Checking, or Cash"]
+        name.tap()
+        name.typeText("New Checking")
+        cardForm.buttons["Save"].tap()
+
+        XCTAssertTrue(cards.waitForExistence(timeout: 5))
+        XCTAssertFalse(cards.label.contains("Create Card"))
+        XCTAssertEqual(app.textFields["budget.name"].value as? String, draftName)
+        cards.tap()
+        XCTAssertTrue(menuItem("New Checking", in: app).waitForExistence(timeout: 5))
+    }
+
+    func testFirstBudgetWithMultipleCardsHasNoDefault() {
+        let app = launchFirstBudgetForm(extraArguments: ["-uiTestProgressTwoCards"])
+        let cards = app.buttons["budget.cards"]
+        XCTAssertTrue(cards.label.contains("None selected"))
+        XCTAssertTrue(cards.isEnabled)
     }
 
     private func launchFirstBudgetForm(extraArguments: [String] = []) -> XCUIApplication {

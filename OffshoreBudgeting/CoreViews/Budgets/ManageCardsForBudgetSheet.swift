@@ -30,6 +30,7 @@ struct ManageCardsForBudgetSheet: View {
 
     @State private var reviewCard: Card? = nil
     @State private var showingReviewRecordedExpenses: Bool = false
+    @State private var showingAddCard = false
 
     init(workspace: Workspace, budget: Budget) {
         self.workspace = workspace
@@ -45,11 +46,15 @@ struct ManageCardsForBudgetSheet: View {
     var body: some View {
         List {
             if cards.isEmpty {
-                ContentUnavailableView(
-                    "No Cards",
-                    systemImage: "creditcard",
-                    description: Text("Create a card first, then you can link it to this budget.")
-                )
+                ContentUnavailableView {
+                    Label("No Cards", systemImage: "creditcard")
+                } description: {
+                    Text("Create a card, then link it to this budget.")
+                } actions: {
+                    Button("Create Card") { showingAddCard = true }
+                        .glassProminentButtonStyleCompat()
+                        .tint(.accentColor)
+                }
                 .frame(maxWidth: .infinity, alignment: .center)
             } else {
                 ForEach(cards) { card in
@@ -80,6 +85,9 @@ struct ManageCardsForBudgetSheet: View {
         }
         .onAppear {
             cleanupOrphanLinks()
+        }
+        .appSheet(isPresented: $showingAddCard) {
+            NavigationStack { AddCardView(workspace: workspace) }
         }
 
         // MARK: - Unlink Policy Prompt (native)

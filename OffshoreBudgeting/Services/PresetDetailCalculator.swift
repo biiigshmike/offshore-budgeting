@@ -61,16 +61,17 @@ enum PresetDetailCalculator {
         presetID: UUID,
         occurrences: [Occurrence],
         grouping: BudgetingPeriod = .monthly,
+        weeklyInterval: Int = 1,
         now: Date = .now,
         calendar: Calendar = .current
     ) -> (start: Date, end: Date) {
         let today = calendar.startOfDay(for: now)
-        let currentStart = grouping.defaultRange(containing: today, calendar: calendar).start
+        let currentStart = grouping.defaultRange(containing: today, calendar: calendar, weeklyInterval: weeklyInterval).start
         let component: Calendar.Component
         let offset: Int
         switch grouping {
         case .daily: (component, offset) = (.day, -29)
-        case .weekly: (component, offset) = (.weekOfYear, -11)
+        case .weekly: (component, offset) = (.weekOfYear, -11 * weeklyInterval)
         case .monthly: (component, offset) = (.month, -11)
         case .quarterly: (component, offset) = (.month, -21)
         case .yearly: (component, offset) = (.year, -4)
@@ -85,7 +86,7 @@ enum PresetDetailCalculator {
               let latestOlder = eligible.map(\.date).max() else {
             return (defaultStart, today)
         }
-        let olderStart = grouping.defaultRange(containing: latestOlder, calendar: calendar).start
+        let olderStart = grouping.defaultRange(containing: latestOlder, calendar: calendar, weeklyInterval: weeklyInterval).start
         return (olderStart, today)
     }
 
@@ -96,6 +97,7 @@ enum PresetDetailCalculator {
         startDate: Date,
         endDate: Date,
         grouping: BudgetingPeriod = .monthly,
+        weeklyInterval: Int = 1,
         hideFuturePlanned: Bool = false,
         excludeFuturePlanned: Bool = false,
         currencyCode: String = "USD",
@@ -136,12 +138,12 @@ enum PresetDetailCalculator {
         }
 
         let grouped = Dictionary(grouping: included) {
-            grouping.defaultRange(containing: $0.date, calendar: calendar).start
+            grouping.defaultRange(containing: $0.date, calendar: calendar, weeklyInterval: weeklyInterval).start
         }
         let periods = grouped.map { start, values in
             PeriodTotal(
                 startDate: start,
-                endDate: grouping.defaultRange(containing: start, calendar: calendar).end,
+                endDate: grouping.defaultRange(containing: start, calendar: calendar, weeklyInterval: weeklyInterval).end,
                 plannedAmount: values.reduce(0) { $0 + $1.plannedAmount },
                 effectiveAmount: values.reduce(0) { $0 + ($1.effectiveAmount(now: now, calendar: calendar) ?? 0) },
                 recordedCount: values.filter { $0.recordedAmount != nil }.count,

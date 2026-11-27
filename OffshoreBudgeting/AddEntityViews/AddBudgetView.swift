@@ -90,6 +90,7 @@ struct AddBudgetView: View {
     var body: some View {
         BudgetFormView(
             modeTitle: "Add Budget",
+            workspace: workspace,
             cards: cards,
             presets: presets,
             categories: goalCategories,
@@ -246,7 +247,7 @@ struct AddBudgetView: View {
 
     private func applyDefaultPeriodRange() {
         let now = Date()
-        let period = BudgetingPeriod(rawValue: defaultBudgetingPeriodRaw) ?? .monthly
+        let period = DefaultBudgetingPeriod(rawValue: defaultBudgetingPeriodRaw)
         let range = period.defaultRange(containing: now, calendar: .current)
         startDate = range.start
         endDate = range.end
@@ -326,7 +327,7 @@ struct AddBudgetView: View {
         selectedPresetIDs = Set((template.presetLinks ?? []).compactMap { $0.preset }
             .filter { $0.workspace?.id == workspace.id && !$0.isArchived }.map(\.id))
         categoryGoalDrafts = BudgetCategoryGoalStore.drafts(for: template)
-        repeatPeriodRaw = (BudgetingPeriod(rawValue: defaultBudgetingPeriodRaw) ?? .monthly).rawValue
+        repeatPeriodRaw = DefaultBudgetingPeriod(rawValue: defaultBudgetingPeriodRaw).period.rawValue
         updateCycleEndDate()
     }
 

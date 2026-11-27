@@ -239,10 +239,10 @@ enum NextPlannedExpenseWidgetSnapshotBuilder {
         }
     }
 
-    nonisolated private static func defaultBudgetingPeriodFromSharedDefaults() -> BudgetingPeriod {
+    nonisolated private static func defaultBudgetingPeriodFromSharedDefaults() -> DefaultBudgetingPeriod {
         let defaults = UserDefaults(suiteName: NextPlannedExpenseWidgetSnapshotStore.appGroupID)
         let raw = defaults?.string(forKey: "general_defaultBudgetingPeriod") ?? BudgetingPeriod.monthly.rawValue
-        return BudgetingPeriod(rawValue: raw) ?? .monthly
+        return DefaultBudgetingPeriod(rawValue: raw)
     }
 
     nonisolated private static func futureTimelineSnapshots(

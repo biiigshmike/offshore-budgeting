@@ -12,6 +12,7 @@ struct UncategorizedExpenseReviewView: View {
     @Query private var categories: [Category]
     @State private var selections: [UUID: UUID] = [:]
     @State private var showingSaveError = false
+    @State private var showingAddCategory = false
 
     init(workspace: Workspace, onSave: @escaping () -> Void) {
         self.workspace = workspace
@@ -50,8 +51,15 @@ struct UncategorizedExpenseReviewView: View {
                 ContentUnavailableView("No Uncategorized Expenses", systemImage: "checkmark.circle")
                 .frame(maxWidth: .infinity, alignment: .center)
             } else if availableCategories.isEmpty {
-                ContentUnavailableView("No Available Categories", systemImage: "tag",
-                    description: Text("Create a category in Settings to categorize these expenses."))
+                ContentUnavailableView {
+                    Label("No Available Categories", systemImage: "tag")
+                } description: {
+                    Text("Create a category to categorize these expenses.")
+                } actions: {
+                    Button("Create Category") { showingAddCategory = true }
+                        .glassProminentButtonStyleCompat()
+                        .tint(.accentColor)
+                }
                 .frame(maxWidth: .infinity, alignment: .center)
             } else {
                 ForEach(reviewExpenses) { expense in
@@ -84,6 +92,9 @@ struct UncategorizedExpenseReviewView: View {
         }
         .navigationTitle("Review Expenses")
         .navigationBarTitleDisplayMode(.inline)
+        .appSheet(isPresented: $showingAddCategory) {
+            NavigationStack { AddCategoryView(workspace: workspace) }
+        }
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
                 Button("Skip", role: .cancel) { dismiss() }

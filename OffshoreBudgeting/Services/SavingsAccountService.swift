@@ -169,7 +169,7 @@ enum SavingsAccountService {
         }
 
         let refreshedAccount = ensureSavingsAccount(for: workspace, modelContext: modelContext)
-        let period = BudgetingPeriod(rawValue: defaultBudgetingPeriodRaw) ?? .monthly
+        let period = DefaultBudgetingPeriod(rawValue: defaultBudgetingPeriodRaw)
         let workspaceID = workspace.id
 
         var insertedPeriodCloseCount = 0
@@ -444,7 +444,7 @@ enum SavingsAccountService {
             return true
         }
 
-        let period = BudgetingPeriod(rawValue: defaultBudgetingPeriodRaw) ?? .monthly
+        let period = DefaultBudgetingPeriod(rawValue: defaultBudgetingPeriodRaw)
         let latestClosedRange = latestClosedPeriodRange(
             defaultBudgetingPeriodRaw: defaultBudgetingPeriodRaw,
             now: now
@@ -611,7 +611,7 @@ enum SavingsAccountService {
     ) {
         let account = ensureSavingsAccount(for: workspace, modelContext: modelContext)
         guard !account.requiresPeriodReview else { return }
-        let period = BudgetingPeriod(rawValue: defaultBudgetingPeriodRaw) ?? .monthly
+        let period = DefaultBudgetingPeriod(rawValue: defaultBudgetingPeriodRaw)
         let workspaceID = workspace.id
 
         trace(
@@ -736,7 +736,7 @@ enum SavingsAccountService {
         defaultBudgetingPeriodRaw: String,
         now: Date = .now
     ) -> Date? {
-        let period = BudgetingPeriod(rawValue: defaultBudgetingPeriodRaw) ?? .monthly
+        let period = DefaultBudgetingPeriod(rawValue: defaultBudgetingPeriodRaw)
         let currentRange = periodRange(containing: now, period: period)
         return previousRange(before: currentRange.start, period: period)?.end
     }
@@ -982,7 +982,7 @@ enum SavingsAccountService {
     private static func backfillHistory(
         workspace: Workspace,
         account: SavingsAccount,
-        period: BudgetingPeriod,
+        period: DefaultBudgetingPeriod,
         through latestClosedPeriodEnd: Date,
         incomes: [Income],
         plannedExpenses: [PlannedExpense],
@@ -1295,7 +1295,7 @@ enum SavingsAccountService {
             return nil
         }
 
-        let period = BudgetingPeriod(rawValue: defaultBudgetingPeriodRaw) ?? .monthly
+        let period = DefaultBudgetingPeriod(rawValue: defaultBudgetingPeriodRaw)
         return periodRange(containing: latestClosedPeriodEnd, period: period)
     }
 
@@ -1620,7 +1620,7 @@ enum SavingsAccountService {
         "Period close \(AppDateFormat.abbreviatedDate(start)) - \(AppDateFormat.abbreviatedDate(end))"
     }
 
-    static func periodRange(containing date: Date, period: BudgetingPeriod) -> (start: Date, end: Date) {
+    static func periodRange(containing date: Date, period: DefaultBudgetingPeriod) -> (start: Date, end: Date) {
         let range = period.defaultRange(containing: date, calendar: .current)
         let start = Calendar.current.startOfDay(for: range.start)
         let endStart = Calendar.current.startOfDay(for: range.end)
@@ -1630,43 +1630,19 @@ enum SavingsAccountService {
 
     static func nextRange(
         after current: (start: Date, end: Date),
-        period: BudgetingPeriod
+        period: DefaultBudgetingPeriod
     ) -> (start: Date, end: Date)? {
-        let nextDate: Date?
-        switch period {
-        case .daily:
-            nextDate = Calendar.current.date(byAdding: .day, value: 1, to: current.start)
-        case .weekly:
-            nextDate = Calendar.current.date(byAdding: .weekOfYear, value: 1, to: current.start)
-        case .monthly:
-            nextDate = Calendar.current.date(byAdding: .month, value: 1, to: current.start)
-        case .quarterly:
-            nextDate = Calendar.current.date(byAdding: .month, value: 3, to: current.start)
-        case .yearly:
-            nextDate = Calendar.current.date(byAdding: .year, value: 1, to: current.start)
-        }
-
-        guard let nextDate else { return nil }
-        return periodRange(containing: nextDate, period: period)
+        guard let nextDay = Calendar.current.date(
+            byAdding: .day, value: 1, to: Calendar.current.startOfDay(for: current.end)
+        ) else { return nil }
+        return periodRange(containing: nextDay, period: period)
     }
 
-    private static func previousRange(before date: Date, period: BudgetingPeriod) -> (start: Date, end: Date)? {
-        let previousDate: Date?
-        switch period {
-        case .daily:
-            previousDate = Calendar.current.date(byAdding: .day, value: -1, to: date)
-        case .weekly:
-            previousDate = Calendar.current.date(byAdding: .weekOfYear, value: -1, to: date)
-        case .monthly:
-            previousDate = Calendar.current.date(byAdding: .month, value: -1, to: date)
-        case .quarterly:
-            previousDate = Calendar.current.date(byAdding: .month, value: -3, to: date)
-        case .yearly:
-            previousDate = Calendar.current.date(byAdding: .year, value: -1, to: date)
-        }
-
-        guard let previousDate else { return nil }
-        return periodRange(containing: previousDate, period: period)
+    private static func previousRange(
+        before date: Date, period: DefaultBudgetingPeriod
+    ) -> (start: Date, end: Date)? {
+        guard let previousDay = Calendar.current.date(byAdding: .day, value: -1, to: date) else { return nil }
+        return periodRange(containing: previousDay, period: period)
     }
 
     private static func shouldInsertPeriodClose(

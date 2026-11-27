@@ -752,6 +752,7 @@ struct BudgetDetailView: View {
                 }
             case .categoryGoals:
                 CategoryGoalsEditorView(
+                    workspace: workspace,
                     categories: derived.categoriesInBudget,
                     drafts: BudgetCategoryGoalStore.drafts(for: budget),
                     plannedContributions: Dictionary(uniqueKeysWithValues: derived.categoriesInBudget.map {

@@ -8,10 +8,17 @@
 import SwiftUI
 
 struct BudgetFormView: View {
+
+    private enum SheetRoute: String, Identifiable {
+        case categoryGoals, addCard, addPreset
+
+        var id: Self { self }
+    }
     
     // MARK: - Inputs
     
     let modeTitle: String
+    let workspace: Workspace
     
     let cards: [Card]
     let presets: [Preset]
@@ -57,10 +64,8 @@ struct BudgetFormView: View {
             }
         } label: {
             selectionMenuLabel("Cards") {
-                if cards.isEmpty {
-                    Text("No cards available")
-                } else if selectedCardIDs.count == 1,
-                          let card = cards.first(where: { selectedCardIDs.contains($0.id) }) {
+                if selectedCardIDs.count == 1,
+                   let card = cards.first(where: { selectedCardIDs.contains($0.id) }) {
                     CardMenuLabel(card: card)
                 } else if selectedCardIDs.isEmpty {
                     Text("None selected")
@@ -72,7 +77,6 @@ struct BudgetFormView: View {
         .buttonStyle(.borderless)
         .menuIndicator(.hidden)
         .menuActionDismissBehavior(.disabled)
-        .disabled(cards.isEmpty)
         .accessibilityIdentifier("budget.cards")
     }
 
@@ -90,10 +94,8 @@ struct BudgetFormView: View {
             }
         } label: {
             selectionMenuLabel("Presets") {
-                if presets.isEmpty {
-                    Text("No presets available")
-                } else if selectedPresetIDs.count == 1,
-                          let preset = presets.first(where: { selectedPresetIDs.contains($0.id) }) {
+                if selectedPresetIDs.count == 1,
+                   let preset = presets.first(where: { selectedPresetIDs.contains($0.id) }) {
                     Text(preset.title)
                 } else if selectedPresetIDs.isEmpty {
                     Text("None selected")
@@ -105,7 +107,6 @@ struct BudgetFormView: View {
         .buttonStyle(.borderless)
         .menuIndicator(.hidden)
         .menuActionDismissBehavior(.disabled)
-        .disabled(presets.isEmpty)
         .accessibilityIdentifier("budget.presets")
     }
 
@@ -156,7 +157,7 @@ struct BudgetFormView: View {
     @Binding var selectedPresetIDs: Set<UUID>
     @Binding var categoryGoalDrafts: [UUID: CategoryGoalDraft]
     @Binding var categoryGoalAutoConfiguration: CategoryGoalAutoConfigurationDraft
-    @State private var showingCategoryGoals: Bool = false
+    @State private var sheetRoute: SheetRoute?
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.displayScale) private var displayScale
     
@@ -204,47 +205,64 @@ struct BudgetFormView: View {
                     onEndDateChanged(newValue)
                 }
 
-                #if targetEnvironment(macCatalyst)
-                BudgetSelectionChecklist(
-                    title: "Cards",
-                    items: cards,
-                    selectedCount: selectedCardIDs.count,
-                    accessibilityID: "budget.cards",
-                    selection: bindingForCard,
-                    onToggleAll: onToggleAllCards
-                ) { card in
-                    CardMenuLabel(card: card)
+                if cards.isEmpty {
+                    FormCreationRow(title: "Cards", actionTitle: "Create Card") {
+                        sheetRoute = .addCard
+                    }
+                    .accessibilityIdentifier("budget.cards")
+                } else {
+                    #if targetEnvironment(macCatalyst)
+                    BudgetSelectionChecklist(
+                        title: "Cards",
+                        items: cards,
+                        selectedCount: selectedCardIDs.count,
+                        accessibilityID: "budget.cards",
+                        selection: bindingForCard,
+                        onToggleAll: onToggleAllCards
+                    ) { card in
+                        CardMenuLabel(card: card)
+                    }
+                    #else
+                    cardsMenu
+                    #endif
                 }
 
-                BudgetSelectionChecklist(
-                    title: "Presets",
-                    items: presets,
-                    selectedCount: selectedPresetIDs.count,
-                    accessibilityID: "budget.presets",
-                    selection: bindingForPreset,
-                    onToggleAll: onToggleAllPresets
-                ) { preset in
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack(spacing: 8) {
-                            Text(preset.title)
-                            if preset.isArchived {
-                                Text("Archived")
-                                    .font(.caption.weight(.semibold))
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                        Text(PresetScheduleFormatter.humanReadableSchedule(for: preset))
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
+                if presets.isEmpty {
+                    FormCreationRow(title: "Presets", actionTitle: "Create Preset") {
+                        sheetRoute = .addPreset
                     }
+                    .accessibilityIdentifier("budget.presets")
+                } else {
+                    #if targetEnvironment(macCatalyst)
+                    BudgetSelectionChecklist(
+                        title: "Presets",
+                        items: presets,
+                        selectedCount: selectedPresetIDs.count,
+                        accessibilityID: "budget.presets",
+                        selection: bindingForPreset,
+                        onToggleAll: onToggleAllPresets
+                    ) { preset in
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack(spacing: 8) {
+                                Text(preset.title)
+                                if preset.isArchived {
+                                    Text("Archived")
+                                        .font(.caption.weight(.semibold))
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                            Text(PresetScheduleFormatter.humanReadableSchedule(for: preset))
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    #else
+                    presetsMenu
+                    #endif
                 }
-                #else
-                cardsMenu
-                presetsMenu
-                #endif
 
                 Button {
-                    showingCategoryGoals = true
+                    sheetRoute = .categoryGoals
                 } label: {
                     HStack {
                         Text("Category Goals").foregroundStyle(.primary)
@@ -265,12 +283,6 @@ struct BudgetFormView: View {
                 Text("Budget")
             } footer: {
                 VStack(alignment: .leading, spacing: 8) {
-                    if cards.isEmpty {
-                        Text("No cards yet. Create a card first.")
-                    }
-                    if presets.isEmpty {
-                        Text("No presets yet. You can add them later.")
-                    }
                     Text("Choose which presets to include. Offshore creates their planned expenses within this budget’s dates.")
                     Text("Set optional minimum and maximum spending goals for this budget. You can change them later.")
                 }
@@ -296,18 +308,26 @@ struct BudgetFormView: View {
             }
         }
         .navigationTitle(modeTitle)
-        .appSheet(isPresented: $showingCategoryGoals) {
-            CategoryGoalsEditorView(
-                categories: categories,
-                drafts: categoryGoalDrafts,
-                plannedContributions: plannedGoalContributions ?? [:],
-                allowsPlannedMinimum: plannedGoalContributions != nil,
-                maximumSuggestionProvider: maximumGoalSuggestionProvider,
-                replacesExistingGoals: reconfiguresExistingGoals,
-                autoConfiguration: categoryGoalAutoConfiguration
-            ) { updatedDrafts, autoConfiguration in
-                categoryGoalDrafts = updatedDrafts
-                categoryGoalAutoConfiguration = autoConfiguration
+        .appSheet(item: $sheetRoute) { route in
+            switch route {
+            case .categoryGoals:
+                CategoryGoalsEditorView(
+                    workspace: workspace,
+                    categories: categories,
+                    drafts: categoryGoalDrafts,
+                    plannedContributions: plannedGoalContributions ?? [:],
+                    allowsPlannedMinimum: plannedGoalContributions != nil,
+                    maximumSuggestionProvider: maximumGoalSuggestionProvider,
+                    replacesExistingGoals: reconfiguresExistingGoals,
+                    autoConfiguration: categoryGoalAutoConfiguration
+                ) { updatedDrafts, autoConfiguration in
+                    categoryGoalDrafts = updatedDrafts
+                    categoryGoalAutoConfiguration = autoConfiguration
+                }
+            case .addCard:
+                NavigationStack { AddCardView(workspace: workspace) }
+            case .addPreset:
+                NavigationStack { AddPresetView(workspace: workspace) }
             }
         }
     }

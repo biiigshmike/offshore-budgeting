@@ -81,6 +81,27 @@ final class UncategorizedExpenseReviewUITests: XCTestCase {
         XCTAssertTrue(app.navigationBars["Review Expenses"].waitForExistence(timeout: 10))
     }
 
+    func testCreatingCategoryFromEmptyReviewKeepsTheExpenseAvailable() {
+        let app = makeApp(extraArguments: ["-uiTestReviewNoActiveCategories"])
+        app.launch()
+        let review = app.navigationBars["Review Expenses"]
+        XCTAssertTrue(review.waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["No Available Categories"].exists)
+
+        app.buttons["Create Category"].tap()
+        let addCategory = app.navigationBars["Add Category"]
+        XCTAssertTrue(addCategory.waitForExistence(timeout: 5))
+        let name = app.textFields.matching(NSPredicate(format: "placeholderValue == %@", "Name")).firstMatch
+        name.tap()
+        name.typeText("Dining")
+        addCategory.buttons["Save"].tap()
+
+        XCTAssertTrue(review.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Review Coffee"].waitForExistence(timeout: 5))
+        chooseDining(app)
+        XCTAssertTrue(review.buttons["Save"].isEnabled)
+    }
+
     func testSwipeDismissalDiscardsSelections() throws {
         let app = makeApp()
         app.launch()

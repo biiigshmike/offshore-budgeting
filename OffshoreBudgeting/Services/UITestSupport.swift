@@ -247,6 +247,18 @@ enum UITestSupport {
 
         case .workspaceProgress:
             let arguments = ProcessInfo.processInfo.arguments
+            if arguments.contains("-uiTestFreshBudgetingOnboarding") {
+                let defaults = UserDefaults.standard
+                defaults.set(BudgetingPeriod.monthly.rawValue, forKey: "general_defaultBudgetingPeriod")
+                defaults.set(false, forKey: "privacy_requireBiometrics")
+                if let release = SettingsReleaseLogsView.currentReleaseSection {
+                    defaults.set(release.id, forKey: "releaseLogs_seenReleaseIDs")
+                }
+                break
+            }
+            if arguments.contains("-uiTestLegacyWeeklyBudgetingPeriod") {
+                UserDefaults.standard.set(BudgetingPeriod.weekly.rawValue, forKey: "general_defaultBudgetingPeriod")
+            }
             if arguments.contains("-uiTestProgressDelayedWorkspace") {
                 let workspaceID = UUID(uuidString: "5AA29E56-BBDB-4CC9-A286-720F6F35B001")!
                 let defaults = UserDefaults.standard
@@ -381,7 +393,6 @@ enum UITestSupport {
         case .uncategorizedReview:
             let workspace = Workspace(name: "Review Workspace", hexColor: "#3B82F6")
             let card = Card(name: "Review Card", workspace: workspace)
-            let category = Category(name: "Dining", hexColor: "#00AA00", workspace: workspace)
             let archived = Category(name: "Archived Review Category", hexColor: "#AAAAAA", workspace: workspace, isArchived: true)
             let expense = VariableExpense(descriptionText: "Review Coffee", amount: 6.50,
                 transactionDate: .now, workspace: workspace, card: card)
@@ -390,7 +401,9 @@ enum UITestSupport {
                 transactionDate: .now, workspace: other)
             context.insert(workspace)
             context.insert(card)
-            context.insert(category)
+            if !ProcessInfo.processInfo.arguments.contains("-uiTestReviewNoActiveCategories") {
+                context.insert(Category(name: "Dining", hexColor: "#00AA00", workspace: workspace))
+            }
             context.insert(archived)
             context.insert(expense)
             context.insert(other)

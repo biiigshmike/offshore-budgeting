@@ -653,17 +653,11 @@ private struct OnboardingWorkspaceStep: View {
                 }
 
                 Section {
-                    Picker("Default Budgeting Period", selection: defaultBudgetingPeriodBinding) {
-                        ForEach(BudgetingPeriod.allCases) { period in
-                            Text(period.displayTitle)
-                                .tag(period)
-                        }
-                    }
-                    .pickerStyle(.menu)
+                    DefaultBudgetingPeriodControls(rawValue: $defaultBudgetingPeriodRaw)
                 } header: {
                     Text("Workspace Behaviors")
                 } footer: {
-                    Text("Sets the default date range for Home, account views, and widgets, and the starting dates for new budgets. Monthly, for example, starts with the current month. This period also determines when completed periods are recorded in Offshore Savings. You can choose other date ranges when needed.")
+                    DefaultBudgetingPeriodControls.footnote
                 }
 
                 Section {
@@ -778,12 +772,6 @@ private struct OnboardingWorkspaceStep: View {
         selectedWorkspaceID = workspaces.first?.id.uuidString ?? ""
     }
 
-    private var defaultBudgetingPeriodBinding: Binding<BudgetingPeriod> {
-        Binding(
-            get: { BudgetingPeriod(rawValue: defaultBudgetingPeriodRaw) ?? .monthly },
-            set: { defaultBudgetingPeriodRaw = $0.rawValue }
-        )
-    }
 }
 
 // MARK: - Step: Privacy + iCloud + Notifications

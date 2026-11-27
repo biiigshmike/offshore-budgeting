@@ -719,10 +719,10 @@ enum SpendTrendsWidgetSnapshotBuilder {
         return cal.date(from: DateComponents(year: year, month: quarterStartMonth, day: 1)) ?? date
     }
 
-    nonisolated private static func defaultBudgetingPeriodFromSharedDefaults() -> BudgetingPeriod {
+    nonisolated private static func defaultBudgetingPeriodFromSharedDefaults() -> DefaultBudgetingPeriod {
         let defaults = UserDefaults(suiteName: SpendTrendsWidgetSnapshotStore.appGroupID)
         let raw = defaults?.string(forKey: "general_defaultBudgetingPeriod") ?? BudgetingPeriod.monthly.rawValue
-        return BudgetingPeriod(rawValue: raw) ?? .monthly
+        return DefaultBudgetingPeriod(rawValue: raw)
     }
 
     nonisolated private static func defaultExcludeFuturePlannedExpensesFromSharedDefaults() -> Bool {

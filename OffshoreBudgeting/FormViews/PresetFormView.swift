@@ -28,6 +28,7 @@ struct PresetFormView: View {
     
     @Binding var selectedCardID: UUID?
     @Binding var selectedCategoryID: UUID?
+    @State private var showingAddCard = false
     
     // MARK: - Validation (shared by Add + Edit)
     
@@ -58,8 +59,10 @@ struct PresetFormView: View {
             
             Section("Details") {
                 if cards.isEmpty {
-                    Text("No cards yet. Create a card first to set a default.")
-                        .foregroundStyle(.secondary)
+                    FormCreationRow(title: "Card", actionTitle: "Create Card") {
+                        showingAddCard = true
+                    }
+                    .accessibilityIdentifier("preset.createCard")
                 } else {
                     EntityMenuPicker(title: "Card", items: cards, selection: $selectedCardID, allowsEmptySelection: false, showsTitle: false) { card in
                         CardMenuLabel(card: card)
@@ -94,6 +97,9 @@ struct PresetFormView: View {
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
+        }
+        .appSheet(isPresented: $showingAddCard) {
+            NavigationStack { AddCardView(workspace: workspace) }
         }
     }
     

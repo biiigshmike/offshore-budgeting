@@ -25,12 +25,13 @@ struct WhatCanISpendTodayIntent: AppIntent {
     private func buildSummary() throws -> String {
         let now = Date.now
         let rawBudgetingPeriod = UserDefaults.standard.string(forKey: "general_defaultBudgetingPeriod")
-        let budgetingPeriod = BudgetingPeriod(rawValue: rawBudgetingPeriod ?? BudgetingPeriod.monthly.rawValue) ?? .monthly
+        let budgetingPeriod = DefaultBudgetingPeriod(rawValue: rawBudgetingPeriod)
 
         let summary = try OffshoreIntentDataStore.shared.performInSelectedWorkspace { _, workspace in
             SafeSpendTodayCalculator.calculate(
                 workspace: workspace,
-                budgetingPeriod: budgetingPeriod,
+                budgetingPeriod: budgetingPeriod.period,
+                weeklyInterval: budgetingPeriod.weeklyInterval,
                 now: now
             )
         }

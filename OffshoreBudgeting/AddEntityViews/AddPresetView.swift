@@ -11,7 +11,8 @@ import SwiftData
 struct AddPresetView: View {
 
     let workspace: Workspace
-    let offersBudgetAfterSave: Bool
+    private let offersBudgetAfterSave: Bool
+    private let offerBudgetID: UUID?
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
@@ -49,9 +50,10 @@ struct AddPresetView: View {
     @State private var budgetSearchText = ""
     @State private var budgetUnavailable = false
 
-    init(workspace: Workspace, offersBudgetAfterSave: Bool = false) {
+    init(workspace: Workspace, offersBudgetAfterSave: Bool = false, offerBudgetID: UUID? = nil) {
         self.workspace = workspace
         self.offersBudgetAfterSave = offersBudgetAfterSave
+        self.offerBudgetID = offerBudgetID
         let workspaceID = workspace.id
 
         _cards = Query(
@@ -187,10 +189,15 @@ struct AddPresetView: View {
         }
     }
 
-    private func budgetOffer(for preset: Preset) -> some View {
-        let eligibleBudgets = budgets.filter {
-            BudgetPresetApplicationService.isEligibleForOffer(preset, in: $0, workspace: workspace)
+    private func eligibleBudgets(for preset: Preset) -> [Budget] {
+        budgets.filter {
+            (offerBudgetID == nil || $0.id == offerBudgetID)
+                && BudgetPresetApplicationService.isEligibleForOffer(preset, in: $0, workspace: workspace)
         }
+    }
+
+    private func budgetOffer(for preset: Preset) -> some View {
+        let eligibleBudgets = eligibleBudgets(for: preset)
         let eligibleIDs = Set(eligibleBudgets.map(\.id))
         let selectedBudgets = eligibleBudgets.filter { selectedBudgetIDs.contains($0.id) }
 
@@ -251,11 +258,12 @@ struct AddPresetView: View {
         }
     }
 
+    @ViewBuilder
     private func budgetChecklist(for preset: Preset, budgets: [Budget]) -> some View {
         let query = budgetSearchText.trimmingCharacters(in: .whitespacesAndNewlines)
         let filteredBudgets = budgets.filter { query.isEmpty || $0.name.localizedStandardContains(query) }
 
-        return List(selection: $selectedBudgetIDs) {
+        let checklist = List(selection: $selectedBudgetIDs) {
             budgetOfferGuidance(for: preset, hasEligibleBudgets: true)
             Section("Choose Budgets") {
                 ForEach(filteredBudgets) { budget in
@@ -272,7 +280,11 @@ struct AddPresetView: View {
         }
         .environment(\.editMode, .constant(.active))
         .tint(.accentColor)
-        .searchable(text: $budgetSearchText, placement: .navigationBarDrawer(displayMode: .automatic), prompt: "Search Budgets")
+        if offerBudgetID == nil {
+            checklist.searchable(text: $budgetSearchText, placement: .navigationBarDrawer(displayMode: .automatic), prompt: "Search Budgets")
+        } else {
+            checklist
+        }
     }
 
     private func budgetOfferGuidance(for preset: Preset, hasEligibleBudgets: Bool) -> some View {
@@ -284,7 +296,11 @@ struct AddPresetView: View {
                     .selectionDisabled()
             }
             if !hasEligibleBudgets {
-                Text("You can select this preset when you create a budget.")
+                if offerBudgetID == nil {
+                    Text("You can select this preset when you create a budget.")
+                } else {
+                    Text("This preset will be available in Linked Presets.")
+                }
                 if preset.frequency == .none {
                     Text("This preset doesn’t repeat, so it generates no scheduled bills.")
                 }
@@ -343,7 +359,7 @@ struct AddPresetView: View {
             return
         }
 
-        if offersBudgetAfterSave {
+        if offersBudgetAfterSave || (offerBudgetID != nil && !eligibleBudgets(for: preset).isEmpty) {
             savedPreset = preset
         } else {
             dismiss()

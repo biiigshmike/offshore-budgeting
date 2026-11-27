@@ -89,6 +89,7 @@ struct EditBudgetView: View {
     var body: some View {
         BudgetFormView(
             modeTitle: "Edit Budget",
+            workspace: workspace,
             cards: cards,
             presets: visiblePresets,
             categories: goalCategories,

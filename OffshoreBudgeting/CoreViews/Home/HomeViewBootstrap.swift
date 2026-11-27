@@ -34,7 +34,7 @@ struct HomeViewBootstrap {
         now: Date = .now,
         calendar: Calendar = .current
     ) -> AppliedRangeSeed {
-        let period = BudgetingPeriod(rawValue: defaultBudgetingPeriodRaw) ?? .monthly
+        let period = DefaultBudgetingPeriod(rawValue: defaultBudgetingPeriodRaw)
         let range = period.defaultRange(containing: now, calendar: calendar)
         return AppliedRangeSeed(
             start: range.start,

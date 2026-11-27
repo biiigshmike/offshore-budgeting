@@ -21,7 +21,8 @@ struct PresetDetailView: View, Equatable {
     @Query private var budgets: [Budget]
     @AppStorage("general_hideFuturePlannedExpenses") private var hideFuture = false
     @AppStorage("general_excludeFuturePlannedExpensesFromCalculations") private var excludeFuture = false
-    @State private var grouping: BudgetingPeriod
+    private let defaultPeriod: DefaultBudgetingPeriod
+    private var grouping: BudgetingPeriod { defaultPeriod.period }
     @State private var hasInitializedRange = false
     @State private var startDate: Date
     @State private var endDate: Date
@@ -44,10 +45,13 @@ struct PresetDetailView: View, Equatable {
         self.preset = preset
         self.workspaceID = workspace.id
         self.presetID = preset.id
-        let period = BudgetingPeriod(rawValue: UserDefaults.standard.string(forKey: "general_defaultBudgetingPeriod") ?? "") ?? .monthly
-        _grouping = State(initialValue: period)
+        let defaultPeriod = DefaultBudgetingPeriod(
+            rawValue: UserDefaults.standard.string(forKey: "general_defaultBudgetingPeriod")
+        )
+        self.defaultPeriod = defaultPeriod
         let dates = PresetDetailCalculator.initialRange(
-            workspaceID: workspace.id, presetID: preset.id, occurrences: [], grouping: period
+            workspaceID: workspace.id, presetID: preset.id, occurrences: [],
+            grouping: defaultPeriod.period, weeklyInterval: defaultPeriod.weeklyInterval
         )
         _startDate = State(initialValue: Calendar.current.startOfDay(for: min(dates.start, dates.end)))
         _endDate = State(initialValue: Calendar.current.startOfDay(for: max(dates.start, dates.end)))
@@ -78,7 +82,8 @@ struct PresetDetailView: View, Equatable {
         guard !hasInitializedRange else { return }
         let dates = PresetDetailCalculator.initialRange(
             workspaceID: workspaceID, presetID: presetID,
-            occurrences: occurrenceSnapshots, grouping: grouping, now: referenceDate
+            occurrences: occurrenceSnapshots, grouping: grouping,
+            weeklyInterval: defaultPeriod.weeklyInterval, now: referenceDate
         )
         startDate = dates.start
         endDate = dates.end
@@ -89,7 +94,7 @@ struct PresetDetailView: View, Equatable {
         PresetDetailCalculator.calculate(
             workspaceID: workspaceID, presetID: presetID, occurrences: occurrenceSnapshots,
             startDate: startDate, endDate: endDate, grouping: grouping,
-            hideFuturePlanned: hideFuture, excludeFuturePlanned: excludeFuture,
+            weeklyInterval: defaultPeriod.weeklyInterval, hideFuturePlanned: hideFuture, excludeFuturePlanned: excludeFuture,
             currencyCode: CurrencyFormatter.currencyCode, now: now
         )
     }

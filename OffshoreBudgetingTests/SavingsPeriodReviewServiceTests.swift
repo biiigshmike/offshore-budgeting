@@ -6,6 +6,7 @@ import Testing
 @MainActor
 struct SavingsPeriodReviewServiceTests {
     private struct Fixture {
+        let container: ModelContainer
         let context: ModelContext
         let workspace: Workspace
         let card: Card
@@ -29,7 +30,7 @@ struct SavingsPeriodReviewServiceTests {
         ])
         let container = try ModelContainer(
             for: schema,
-            configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+            configurations: ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         )
         let context = ModelContext(container)
         context.autosaveEnabled = false
@@ -44,14 +45,17 @@ struct SavingsPeriodReviewServiceTests {
         context.insert(planned)
         context.insert(variable)
         try context.save()
-        return Fixture(context: context, workspace: workspace, card: card, income: income, planned: planned, variable: variable)
+        return Fixture(
+            container: container, context: context, workspace: workspace,
+            card: card, income: income, planned: planned, variable: variable
+        )
     }
 
     private func summaries(_ fixture: Fixture, period: String = "monthly", now: Date? = nil) throws -> [SavingsPeriodReviewSummary] {
         try SavingsPeriodReviewService.summaries(
             workspaceID: fixture.workspace.id,
             defaultBudgetingPeriodRaw: period,
-            modelContext: ModelContext(fixture.context.container),
+            modelContext: ModelContext(fixture.container),
             now: now ?? date(4, 10)
         )
     }
@@ -74,12 +78,12 @@ struct SavingsPeriodReviewServiceTests {
     }
 
     private func entries(_ fixture: Fixture) throws -> [SavingsLedgerEntry] {
-        let context = ModelContext(fixture.context.container)
+        let context = ModelContext(fixture.container)
         return try context.fetch(FetchDescriptor<SavingsLedgerEntry>()).filter { $0.workspace?.id == fixture.workspace.id }
     }
 
     private func account(_ fixture: Fixture) throws -> SavingsAccount {
-        let context = ModelContext(fixture.context.container)
+        let context = ModelContext(fixture.container)
         return try #require(context.fetch(FetchDescriptor<SavingsAccount>()).first { $0.workspace?.id == fixture.workspace.id })
     }
 
@@ -340,6 +344,79 @@ struct SavingsPeriodReviewServiceTests {
         #expect(try january(fixture).needsReview)
     }
 
+    @Test func twoWeekScheduleKeepsWeeklyCloseAndPostsNextUncoveredPeriod() throws {
+        let fixture = try fixture()
+        let period = DefaultBudgetingPeriod(.weekly, weeklyInterval: 2)
+        let firstRange = SavingsAccountService.periodRange(containing: fixture.income.date, period: period)
+        let secondRange = try #require(SavingsAccountService.nextRange(after: firstRange, period: period))
+        let thirdRange = try #require(SavingsAccountService.nextRange(after: secondRange, period: period))
+        let now = thirdRange.start
+        let firstUncoveredDay = Calendar.current.date(byAdding: .second, value: 1, to: firstRange.end)
+        #expect(secondRange.start == firstUncoveredDay)
+
+        let legacyRange = SavingsAccountService.periodRange(
+            containing: fixture.income.date, period: DefaultBudgetingPeriod(.weekly)
+        )
+        let account = SavingsAccountService.ensureSavingsAccount(for: fixture.workspace, modelContext: fixture.context)
+        let legacy = SavingsLedgerEntry(
+            date: legacyRange.end, amount: 125, note: "Prior weekly close",
+            kindRaw: SavingsLedgerEntryKind.periodClose.rawValue,
+            periodStartDate: legacyRange.start, periodEndDate: legacyRange.end,
+            workspace: fixture.workspace, account: account
+        )
+        let legacyID = legacy.id
+        fixture.context.insert(legacy)
+        let income = Income(source: "Next paycheck", amount: 500, date: secondRange.start,
+                            isPlanned: false, workspace: fixture.workspace, card: fixture.card)
+        fixture.context.insert(income)
+        try fixture.context.save()
+        let review = try summaries(fixture, period: period.rawValue, now: now)
+        #expect(review.contains { $0.start == firstRange.start && $0.end == firstRange.end && $0.hasOverlapConflict })
+        #expect(review.contains { $0.start == secondRange.start && $0.end == secondRange.end && !$0.hasOverlapConflict })
+
+        try SavingsPeriodReviewService.setRequiresReview(
+            false, workspace: fixture.workspace, modelContext: fixture.context, now: firstRange.start
+        )
+        for _ in 0..<2 {
+            SavingsAccountService.runAutoCaptureIfNeeded(
+                for: fixture.workspace, defaultBudgetingPeriodRaw: period.rawValue,
+                incomes: [fixture.income, income], plannedExpenses: [fixture.planned], variableExpenses: [fixture.variable],
+                modelContext: fixture.context, now: now
+            )
+        }
+        let closes = try entries(fixture).filter { $0.kind == .periodClose }
+        #expect(closes.count == 2)
+        let preserved = try #require(closes.first { $0.id == legacyID })
+        #expect(preserved.periodStartDate == legacyRange.start)
+        #expect(preserved.periodEndDate == legacyRange.end)
+        #expect(preserved.amount == 125)
+        #expect(closes.contains { $0.periodStartDate == secondRange.start && $0.periodEndDate == secondRange.end })
+    }
+
+    @Test func incomeWidgetAndSafeSpendUseTheSharedTwoWeekDefault() throws {
+        let fixture = try fixture()
+        let defaults = try #require(UserDefaults(suiteName: IncomeWidgetSnapshotStore.appGroupID))
+        let key = "general_defaultBudgetingPeriod"
+        let original = defaults.object(forKey: key)
+        defer { defaults.set(original, forKey: key) }
+        let period = DefaultBudgetingPeriod(.weekly, weeklyInterval: 2)
+        defaults.set(period.rawValue, forKey: key)
+        let now = date(1, 12)
+        let snapshot = try #require(IncomeWidgetSnapshotBuilder.buildSnapshot(
+            modelContext: fixture.context, workspaceID: fixture.workspace.id,
+            period: .period, now: now, maxRecent: 3
+        ))
+        let expected = SavingsAccountService.periodRange(containing: now, period: period)
+        #expect(snapshot.rangeStart == expected.start)
+        #expect(snapshot.rangeEnd == expected.end)
+        let safeSpend = SafeSpendTodayCalculator.calculate(
+            workspace: fixture.workspace, budgetingPeriod: period.period,
+            weeklyInterval: period.weeklyInterval, now: now
+        )
+        #expect(safeSpend.rangeStart == expected.start)
+        #expect(safeSpend.rangeEnd == expected.end)
+    }
+
     @Test func scheduleChangePreservesExistingBoundsAndBlocksOverlappingNewClose() throws {
         let fixture = try fixture()
         try confirm(january(fixture), fixture: fixture)
@@ -403,7 +480,7 @@ struct SavingsPeriodReviewServiceTests {
     @Test func duplicateNormalizationRetainsReviewedCorrectionAndMetadata() throws {
         let fixture = try fixture()
         try confirm(january(fixture), fixture: fixture, corrected: 0, explanation: "Unreliable historical records")
-        let context = ModelContext(fixture.context.container)
+        let context = ModelContext(fixture.container)
         let workspace = try #require(context.fetch(FetchDescriptor<Workspace>()).first { $0.id == fixture.workspace.id })
         let account = try #require(context.fetch(FetchDescriptor<SavingsAccount>()).first { $0.workspace?.id == workspace.id })
         let reviewed = try #require(context.fetch(FetchDescriptor<SavingsLedgerEntry>()).first { $0.kind == .periodClose })
@@ -482,7 +559,7 @@ struct SavingsPeriodReviewServiceTests {
         #expect(review.postedAmount == 400)
         let projectedTotal = review.currentTotal - review.postedAmount + review.calculatedAmount
         try confirm(review, fixture: fixture)
-        let verificationContext = ModelContext(fixture.context.container)
+        let verificationContext = ModelContext(fixture.container)
         let accounts = try verificationContext.fetch(FetchDescriptor<SavingsAccount>())
         #expect(accounts.first { $0.id == primary.id }?.total == projectedTotal)
         #expect(accounts.first { $0.id == secondary.id }?.total == 0)

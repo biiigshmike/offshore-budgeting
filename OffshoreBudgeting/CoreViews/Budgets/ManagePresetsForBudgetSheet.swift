@@ -20,6 +20,7 @@ struct ManagePresetsForBudgetSheet: View {
     @State private var showingUnlinkDeleteConfirm: Bool = false
     @State private var pendingUnlinkDelete: (() -> Void)? = nil
     @State private var showingApplyError = false
+    @State private var showingAddPreset = false
     
     @Query private var presets: [Preset]
     
@@ -37,11 +38,15 @@ struct ManagePresetsForBudgetSheet: View {
     var body: some View {
         List {
             if visiblePresets.isEmpty {
-                ContentUnavailableView(
-                    "No Presets",
-                    systemImage: "list.bullet.rectangle",
-                    description: Text("Create a preset first, then you can link it to this budget.")
-                )
+                ContentUnavailableView {
+                    Label("No Presets", systemImage: "list.bullet.rectangle")
+                } description: {
+                    Text("Create a preset, then link it to this budget.")
+                } actions: {
+                    Button("Create Preset") { showingAddPreset = true }
+                        .glassProminentButtonStyleCompat()
+                        .tint(.accentColor)
+                }
                 .frame(maxWidth: .infinity, alignment: .center)
             } else {
                 Section {
@@ -98,6 +103,11 @@ struct ManagePresetsForBudgetSheet: View {
         }
         .onAppear {
             cleanupOrphanLinks()
+        }
+        .appSheet(isPresented: $showingAddPreset) {
+            NavigationStack {
+                AddPresetView(workspace: workspace, offerBudgetID: budget.id)
+            }
         }
         .blocksAutomaticExpenseReview(while: showingUnlinkDeleteConfirm)
         .alert("Delete?", isPresented: $showingUnlinkDeleteConfirm) {

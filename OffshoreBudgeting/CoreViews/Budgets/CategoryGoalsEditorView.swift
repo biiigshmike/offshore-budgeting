@@ -3,6 +3,7 @@ import SwiftUI
 /// Shared, cancelable editor for creation drafts and existing budget goals.
 /// The caller decides when to persist the returned values.
 struct CategoryGoalsEditorView: View {
+    let workspace: Workspace
     let categories: [Category]
     let plannedContributions: [UUID: Double]
     let variableContributions: [UUID: Double]
@@ -17,9 +18,11 @@ struct CategoryGoalsEditorView: View {
     @State private var generatedValues: CategoryGoalAutoConfigurationDraft
     @State private var maximumSuggestions: [UUID: CategoryGoalSuggestion]?
     @State private var showingHistoryError = false
+    @State private var showingAddCategory = false
     @State private var drafts: [UUID: CategoryGoalDraft]
 
     init(
+        workspace: Workspace,
         categories: [Category],
         drafts: [UUID: CategoryGoalDraft],
         plannedContributions: [UUID: Double] = [:],
@@ -31,6 +34,7 @@ struct CategoryGoalsEditorView: View {
         autoConfiguration: CategoryGoalAutoConfigurationDraft = CategoryGoalAutoConfigurationDraft(),
         onSave: @escaping ([UUID: CategoryGoalDraft], CategoryGoalAutoConfigurationDraft) -> Void
     ) {
+        self.workspace = workspace
         self.categories = categories
         self.plannedContributions = plannedContributions
         self.variableContributions = variableContributions
@@ -47,7 +51,7 @@ struct CategoryGoalsEditorView: View {
     var body: some View {
         NavigationStack {
             List {
-                if allowsPlannedMinimum {
+                if allowsPlannedMinimum && !categories.isEmpty {
                     Section {
                         Toggle("Auto-Configure", isOn: $autoConfigure)
                             .toggleStyle(.switch)
@@ -66,67 +70,74 @@ struct CategoryGoalsEditorView: View {
                         Text("For categories without preset spending, historical minimum suggestions use the lowest comparable spending, including zero. Historical suggestions require Suggest Maximums to be enabled.")
                     }
                 }
-                Section {
-                    ForEach(categories) { category in
-                        NavigationLink {
-                            CategoryGoalDraftEditorView(
-                                category: category,
-                                draft: draftBinding(for: category.id),
-                                plannedContribution: plannedContributions[category.id] ?? 0,
-                                variableContribution: variableContributions[category.id] ?? 0,
-                                maximumSuggestion: maximumSuggestions?[category.id],
-                                showsMaximumSuggestion: autoConfigure && maximumSuggestions != nil && maximumSuggestionProvider != nil
-                            )
-                        } label: {
-                            VStack(alignment: .leading, spacing: 6) {
-                                HStack(spacing: 8) {
-                                    Circle()
-                                        .fill(Color(hex: category.hexColor) ?? .secondary)
-                                        .frame(width: 12, height: 12)
-                                        .accessibilityHidden(true)
-                                    Text(category.name)
-                                }
-                                goalSummary(for: category.id)
-                                if autoConfigure, let maximumSuggestions, maximumSuggestionProvider != nil {
-                                    if let suggestion = maximumSuggestions[category.id] {
-                                        Group {
-                                            if suggestion.samples.count == 1 {
-                                                Text("History: 1 past budget · \(suggestion.cushionPercent / 100, format: .percent.precision(.fractionLength(0))) cushion")
-                                            } else {
-                                                Text("History: \(suggestion.samples.count) past budgets · \(suggestion.cushionPercent / 100, format: .percent.precision(.fractionLength(0))) cushion")
+                if categories.isEmpty {
+                    ContentUnavailableView {
+                        Label("No Categories Yet", systemImage: "tag")
+                    } description: {
+                        Text("Create a category to set spending goals.")
+                    } actions: {
+                        Button("Create Category") { showingAddCategory = true }
+                            .glassProminentButtonStyleCompat()
+                            .tint(.accentColor)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .listRowBackground(Color.clear)
+                } else {
+                    Section {
+                        ForEach(categories) { category in
+                            NavigationLink {
+                                CategoryGoalDraftEditorView(
+                                    category: category,
+                                    draft: draftBinding(for: category.id),
+                                    plannedContribution: plannedContributions[category.id] ?? 0,
+                                    variableContribution: variableContributions[category.id] ?? 0,
+                                    maximumSuggestion: maximumSuggestions?[category.id],
+                                    showsMaximumSuggestion: autoConfigure && maximumSuggestions != nil && maximumSuggestionProvider != nil
+                                )
+                            } label: {
+                                VStack(alignment: .leading, spacing: 6) {
+                                    HStack(spacing: 8) {
+                                        Circle()
+                                            .fill(Color(hex: category.hexColor) ?? .secondary)
+                                            .frame(width: 12, height: 12)
+                                            .accessibilityHidden(true)
+                                        Text(category.name)
+                                    }
+                                    goalSummary(for: category.id)
+                                    if autoConfigure, let maximumSuggestions, maximumSuggestionProvider != nil {
+                                        if let suggestion = maximumSuggestions[category.id] {
+                                            Group {
+                                                if suggestion.samples.count == 1 {
+                                                    Text("History: 1 past budget · \(suggestion.cushionPercent / 100, format: .percent.precision(.fractionLength(0))) cushion")
+                                                } else {
+                                                    Text("History: \(suggestion.samples.count) past budgets · \(suggestion.cushionPercent / 100, format: .percent.precision(.fractionLength(0))) cushion")
+                                                }
                                             }
-                                        }
-                                        .font(.footnote)
-                                        .foregroundStyle(.secondary)
-                                    } else {
-                                        Text("No comparable category history")
                                             .font(.footnote)
                                             .foregroundStyle(.secondary)
+                                        } else {
+                                            Text("No comparable category history")
+                                                .font(.footnote)
+                                                .foregroundStyle(.secondary)
+                                        }
                                     }
                                 }
                             }
                         }
+                    } footer: {
+                        Text("Goals apply only to this budget. Leave either amount blank if you don't want that goal.")
+                        Text("Maximums also power Savings at Goal Maximums in Budget Detail and Category Goals on Home.")
                     }
-                } footer: {
-                    Text("Goals apply only to this budget. Leave either amount blank if you don't want that goal.")
-                    Text("Maximums also power Savings at Goal Maximums in Budget Detail and Category Goals on Home.")
                 }
                 Section {
                     HelpTopicLink(topicID: "budgets-category-goals", title: "Category Goals guide", font: .body)
                 }
             }
-            .overlay {
-                if categories.isEmpty {
-                    ContentUnavailableView(
-                        "No Categories Yet",
-                        systemImage: "tag",
-                        description: Text("Create a category in Settings to set spending goals.")
-                    )
-                    .frame(maxWidth: .infinity, alignment: .center)
-                }
-            }
             .navigationTitle("Category Goals")
             .navigationBarTitleDisplayMode(.inline)
+            .appSheet(isPresented: $showingAddCategory) {
+                NavigationStack { AddCategoryView(workspace: workspace) }
+            }
             .alert("Couldn’t Load Budget History", isPresented: $showingHistoryError) {
                 Button("OK", role: .cancel) { }
             } message: {

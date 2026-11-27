@@ -447,7 +447,7 @@ struct AllocationAccountDetailView: View {
 
     private func applyDefaultPeriodRange() {
         let now = Date()
-        let period = BudgetingPeriod(rawValue: defaultBudgetingPeriodRaw) ?? .monthly
+        let period = DefaultBudgetingPeriod(rawValue: defaultBudgetingPeriodRaw)
         let range = period.defaultRange(containing: now, calendar: .current)
 
         draftStartDate = normalizedStart(range.start)

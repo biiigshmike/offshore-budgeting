@@ -41,7 +41,7 @@ enum SavingsPeriodReviewService {
         )).filter { !$0.isDeleted }
         let closes = entries.filter { $0.kind == .periodClose }
         let total = entries.reduce(0) { $0 + $1.amount }
-        let period = BudgetingPeriod(rawValue: defaultBudgetingPeriodRaw) ?? .monthly
+        let period = DefaultBudgetingPeriod(rawValue: defaultBudgetingPeriodRaw)
         let currentRange = SavingsAccountService.periodRange(containing: now, period: period)
 
         // Store bounds as days in the key: older closes may have used start-of-day end dates.

@@ -71,13 +71,14 @@ enum SafeSpendTodayWidgetSnapshotBuilder {
         let budgetingPeriod = defaultBudgetingPeriodFromSharedDefaults()
         let summary = SafeSpendTodayCalculator.calculate(
             workspace: workspace,
-            budgetingPeriod: budgetingPeriod,
+            budgetingPeriod: budgetingPeriod.period,
+            weeklyInterval: budgetingPeriod.weeklyInterval,
             now: now
         )
 
         return Snapshot(
             title: "Safe Spend Today",
-            periodTitle: budgetingPeriod.displayTitle,
+            periodTitle: budgetingPeriod.period.displayTitle,
             rangeStart: summary.rangeStart,
             rangeEnd: summary.rangeEnd,
             safeToSpendToday: summary.safeToSpendToday,
@@ -136,9 +137,9 @@ enum SafeSpendTodayWidgetSnapshotBuilder {
         "safeSpendTodayWidget.snapshot.\(workspaceID)"
     }
 
-    private static func defaultBudgetingPeriodFromSharedDefaults() -> BudgetingPeriod {
+    private static func defaultBudgetingPeriodFromSharedDefaults() -> DefaultBudgetingPeriod {
         let defaults = UserDefaults(suiteName: appGroupID)
         let rawValue = defaults?.string(forKey: "general_defaultBudgetingPeriod") ?? BudgetingPeriod.monthly.rawValue
-        return BudgetingPeriod(rawValue: rawValue) ?? .monthly
+        return DefaultBudgetingPeriod(rawValue: rawValue)
     }
 }

@@ -12,7 +12,6 @@ struct UncategorizedExpenseReviewPresenter: ViewModifier {
     @AppStorage("general_hideFutureVariableExpenses") private var hideFuture = false
     @AppStorage("releaseLogs_seenReleaseIDs") private var seenReleaseIDs = ""
     @Query private var expenses: [VariableExpense]
-    @Query private var categories: [Category]
     @State private var reviewWorkspace: Workspace?
     @State private var presentationID = UUID()
 
@@ -26,9 +25,6 @@ struct UncategorizedExpenseReviewPresenter: ViewModifier {
         _expenses = Query(filter: #Predicate<VariableExpense> {
             $0.workspace?.id == workspaceID && $0.category == nil
         })
-        _categories = Query(filter: #Predicate<Category> {
-            $0.workspace?.id == workspaceID && !$0.isArchived
-        })
     }
 
     private var hasPendingRelease: Bool {
@@ -39,7 +35,7 @@ struct UncategorizedExpenseReviewPresenter: ViewModifier {
     private var eligibility: [String] {
         [String(session.generation), String(session.isPending), workspace.id.uuidString,
          String(activity.isBusy), String(scenePhase == .active), seenReleaseIDs,
-         String(expenses.count), String(categories.count), String(hideFuture), String(automaticLaunchPromptsDeferred)]
+         String(expenses.count), String(hideFuture), String(automaticLaunchPromptsDeferred)]
     }
 
     func body(content: Content) -> some View {
@@ -66,9 +62,8 @@ struct UncategorizedExpenseReviewPresenter: ViewModifier {
                 let eligible = UncategorizedExpenseReviewService.expenses(
                     in: expenses, workspaceID: workspace.id, hideFuture: hideFuture
                 )
-                let available = UncategorizedExpenseReviewService.categories(in: categories, workspaceID: workspace.id)
                 session.consume()
-                guard !eligible.isEmpty, !available.isEmpty else { return }
+                guard !eligible.isEmpty else { return }
                 // SwiftUI can retain sheet state after an interactive dismissal.
                 // Every new review gets a fresh staging area, even for the same workspace.
                 presentationID = UUID()

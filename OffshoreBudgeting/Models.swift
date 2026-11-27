@@ -39,7 +39,9 @@ enum BudgetingPeriod: String, CaseIterable, Identifiable {
         displayTitle
     }
 
-    nonisolated func defaultRange(containing date: Date, calendar: Calendar = .current) -> (start: Date, end: Date) {
+    nonisolated func defaultRange(
+        containing date: Date, calendar: Calendar = .current, weeklyInterval: Int = 1
+    ) -> (start: Date, end: Date) {
         let day = calendar.startOfDay(for: date)
 
         switch self {
@@ -47,9 +49,25 @@ enum BudgetingPeriod: String, CaseIterable, Identifiable {
             return (start: day, end: day)
 
         case .weekly:
-            let start = startOfWeek(containing: day, calendar: calendar)
-            let end = calendar.date(byAdding: DateComponents(day: 6), to: start) ?? day
-            return (start: start, end: end)
+            let weekStart = startOfWeek(containing: day, calendar: calendar)
+            let interval = DefaultBudgetingPeriod.weeklyIntervalBounds.contains(weeklyInterval) ? weeklyInterval : 1
+            guard interval > 1 else {
+                let end = calendar.date(byAdding: .day, value: 6, to: weekStart) ?? day
+                return (start: weekStart, end: end)
+            }
+
+            // A fixed local calendar week keeps the cadence continuous across years.
+            var gregorian = Calendar(identifier: .gregorian)
+            gregorian.timeZone = calendar.timeZone
+            let anchorDay = gregorian.date(from: DateComponents(year: 2000, month: 1, day: 3)) ?? weekStart
+            let anchor = startOfWeek(containing: anchorDay, calendar: calendar)
+            let anchorNoon = calendar.date(bySettingHour: 12, minute: 0, second: 0, of: anchor) ?? anchor
+            let weekNoon = calendar.date(bySettingHour: 12, minute: 0, second: 0, of: weekStart) ?? weekStart
+            let weeks = calendar.dateComponents([.weekOfYear], from: anchorNoon, to: weekNoon).weekOfYear ?? 0
+            let offset = (weeks % interval + interval) % interval
+            let start = calendar.date(byAdding: .weekOfYear, value: -offset, to: weekStart) ?? weekStart
+            let end = calendar.date(byAdding: .day, value: interval * 7 - 1, to: start) ?? day
+            return (start: calendar.startOfDay(for: start), end: calendar.startOfDay(for: end))
 
         case .monthly:
             let start = startOfMonth(containing: day, calendar: calendar)
