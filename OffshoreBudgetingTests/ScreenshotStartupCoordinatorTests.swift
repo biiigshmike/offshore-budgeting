@@ -79,16 +79,22 @@ final class ScreenshotStartupCoordinatorTests: XCTestCase {
     }
 
     func testRetryCanRecoverAfterPreparationFailure() throws {
+        class ShouldFailBox {
+            var value: Bool
+            init(value: Bool) {
+                self.value = value
+            }
+        }
         let candidate = try makeContainer()
-        var shouldFail = true
+        let shouldFailBox = ShouldFailBox(value: true)
         var preparations = 0
         let coordinator = ScreenshotStartupCoordinator(open: { candidate }, prepare: { container in
             XCTAssertTrue(container === candidate)
             preparations += 1
-            if shouldFail { throw SetupFailure.prepare }
+            if shouldFailBox.value { throw SetupFailure.prepare }
         })
         XCTAssertNil(coordinator.container)
-        shouldFail = false
+        shouldFailBox.value = false
         coordinator.retry()
         XCTAssertTrue(try coordinator.requireContainer() === candidate)
         XCTAssertNil(coordinator.failureMessage)
@@ -188,3 +194,4 @@ final class ScreenshotStartupCoordinatorTests: XCTestCase {
     }
 }
 #endif
+
