@@ -1,14 +1,9 @@
 import SwiftUI
 
 struct DateRangeNavigationHeader: ViewModifier {
-    enum Presentation {
-        case large, inline, inContent
-    }
-
     let title: String
     let startDate: Date
     let endDate: Date
-    var presentation: Presentation = .large
 
     private var subtitle: String {
         "\(AppDateFormat.abbreviatedDate(startDate)) – \(AppDateFormat.abbreviatedDate(endDate))"
@@ -52,26 +47,20 @@ struct DateRangeNavigationHeader: ViewModifier {
                     .frame(width: 0, height: 0)
             }
         #else
-        if presentation == .inContent {
-            content
-                .navigationTitle("")
-                .navigationBarTitleDisplayMode(.inline)
-        } else if #available(iOS 26.0, *) {
+        if #available(iOS 26.0, *) {
             content
                 .navigationTitle(title)
                 .navigationSubtitle(intervalText(style: .medium))
-                .toolbarTitleDisplayMode(presentation == .large ? .large : .inline)
+                .toolbarTitleDisplayMode(.large)
                 .toolbarRole(.navigationStack)
                 .toolbar {
-                    if presentation == .large {
-                        ToolbarItem(placement: .largeSubtitle) {
-                            Text(subtitle)
-                                .font(.footnote)
-                                .foregroundStyle(.secondary)
-                                .multilineTextAlignment(.leading)
-                                .fixedSize(horizontal: false, vertical: true)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                        }
+                    ToolbarItem(placement: .largeSubtitle) {
+                        Text(subtitle)
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.leading)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .frame(maxWidth: .infinity, alignment: .leading)
                     }
                     ToolbarItem(placement: .subtitle) { compactSubtitle }
                 }

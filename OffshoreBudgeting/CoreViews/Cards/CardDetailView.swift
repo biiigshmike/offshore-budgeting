@@ -70,8 +70,6 @@ struct CardDetailView: View {
     @State private var pendingExpenseDelete: (() -> Void)? = nil
 
     @State private var searchText: String = ""
-    @State private var layout: CardDetailLayout?
-    @State private var compactSummaryHeight: CGFloat = 0
     @State private var didApplyDefaultsOnAppear: Bool = false
     @FocusState private var searchFocused: Bool
 
@@ -498,18 +496,35 @@ struct CardDetailView: View {
 
     var body: some View {
         let derived = derivedState
-        adaptiveContent(derived)
+        listContent(derived: derived)
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                DetailListAccessory(
+                    categories: derived.availableCategories,
+                    selectedCategoryIDs: $selectedCategoryIDs,
+                    expenseScope: $expenseScope,
+                    sortMode: $sortMode,
+                    name: (.az, .za),
+                    amount: (.amountAsc, .amountDesc),
+                    date: (.dateAsc, .dateDesc)
+                )
+            }
             .postBoardingTip(
                 key: "tip.carddetail.v1",
                 title: "Card Detail Overview",
                 items: Self.tipItems
             )
+            .listStyle(.insetGrouped)
             .modifier(DateRangeNavigationHeader(
                 title: card.name,
                 startDate: appliedStartDate,
-                endDate: appliedEndDate,
-                presentation: navigationPresentation
+                endDate: appliedEndDate
             ))
+            .searchable(
+                text: $searchText,
+                placement: .navigationBarDrawer(displayMode: .always),
+                prompt: "Search"
+            )
+            .searchFocused($searchFocused)
             .toolbar {
                 toolbarContent
             }
@@ -603,265 +618,48 @@ struct CardDetailView: View {
         return uniqueByID.values.sorted { $0.id.uuidString < $1.id.uuidString }
     }
 
-    private var navigationPresentation: DateRangeNavigationHeader.Presentation {
-        guard let layout else { return .large }
-        switch layout.fitting(compactSummaryHeight: compactSummaryHeight) {
-        case .stacked: return .large
-        case .sideBySide: return layout.isFold ? .inContent : .inline
-        case .tabletop: return .inline
-        }
-    }
-
-    private func adaptiveContent(_ derived: CardDetailDerivedState) -> some View {
-        ZStack {
-            // Measure the arrangement without the keyboard. The foreground still avoids it.
-            Color.clear
-                .onGeometryChange(for: CardDetailLayout.self) { proxy in
-                    CardDetailLayout.measure(proxy)
-                } action: { layout = $0 }
-                .ignoresSafeArea(.keyboard, edges: .bottom)
-                .allowsHitTesting(false)
-                .accessibilityHidden(true)
-
-            GeometryReader { proxy in
-                let measuredLayout = layout ?? CardDetailLayout.measure(proxy)
-                ZStack(alignment: .topLeading) {
-                    switch measuredLayout.fitting(compactSummaryHeight: compactSummaryHeight) {
-                    case .stacked(let frame):
-                        pane(in: frame, visibleHeight: proxy.size.height) {
-                            expenseList(derived, includesSummary: true)
-                                .searchable(
-                                    text: $searchText,
-                                    placement: .navigationBarDrawer(displayMode: .always),
-                                    prompt: "Search"
-                                )
-                                .searchFocused($searchFocused)
-                        }
-                    case .sideBySide(let summary, let expenses):
-                        splitContent(derived, summary: summary, expenses: expenses,
-                                     visibleHeight: proxy.size.height, tabletop: false, showsTitle: measuredLayout.isFold)
-                    case .tabletop(let summary, let expenses):
-                        splitContent(derived, summary: summary, expenses: expenses,
-                                     visibleHeight: proxy.size.height, tabletop: true, showsTitle: false)
-                    }
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                .background(Color(uiColor: .systemGroupedBackground))
-                .overlay(alignment: .topLeading) {
-                    switch measuredLayout.placement {
-                    case .sideBySide(let summary, _):
-                        measureCompactSummary(derived, frame: summary, tabletop: false,
-                                              showsTitle: measuredLayout.isFold)
-                    case .tabletop(let summary, _):
-                        measureCompactSummary(derived, frame: summary, tabletop: true, showsTitle: false)
-                    case .stacked:
-                        EmptyView()
-                    }
-                }
-            }
-        }
-    }
-
-    private func splitContent(
-        _ derived: CardDetailDerivedState, summary: CGRect, expenses: CGRect,
-        visibleHeight: CGFloat, tabletop: Bool, showsTitle: Bool
-    ) -> some View {
-        ZStack(alignment: .topLeading) {
-            pane(in: summary, visibleHeight: summary.maxY) {
-                ViewThatFits(in: .vertical) {
-                    if !tabletop {
-                        fixedSummary(derived, frame: summary, tabletop: false, compact: false, showsTitle: showsTitle)
-                    }
-                    fixedSummary(derived, frame: summary, tabletop: tabletop, compact: true, showsTitle: showsTitle)
-                }
-                .frame(maxHeight: .infinity, alignment: tabletop ? .center : .top)
-            }
-            pane(in: expenses, visibleHeight: visibleHeight) {
-                VStack(spacing: 0) {
-                    expenseSearchField
-                    expenseList(derived, includesSummary: false)
-                }
-            }
-        }
-    }
-
-    private func pane<Content: View>(
-        in frame: CGRect, visibleHeight: CGFloat, @ViewBuilder content: () -> Content
-    ) -> some View {
-        content()
-            .frame(width: frame.width, height: min(frame.height, max(0, visibleHeight - frame.minY)),
-                   alignment: .topLeading)
-            .clipped()
-            .padding(.leading, frame.minX)
-            .padding(.top, frame.minY)
-    }
-
-    private var expenseSearchField: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "magnifyingglass")
-                .foregroundStyle(.secondary)
-                .accessibilityHidden(true)
-            TextField("Search", text: $searchText)
-                .textFieldStyle(.plain)
-                .focused($searchFocused)
-                .submitLabel(.search)
-                .onSubmit { searchFocused = false }
-            if !searchText.isEmpty {
-                Button("Clear search", systemImage: "xmark.circle.fill") {
-                    searchText = ""
-                }
-                .labelStyle(.iconOnly)
-                .buttonStyle(.plain)
-                .foregroundStyle(.secondary)
-            }
-        }
-        .padding(.horizontal, 12)
-        .frame(minHeight: 44)
-        .background {
-            if #available(iOS 26.0, macCatalyst 26.0, *) {
-                Color.clear
-                    .glassEffect(.regular, in: .capsule)
-                    .allowsHitTesting(false)
-            } else {
-                Capsule().fill(.regularMaterial)
-            }
-        }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 4)
-    }
-
-    private func measureCompactSummary(
-        _ derived: CardDetailDerivedState, frame: CGRect, tabletop: Bool, showsTitle: Bool
-    ) -> some View {
-        // Measure even in the stacked fallback so the split can return when the window grows.
-        fixedSummary(derived, frame: frame, tabletop: tabletop, compact: true, showsTitle: showsTitle)
-            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { compactSummaryHeight = $0 }
-            .hidden()
-            .accessibilityHidden(true)
-    }
-
-    private func fixedSummary(
-        _ derived: CardDetailDerivedState, frame: CGRect, tabletop: Bool, compact: Bool, showsTitle: Bool
-    ) -> some View {
-        let tabletopCardWidth = min(240, frame.height, frame.width * 0.4)
-        return VStack(alignment: .leading, spacing: 12) {
-            if showsTitle {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(card.name)
-                        .font(.title2.weight(.semibold))
-                        .accessibilityAddTraits(.isHeader)
-                    Text(verbatim: "\(AppDateFormat.abbreviatedDate(appliedStartDate)) – \(AppDateFormat.abbreviatedDate(appliedEndDate))")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                }
-            }
-
-            if tabletop {
-                HStack(spacing: 16) {
-                    heroCard(maxWidth: tabletopCardWidth, minHeight: nil)
-                        .frame(width: tabletopCardWidth)
-                    spendingSummary(derived, compact: true)
-                }
-            } else {
-                heroCard(maxWidth: compact ? 144 : 300, minHeight: nil)
-                    .padding(.horizontal, 12)
-                    .background(Color(uiColor: .secondarySystemGroupedBackground),
-                                in: RoundedRectangle(cornerRadius: 16))
-                spendingSummary(derived, compact: compact)
-            }
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 8)
-        .frame(width: frame.width, alignment: .leading)
-        .fixedSize(horizontal: false, vertical: true)
-    }
-
-    private func spendingSummary(_ derived: CardDetailDerivedState, compact: Bool) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text("Total Spent")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .accessibilityHidden(true)
-            spendingStatement(derived)
-            calculationHelpButton
-            if !compact {
-                calculationExplanation
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            }
-        }
-    }
-
-    private func expenseList(_ derived: CardDetailDerivedState, includesSummary: Bool) -> some View {
+    @ViewBuilder
+    private func listContent(derived: CardDetailDerivedState) -> some View {
         List {
-            if includesSummary {
-                heroSection
-                totalSpentSection(derived)
-            }
+            heroSection
+            totalSpentSection(derived)
             expensesSection(derived)
-        }
-        .listStyle(.insetGrouped)
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-            DetailListAccessory(
-                categories: derived.availableCategories,
-                selectedCategoryIDs: $selectedCategoryIDs,
-                expenseScope: $expenseScope,
-                sortMode: $sortMode,
-                name: (.az, .za),
-                amount: (.amountAsc, .amountDesc),
-                date: (.dateAsc, .dateDesc)
-            )
         }
     }
 
     private var heroSection: some View {
         Section {
-            heroCard()
-                .listRowInsets(EdgeInsets(top: 10, leading: 16, bottom: 10, trailing: 16))
-                .listRowSeparator(.hidden)
+            HeroCardRow(
+                title: card.name,
+                theme: cardThemeOption(from: card.theme),
+                effect: cardEffectOption(from: card.effect)
+            )
+            .listRowInsets(EdgeInsets(top: 10, leading: 16, bottom: 10, trailing: 16))
+            .listRowSeparator(.hidden)
         }
-    }
-
-    private func heroCard(maxWidth: CGFloat = 520, minHeight: CGFloat? = 155) -> some View {
-        CardVisualView(
-            title: card.name,
-            theme: cardThemeOption(from: card.theme),
-            effect: cardEffectOption(from: card.effect),
-            minHeight: minHeight
-        )
-        .frame(maxWidth: maxWidth)
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 8)
-    }
-
-    private func spendingStatement(_ derived: CardDetailDerivedState) -> some View {
-        TotalSpentStatementRow(total: derived.displayTotal, heatMapStops: derived.heatMapStops)
-    }
-
-    private var calculationHelpButton: some View {
-        Button("How is this calculated?", systemImage: "info.circle") {
-            activeModal = .calculationHelp
-        }
-        .buttonStyle(.plain)
-        .foregroundStyle(.tint)
-        .font(.subheadline)
-        .padding(.vertical, 4)
-    }
-
-    private var calculationExplanation: Text {
-        Text("Total Spent shows planned expenses and debit purchases for the selected view. Credits and adjustments remain in card history and do not contribute to this gross spending total.")
     }
 
     private func totalSpentSection(_ derived: CardDetailDerivedState) -> some View {
         Section {
-            spendingStatement(derived)
-                .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
+            TotalSpentStatementRow(
+                total: derived.displayTotal,
+                heatMapStops: derived.heatMapStops
+            )
+            .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
+
         } header: {
             Text("Total Spent")
         } footer: {
             VStack(alignment: .leading, spacing: 8) {
-                calculationHelpButton
-                calculationExplanation
+                Button("How is this calculated?", systemImage: "info.circle") {
+                    activeModal = .calculationHelp
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.tint)
+                .font(.subheadline)
+                .padding(.vertical, 4)
+
+                Text("Total Spent shows planned expenses and debit purchases for the selected view. Credits and adjustments remain in card history and do not contribute to this gross spending total.")
             }
         }
     }
@@ -1551,6 +1349,28 @@ private struct CategorySpendSlice: Identifiable {
 
     var start: Double = 0
     var end: Double = 0
+}
+
+// MARK: - Hero Card Row
+
+private struct HeroCardRow: View {
+    let title: String
+    let theme: CardThemeOption
+    let effect: CardEffectOption
+
+    private let maxHeroWidth: CGFloat = 520
+
+    var body: some View {
+        HStack {
+            Spacer(minLength: 0)
+
+            CardVisualView(title: title, theme: theme, effect: effect)
+                .frame(maxWidth: maxHeroWidth)
+
+            Spacer(minLength: 0)
+        }
+        .padding(.vertical, 8)
+    }
 }
 
 // MARK: - Date Pill Button
