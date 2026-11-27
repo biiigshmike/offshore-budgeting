@@ -34,19 +34,19 @@ final class FirstRunBudgetingUITests: XCTestCase {
         XCTAssertTrue(app.buttons["budget.cards"].label.contains("Checking"))
         let budgetName = nameBudget("First Run Budget", in: app)
         let presetsRow = app.buttons["budget.presets"]
-        XCTAssertTrue(presetsRow.label.contains("Create Preset"))
+        XCTAssertTrue(presetsRow.label.contains("Add Preset"))
         tap(presetsRow, in: app)
         tap(app.navigationBars["Add Preset"].buttons["Cancel"], in: app)
         XCTAssertTrue(app.navigationBars["Add Budget"].waitForExistence(timeout: 5))
 
         tap(app.buttons["budget.categoryGoals"], in: app)
-        let createCategory = app.buttons["Create Category"]
+        let addCategory = app.buttons["Add Category"]
         let categoryGoalsGuide = app.buttons["Category Goals guide"]
-        XCTAssertTrue(createCategory.waitForExistence(timeout: 5))
+        XCTAssertTrue(addCategory.waitForExistence(timeout: 5))
         XCTAssertTrue(categoryGoalsGuide.exists)
-        XCTAssertLessThanOrEqual(createCategory.frame.maxY, categoryGoalsGuide.frame.minY)
+        XCTAssertLessThanOrEqual(addCategory.frame.maxY, categoryGoalsGuide.frame.minY)
         XCTAssertFalse(app.switches["categoryGoals.autoConfigure"].exists)
-        tap(createCategory, in: app)
+        tap(addCategory, in: app)
         let categoryName = app.textFields.matching(NSPredicate(format: "placeholderValue == %@", "Name")).firstMatch
         tap(categoryName, in: app)
         categoryName.typeText("First Run Bills")
@@ -62,7 +62,7 @@ final class FirstRunBudgetingUITests: XCTestCase {
         tap(app.buttons["Manage Presets"], in: app)
         XCTAssertTrue(app.navigationBars["Linked Presets"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["No Presets"].exists)
-        tap(app.buttons["Create Preset"], in: app)
+        tap(app.buttons["Add Preset"], in: app)
         XCTAssertTrue(app.navigationBars["Add Preset"].waitForExistence(timeout: 5))
         tap(app.buttons["Choose a Card"], in: app)
         tap(app.buttons["Checking"], in: app)
@@ -87,7 +87,7 @@ final class FirstRunBudgetingUITests: XCTestCase {
         let preset = app.switches.matching(NSPredicate(format: "label BEGINSWITH %@", presetName)).firstMatch
         XCTAssertTrue(preset.waitForExistence(timeout: 5))
         XCTAssertEqual(preset.value as? String, "1")
-        tap(app.navigationBars["Linked Presets"].buttons.firstMatch, in: app)
+        tap(app.navigationBars["Linked Presets"].buttons["Close"], in: app)
         XCTAssertTrue(app.navigationBars[budgetName].waitForExistence(timeout: 5))
         let plannedExpense = app.staticTexts.matching(identifier: presetName)
         reveal(plannedExpense.firstMatch, in: app)
@@ -107,7 +107,7 @@ final class FirstRunBudgetingUITests: XCTestCase {
         tap(presetTitle, in: app)
         presetTitle.typeText("Draft Preset")
         let createCardRow = app.buttons["preset.createCard"]
-        XCTAssertTrue(createCardRow.label.contains("Create Card"))
+        XCTAssertTrue(createCardRow.label.contains("Add Card"))
         tap(createCardRow, in: app)
         tap(app.navigationBars["Add Card"].buttons["Cancel"], in: app)
         XCTAssertTrue(app.navigationBars["Add Preset"].waitForExistence(timeout: 5))
@@ -119,7 +119,7 @@ final class FirstRunBudgetingUITests: XCTestCase {
         tap(app.buttons["Budget Actions"], in: app)
         tap(app.buttons["Manage Cards"], in: app)
         XCTAssertTrue(app.navigationBars["Linked Cards"].waitForExistence(timeout: 5))
-        tap(app.buttons["Create Card"], in: app)
+        tap(app.buttons["Add Card"], in: app)
         let cardName = app.textFields["Credit Card, Checking, or Cash"]
         tap(cardName, in: app)
         cardName.typeText("New Checking")

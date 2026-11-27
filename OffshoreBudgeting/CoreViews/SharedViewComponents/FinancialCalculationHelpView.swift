@@ -57,9 +57,7 @@ struct FinancialCalculationHelpView: View {
             .navigationTitle("How is this calculated?")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Close") { dismiss() }
-                }
+                SheetCloseToolbarItem { dismiss() }
             }
         }
     }

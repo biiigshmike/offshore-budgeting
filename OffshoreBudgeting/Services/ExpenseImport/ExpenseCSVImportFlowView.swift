@@ -146,11 +146,11 @@ struct ExpenseCSVImportFlowView: View {
         .listStyle(.insetGrouped)
         .navigationTitle(navigationTitle)
         .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
+            ToolbarItem(placement: .cancellationAction) {
                 Button("Cancel") { dismiss() }
             }
 
-            ToolbarItem(placement: .topBarTrailing) {
+            ToolbarItem(placement: .confirmationAction) {
                 Button("Import") {
                     vm.commitImport(workspace: workspace, card: card, modelContext: modelContext)
                     dismiss()

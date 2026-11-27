@@ -145,12 +145,7 @@ struct WorkspacePickerView: View {
         }
         .toolbar {
             if showsCloseButton {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button("Close", systemImage: "xmark") {
-                        dismiss()
-                    }
-                    .labelStyle(.iconOnly)
-                }
+                SheetCloseToolbarItem { dismiss() }
             }
 
             if #available(iOS 26.0, macCatalyst 26.0, *) {
@@ -501,11 +496,11 @@ private struct WorkspaceExportReviewView: View {
         }
         .navigationTitle("Export Workspace")
         .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
+            ToolbarItem(placement: .cancellationAction) {
                 Button("Cancel", action: onCancel)
             }
 
-            ToolbarItem(placement: .topBarTrailing) {
+            ToolbarItem(placement: .confirmationAction) {
                 Button("Export") {
                     onExport(selectedSections)
                 }
@@ -560,11 +555,11 @@ private struct WorkspaceImportPreviewView: View {
         }
         .navigationTitle("Import Workspace")
         .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
+            ToolbarItem(placement: .cancellationAction) {
                 Button("Cancel", action: onCancel)
             }
 
-            ToolbarItem(placement: .topBarTrailing) {
+            ToolbarItem(placement: .confirmationAction) {
                 Button("Import", action: onImport)
             }
         }

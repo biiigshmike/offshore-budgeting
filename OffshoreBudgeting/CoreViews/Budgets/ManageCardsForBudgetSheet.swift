@@ -51,7 +51,7 @@ struct ManageCardsForBudgetSheet: View {
                 } description: {
                     Text("Create a card, then link it to this budget.")
                 } actions: {
-                    Button("Create Card") { showingAddCard = true }
+                    Button("Add Card") { showingAddCard = true }
                         .glassProminentButtonStyleCompat()
                         .tint(.accentColor)
                 }
@@ -75,13 +75,7 @@ struct ManageCardsForBudgetSheet: View {
         }
         .navigationTitle("Linked Cards")
         .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
-                Button {
-                    dismiss()
-                } label: {
-                    Image(systemName: "xmark")
-                }
-            }
+            SheetCloseToolbarItem { dismiss() }
         }
         .onAppear {
             cleanupOrphanLinks()

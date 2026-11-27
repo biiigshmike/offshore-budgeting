@@ -136,23 +136,14 @@ struct AddPresetView: View {
         )
         .navigationTitle("Add Preset")
         .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
+            ToolbarItem(placement: .cancellationAction) {
                 Button("Cancel") { dismiss() }
             }
-            if #available(iOS 26.0, *) {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Save") { save() }
-                        .disabled(!canSave)
-                        .tint(.accentColor)
-                        .glassProminentButtonStyleCompat()
-                }
-            } else {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Save") { save() }
-                        .disabled(!canSave)
-                        .tint(.accentColor)
-                        .buttonStyle(.plain)
-                }
+            ToolbarItem(placement: .confirmationAction) {
+                Button("Save") { save() }
+                    .disabled(!canSave)
+                    .tint(.accentColor)
+                    .glassProminentButtonStyleCompat()
             }
         }
         .blocksAutomaticExpenseReview(while: showingInvalidAmountAlert)

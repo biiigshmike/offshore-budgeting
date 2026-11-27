@@ -177,11 +177,15 @@ final class RecordPlannedExpenseUITests: XCTestCase {
     func testReviewTodayUpdatesSummary() {
         let app = launch()
         app.buttons["home.reviewToday"].tap()
-        XCTAssertTrue(app.navigationBars["Review Today"].waitForExistence(timeout: 5))
+        let review = app.navigationBars["Review Today"]
+        XCTAssertTrue(review.waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["Still Planned"].exists)
         recordAndVerify(in: app)
         app.buttons["Cancel"].tap()
         XCTAssertTrue(app.staticTexts["Today’s Activity"].waitForExistence(timeout: 5))
         XCTAssertFalse(app.staticTexts["Still Planned"].exists)
+        review.buttons["Close"].tap()
+        XCTAssertTrue(review.waitForNonExistence(timeout: 5))
+        XCTAssertTrue(app.navigationBars["Home"].exists)
     }
 }

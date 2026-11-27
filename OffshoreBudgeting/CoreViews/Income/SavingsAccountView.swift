@@ -1009,12 +1009,14 @@ private struct SavingsLedgerEntryFormView: View {
         }
         .navigationTitle(saveTitle)
         .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
+            ToolbarItem(placement: .cancellationAction) {
                 Button("Cancel") { dismiss() }
             }
 
-            ToolbarItem(placement: .topBarTrailing) {
+            ToolbarItem(placement: .confirmationAction) {
                 Button("Save") { save() }
+                    .tint(.accentColor)
+                    .glassProminentButtonStyleCompat()
             }
         }
         .blocksAutomaticExpenseReview(while: showingInvalidAmount)

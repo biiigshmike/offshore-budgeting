@@ -19,6 +19,8 @@ struct BudgetBatchPreviewView: View {
     @State private var showingError = false
     @State private var errorMessage = ""
 
+    private let createTitle = String(localized: "common.create", defaultValue: "Create", comment: "Common action to create an item.")
+
     var body: some View {
         List {
             Section {
@@ -75,9 +77,9 @@ struct BudgetBatchPreviewView: View {
                     }
                 } label: {
                     if dynamicTypeSize.isAccessibilitySize {
-                        Label("Create", systemImage: "checkmark").labelStyle(.iconOnly)
+                        Label(createTitle, systemImage: "checkmark").labelStyle(.iconOnly)
                     } else {
-                        Text("Create")
+                        Text(createTitle)
                     }
                 }
                 .disabled(isSaving)
@@ -89,7 +91,7 @@ struct BudgetBatchPreviewView: View {
         .interactiveDismissDisabled(isSaving)
         .blocksAutomaticExpenseReview(while: showingOverlapConfirmation || showingError)
         .confirmationDialog("Create overlapping budgets?", isPresented: $showingOverlapConfirmation, titleVisibility: .visible) {
-            Button("Create") { create(allowOverlaps: true) }
+            Button(createTitle) { create(allowOverlaps: true) }
             Button("Cancel", role: .cancel) { }
         } message: {
             Text("The new budgets overlap existing budgets shown in the preview. Existing budgets will not be changed.")

@@ -59,7 +59,7 @@ struct PresetFormView: View {
             
             Section("Details") {
                 if cards.isEmpty {
-                    FormCreationRow(title: "Card", actionTitle: "Create Card") {
+                    FormCreationRow(title: "Card", actionTitle: "Add Card") {
                         showingAddCard = true
                     }
                     .accessibilityIdentifier("preset.createCard")

@@ -206,7 +206,7 @@ struct BudgetFormView: View {
                 }
 
                 if cards.isEmpty {
-                    FormCreationRow(title: "Cards", actionTitle: "Create Card") {
+                    FormCreationRow(title: "Cards", actionTitle: "Add Card") {
                         sheetRoute = .addCard
                     }
                     .accessibilityIdentifier("budget.cards")
@@ -228,7 +228,7 @@ struct BudgetFormView: View {
                 }
 
                 if presets.isEmpty {
-                    FormCreationRow(title: "Presets", actionTitle: "Create Preset") {
+                    FormCreationRow(title: "Presets", actionTitle: "Add Preset") {
                         sheetRoute = .addPreset
                     }
                     .accessibilityIdentifier("budget.presets")

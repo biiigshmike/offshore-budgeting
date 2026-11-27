@@ -60,13 +60,7 @@ struct SavingsPeriodReviewDetailView: View {
         .accessibilityIdentifier("savings.periodReview.detail")
         .toolbar {
             ToolbarItem(placement: .confirmationAction) {
-                Button(action: confirm) {
-                    if summary.isPending {
-                        Text("Save")
-                    } else {
-                        Text("Update")
-                    }
-                }
+                Button("Save", action: confirm)
                 .tint(.accentColor)
                 .glassProminentButtonStyleCompat()
                 .disabled(!canConfirm)

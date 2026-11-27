@@ -130,7 +130,7 @@ final class CategoryGoalSavingsUITests: XCTestCase {
         let text = current == maximum.placeholderValue ? "" : current
         maximum.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: text.count) + amount)
         app.navigationBars["Bills"].buttons["Category Goals"].tap()
-        app.navigationBars["Category Goals"].buttons["Done"].tap()
+        app.navigationBars["Category Goals"].buttons["Save"].tap()
         XCTAssertTrue(app.navigationBars["Category Goals"].waitForNonExistence(timeout: 5))
     }
 

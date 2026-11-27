@@ -538,9 +538,7 @@ struct WhatIfScenarioPlannerView: View {
                 .navigationTitle(String(localized: "common.export", defaultValue: "Export", comment: "Common action label for export."))
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
-                    ToolbarItem(placement: .cancellationAction) {
-                        Button(String(localized: "common.close", defaultValue: "Close", comment: "Common action label to close a sheet.")) { dismiss() }
-                    }
+                    SheetCloseToolbarItem { dismiss() }
                 }
             }
             .presentationDetents(

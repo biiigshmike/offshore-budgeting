@@ -178,13 +178,7 @@ struct HomeEditPinnedCardsView: View {
     @ToolbarContentBuilder
     private var editorToolbar: some ToolbarContent {
         #if !targetEnvironment(macCatalyst)
-        ToolbarItem(placement: .topBarLeading) {
-            Button {
-                dismiss()
-            } label: {
-                Image(systemName: "xmark")
-            }
-        }
+        SheetCloseToolbarItem { dismiss() }
 
         #endif
 

@@ -104,7 +104,10 @@ final class SpendingCalculationSheetUITests: XCTestCase {
             let help = app.buttons["Learn more in Help"].firstMatch
             reveal(help, in: app)
             XCTAssertTrue(help.isHittable)
-            sheet.buttons["Close"].tap()
+            let close = sheet.buttons["Close"]
+            XCTAssertTrue(close.exists)
+            XCTAssertLessThan(close.frame.midX, sheet.frame.midX)
+            close.tap()
             XCTAssertTrue(sheet.waitForNonExistence(timeout: 5))
             XCTAssertTrue(calculation.exists)
             app.navigationBars.buttons.element(boundBy: 0).tap()

@@ -43,7 +43,7 @@ struct ManagePresetsForBudgetSheet: View {
                 } description: {
                     Text("Create a preset, then link it to this budget.")
                 } actions: {
-                    Button("Create Preset") { showingAddPreset = true }
+                    Button("Add Preset") { showingAddPreset = true }
                         .glassProminentButtonStyleCompat()
                         .tint(.accentColor)
                 }
@@ -93,13 +93,7 @@ struct ManagePresetsForBudgetSheet: View {
         }
         .navigationTitle("Linked Presets")
         .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
-                Button {
-                    dismiss()
-                } label: {
-                    Image(systemName: "xmark")
-                }
-            }
+            SheetCloseToolbarItem { dismiss() }
         }
         .onAppear {
             cleanupOrphanLinks()

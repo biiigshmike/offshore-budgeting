@@ -38,9 +38,7 @@ struct ReviewTodayView: View {
                 .navigationTitle("Review Today")
                 .onAppear(perform: reload)
                 .toolbar {
-                    ToolbarItem(placement: .confirmationAction) {
-                        Button("Done") { dismiss() }
-                    }
+                    SheetCloseToolbarItem { dismiss() }
                 }
                 .plannedExpenseRecordingAlert(isPresented: $showingPlannedExpenseRecordingError)
                 .blocksAutomaticExpenseReview(while: showingDeleteConfirm)

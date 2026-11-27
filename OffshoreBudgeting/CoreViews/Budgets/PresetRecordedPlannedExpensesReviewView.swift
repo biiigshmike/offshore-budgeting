@@ -41,8 +41,7 @@ struct PresetRecordedPlannedExpensesReviewView: View {
                 if recordedExpenses.isEmpty {
                     ContentUnavailableView(
                         "No recorded expenses found",
-                        systemImage: "checkmark.circle",
-                        description: Text("You can tap Done to return.")
+                        systemImage: "checkmark.circle"
                     )
                     .frame(maxWidth: .infinity, alignment: .center)
                 } else {
@@ -71,11 +70,7 @@ struct PresetRecordedPlannedExpensesReviewView: View {
         .navigationTitle("Review \(preset.title)")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .confirmationAction) {
-                Button("Done") {
-                    onDone()
-                }
-            }
+            SheetCloseToolbarItem { onDone() }
         }
         .onAppear {
             reload()

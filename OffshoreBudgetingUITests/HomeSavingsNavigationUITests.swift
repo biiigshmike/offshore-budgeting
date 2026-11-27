@@ -81,13 +81,19 @@ final class HomeSavingsNavigationUITests: XCTestCase {
         XCTAssertTrue(actual.label.contains("$1,430.00"))
         XCTAssertFalse(app.staticTexts["Linked to Planned"].exists)
         let actualEditBar = app.navigationBars["Edit Income"]
-        openEditorBySwipingRight(on: actual, in: app)
+        actual.tap()
+        XCTAssertTrue(actualEditBar.waitForExistence(timeout: 5))
         XCTAssertTrue(app.segmentedControls.buttons["Actual"].isSelected)
         XCTAssertTrue(app.staticTexts["Repeat"].exists)
         let source = app.textFields["Source"]
         source.tap()
         source.typeText(" Deposit")
-        actualEditBar.buttons["Update"].tap()
+        let cancel = actualEditBar.buttons["Cancel"]
+        let save = actualEditBar.buttons["Save"]
+        XCTAssertTrue(cancel.exists)
+        XCTAssertTrue(save.exists)
+        XCTAssertLessThan(cancel.frame.midX, save.frame.midX)
+        save.tap()
         XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label CONTAINS %@ AND label CONTAINS %@",
                                                        "Payroll Deposit", "Actual")).firstMatch.waitForExistence(timeout: 5))
 
@@ -100,7 +106,7 @@ final class HomeSavingsNavigationUITests: XCTestCase {
         XCTAssertTrue(editor.waitForExistence(timeout: 5))
         XCTAssertTrue(app.segmentedControls.buttons["Planned"].isSelected)
         XCTAssertTrue(app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", "Weekly")).firstMatch.exists)
-        editor.buttons["Update"].tap()
+        editor.buttons["Save"].tap()
         let applyChanges = app.alerts["Apply changes to…"]
         XCTAssertTrue(applyChanges.waitForExistence(timeout: 5))
         applyChanges.buttons["Just This Income"].tap()

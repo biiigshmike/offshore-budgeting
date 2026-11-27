@@ -179,7 +179,7 @@ final class BudgetFormMenusUITests: XCTestCase {
         let app = launchFirstBudgetForm(extraArguments: ["-uiTestProgressNoCard"])
         let cards = app.buttons["budget.cards"]
         let draftName = app.textFields["budget.name"].value as? String
-        XCTAssertTrue(cards.label.contains("Create Card"))
+        XCTAssertTrue(cards.label.contains("Add Card"))
         cards.tap()
 
         let cardForm = app.navigationBars["Add Card"]
@@ -190,7 +190,7 @@ final class BudgetFormMenusUITests: XCTestCase {
         cardForm.buttons["Save"].tap()
 
         XCTAssertTrue(cards.waitForExistence(timeout: 5))
-        XCTAssertFalse(cards.label.contains("Create Card"))
+        XCTAssertFalse(cards.label.contains("Add Card"))
         XCTAssertEqual(app.textFields["budget.name"].value as? String, draftName)
         cards.tap()
         XCTAssertTrue(menuItem("New Checking", in: app).waitForExistence(timeout: 5))

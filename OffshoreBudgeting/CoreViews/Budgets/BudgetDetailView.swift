@@ -770,6 +770,7 @@ struct BudgetDetailView: View {
                         )
                     } : nil,
                     replacesExistingGoals: true,
+                    persistsGoals: true,
                     autoConfigurePlannedContributions: BudgetCategoryGoalStore.plannedContributions(
                         presets: workspacePresets, selectedPresetIDs: Set(linkedPresets.map(\.id)),
                         selectedCardIDs: Set(linkedCards.map(\.id)), workspaceID: workspace.id,

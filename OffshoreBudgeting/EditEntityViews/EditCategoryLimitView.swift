@@ -40,6 +40,8 @@ struct EditCategoryLimitView: View {
                         }
                     }
                     .disabled(!draft.isValid)
+                    .tint(.accentColor)
+                    .glassProminentButtonStyleCompat()
                 }
             }
             .onAppear {

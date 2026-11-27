@@ -76,12 +76,11 @@ struct ExcursionCategorySelectionView: View {
             }
             ToolbarItem(placement: .confirmationAction) {
                 if isEditing {
-                    Button("Done", systemImage: "checkmark") {
+                    Button("Save") {
                         var next = store.value
                         next.categoryIDs = draftCategoryIDs
                         if store.update(next) { editMode = .inactive }
                     }
-                    .labelStyle(.iconOnly)
                     .disabled(!canSave)
                     .glassProminentButtonStyleCompat()
                     .tint(.accentColor)

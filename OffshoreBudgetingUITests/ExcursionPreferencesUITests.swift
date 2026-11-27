@@ -142,8 +142,10 @@ final class ExcursionPreferencesUITests: XCTestCase {
         editingScreenshot.name = "Native categories editing"
         editingScreenshot.lifetime = .keepAlways
         add(editingScreenshot)
-        XCTAssertTrue(app.buttons["excursionSaveCategories"].isEnabled)
-        app.buttons["excursionSaveCategories"].tap()
+        let save = app.buttons["excursionSaveCategories"]
+        XCTAssertEqual(save.label, "Save")
+        XCTAssertTrue(save.isEnabled)
+        save.tap()
         let airport = app.staticTexts.matching(NSPredicate(format: "label == %@", "Airport")).firstMatch
         let amusementPark = app.staticTexts.matching(NSPredicate(format: "label == %@", "Amusement Park")).firstMatch
         XCTAssertEqual(airport.value as? String, "Selected")

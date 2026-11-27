@@ -10,6 +10,7 @@ struct CategoryGoalsEditorView: View {
     let allowsPlannedMinimum: Bool
     let maximumSuggestionProvider: (() throws -> [UUID: CategoryGoalSuggestion])?
     let replacesExistingGoals: Bool
+    let persistsGoals: Bool
     let autoConfigurePlannedContributions: [UUID: Double]?
     let onSave: ([UUID: CategoryGoalDraft], CategoryGoalAutoConfigurationDraft) -> Void
 
@@ -30,6 +31,7 @@ struct CategoryGoalsEditorView: View {
         allowsPlannedMinimum: Bool = false,
         maximumSuggestionProvider: (() throws -> [UUID: CategoryGoalSuggestion])? = nil,
         replacesExistingGoals: Bool = false,
+        persistsGoals: Bool = false,
         autoConfigurePlannedContributions: [UUID: Double]? = nil,
         autoConfiguration: CategoryGoalAutoConfigurationDraft = CategoryGoalAutoConfigurationDraft(),
         onSave: @escaping ([UUID: CategoryGoalDraft], CategoryGoalAutoConfigurationDraft) -> Void
@@ -41,6 +43,7 @@ struct CategoryGoalsEditorView: View {
         self.allowsPlannedMinimum = allowsPlannedMinimum
         self.maximumSuggestionProvider = maximumSuggestionProvider
         self.replacesExistingGoals = replacesExistingGoals
+        self.persistsGoals = persistsGoals
         self.autoConfigurePlannedContributions = autoConfigurePlannedContributions
         self.onSave = onSave
         _drafts = State(initialValue: drafts)
@@ -76,7 +79,7 @@ struct CategoryGoalsEditorView: View {
                     } description: {
                         Text("Create a category to set spending goals.")
                     } actions: {
-                        Button("Create Category") { showingAddCategory = true }
+                        Button("Add Category") { showingAddCategory = true }
                             .glassProminentButtonStyleCompat()
                             .tint(.accentColor)
                     }
@@ -148,11 +151,13 @@ struct CategoryGoalsEditorView: View {
                     Button("Cancel") { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") {
+                    Button(persistsGoals ? "Save" : "Done") {
                         onSave(drafts, generatedValues)
                         dismiss()
                     }
                     .disabled(!drafts.values.allSatisfy(\.isValid))
+                    .tint(.accentColor)
+                    .glassProminentButtonStyleCompat()
                 }
             }
         }

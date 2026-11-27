@@ -19,17 +19,7 @@ struct HelpGuideButton: View {
             NavigationStack {
                 SettingsHelpView()
                     .toolbar {
-                        ToolbarItem(placement: .cancellationAction) {
-                            Button(
-                                String(
-                                    localized: "common.done",
-                                    defaultValue: "Done",
-                                    comment: "Generic action label to finish and close a sheet."
-                                )
-                            ) {
-                                isShowingHelp = false
-                            }
-                        }
+                        SheetCloseToolbarItem { isShowingHelp = false }
                     }
             }
         }

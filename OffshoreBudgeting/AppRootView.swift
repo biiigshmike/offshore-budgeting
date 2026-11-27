@@ -430,17 +430,7 @@ struct AppRootView: View {
             NavigationStack {
                 SettingsHelpView()
                     .toolbar {
-                        ToolbarItem(placement: .cancellationAction) {
-                            Button(
-                                String(
-                                    localized: "common.done",
-                                    defaultValue: "Done",
-                                    comment: "Generic action label to finish and close a sheet."
-                                )
-                            ) {
-                                showingHelpSheet = false
-                            }
-                        }
+                        SheetCloseToolbarItem { showingHelpSheet = false }
                     }
             }
         }

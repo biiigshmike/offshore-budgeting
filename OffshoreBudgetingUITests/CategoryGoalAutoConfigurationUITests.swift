@@ -101,7 +101,7 @@ final class CategoryGoalAutoConfigurationUITests: XCTestCase {
         categoryGoals.tap()
         XCTAssertEqual(toggle.value as? String, "1")
         toggleAutoConfigure(in: app)
-        app.navigationBars["Category Goals"].buttons["Done"].tap()
+        app.navigationBars["Category Goals"].buttons["Save"].tap()
 
         app.buttons["Budget Actions"].tap()
         categoryGoals.tap()

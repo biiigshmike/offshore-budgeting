@@ -35,7 +35,7 @@ final class UncategorizedExpenseReviewUITests: XCTestCase {
         app.buttons["Dining"].firstMatch.tap()
     }
 
-    func testLaterDiscardsSelectionsAndSavePersistsCategory() throws {
+    func testSkipDiscardsSelectionsAndSavePersistsCategory() throws {
         let app = makeApp()
         app.launch()
         XCTAssertTrue(app.navigationBars["Review Expenses"].waitForExistence(timeout: 10))
@@ -48,7 +48,7 @@ final class UncategorizedExpenseReviewUITests: XCTestCase {
         XCTAssertFalse(app.buttons["Save"].isEnabled)
         chooseDining(app)
         XCTAssertTrue(app.buttons["Save"].isEnabled)
-        app.buttons["Later"].tap()
+        app.buttons["Skip"].tap()
         XCTAssertTrue(app.navigationBars["Home"].waitForExistence(timeout: 5))
         XCTAssertFalse(app.navigationBars["Review Expenses"].exists)
 
@@ -88,7 +88,7 @@ final class UncategorizedExpenseReviewUITests: XCTestCase {
         XCTAssertTrue(review.waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["No Available Categories"].exists)
 
-        app.buttons["Create Category"].tap()
+        app.buttons["Add Category"].tap()
         let addCategory = app.navigationBars["Add Category"]
         XCTAssertTrue(addCategory.waitForExistence(timeout: 5))
         let name = app.textFields.matching(NSPredicate(format: "placeholderValue == %@", "Name")).firstMatch
@@ -124,7 +124,7 @@ final class UncategorizedExpenseReviewUITests: XCTestCase {
         XCTAssertTrue(app.navigationBars["Review Expenses"].waitForExistence(timeout: 10))
         returnFromBackground(app)
         XCTAssertTrue(app.navigationBars["Review Expenses"].waitForExistence(timeout: 5))
-        app.buttons["Later"].tap()
+        app.buttons["Skip"].tap()
         XCTAssertTrue(app.navigationBars["Home"].waitForExistence(timeout: 5))
         XCTAssertFalse(app.navigationBars["Review Expenses"].exists)
     }
@@ -143,7 +143,7 @@ final class UncategorizedExpenseReviewUITests: XCTestCase {
         let app = makeApp()
         app.launch()
         XCTAssertTrue(app.navigationBars["Review Expenses"].waitForExistence(timeout: 10))
-        app.buttons["Later"].tap()
+        app.buttons["Skip"].tap()
         app.buttons["Settings"].firstMatch.tap()
         app.buttons["General"].firstMatch.tap()
         app.swipeUp()
@@ -173,7 +173,7 @@ final class UncategorizedExpenseReviewUITests: XCTestCase {
         add(screenshot)
         // Check the scrollable content and actions at AX5. The simulator's
         // automatic font audit flags the standard navigation-bar text sizing.
-        XCTAssertTrue(app.buttons["Later"].isHittable)
+        XCTAssertTrue(app.buttons["Skip"].isHittable)
         XCTAssertTrue(app.buttons["Save"].isHittable)
     }
 
@@ -181,7 +181,7 @@ final class UncategorizedExpenseReviewUITests: XCTestCase {
         let app = makeApp()
         app.launch()
         XCTAssertTrue(app.navigationBars["Review Expenses"].waitForExistence(timeout: 10))
-        app.buttons["Later"].tap()
+        app.buttons["Skip"].tap()
         app.buttons["Accounts"].firstMatch.tap()
         let add = app.buttons["Add Card"].firstMatch
         XCTAssertTrue(add.waitForExistence(timeout: 5))

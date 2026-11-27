@@ -83,12 +83,14 @@ struct EditIncomeView: View {
         )
         .navigationTitle("Edit Income")
         .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
+            ToolbarItem(placement: .cancellationAction) {
                 Button("Cancel") { dismiss() }
             }
-            ToolbarItem(placement: .topBarTrailing) {
-                Button("Update") { onTapUpdate() }
+            ToolbarItem(placement: .confirmationAction) {
+                Button("Save") { onTapUpdate() }
                     .disabled(!canSave)
+                    .tint(.accentColor)
+                    .glassProminentButtonStyleCompat()
             }
         }
         .blocksAutomaticExpenseReview(while: showingInvalidAmountAlert)

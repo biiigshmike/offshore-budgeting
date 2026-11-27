@@ -38,24 +38,14 @@ struct EditCategoryView: View {
         CategoryFormView(name: $name, color: $color)
             .navigationTitle("Edit Category")
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
+                ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
                 }
-                if #available(iOS 26.0, *) {
-                    ToolbarItem(placement: .topBarTrailing) {
-                        Button("Save") { save() }
-                            .disabled(!canSave)
-                            .tint(.accentColor)
-                            .glassProminentButtonStyleCompat()
-                    }
-                } else {
-                    ToolbarItem(placement: .topBarTrailing) {
-                        Button("Save") { save() }
-                            .disabled(!canSave)
-                            .tint(.accentColor)
-                            .controlSize(.large)
-                            .buttonStyle(.plain)
-                    }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") { save() }
+                        .disabled(!canSave)
+                        .tint(.accentColor)
+                        .glassProminentButtonStyleCompat()
                 }
             }
             .onAppear {

@@ -123,25 +123,15 @@ struct AddBudgetView: View {
             onEndDateChanged: handleEndDateChanged(_:)
         )
         .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
+            ToolbarItem(placement: .cancellationAction) {
                 Button("Cancel") { dismiss() }
                     .clipShape(.containerRelative)
             }
-            if #available(iOS 26.0, *) {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button(repeatPeriodRaw.isEmpty ? "Save" : "Preview") { submit() }
-                        .disabled(!canCreate)
-                        .tint(.accentColor)
-                        .glassProminentButtonStyleCompat()
-                }
-            } else {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button(repeatPeriodRaw.isEmpty ? "Save" : "Preview") { submit() }
-                        .disabled(!canCreate)
-                        .tint(.accentColor)
-                        .controlSize(.large)
-                        .buttonStyle(.plain)
-                }
+            ToolbarItem(placement: .confirmationAction) {
+                Button(repeatPeriodRaw.isEmpty ? "Save" : "Preview") { submit() }
+                    .disabled(!canCreate)
+                    .tint(.accentColor)
+                    .glassProminentButtonStyleCompat()
             }
         }
         .onAppear {

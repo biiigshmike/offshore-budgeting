@@ -24,9 +24,7 @@ struct HelpTopicLink: View {
                 NavigationStack {
                     HelpTopicDetailView(topic: topic)
                         .toolbar {
-                            ToolbarItem(placement: .confirmationAction) {
-                                Button("Close") { isShowingHelp = false }
-                            }
+                            SheetCloseToolbarItem { isShowingHelp = false }
                         }
                 }
             }

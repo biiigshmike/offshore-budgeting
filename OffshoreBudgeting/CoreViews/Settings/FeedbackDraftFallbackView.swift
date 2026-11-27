@@ -52,9 +52,7 @@ struct FeedbackDraftFallbackView: View {
             .navigationTitle(draft.kind.title)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Close") { dismiss() }
-                }
+                SheetCloseToolbarItem { dismiss() }
             }
         }
     }

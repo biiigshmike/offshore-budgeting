@@ -64,7 +64,7 @@ struct BudgetRecordedPlannedExpensesReviewView: View {
                     ContentUnavailableView(
                         "No recorded expenses found",
                         systemImage: "checkmark.circle",
-                        description: Text("You can delete the budget now, or tap Done to keep it.")
+                        description: Text("You can delete the budget now or close this review to keep it.")
                     )
                     .frame(maxWidth: .infinity, alignment: .center)
                 } else {
@@ -93,11 +93,7 @@ struct BudgetRecordedPlannedExpensesReviewView: View {
         .navigationTitle(navigationTitleText)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .cancellationAction) {
-                Button("Done") {
-                    onDone()
-                }
-            }
+            SheetCloseToolbarItem { onDone() }
 
             ToolbarItem(placement: .confirmationAction) {
                 Button(role: .destructive) {

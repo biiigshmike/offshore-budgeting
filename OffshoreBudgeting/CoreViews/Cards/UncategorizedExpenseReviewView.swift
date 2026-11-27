@@ -56,7 +56,7 @@ struct UncategorizedExpenseReviewView: View {
                 } description: {
                     Text("Create a category to categorize these expenses.")
                 } actions: {
-                    Button("Create Category") { showingAddCategory = true }
+                    Button("Add Category") { showingAddCategory = true }
                         .glassProminentButtonStyleCompat()
                         .tint(.accentColor)
                 }
@@ -101,6 +101,8 @@ struct UncategorizedExpenseReviewView: View {
             }
             ToolbarItem(placement: .confirmationAction) {
                 Button("Save", action: save).disabled(validSelections.isEmpty)
+                    .tint(.accentColor)
+                    .glassProminentButtonStyleCompat()
             }
         }
         .alert("Couldn’t Save Categories", isPresented: $showingSaveError) {

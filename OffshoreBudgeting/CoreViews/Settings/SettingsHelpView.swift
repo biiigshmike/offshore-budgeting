@@ -875,18 +875,6 @@ private struct HelpSectionFullscreenViewer: View {
 
     private var header: some View {
         HStack(spacing: 12) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(topicTitle)
-                    .font(.caption)
-                    .foregroundStyle(.white.opacity(0.75))
-                Text(presentation.sectionTitle)
-                    .font(.headline)
-                    .foregroundStyle(.white)
-                    .lineLimit(1)
-            }
-            
-            Spacer()
-            
             if #available(iOS 26.0, *) {
                 Button {
                     dismiss()
@@ -908,6 +896,18 @@ private struct HelpSectionFullscreenViewer: View {
                 .buttonBorderShape(.circle)
                 .accessibilityLabel(Text("Close"))
             }
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(topicTitle)
+                    .font(.caption)
+                    .foregroundStyle(.white.opacity(0.75))
+                Text(presentation.sectionTitle)
+                    .font(.headline)
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+            }
+
+            Spacer()
         }
     }
 }

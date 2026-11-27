@@ -57,11 +57,7 @@ struct PresetTemplateRecordedPlannedExpensesReviewView: View {
         .navigationTitle("Review \(preset.title)")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .confirmationAction) {
-                Button("Done") {
-                    onDone()
-                }
-            }
+            SheetCloseToolbarItem { onDone() }
         }
         .onAppear {
             reload()

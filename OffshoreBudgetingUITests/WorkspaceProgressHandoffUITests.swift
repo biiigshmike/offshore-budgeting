@@ -283,7 +283,7 @@ final class WorkspaceProgressHandoffUITests: XCTestCase {
         link.tap()
         let help = app.navigationBars["Help"]
         XCTAssertTrue(help.waitForExistence(timeout: 5))
-        help.buttons["Done"].tap()
+        help.buttons["Close"].tap()
         assertHandoff(in: app)
     }
 
@@ -516,7 +516,7 @@ final class WorkspaceProgressHandoffUITests: XCTestCase {
         attachScreenshot("Help Guide opened", app: app)
         let introduction = app.descendants(matching: .any).matching(identifier: "Introduction").firstMatch
         XCTAssertTrue(introduction.waitForExistence(timeout: 5))
-        help.buttons["Done"].tap()
+        help.buttons["Close"].tap()
         XCTAssertTrue(help.waitForNonExistence(timeout: 5))
     }
 
