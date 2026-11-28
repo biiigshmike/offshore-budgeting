@@ -69,7 +69,8 @@ struct ImportFromClipboardIntent: AppIntent {
                 try ShortcutImportPreviewService.shared.previewFromClipboard(text: resolvedClipboardText)
             }
         } catch {
-            let message = (error as? LocalizedError)?.errorDescription ?? "Could not parse clipboard text into entries."
+            let message = (error as? LocalizedError)?.errorDescription
+                ?? String(localized: "Could not parse clipboard text into entries.")
             return .result(
                 value: message,
                 dialog: IntentDialog(stringLiteral: message)
@@ -152,7 +153,7 @@ struct ImportFromClipboardIntent: AppIntent {
             )
         }
 
-        let message = "I parsed your clipboard, but couldn't classify any import rows."
+        let message = String(localized: "I parsed your clipboard, but couldn't classify any import rows.")
         return .result(
             value: message,
             dialog: IntentDialog(stringLiteral: message)

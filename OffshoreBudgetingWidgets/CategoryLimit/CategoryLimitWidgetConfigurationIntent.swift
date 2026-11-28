@@ -32,21 +32,21 @@ struct CategoryLimitWidgetCategory: AppEntity {
     }
 
     static var unconfigured: Self {
-        Self(id: "__choose_category__", name: widgetLocalized("Choose a Category"))
+        Self(id: "__choose_category__", name: String(localized: "Choose a Category"))
     }
 
     static let topCategoryID = "__top_category__"
 
     static var topCategory: Self {
-        Self(id: topCategoryID, name: widgetLocalized("Top Category"))
+        Self(id: topCategoryID, name: String(localized: "Top Category"))
     }
 
     static var noLimits: Self {
-        Self(id: "__no_limits__", name: widgetLocalized("No limits in current budget"))
+        Self(id: "__no_limits__", name: String(localized: "No limits in current budget"))
     }
 
     static var openOffshore: Self {
-        Self(id: "__open_offshore__", name: widgetLocalized("Open Offshore to refresh"))
+        Self(id: "__open_offshore__", name: String(localized: "Open Offshore to refresh"))
     }
 }
 

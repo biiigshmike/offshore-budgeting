@@ -22,7 +22,7 @@ struct OpenQuickAddExpenseIntent: AppIntent {
 
         return .result(
             opensIntent: OpenOffshoreForImportIntent(),
-            dialog: IntentDialog(stringLiteral: "Opening Offshore quick add.")
+            dialog: IntentDialog("Opening Offshore quick add.")
         )
     }
 }

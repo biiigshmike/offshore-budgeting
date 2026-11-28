@@ -70,7 +70,7 @@ struct SettingsPrivacyView: View {
         LocalAuthenticationService.biometricAvailability()
     }
 
-    private var biometricToggleTitle: String {
+    private var biometricToggleTitle: LocalizedStringKey {
         switch biometricAvailability.kind {
         case .faceID:
             return "Use Face ID"

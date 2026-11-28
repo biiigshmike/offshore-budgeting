@@ -40,13 +40,13 @@ struct WhatCanISpendTodayIntent: AppIntent {
         let safeSpendTodayText = CurrencyFormatter.string(from: summary.safeToSpendToday)
 
         var lines = [
-            "Budget period: \(summary.budgetingPeriod.displayTitle)",
-            "Period remaining room: \(periodRemainingText)",
-            "Safe to spend today: \(safeSpendTodayText)"
+            String(localized: "Budget period: \(summary.budgetingPeriod.displayTitle)"),
+            String(localized: "Period remaining room: \(periodRemainingText)"),
+            String(localized: "Safe to spend today: \(safeSpendTodayText)")
         ]
 
         if !summary.isDaily {
-            lines.append("Days left in period: \(summary.daysLeftInPeriod.formatted())")
+            lines.append(String(localized: "Days left in period: \(summary.daysLeftInPeriod.formatted())"))
         }
 
         return lines.joined(separator: "\n")

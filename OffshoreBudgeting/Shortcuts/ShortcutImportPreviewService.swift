@@ -11,11 +11,11 @@ enum ShortcutImportPreviewError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .emptyClipboard:
-            return "Clipboard text is empty."
+            return String(localized: "Clipboard text is empty.")
         case .couldNotParseClipboard:
-            return "Could not parse clipboard text into entries."
+            return String(localized: "Could not parse clipboard text into entries.")
         case .imageFileUnavailable:
-            return "The image file could not be read."
+            return String(localized: "The image file could not be read.")
         }
     }
 }
@@ -150,24 +150,25 @@ final class ShortcutImportPreviewService {
         let paymentRows = rows.filter { !$0.isBlocked && $0.bucket == .payment }.count
         let includedRows = rows.filter { !$0.isBlocked && $0.includeInImport && !$0.isMissingRequiredData }.count
 
-        var lines: [String] = []
-        lines.append("Parsed \(totalRows.formatted()) rows")
-        lines.append("\(expenseRows.formatted()) expenses, \(adjustmentRows.formatted()) adjustments, \(incomeRows.formatted()) income")
-        lines.append("Ready: \(readyRows.formatted())")
-        lines.append("Possible matches: \(possibleMatchRows.formatted())")
-        lines.append("Possible duplicates: \(possibleDuplicateRows.formatted())")
-        lines.append("Needs more data: \(needsMoreDataRows.formatted())")
+        var lines = [
+            String(localized: "Rows found: \(totalRows.formatted())"),
+            String(localized: "Expenses: \(expenseRows.formatted()), adjustments: \(adjustmentRows.formatted()), income: \(incomeRows.formatted())"),
+            String(localized: "Ready: \(readyRows.formatted())"),
+            String(localized: "Possible matches: \(possibleMatchRows.formatted())"),
+            String(localized: "Possible duplicates: \(possibleDuplicateRows.formatted())"),
+            String(localized: "Needs more data: \(needsMoreDataRows.formatted())")
+        ]
         if paymentRows > 0 {
-            lines.append("Credit/adjustment/income rows: \(paymentRows.formatted())")
+            lines.append(String(localized: "Credit, adjustment, or income rows: \(paymentRows.formatted())"))
         }
-        lines.append("Immediately importable: \(includedRows.formatted())")
-        lines.append("Nothing is saved yet. Offshore saves only after you confirm Import.")
+        lines.append(String(localized: "Immediately importable: \(includedRows.formatted())"))
+        lines.append(String(localized: "Nothing is saved yet. Offshore saves only after you confirm Import."))
 
         if expenseRows > 0 && importableIncomeRows == 0 {
-            lines.append("Detected expense-style rows only. Income Import won't save those rows.")
-            lines.append("To import expenses, open a Card and use Import Expenses.")
+            lines.append(String(localized: "Import Income skips expense rows."))
+            lines.append(String(localized: "To import expenses, open a card and choose Import Expenses."))
         } else if incomeRows > 0 && importableIncomeRows == 0 {
-            lines.append("No income rows are ready yet. Review fields in Offshore before importing.")
+            lines.append(String(localized: "No income rows are ready yet. Review fields in Offshore before importing."))
         }
 
         return lines.joined(separator: "\n")

@@ -24,13 +24,13 @@ enum AddExpenseShortcutExecutor {
         var errorDescription: String? {
             switch self {
             case .invalidAmount:
-                return "Please provide a valid amount."
+                return String(localized: "Please provide a valid amount.")
             case .missingCard:
-                return "Please choose an Offshore card or provide the Wallet card name."
+                return String(localized: "Please choose an Offshore card or provide the Wallet card name.")
             case .missingMerchant:
-                return "Please provide a merchant or description for the expense."
+                return String(localized: "Please provide a merchant or description for the expense.")
             case .missingDate:
-                return "Please provide a date."
+                return String(localized: "Please provide a date.")
             }
         }
     }
@@ -126,7 +126,7 @@ enum AddExpenseShortcutExecutor {
         )
 
         let amountText = CurrencyFormatter.string(from: parsedAmount)
-        let categoryName = resolvedCategory?.name ?? "Uncategorized"
-        return "Logged \(amountText) to \(resolvedCard.name) in \(categoryName)."
+        let categoryName = resolvedCategory?.name ?? String(localized: "Uncategorized")
+        return String(localized: "Logged \(amountText) to \(resolvedCard.name) in \(categoryName).")
     }
 }

@@ -15,9 +15,9 @@ enum ExpenseImageImportParserError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .noTextFound:
-            return "No text could be recognized from this image."
+            return String(localized: "No text could be recognized from this image.")
         case .noTransactionsFound:
-            return "No entry rows were found in this image."
+            return String(localized: "No entry rows were found in this image.")
         }
     }
 }

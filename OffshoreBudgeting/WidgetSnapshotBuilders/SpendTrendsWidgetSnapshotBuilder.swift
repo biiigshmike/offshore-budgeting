@@ -288,10 +288,16 @@ enum SpendTrendsWidgetSnapshotBuilder {
                 return nil
             }
 
+            let categoryName: String = switch topSlice.id {
+            case "uncategorized": String(localized: "Uncategorized")
+            case "other": String(localized: "Other")
+            default: topSlice.name
+            }
+
             return .init(
                 label: highest.label,
                 amount: highest.total,
-                topCategoryName: topSlice.name,
+                topCategoryName: categoryName,
                 topCategoryAmount: topSlice.amount,
                 topCategoryPercentOfBucket: topSlice.amount / max(0.000_1, highest.total)
             )

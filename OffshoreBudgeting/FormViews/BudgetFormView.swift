@@ -40,7 +40,7 @@ struct BudgetFormView: View {
 
     private var cardsMenu: some View {
         Menu {
-            Button(selectedCardIDs.count == cards.count ? "Clear All" : "Select All", action: onToggleAllCards)
+            Button(selectedCardIDs.count == cards.count ? "Deselect All" : "Select All", action: onToggleAllCards)
                 .menuActionDismissBehavior(.disabled)
             Divider()
             ForEach(cards) { card in
@@ -82,7 +82,7 @@ struct BudgetFormView: View {
 
     private var presetsMenu: some View {
         Menu {
-            Button(selectedPresetIDs.count == presets.count ? "Clear All" : "Select All", action: onToggleAllPresets)
+            Button(selectedPresetIDs.count == presets.count ? "Deselect All" : "Select All", action: onToggleAllPresets)
                 .menuActionDismissBehavior(.disabled)
             Divider()
             ForEach(presets) { preset in

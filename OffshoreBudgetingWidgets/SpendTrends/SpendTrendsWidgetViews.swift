@@ -12,6 +12,14 @@ private func spendTrendsLocalizedFormat(_ key: String, _ arguments: CVarArg...) 
     String(format: widgetLocalized(key), locale: Locale.current, arguments)
 }
 
+private func localizedSpendTrendsBucketLabel(_ label: String) -> String {
+    guard label.count == 2, label.first == "Q",
+          let quarter = label.last?.wholeNumberValue, (1...4).contains(quarter) else {
+        return label
+    }
+    return String(localized: "Q\(quarter)", comment: "Compact chart label for calendar quarter 1 through 4.")
+}
+
 private extension SpendTrendsWidgetSnapshot {
     var rangeText: String {
         let start = rangeStart.formatted(.dateTime.month(.abbreviated).day())
@@ -130,7 +138,7 @@ private struct SpendTrendsBarChartView: View {
     }
 
     private func normalizedLabel(_ label: String) -> String {
-        guard compactRangeLabels else { return label }
+        guard compactRangeLabels else { return localizedSpendTrendsBucketLabel(label) }
 
         // Keep small-widget labels visually uniform (e.g. "1-4", "5-11"), even if labels use
         // non-hyphen separators or include extra text.
@@ -138,7 +146,7 @@ private struct SpendTrendsBarChartView: View {
             .split(whereSeparator: { !$0.isNumber })
             .compactMap { Int($0) }
 
-        guard numbers.count >= 2 else { return label }
+        guard numbers.count >= 2 else { return localizedSpendTrendsBucketLabel(label) }
         return "\(numbers[0])-\(numbers[1])"
     }
 
@@ -206,6 +214,14 @@ private struct SpendTrendsBarView: View {
 private struct SpendTrendsCategoryRowView: View {
     let item: SpendTrendsWidgetSnapshot.TopCategory
 
+    private var categoryName: String {
+        switch item.id {
+        case "uncategorized": String(localized: "Uncategorized")
+        case "other": String(localized: "Other")
+        default: item.name
+        }
+    }
+
     var body: some View {
         HStack(spacing: 8) {
             Circle()
@@ -213,7 +229,7 @@ private struct SpendTrendsCategoryRowView: View {
                 .frame(width: 8, height: 8)
                 .accessibilityHidden(true)
 
-            Text(item.name)
+            Text(categoryName)
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
@@ -253,7 +269,7 @@ struct SpendTrendsWidgetSmallView: View {
                 smallHeaderCandidate(snapshot.compactPeriodRangeText)
                 smallHeaderCandidate(snapshot.compactPeriodRangeTextWithEnDash)
                 smallHeaderCandidate(snapshot.slashPeriodRangeText)
-                smallHeaderCandidate(snapshot.periodToken)
+                smallHeaderCandidate(widgetPeriodLabel(snapshot.periodToken))
             }
 
             SpendTrendsBarChartView(
@@ -334,7 +350,7 @@ struct SpendTrendsWidgetMediumView: View {
 
                                 Spacer(minLength: 0)
 
-                                Text(highest.label)
+                                Text(localizedSpendTrendsBucketLabel(highest.label))
                                     .font(.caption.weight(.semibold))
                                     .foregroundStyle(.secondary)
                                     .lineLimit(1)

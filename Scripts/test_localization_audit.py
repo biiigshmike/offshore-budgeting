@@ -16,9 +16,9 @@ def unit(value, state="translated"):
 
 
 class LocalizationAuditTests(unittest.TestCase):
-    def audit(self, strings, locale="es", source_language="en"):
+    def audit(self, strings, locale="es", source_language="en", catalog_name="Localizable.xcstrings"):
         with tempfile.TemporaryDirectory() as directory:
-            catalog = Path(directory) / "Localizable.xcstrings"
+            catalog = Path(directory) / catalog_name
             catalog.write_text(json.dumps({
                 "sourceLanguage": source_language,
                 "strings": strings,
@@ -136,6 +136,20 @@ class LocalizationAuditTests(unittest.TestCase):
         )})
         self.assertEqual(result.returncode, 1)
         self.assertIn("placeholder mismatches: 1", result.stdout)
+
+    def test_app_shortcut_phrases_keep_the_application_name(self):
+        key = "Add expense in ${applicationName}"
+        for phrase, expected_status in [
+            ("Registra un gasto en ${applicationName}", 0),
+            ("Registra un gasto en Offshore", 1),
+        ]:
+            with self.subTest(phrase=phrase):
+                result = self.audit({key: {"localizations": {
+                    "en": {"stringSet": {"state": "translated", "values": [key]}},
+                    "es": {"stringSet": {"state": "translated", "values": [phrase]}},
+                }}}, catalog_name="AppShortcuts.xcstrings")
+                self.assertEqual(result.returncode, expected_status, result.stdout + result.stderr)
+                self.assertIn(f"placeholder mismatches: {expected_status}", result.stdout)
 
     def test_missing_catalog_has_error_status(self):
         result = subprocess.run(

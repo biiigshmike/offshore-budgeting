@@ -21,6 +21,42 @@ struct HelpFAQEngineTests {
         #expect(matches.first?.topicID == "budgets-category-goals")
     }
 
+    @Test(arguments: [
+        ("How do I delete a budget?", "budgets-details-delete-budget"),
+        ("How do I record a refund?", "accounts-transaction-types-credit"),
+        ("How do I import a statement?", "introduction-import-2"),
+        ("How do I back up a workspace?", "settings-workspaces-transfer"),
+        ("Where can I find Lock Screen widgets?", "home-system-widgets-gallery"),
+        ("Can I add widgets to my Mac desktop?", "home-system-widgets-desktop")
+    ])
+    func taskQueriesFindRelevantHelpSection(prompt: String, expectedSectionID: String) {
+        let matches = HelpFAQEngine().rankedTopicMatches(
+            for: prompt,
+            topics: GeneratedHelpContent.visibleLeafTopics(for: .phone)
+        )
+
+        #expect(matches.first?.sectionID == expectedSectionID)
+    }
+
+    @Test(arguments: [
+        ("شاشة القفل", "إضافة الأدوات", "يمكنك إضافة أداة إلى شاشة القفل.", "شاشة"),
+        ("如何在锁定屏幕添加小组件", "锁定屏幕小组件", "在锁定屏幕上添加小组件。", "屏幕"),
+        ("depense", "Ajouter une dépense", "Sélectionnez une dépense.", "dépense")
+    ])
+    func localizedSearchFindsAndHighlightsWords(prompt: String, heading: String, body: String, expectedWord: String) {
+        let engine = HelpFAQEngine()
+        let topic = GeneratedHelpLeafTopic(
+            id: "localized-topic",
+            destinationID: "accounts",
+            resolvedTitle: heading,
+            sections: [GeneratedHelpSection(id: "localized-section", resolvedHeader: heading, resolvedBodyText: body)]
+        )
+
+        #expect(engine.rankedTopicMatches(for: prompt, topics: [topic]).first?.sectionID == "localized-section")
+        let matches = engine.matchedWordRanges(in: body, queryTokens: engine.queryTokens(for: prompt))
+        #expect(matches.contains { body[$0] == expectedWord })
+    }
+
     // MARK: - Answering
 
     @Test func answer_exactTopicQuestion_returnsHomeTopic() {

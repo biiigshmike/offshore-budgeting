@@ -51,7 +51,7 @@ struct EnableSpendingSessionIntent: AppIntent {
         if !canRunInBackground {
             return .result(
                 dialog: IntentDialog(
-                    stringLiteral: "Open Offshore to finish location setup or use Excursion Mode while the app is open."
+                    "Open Offshore to finish location setup or use Excursion Mode while the app is open."
                 )
             )
         }
@@ -61,10 +61,10 @@ struct EnableSpendingSessionIntent: AppIntent {
         switch result {
         case .started(let expiresAt):
             let timeText = expiresAt.formatted(date: .omitted, time: .shortened)
-            return .result(dialog: IntentDialog(stringLiteral: "Excursion mode is active until \(timeText)."))
+            return .result(dialog: IntentDialog("Excursion mode is active until \(timeText)."))
         case .blocked(let blockers):
             let details = blockers.map(\.message).joined(separator: " ")
-            return .result(dialog: IntentDialog(stringLiteral: "Excursion mode could not start. \(details)"))
+            return .result(dialog: IntentDialog("Excursion mode could not start. \(details)"))
         }
     }
 }

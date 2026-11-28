@@ -46,11 +46,11 @@ final class ExpenseCSVImportViewModel: ObservableObject {
         var errorDescription: String? {
             switch self {
             case .unsupportedFileType:
-                return "Unsupported file type. Choose a CSV, PDF, or image."
+                return String(localized: "Unsupported file type. Choose a CSV, PDF, or image.")
             case .missingCardForCardTransactions:
-                return "No card was selected for this import."
+                return String(localized: "No card was selected for this import.")
             case .noIncomeRowsFound:
-                return "No income rows were found in this file."
+                return String(localized: "No income rows were found in this file.")
             }
         }
     }
@@ -96,12 +96,12 @@ final class ExpenseCSVImportViewModel: ObservableObject {
 
         switch mode {
         case .cardTransactions:
-            return "\(localizedInt(expCount)) expenses, \(localizedInt(creditCount)) credits, \(localizedInt(adjustmentCount)) adjustments, \(localizedInt(incCount)) incomes will be imported."
+            return String(localized: "Rows to import: Expenses (\(localizedInt(expCount))), credits (\(localizedInt(creditCount))), adjustments (\(localizedInt(adjustmentCount))), income (\(localizedInt(incCount))).")
         case .incomeOnly:
             if blockedCount > 0 {
-                return "\(localizedInt(incCount)) incomes will be imported. \(localizedInt(blockedCount)) expense rows were skipped."
+                return String(localized: "Income rows to import: \(localizedInt(incCount)). Expense rows skipped: \(localizedInt(blockedCount)).")
             }
-            return "\(localizedInt(incCount)) incomes will be imported."
+            return String(localized: "Income rows to import: \(localizedInt(incCount)).")
         }
     }
 
@@ -633,7 +633,7 @@ final class ExpenseCSVImportViewModel: ObservableObject {
                 var updated = row
 
                 if updated.kind == .expense || updated.kind == .credit || updated.kind == .adjustment {
-                    updated.blockedReason = "Expense, credit, and adjustment rows are skipped when importing from Income."
+                    updated.blockedReason = String(localized: "Expense, credit, and adjustment rows are skipped when importing from Income.")
                     updated.includeInImport = false
                     updated.rememberMapping = false
                     return updated

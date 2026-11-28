@@ -174,6 +174,18 @@ struct HelpFAQEngine {
         tokenSet(from: prompt)
     }
 
+    func matchedWordRanges(in text: String, queryTokens: Set<String>) -> [Range<String.Index>] {
+        guard !queryTokens.isEmpty else { return [] }
+
+        var matches: [Range<String.Index>] = []
+        text.enumerateSubstrings(in: text.startIndex..<text.endIndex, options: [.byWords, .localized]) { word, range, _, _ in
+            if let word, !tokenSet(from: word).isDisjoint(with: queryTokens) {
+                matches.append(range)
+            }
+        }
+        return matches
+    }
+
     // MARK: - Ranking
 
     private func rankedTopics(for normalizedPrompt: String, topics: [GeneratedHelpLeafTopic]) -> [TopicCandidate] {
@@ -310,8 +322,8 @@ struct HelpFAQEngine {
 
     private func normalized(_ text: String) -> String {
         text
-            .lowercased()
-            .replacingOccurrences(of: "[^a-z0-9\\s]", with: " ", options: .regularExpression)
+            .folding(options: [.caseInsensitive, .diacriticInsensitive, .widthInsensitive], locale: .current)
+            .replacingOccurrences(of: "[^\\p{L}\\p{M}\\p{N}\\s]", with: " ", options: .regularExpression)
             .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
             .trimmingCharacters(in: .whitespacesAndNewlines)
     }
@@ -320,13 +332,15 @@ struct HelpFAQEngine {
         let normalizedText = normalized(text)
         guard normalizedText.isEmpty == false else { return [] }
 
-        let rawTokens = normalizedText.split(separator: " ").map(String.init)
         var tokens: Set<String> = []
-
-        for token in rawTokens {
+        normalizedText.enumerateSubstrings(
+            in: normalizedText.startIndex..<normalizedText.endIndex,
+            options: [.byWords, .localized]
+        ) { token, _, _, _ in
+            guard let token else { return }
             let canonical = canonicalToken(token)
-            guard canonical.count >= 2 else { continue }
-            guard stopWords.contains(canonical) == false else { continue }
+            guard canonical.count >= 2 else { return }
+            guard stopWords.contains(canonical) == false else { return }
             tokens.insert(canonical)
         }
 

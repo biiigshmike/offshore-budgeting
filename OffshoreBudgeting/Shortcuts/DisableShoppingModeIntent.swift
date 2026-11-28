@@ -13,6 +13,6 @@ struct DisableShoppingModeIntent: AppIntent {
             ShoppingModeManager.shared.end()
         }
 
-        return .result(dialog: IntentDialog(stringLiteral: "Excursion mode stopped."))
+        return .result(dialog: IntentDialog("Excursion mode stopped."))
     }
 }

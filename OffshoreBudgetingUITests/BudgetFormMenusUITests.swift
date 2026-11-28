@@ -15,18 +15,18 @@ final class BudgetFormMenusUITests: XCTestCase {
     private func exerciseMenus(_ app: XCUIApplication, formTitle: String) {
         app.buttons["budget.cards"].tap()
         app.buttons["Select All"].tap()
-        XCTAssertTrue(app.buttons["Clear All"].waitForExistence(timeout: 3))
-        app.buttons["Clear All"].tap()
+        XCTAssertTrue(app.buttons["Deselect All"].waitForExistence(timeout: 3))
+        app.buttons["Deselect All"].tap()
         XCTAssertTrue(menuItem("Ocean Card", in: app).waitForExistence(timeout: 5))
         menuItem("Ocean Card", in: app).tap()
         XCTAssertTrue(menuItem("Ruby Card", in: app).waitForExistence(timeout: 3))
         menuItem("Ruby Card", in: app).tap()
         // A second action must be possible without reopening the menu.
-        XCTAssertTrue(app.buttons["Clear All"].waitForExistence(timeout: 3))
-        app.buttons["Clear All"].tap()
+        XCTAssertTrue(app.buttons["Deselect All"].waitForExistence(timeout: 3))
+        app.buttons["Deselect All"].tap()
         XCTAssertTrue(app.buttons["Select All"].waitForExistence(timeout: 3))
         app.buttons["Select All"].tap()
-        XCTAssertTrue(app.buttons["Clear All"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.buttons["Deselect All"].waitForExistence(timeout: 3))
         let cards = XCTAttachment(screenshot: app.screenshot())
         cards.name = "Budget cards menu with artwork"
         cards.lifetime = .keepAlways
@@ -35,8 +35,8 @@ final class BudgetFormMenusUITests: XCTestCase {
 
         app.buttons["budget.presets"].tap()
         app.buttons["Select All"].tap()
-        XCTAssertTrue(app.buttons["Clear All"].waitForExistence(timeout: 3))
-        app.buttons["Clear All"].tap()
+        XCTAssertTrue(app.buttons["Deselect All"].waitForExistence(timeout: 3))
+        app.buttons["Deselect All"].tap()
         let rent = app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH %@", "Rent")).firstMatch
         XCTAssertTrue(rent.waitForExistence(timeout: 5))
         XCTAssertFalse(rent.label.contains("$"))
@@ -45,11 +45,11 @@ final class BudgetFormMenusUITests: XCTestCase {
         XCTAssertTrue(internet.waitForExistence(timeout: 3))
         XCTAssertFalse(internet.label.contains("$"))
         internet.tap()
-        XCTAssertTrue(app.buttons["Clear All"].waitForExistence(timeout: 3))
-        app.buttons["Clear All"].tap()
+        XCTAssertTrue(app.buttons["Deselect All"].waitForExistence(timeout: 3))
+        app.buttons["Deselect All"].tap()
         XCTAssertTrue(app.buttons["Select All"].waitForExistence(timeout: 3))
         app.buttons["Select All"].tap()
-        XCTAssertTrue(app.buttons["Clear All"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.buttons["Deselect All"].waitForExistence(timeout: 3))
         let presets = XCTAttachment(screenshot: app.screenshot())
         presets.name = "Budget presets menu with schedule details"
         presets.lifetime = .keepAlways
@@ -102,11 +102,11 @@ final class BudgetFormMenusUITests: XCTestCase {
         XCTAssertTrue(app.navigationBars["Edit Budget"].waitForExistence(timeout: 5))
         app.buttons["budget.cards"].tap()
         XCTAssertTrue(app.buttons["Select All"].waitForExistence(timeout: 3))
-        XCTAssertFalse(app.buttons["Clear All"].exists)
+        XCTAssertFalse(app.buttons["Deselect All"].exists)
         dismissMenu(app, formTitle: "Edit Budget")
         app.buttons["budget.presets"].tap()
         XCTAssertTrue(app.buttons["Select All"].waitForExistence(timeout: 3))
-        XCTAssertFalse(app.buttons["Clear All"].exists)
+        XCTAssertFalse(app.buttons["Deselect All"].exists)
         dismissMenu(app, formTitle: "Edit Budget")
         app.buttons["Cancel"].tap()
     }
@@ -117,7 +117,7 @@ final class BudgetFormMenusUITests: XCTestCase {
         let addBudget = app.navigationBars["Add Budget"]
         XCTAssertTrue(cards.label.contains("First Card"))
         cards.tap()
-        app.buttons["Clear All"].tap()
+        app.buttons["Deselect All"].tap()
         XCTAssertTrue(app.buttons["Select All"].waitForExistence(timeout: 3))
         XCTAssertFalse(app.buttons["Done"].exists)
         dismissMenu(app, formTitle: "Add Budget")

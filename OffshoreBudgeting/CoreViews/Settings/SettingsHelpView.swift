@@ -272,17 +272,7 @@ struct SettingsHelpView: View {
     }
 
     private func firstMatchIndex(in text: String, queryTokens: Set<String>) -> String.Index? {
-        guard queryTokens.isEmpty == false else { return nil }
-
-        for range in wordRanges(in: text) {
-            let rawToken = String(text[range]).lowercased()
-            let canonical = canonicalSearchToken(rawToken)
-            if queryTokens.contains(canonical) {
-                return range.lowerBound
-            }
-        }
-
-        return nil
+        faqEngine.matchedWordRanges(in: text, queryTokens: queryTokens).first?.lowerBound
     }
 
     private func highlightedSnippet(
@@ -290,41 +280,13 @@ struct SettingsHelpView: View {
         queryTokens: Set<String>
     ) -> AttributedString {
         var attributed = AttributedString(text)
-        guard text.isEmpty == false else { return attributed }
-        guard queryTokens.isEmpty == false else { return attributed }
-
-        for range in wordRanges(in: text) {
-            let rawToken = String(text[range]).lowercased()
-            let canonical = canonicalSearchToken(rawToken)
-            guard queryTokens.contains(canonical) else { continue }
-
+        for range in faqEngine.matchedWordRanges(in: text, queryTokens: queryTokens) {
             if let attributedRange = Range(range, in: attributed) {
                 attributed[attributedRange].inlinePresentationIntent = .stronglyEmphasized
             }
         }
 
         return attributed
-    }
-
-    private func wordRanges(in text: String) -> [Range<String.Index>] {
-        guard let regex = try? NSRegularExpression(pattern: "[A-Za-z0-9]+") else { return [] }
-        let fullRange = NSRange(text.startIndex..<text.endIndex, in: text)
-
-        return regex.matches(in: text, range: fullRange).compactMap { match in
-            Range(match.range, in: text)
-        }
-    }
-
-    private func canonicalSearchToken(_ token: String) -> String {
-        var value = token
-
-        if value.hasSuffix("ies"), value.count > 4 {
-            value = String(value.dropLast(3)) + "y"
-        } else if value.hasSuffix("s"), value.count > 3 {
-            value = String(value.dropLast())
-        }
-
-        return value
     }
 }
 

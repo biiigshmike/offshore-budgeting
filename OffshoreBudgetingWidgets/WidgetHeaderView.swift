@@ -37,9 +37,20 @@ func widgetCompactDateRangeText(start: Date, end: Date, calendar: Calendar = .cu
 }
 
 func widgetJoinedPeriodRangeText(periodToken: String, rangeText: String) -> String {
-    let token = periodToken.trimmingCharacters(in: .whitespacesAndNewlines)
+    let token = widgetPeriodLabel(periodToken.trimmingCharacters(in: .whitespacesAndNewlines))
     guard token.isEmpty == false else { return rangeText }
     return "\(token) • \(rangeText)"
+}
+
+func widgetPeriodLabel(_ token: String) -> String {
+    switch token {
+    case "P": String(localized: "P", comment: "Compact label for the default budget period.")
+    case "1W": String(localized: "1W", comment: "Compact label for a one-week range.")
+    case "1M": String(localized: "1M", comment: "Compact label for a one-month range.")
+    case "Q": String(localized: "Q", comment: "Compact label for a calendar quarter.")
+    case "1Y": String(localized: "1Y", comment: "Compact label for a one-year range.")
+    default: token
+    }
 }
 
 struct WidgetHeaderView: View {

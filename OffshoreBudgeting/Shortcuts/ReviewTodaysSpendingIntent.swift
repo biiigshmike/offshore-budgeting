@@ -34,15 +34,17 @@ struct ReviewTodaysSpendingIntent: AppIntent {
             return try dataStore.performInSelectedWorkspace { modelContext, workspace in
                 let summary = try ReviewTodaySummary.load(workspaceID: workspace.id, in: modelContext)
                 let topCards = summary.topCards.map {
-                    "\($0.name): \(CurrencyFormatter.string(from: $0.amount))"
+                    let amount = CurrencyFormatter.string(from: $0.amount)
+                    return String(localized: "\($0.name): \(amount)", comment: "A card name followed by its spending total in the Review Today's Spending shortcut.")
                 }
 
                 var lines = [
-                    "Today: \(CurrencyFormatter.string(from: summary.total))",
-                    "\(summary.variableCount.formatted()) variable, \(summary.plannedCount.formatted()) planned"
+                    String(localized: "Today: \(CurrencyFormatter.string(from: summary.total))"),
+                    String(localized: "\(summary.variableCount.formatted()) variable, \(summary.plannedCount.formatted()) planned")
                 ]
                 if !topCards.isEmpty {
-                    lines.append("Top cards: \(topCards.joined(separator: ", "))")
+                    let cardList = ListFormatter.localizedString(byJoining: topCards)
+                    lines.append(String(localized: "Top cards: \(cardList)"))
                 }
                 return lines.joined(separator: "\n")
             }

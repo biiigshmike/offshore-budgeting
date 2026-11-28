@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # Usage: localization_audit.sh [catalog.xcstrings [locale]]
-# With no arguments, audit app + widget catalogs for all project languages.
+# With no arguments, audit app, widget, and App Shortcuts catalogs for all project languages.
 # Run from any directory. Relative catalog arguments remain relative to the caller.
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TARGET_LOCALE="${2:-}"
@@ -10,6 +10,9 @@ if [[ -n "${1:-}" ]]; then
   CATALOG_PATHS=("$(python3 -c 'import pathlib, sys; print(pathlib.Path(sys.argv[1]).resolve())' "$1")")
 else
   CATALOG_PATHS=("$REPO_ROOT/OffshoreBudgeting/Localizable.xcstrings" "$REPO_ROOT/OffshoreBudgetingWidgets/Localizable.xcstrings")
+  if [[ -f "$REPO_ROOT/OffshoreBudgeting/Shortcuts/OffshoreAppShortcuts.swift" || -f "$REPO_ROOT/OffshoreBudgeting/AppShortcuts.xcstrings" ]]; then
+    CATALOG_PATHS+=("$REPO_ROOT/OffshoreBudgeting/AppShortcuts.xcstrings")
+  fi
 fi
 cd "$REPO_ROOT"
 
@@ -27,6 +30,7 @@ data = json.loads(catalog_path.read_text(encoding="utf-8"))
 strings = data.get("strings", {})
 widget_catalog_path = Path("OffshoreBudgetingWidgets/Localizable.xcstrings").resolve()
 app_catalog_path = Path("OffshoreBudgeting/Localizable.xcstrings").resolve()
+shortcut_catalog_path = Path("OffshoreBudgeting/AppShortcuts.xcstrings").resolve()
 generated_help_path = Path("OffshoreBudgeting/CoreViews/Settings/GeneratedHelpContent.swift")
 release_logs_path = Path("OffshoreBudgeting/CoreViews/Settings/SettingsReleaseLogsView.swift")
 about_view_path = Path("OffshoreBudgeting/CoreViews/Settings/SettingsAboutView.swift")
@@ -123,6 +127,7 @@ fr_equals_key_allowlist = {
     "Offshore",
     "Photos",
     "Source",
+    "Standard",
     "Section",
     "Total",
     "Type",
@@ -188,6 +193,7 @@ de_equals_key_allowlist = {
     "Offshore",
     "Offshore Widgets",
     "Screenshot",
+    "Standard",
     "Status",
     "Trend",
     "Trends",
@@ -336,9 +342,9 @@ equals_key_allowlist = {
 equals_key_allowlist |= {"Offshore Savings"}
 equals_key_allowlist |= {
     "es": {"Hospital", "Hotel", "Personal", "Spa"},
-    "de": {"Museum", "Optional", "Start"},
+    "de": {"In %@", "Museum", "Optional", "Q", "Start"},
     "fr": {"Message"},
-    "pt-BR": {"Email", "Hospital", "Hotel", "Marina", "Spa"},
+    "pt-BR": {"30 min", "Email", "Hospital", "Hotel", "Marina", "Spa"},
 }.get(target_locale, set())
 
 # Match complete printf tokens, including positional, precision and length forms.
@@ -571,10 +577,31 @@ plist_issue_items: list[str] = []
 source_issue_items: list[str] = []
 
 source_language = data.get("sourceLanguage", "en")
+phrase_parameters = re.compile(r"\$\{[^}]+\}")
 for key, entry in strings.items():
     if entry.get("shouldTranslate") is False:
         continue
     locs = entry.get("localizations", {})
+    if catalog_path.name == "AppShortcuts.xcstrings":
+        target_set = locs.get(target_locale, {}).get("stringSet", {})
+        phrases = target_set.get("values", [])
+        if not isinstance(phrases, list) or not phrases or any(not isinstance(phrase, str) or not phrase.strip() for phrase in phrases):
+            missing_count += 1
+            missing_items.append(key)
+            continue
+        if target_set.get("state") != "translated":
+            review_issues += 1
+            review_issue_items.append(f"{key}: {target_set.get('state', 'missing state')}")
+        expected_parameters = sorted(phrase_parameters.findall(key))
+        source_phrases = locs.get(source_language, {}).get("stringSet", {}).get("values", [key])
+        for phrase in phrases:
+            if sorted(phrase_parameters.findall(phrase)) != expected_parameters or expected_parameters.count("${applicationName}") != 1:
+                placeholder_mismatches += 1
+                placeholder_mismatch_items.append(f"{key} => {phrase}")
+            if phrase in source_phrases:
+                equals_en_count += 1
+                equals_en_items.append(f"{key} => {phrase}")
+        continue
     source_units = dict(string_units(locs.get(source_language, {})))
     target_units = list(string_units(locs.get(target_locale, {})))
     for path in missing_plural_fallbacks(locs.get(target_locale, {})):
@@ -616,7 +643,8 @@ for key, entry in strings.items():
                     glossary_issues += 1
                     glossary_issue_items.append(f"{label} => {target_value}")
 
-if widget_catalog_path.exists():
+project_catalog = catalog_path in (app_catalog_path, widget_catalog_path)
+if project_catalog and widget_catalog_path.exists():
     widget_data = json.loads(widget_catalog_path.read_text(encoding="utf-8"))
     widget_strings = widget_data.get("strings", {})
     for key, entry in widget_strings.items():
@@ -638,7 +666,7 @@ if widget_catalog_path.exists():
             source_issue_items.append(
                 f"{source_path} missing widget catalog key for {source_text!r}"
             )
-else:
+elif project_catalog:
     widget_coverage_issues += 1
     widget_issue_items.append("missing OffshoreBudgetingWidgets/Localizable.xcstrings")
 
@@ -687,6 +715,19 @@ if catalog_path == app_catalog_path:
             source_issue_items.append(
                 f"{about_view_path} missing catalog key for {source_text!r}"
             )
+
+if catalog_path == shortcut_catalog_path:
+    provider = Path("OffshoreBudgeting/Shortcuts/OffshoreAppShortcuts.swift")
+    if provider.exists():
+        template_blocks = re.findall(r"\bphrases:\s*\[(.*?)\]", provider.read_text(encoding="utf-8"), re.DOTALL)
+        phrase_literals = [literal for block in template_blocks for literal in re.findall(r'"(?:[^"\\]|\\.)*"', block)]
+        for literal in phrase_literals:
+            template = literal.replace(r"\(.applicationName)", "${applicationName}")
+            template = re.sub(r"\\\(\\\.\$(\w+)\)", lambda match: "${" + match[1] + "}", template)
+            key = json.loads(template)
+            if key not in strings:
+                source_coverage_issues += 1
+                source_issue_items.append(f"{provider} missing App Shortcuts phrase {key!r}")
 
 # Guard against common regressions in critical user-facing views.
 source_watchlist = {
@@ -791,7 +832,16 @@ source_regex_watchlist = {
     ],
 }
 
+if catalog_path == app_catalog_path:
+    source_prefixes = ("OffshoreBudgeting/", "OffshoreBudgetingWidgets/")
+elif catalog_path == widget_catalog_path:
+    source_prefixes = ("OffshoreBudgetingWidgets/", "OffshoreBudgeting/WidgetSnapshotBuilders/")
+else:
+    source_prefixes = ()
+
 for relative_path, blocked_values in source_watchlist.items():
+    if not relative_path.startswith(source_prefixes):
+        continue
     source_path = Path(relative_path)
     if not source_path.exists():
         continue
@@ -802,6 +852,8 @@ for relative_path, blocked_values in source_watchlist.items():
             source_issue_items.append(f"{relative_path} contains '{blocked}'")
 
 for relative_path, blocked_patterns in source_regex_watchlist.items():
+    if not relative_path.startswith(source_prefixes):
+        continue
     source_path = Path(relative_path)
     if not source_path.exists():
         continue

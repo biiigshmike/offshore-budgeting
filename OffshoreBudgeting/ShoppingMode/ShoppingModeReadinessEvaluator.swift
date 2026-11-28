@@ -25,15 +25,15 @@ enum ShoppingModeStartBlocker: String, Equatable, CaseIterable {
     nonisolated var message: String {
         switch self {
         case .preciseLocationRequired:
-            return "Enable Precise Location for Offshore in System Settings."
+            return String(localized: "Enable Precise Location for Offshore in System Settings.")
         case .locationNotAuthorized:
-            return "Open Offshore to allow location access for nearby reminders."
+            return String(localized: "Open Offshore to allow location access for nearby reminders.")
         case .notificationsNotAuthorized:
-            return "Enable Notifications for Offshore in System Settings."
+            return String(localized: "Enable Notifications for Offshore in System Settings.")
         case .liveActivitiesDisabled:
-            return "Enable Live Activities for Offshore in System Settings."
+            return String(localized: "Enable Live Activities for Offshore in System Settings.")
         case .backgroundRefreshUnavailable:
-            return "Enable Background App Refresh for Offshore in System Settings."
+            return String(localized: "Enable Background App Refresh for Offshore in System Settings.")
         }
     }
 }

@@ -49,7 +49,7 @@ private struct ExcursionStatusTextView: View {
     private var compactText: some View {
         statusText(
             isExpired
-            ? Text(liveActivityLocalized("Ended"))
+            ? Text("Ended")
             : Text("Until \(endDate, format: .dateTime.hour().minute())")
         )
     }

@@ -45,17 +45,18 @@ struct ForecastSavingsIntent: AppIntent {
 
         let statusLine: String
         if totals.projectedSavings < 0 {
-            statusLine = "Warning: this month is forecast to overspend by \(CurrencyFormatter.string(from: abs(totals.projectedSavings)))."
+            let overspend = CurrencyFormatter.string(from: abs(totals.projectedSavings))
+            statusLine = String(localized: "Warning: this month is forecast to overspend by \(overspend).")
         } else if totals.actualSavings < 0 {
-            statusLine = "Warning: current actual savings are negative (\(actualText))."
+            statusLine = String(localized: "Warning: current actual savings are negative (\(actualText)).")
         } else {
-            statusLine = "Forecast is currently on track."
+            statusLine = String(localized: "Forecast is currently on track.")
         }
 
         return [
-            "Projected end-of-month savings: \(projectedText)",
-            "Current actual savings: \(actualText)",
-            "Gap vs projected: \(gapText)",
+            String(localized: "Projected end-of-month savings: \(projectedText)"),
+            String(localized: "Current actual savings: \(actualText)"),
+            String(localized: "Gap vs projected: \(gapText)"),
             statusLine
         ].joined(separator: "\n")
     }

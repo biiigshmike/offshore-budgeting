@@ -23,15 +23,15 @@ final class OffshoreIntentDataStore {
         var errorDescription: String? {
             switch self {
             case .workspaceUnavailable:
-                return "No workspace is selected. Open Offshore and pick a workspace first."
+                return String(localized: "No workspace is selected. Open Offshore and pick a workspace first.")
             case .cardUnavailable:
-                return "The selected card was not found in your active workspace."
+                return String(localized: "The selected card was not found in your active workspace.")
             case .ambiguousCardName:
-                return "More than one card matched that Wallet card name. Rename cards so each one is unique."
+                return String(localized: "More than one card matched that Wallet card name. Rename cards so each one is unique.")
             case .categoryUnavailable:
-                return "The selected category was not found in your active workspace."
+                return String(localized: "The selected category was not found in your active workspace.")
             case .allocationAccountUnavailable:
-                return "The selected Reconciliation was not found in your active workspace."
+                return String(localized: "The selected Reconciliation was not found in your active workspace.")
             }
         }
     }

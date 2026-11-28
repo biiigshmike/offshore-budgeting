@@ -117,6 +117,30 @@ struct ReviewTodaySummaryTests {
         #expect(summary.topCards.isEmpty)
     }
 
+    @Test func keepsUnassignedExpensesSeparateFromAUserNamedCard() throws {
+        let context = try makeContext()
+        let workspace = Workspace(name: "Personal", hexColor: "#3B82F6")
+        let card = Card(name: "Unknown Card", workspace: workspace)
+        let today = Date.now
+        context.insert(workspace)
+        context.insert(card)
+        context.insert(VariableExpense(
+            descriptionText: "On card", amount: 25, transactionDate: today, workspace: workspace, card: card
+        ))
+        context.insert(VariableExpense(
+            descriptionText: "Unassigned", amount: 10, transactionDate: today, workspace: workspace
+        ))
+        try context.save()
+
+        let summary = try ReviewTodaySummary.load(workspaceID: workspace.id, in: context, date: today)
+
+        #expect(summary.total == 35)
+        #expect(summary.topCards == [
+            .init(name: card.name, amount: 25),
+            .init(name: String(localized: "No Card"), amount: 10)
+        ])
+    }
+
     @Test func reviewUsesGrossSpendingAndRefreshesAfterEdits() throws {
         let context = try makeContext()
         let workspace = Workspace(name: "Personal", hexColor: "#3B82F6")

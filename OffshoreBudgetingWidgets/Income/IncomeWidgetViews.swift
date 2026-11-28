@@ -77,7 +77,9 @@ private extension IncomeWidgetSnapshot {
     }
 
     /// Small header uses no spaces around the separator to keep it short.
-    var periodAndRangeSmall: String { "\(periodToken) • \(rangeTextSmall)" }
+    var periodAndRangeSmall: String {
+        widgetJoinedPeriodRangeText(periodToken: periodToken, rangeText: rangeTextSmall)
+    }
 
     var compactRangeText: String {
         widgetCompactDateRangeText(start: rangeStart, end: rangeEnd)

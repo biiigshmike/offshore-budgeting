@@ -24,7 +24,7 @@ extension SafeSpendTodayWidgetSnapshot {
         let end = Calendar.current.date(byAdding: DateComponents(month: 1, day: -1), to: start) ?? .now
 
         return SafeSpendTodayWidgetSnapshot(
-            title: widgetLocalized("Safe Spend Today"),
+            title: "Safe Spend Today",
             periodTitle: widgetLocalized("Monthly"),
             rangeStart: start,
             rangeEnd: end,
@@ -140,22 +140,22 @@ private struct SafeSpendTodayWidgetEntryView: View {
         amountText(snapshot.periodRemainingRoom)
     }
 
-    private var secondarySummaryText: String {
+    private var secondarySummaryText: LocalizedStringKey {
         if snapshot.isDailyPeriod {
             return "Budget period: \(snapshot.periodTitle)"
         }
 
         let daysLeft = snapshot.daysLeftInPeriod ?? 0
-        return "\(daysLeft) day(s) left in \(snapshot.periodTitle.lowercased())"
+        return "Days left in \(snapshot.periodTitle): \(daysLeft)"
     }
 
-    private var compactSecondarySummaryText: String {
+    private var compactSecondarySummary: Text {
         if snapshot.isDailyPeriod {
-            return snapshot.periodTitle
+            return Text(verbatim: snapshot.periodTitle)
         }
 
         let daysLeft = snapshot.daysLeftInPeriod ?? 0
-        return "\(daysLeft)d left in \(snapshot.periodTitle.lowercased())"
+        return Text("Days left: \(daysLeft) · \(snapshot.periodTitle)")
     }
 
     private var smallBody: some View {
@@ -180,7 +180,7 @@ private struct SafeSpendTodayWidgetEntryView: View {
 
                 Spacer(minLength: 0)
 
-                Text(compactSecondarySummaryText)
+                compactSecondarySummary
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(2)
@@ -194,7 +194,7 @@ private struct SafeSpendTodayWidgetEntryView: View {
 
     private var smallHeader: some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text(snapshot.title)
+            Text(widgetLocalized(snapshot.title))
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(.primary)
                 .lineLimit(2)
@@ -214,7 +214,7 @@ private struct SafeSpendTodayWidgetEntryView: View {
     private var mediumBody: some View {
         VStack(alignment: .leading, spacing: 10) {
             WidgetHeaderView(
-                title: snapshot.title,
+                title: widgetLocalized(snapshot.title),
                 periodToken: "",
                 rangeText: rangeText,
                 style: .singleLine
@@ -237,9 +237,9 @@ private struct SafeSpendTodayWidgetEntryView: View {
                 }
 
                 HStack(spacing: 12) {
-                    summaryPill(title: snapshot.isDailyPeriod ? "Today" : "Period Room", value: periodRemainingText)
+                    summaryPill(title: snapshot.isDailyPeriod ? "Today" : "Remaining in Period", value: periodRemainingText)
                     if !snapshot.isDailyPeriod {
-                        summaryPill(title: "Days Left", value: "\(snapshot.daysLeftInPeriod ?? 0)")
+                        summaryPill(title: "Days Left", value: (snapshot.daysLeftInPeriod ?? 0).formatted())
                     }
                 }
 
@@ -254,7 +254,7 @@ private struct SafeSpendTodayWidgetEntryView: View {
 
     private var rectangularBody: some View {
         VStack(alignment: .leading, spacing: 3) {
-            Text(snapshot.title)
+            Text(widgetLocalized(snapshot.title))
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
@@ -269,7 +269,7 @@ private struct SafeSpendTodayWidgetEntryView: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
 
-                Text(rectangularSupportingText)
+                rectangularSupportingText
                     .font(.caption2)
                     .foregroundStyle(.secondary)
                     .lineLimit(2)
@@ -277,15 +277,15 @@ private struct SafeSpendTodayWidgetEntryView: View {
         }
     }
 
-    private var rectangularSupportingText: String {
+    private var rectangularSupportingText: Text {
         if snapshot.isDailyPeriod {
-            return snapshot.periodTitle
+            return Text(verbatim: snapshot.periodTitle)
         }
 
-        return "\(snapshot.daysLeftInPeriod ?? 0)d left"
+        return Text("Days left: \(snapshot.daysLeftInPeriod ?? 0)")
     }
 
-    private func summaryPill(title: String, value: String) -> some View {
+    private func summaryPill(title: LocalizedStringKey, value: String) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(title)
                 .font(.caption.weight(.semibold))

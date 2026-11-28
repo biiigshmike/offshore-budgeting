@@ -252,6 +252,8 @@ enum GeneratedHelpContent {
             iconStyle: .purple,
             leafTopicIDs: [
                 "home-overview",
+                "home-system-widgets",
+                "home-review-today",
                 "home-customization",
                 "home-widgets"
             ]
@@ -365,13 +367,13 @@ enum GeneratedHelpContent {
                 ),
                 textSection(
                     id: "introduction-planned-expenses-2",
-                    header: "Where To Add Them",
-                    body: "Add planned expenses from the budget period you are actively managing so totals remain scoped to the right cycle. Staying inside the correct period avoids silent crossover issues that can make math look wrong later.\n\nFor recurring items, use presets whenever possible. Presets speed up setup, reduce manual mistakes, and keep naming and category behavior consistent from one period to the next."
+                    header: "Schedule a Planned Bill",
+                    body: "Open Settings › Manage Presets and create a preset with a card, planned amount, and schedule. In Add Budget or Budget Details › Manage Presets, attach the preset to a budget that includes its default card and the scheduled date. Offshore generates the dated planned expense on that card."
                 ),
                 textSection(
                     id: "introduction-planned-expenses-3",
                     header: "Recording a Paid Bill",
-                    body: "When this bill is paid, enter its actual amount on the existing planned expense. Leave Actual Amount blank to use the planned amount. You do not need to add a separate expense for this payment.\n\nFor example, a planned electricity bill of $80 counts as $80 while its actual amount is blank. If you record an actual amount of $72, the same planned expense counts as $72. Adding another $72 variable expense for that payment would count the bill twice.\n\nAn actual amount of zero currently also uses the planned amount; it does not mark a bill as free or canceled."
+                    body: "Open the existing planned expense in Budget Details or Card Details. In Edit Planned Expense, enter Actual Amount (optional) and choose Save. If the bill matched the estimate, use As Planned from the row actions to record the planned amount as paid.\n\nFor example, a planned electricity bill of $80 counts as $80 while the actual amount is blank or zero. Entering $72 changes its effective amount to $72. Creating a separate variable expense for the same payment would count it twice."
                 ),
                 textSection(
                     id: "introduction-planned-expenses-4",
@@ -381,7 +383,7 @@ enum GeneratedHelpContent {
                 textSection(
                     id: "introduction-planned-expenses-5",
                     header: "Planned Expense Pitfalls",
-                    body: "Avoid duplicating recurring bills across presets and manual entries, because duplicates can quietly overstate your period. If a planned amount changes often, update the preset source so future cycles stay accurate.\n\nKeep category mapping and naming consistent. When labels drift, reviews get noisy and it becomes harder to spot real behavior changes."
+                    body: "Before adding a preset or a separate transaction, check whether the bill already appears in Planned Expenses. If the expected cost changes for future periods, update the preset. See Delete a Budget or Change Its Links in Help › Budgets › Budget Details before removing a preset from an existing budget."
                 )
             ]
         ),
@@ -393,12 +395,12 @@ enum GeneratedHelpContent {
                 textSection(
                     id: "introduction-variable-expenses-1",
                     header: "What Variable Expenses Mean",
-                    body: "Variable expenses are flexible or less predictable purchases that happen in real time during the period. These are usually your day-to-day categories, like dining, fuel, shopping, entertainment, and one-off needs.\n\nUnlike planned expenses, variable entries describe what already happened. They are your lived spending behavior, and they give the most honest signal about where your budget pressure is building."
+                    body: "Variable expenses record card activity, including purchases, refunds, and positive ledger corrections. In Add Expense, choose Debit, Credit, or Adjustment to match the transaction. See Purchases, Refunds, and Adjustments for examples of how each type affects totals."
                 ),
                 textSection(
                     id: "introduction-variable-expenses-2",
                     header: "Where To Record Them",
-                    body: "Record variable expenses in the active budget context so entries land in the correct period and comparisons stay meaningful. Keeping the right context from the start prevents avoidable cleanup work.\n\nAssign category, amount, date, and account details with care. Clean entry data now directly improves every filter, report, and trend you rely on later."
+                    body: "Use Add Expense from Budget Details or Card Details and choose the card and transaction date. A variable transaction can appear in every budget in the workspace that links that card and includes the date. Set its description and amount, and choose a category if you want it grouped in spending reports."
                 ),
                 textSection(
                     id: "introduction-variable-expenses-3",
@@ -430,7 +432,7 @@ enum GeneratedHelpContent {
                 textSection(
                     id: "introduction-planned-income-2",
                     header: "Where To Enter It",
-                    body: "Enter planned income in Income for the same timeframe as your active budget period. Keep each source clearly labeled so you can quickly distinguish predictable pay from irregular inflows.\n\nClear naming now makes planned-versus-actual review much easier later. It also helps you identify which income source changed when a variance appears."
+                    body: "In Income, choose + › Add Income and set Type to Planned. Enter the source, amount, and expected date, then save. See Add Planned or Actual Income in Help › Income › Planned vs Actual for the full workflow and recurring options."
                 ),
                 textSection(
                     id: "introduction-planned-income-3",
@@ -462,7 +464,7 @@ enum GeneratedHelpContent {
                 textSection(
                     id: "introduction-actual-income-2",
                     header: "Where To Record It",
-                    body: "Record actual income in Income using the flow that matches how you track deposits. Capture accurate amount and date so the entry lands in the right period and comparisons stay trustworthy.\n\nTimely recording matters. The faster you log landed income, the more reliable Home and budget guidance becomes."
+                    body: "In Income, choose + › Add Income. Use Actual under Type, then enter the source, amount, and date received. See Add Planned or Actual Income in Help › Income › Planned vs Actual for the full workflow and recurring options."
                 ),
                 textSection(
                     id: "introduction-actual-income-3",
@@ -509,7 +511,7 @@ enum GeneratedHelpContent {
                 textSection(
                     id: "introduction-budgets-5",
                     header: "Budget Pitfalls",
-                    body: "Avoid overlapping periods unless you intentionally want separate parallel contexts. Overlap can make it harder to explain which cycle owns a given result.\n\nAlso avoid changing date ranges mid-cycle without reviewing impacted totals. Stable ranges produce cleaner history and clearer trend comparisons."
+                    body: "When you change an existing budget’s dates, cards, or presets, check which generated planned expenses may be removed. For the effects of each action, see Delete a Budget or Change Its Links in Help › Budgets › Budget Details. Overlapping budgets can show the same variable expense when they both include its card and date."
                 )
             ]
         ),
@@ -557,13 +559,13 @@ enum GeneratedHelpContent {
                 ),
                 textSection(
                     id: "introduction-import-2",
-                    header: "Where To Start Import",
-                    body: "Start import from the screen that owns the records you want to create. This keeps destination context clear and reduces mapping confusion.\n\nBefore importing, confirm the target period so records land in the correct cycle. That one check prevents a lot of cleanup later."
+                    header: "Import a Statement or Income Records",
+                    body: "1. For card transactions, open Accounts › Cards, select the card, then choose + › Import Expenses. For income, open Income and choose + › Import Income.\n2. Choose Source, then Import from Files for a CSV, PDF, or image, or Import from Photos for an image.\n3. Review the parsed dates, amounts, and transaction types. A row’s date determines which budget periods can include it. Imported income is saved as Actual. Income import skips expense, credit, and adjustment rows.\n4. Review which rows are selected and choose Import when the summary is correct."
                 ),
                 textSection(
                     id: "introduction-import-3",
-                    header: "How To Review Records",
-                    body: "During review, check names, amounts, dates, and categories before committing. Resolve likely duplicates and fill missing required details while you are still in the review step.\n\nTaking an extra minute here is usually faster than fixing a full batch after save. Clean imports protect every report that depends on them."
+                    header: "Review Duplicates and Missing Import Data",
+                    body: "Review Possible Matches, Possible Duplicates, and Needs More Data before saving. Open a row to correct its details and set a category when required. Check the inclusion circle for each entry you want to save. Leave duplicates and unwanted payment or transfer rows unselected.\n\nSave for Future Imports is a per-row switch for reusing a recognized merchant or source name and, for expenses, its category in this workspace. Review the final count before choosing Import."
                 ),
                 textSection(
                     id: "introduction-import-4",
@@ -595,29 +597,63 @@ enum GeneratedHelpContent {
                 ),
                 textSection(
                     id: "introduction-excursion-mode-2",
-                    header: "When To Use It",
-                    body: "Use Excursion Mode during travel, outings, event days, or any period with many small transactions. It is especially helpful when waiting until later would cause details to be forgotten.\n\nShort bursts of consistent capture can dramatically improve data quality and reduce end-of-day guesswork."
+                    header: "Start or Stop Excursion Mode",
+                    body: "On a supported device, open Settings › Excursion Mode. Choose Duration, then Start Excursion Mode. To end a session early, return here and choose Stop Excursion Mode. On supported devices, use the Offshore control or Shortcut to get to Excursion Mode."
                 ),
                 textSection(
                     id: "introduction-excursion-mode-3",
-                    header: "How To Work In It",
-                    body: "Capture each transaction quickly, then return later for deeper cleanup if needed, such as notes or category refinement. Keep the process simple so you keep momentum.\n\nThe goal in this mode is completeness first, refinement second. A complete draft record is better than a missing one."
+                    header: "Configure Nearby Spending Reminders",
+                    body: "In Settings › Excursion Mode, open Preferences. Choose which Categories can trigger reminders, whether to include uncategorized places, and how long to wait under Remind After. These preferences apply to this device across workspaces.\n\nFor background reminders, allow location while using the app first, then choose Change to Always Allow when prompted. Allow Once supports reminders while Offshore is open."
                 ),
                 textSection(
                     id: "introduction-excursion-mode-4",
-                    header: "Verify After A Session",
-                    body: "When the high-activity window ends, do a short closeout review. Confirm totals align with what you expected and fix obvious mislabels while memory is still fresh.\n\nThis quick wrap-up step keeps excursion sessions accurate and prevents cleanup from piling up later."
+                    header: "Review Expenses After an Excursion",
+                    body: "Open Review Today from Home to check what was recorded during the day. Review dates, cards, and categories on any expense you want to correct."
                 ),
                 textSection(
                     id: "introduction-excursion-mode-5",
-                    header: "Excursion Mode Pitfalls",
-                    body: "Avoid over-editing entries in the moment, because that usually leads to skipped capture. Focus on fast capture first.\n\nAlso avoid skipping the post-session review. Fast entry is great for speed, but the short cleanup pass is what locks in long-term accuracy."
+                    header: "If Excursion Reminders Are Missing",
+                    body: "Check that the session is still active and review Offshore’s location and notification permissions in Settings. Also check the selected place categories and Remind After delay in Excursion Mode preferences. Excursion Mode is unavailable on Mac."
                 )
             ]
         ),
 
         // MARK: Home
 
+        GeneratedHelpLeafTopic(
+            id: "home-review-today",
+            destinationID: "home",
+            title: "Review Today",
+            sections: [
+                textSection(
+                    id: "home-review-today-activity",
+                    header: "Review Today’s Spending and Planned Bills",
+                    body: "On Home, choose Review Today. Check Today’s Activity for recorded entries and Still Planned for bills that have no recorded actual amount. In Spending Breakdown, choose By Category or By Card. In By Card, expand a card to inspect its entries. When Period Review appears, open it to review completed savings periods and see how many are waiting."
+                )
+            ]
+        ),
+        GeneratedHelpLeafTopic(
+            id: "home-system-widgets",
+            destinationID: "home",
+            title: "Device Widgets and Controls",
+            sections: [
+                textSection(
+                    id: "home-system-widgets-desktop",
+                    header: "Home Screen and Mac Desktop Widgets",
+                    body: "Search for Offshore in the widget gallery on the iPhone or iPad Home Screen or the Mac desktop. Look for Income, Card, Spend Trends, Next Planned Expense, Safe Spend Today, and Forecast Savings. The gallery shows the sizes available for your device and placement."
+                ),
+                textSection(
+                    id: "home-system-widgets-gallery",
+                    header: "Lock Screen Widgets",
+                    body: "On supported Lock Screens, search for Offshore in the widget gallery. The Lock Screen collection includes Next Planned Expense, Safe Spend Today, Forecast Savings, Category Limit, and Next Income. Category Limit can be configured to show the top-spending category among those with a budget limit."
+                ),
+                textSection(
+                    id: "home-system-widgets-controls",
+                    header: "Controls and Excursion Live Activity",
+                    body: "On supported iPhone and iPad setups, search for Offshore in the controls gallery to add Add Expense, Add Income, Review Today, or Excursion Mode. Excursion Mode can also display a Live Activity on supported devices. See Help › Introduction › Excursion Mode for setup and location permissions."
+                )
+            ]
+        ),
         GeneratedHelpLeafTopic(
             id: "home-overview",
             destinationID: "home",
@@ -646,25 +682,25 @@ enum GeneratedHelpContent {
                 mediaSection(
                     id: "home-customization-edit-home",
                     header: "Customize Home",
-                    body: "Home customization lets you decide which insights appear first so your most important decisions require fewer taps. A strong layout reduces scrolling and keeps critical widgets visible when you are moving quickly. This is especially useful if your priorities change during different parts of the month.\n\nTreat customization as a workflow tool, not just a visual preference. Put frequently checked widgets near the top and move low-priority items lower. Revisit your layout after a few cycles to ensure it still matches how you actually review the app.\n\nAfter reordering, run one normal daily check-in to validate that the sequence feels natural. Small changes in order can significantly improve consistency. A layout that matches your routine helps you catch problems earlier.",
+                    body: "On Home, choose Edit to open the editor. Under Pinned on Dashboard, choose Edit to reorder your tiles. Drag them into place, then choose Done. On Mac, the editor opens beside the dashboard.",
                     media: [
                         mediaItem(
                             id: "home-customization-edit-home-1",
                             assetName: "Help/CoreScreens/Home/Customization/edit-home-1",
-                            bodyText: "This first step walks you into edit mode from Home customization. Use this point to decide which tiles belong in your top view versus lower priority positions. If you are unsure, place your most decision-driving widgets first, such as income reliability or savings trend signals. Starting with intention makes later ordering changes simpler.",
-                            fullscreenCaptionText: "Enter edit mode to begin arranging the Home widgets around your priorities."
+                            bodyText: "Choose Edit on Home to open the dashboard editor.",
+                            fullscreenCaptionText: "Open the Home editor."
                         ),
                         mediaItem(
                             id: "home-customization-edit-home-2",
                             assetName: "Help/CoreScreens/Home/Customization/edit-home-2",
-                            bodyText: "This step shows you how to reorder widgets into the sequence you want for quick daily checks. Drag high-impact tiles toward the top so important shifts are visible immediately. Keep related widgets near each other when possible so context is easier to read. A practical order reduces friction and improves follow-through.",
-                            fullscreenCaptionText: "Drag widgets into the order that supports your fastest daily review."
+                            bodyText: "Under Pinned on Dashboard, choose Edit and drag items to arrange them.",
+                            fullscreenCaptionText: "Drag pinned items into your preferred order."
                         ),
                         mediaItem(
                             id: "home-customization-edit-home-3",
                             assetName: "Help/CoreScreens/Home/Customization/edit-home-3",
-                            bodyText: "This final step confirms and saves your updated Home layout. After saving, perform a quick scan to verify the new order feels right in real use. If a tile is still out of place, adjust it now while the workflow is fresh. Regular small refinements keep the Home experience aligned with your budgeting habits.",
-                            fullscreenCaptionText: "Save and test the new layout, then make small tweaks until the flow feels natural."
+                            bodyText: "Choose Done after rearranging your widgets, then check their order on Home.",
+                            fullscreenCaptionText: "Finish editing with Done."
                         )
                     ]
                 )
@@ -673,7 +709,7 @@ enum GeneratedHelpContent {
         GeneratedHelpLeafTopic(
             id: "home-widgets",
             destinationID: "home",
-            title: "Widgets",
+            title: "Home Dashboard Widgets",
             sections: [
                 textSection(
                     id: "home-widgets-category-goals",
@@ -682,7 +718,7 @@ enum GeneratedHelpContent {
                 ),
                 mediaSection(
                     id: "home-widgets-overview",
-                    header: "Widgets",
+                    header: "Choose Widgets for Your Dashboard",
                     body: "Home widgets are designed to answer distinct budgeting questions quickly without opening every screen. Each tile provides a focused signal, and together they form a reliable daily scan pattern. Use them in sequence so you can detect pressure, prioritize action, and decide where to drill in next.\n\nTreat widgets as an early-warning system. They help you catch shifts while there is still time to correct course. When one tile changes sharply, verify the cause in Budgets, Income, or Accounts before making decisions.\n\nConsistency matters more than speed here. A short repeatable scan each day usually produces better outcomes than occasional deep dives. Use the same order to build confidence and reduce missed signals.",
                     media: [
                         mediaItem(
@@ -696,8 +732,8 @@ enum GeneratedHelpContent {
                             id: "home-widgets-savings-outlook",
                             assetName: "Help/CoreScreens/Home/Widgets/savings-outlook",
                             displayTitle: "Savings Outlook",
-                            bodyText: "Offshore Savings Outlook projects where the period may end based on current entries and assumptions. Review it after adding meaningful expenses or income updates so direction changes are visible immediately. Use this signal to decide whether you need to slow discretionary spending. Frequent checks keep surprises smaller at period close.",
-                            fullscreenCaptionText: "Use Offshore Savings Outlook to forecast direction and course-correct before period close."
+                            bodyText: "Savings Outlook projects where the period may end based on current entries and assumptions. Review it after adding meaningful expenses or income updates so direction changes are visible immediately. Use this signal to decide whether you need to slow discretionary spending. Frequent checks keep surprises smaller at period close.",
+                            fullscreenCaptionText: "Use Savings Outlook to forecast direction and course-correct before period close."
                         ),
                         mediaItem(
                             id: "home-widgets-spend-trends",
@@ -721,6 +757,16 @@ enum GeneratedHelpContent {
                             fullscreenCaptionText: "Run What If scenarios to compare tradeoffs before committing real changes."
                         )
                     ]
+                ),
+                textSection(
+                    id: "home-widgets-next-planned",
+                    header: "Next Planned Expense on Home",
+                    body: "Pin Next Planned Expense from the Home editor to see the upcoming planned bill in Home’s selected range. If nothing qualifies, the tile says No planned expenses coming up in this range."
+                ),
+                textSection(
+                    id: "home-widgets-what-if-scenarios",
+                    header: "Save, Pin, or Export a What If Scenario",
+                    body: "Open What If? on Home. Use the scenario menu to create, duplicate, or rename a scenario. Choose Pin to Home to show it on your dashboard, or Unpin from Home to remove it from the dashboard. Use Export to share the scenario as CSV, PDF, or text. Simulated adjustments stay in the scenario."
                 )
             ]
         ),
@@ -748,21 +794,26 @@ enum GeneratedHelpContent {
                 mediaSection(
                     id: "budgets-overview-create-budget",
                     header: "Create a Budget",
-                    body: "Creating a budget establishes the date window used for totals, comparisons, and savings outcomes in that cycle. This step defines the frame every entry depends on, so clarity here matters.\n\nThe title field is dynamic and can self-generate based on your period setup. You can keep that generated title or enter your own custom title if you want tighter naming control.\n\nAfter creation, move directly into assigning structure and adding initial planned entries. Early setup quality improves every downstream decision.",
+                    body: "1. Open Budgets and choose + (Add Budget).\n2. Enter a Name or keep the suggested one. Set the Start Date and End Date. Both dates are included.\n3. Under Cards, select the cards to include. If the workspace has none, use Add Card. A budget with no linked cards cannot add expenses from Budget Details.\n4. Under Presets, choose any recurring bills to include. An eligible preset generates dated planned expenses when you save.\n5. Choose Save, then open the new budget and check its dates, cards, and planned expenses.",
                     media: [
                         mediaItem(
                             id: "budgets-overview-create-budget-1",
                             assetName: "Help/CoreScreens/Budgets/Overview/create-budget-1",
-                            bodyText: "Start a new budget period from the add flow. The title can auto-fill based on your period details, and you can override it with your own name at any time before saving. Choose a date range that matches your review rhythm so planned income and recurring expenses align cleanly.",
-                            fullscreenCaptionText: "Start the budget, keep the generated title or enter your own, then confirm dates."
+                            bodyText: "Choose the budget dates and review the suggested name, or enter your own.",
+                            fullscreenCaptionText: "Set the name, start date, and end date."
                         ),
                         mediaItem(
                             id: "budgets-overview-create-budget-2",
                             assetName: "Help/CoreScreens/Budgets/Overview/create-budget-2",
-                            bodyText: "This step walks through reviewing and confirming budget setup details before saving. Verify the period boundaries and core settings now so you do not need cleanup edits after entries are added. Once saved, continue directly into cards, planned expenses, and other setup tasks. A short confirmation pass here saves significant correction time later.",
-                            fullscreenCaptionText: "Review setup details before save so the period starts with clean boundaries."
+                            bodyText: "Select the cards and any presets before saving. Check the generated planned expenses in Budget Details afterward.",
+                            fullscreenCaptionText: "Review the selected cards and presets before saving."
                         )
                     ]
+                ),
+                textSection(
+                    id: "budgets-overview-repeat",
+                    header: "Create Recurring Budgets",
+                    body: "In Add Budget, use Repeat to choose the cadence, then set Every and Number of budgets. The count includes the first budget. Choose Preview to review the dates before creating the batch. Each budget is independent, so editing one later affects that budget alone."
                 )
             ]
         ),
@@ -779,42 +830,47 @@ enum GeneratedHelpContent {
                         mediaItem(
                             id: "budgets-details-add-expense-1",
                             assetName: "Help/CoreScreens/Budgets/Budget Details/add-expense-1",
-                            bodyText: "This step opens the add expense flow from Budget Details. Choose the correct expense type first so the entry contributes to calculations in the right way. Planned and variable entries serve different purposes, so classification is important. Starting with the right type prevents avoidable reporting confusion.",
-                            fullscreenCaptionText: "Start add expense from Budget Details and choose the correct expense type first."
+                            bodyText: "Add Expense opens a variable transaction. Under Transaction Type, choose Debit for a purchase, Credit for a refund, or Adjustment for a positive ledger correction. To record payment for a planned bill, open its existing row.",
+                            fullscreenCaptionText: "Choose Debit, Credit, or Adjustment in the Add Expense form."
                         ),
                         mediaItem(
                             id: "budgets-details-add-expense-2",
                             assetName: "Help/CoreScreens/Budgets/Budget Details/add-expense-2",
-                            bodyText: "Complete the amount, date, card, and category. Split assigns a share of a purchase to a reconciliation balance. Offset reduces that shared balance through a settlement; Pay From Savings covers a purchase from available Offshore Savings. Check the explanation under the selected action before saving.",
-                            fullscreenCaptionText: "Complete fields, apply split or offset if needed, then verify totals after save."
+                            bodyText: "Enter the Description and amount, then confirm the date and card. Category is optional. When available, use Split, Offset, or Pay From Savings to reflect how the transaction was handled.",
+                            fullscreenCaptionText: "Enter the transaction details and review the selected action before saving."
                         )
                     ]
                 ),
                 mediaSection(
                     id: "budgets-details-filter-expenses",
                     header: "Filter Expenses",
-                    body: "Filtering lets you isolate the exact slice of spending you need to evaluate before making changes. Use this to narrow by category, card, or other scope controls when totals need explanation. Focused views reduce noise and shorten investigation time.\n\nA good sequence is filter first, inspect entries second, then decide action. This keeps decisions tied to evidence instead of intuition. Clear filtered views are especially useful when spending accelerates unexpectedly.\n\nReset filters after analysis so future reviews begin from full context. That habit avoids accidental conclusions from stale scopes. Filtering is most powerful when used intentionally and reset consistently.",
+                    body: "In Budget Details, use Categories, the expense type picker, and Search to find records within the budget’s existing dates and linked cards. Use Sort to change their order. Clear filters when you want the full list again.",
                     media: [
                         mediaItem(
                             id: "budgets-details-filter-expenses-1",
                             assetName: "Help/CoreScreens/Budgets/Budget Details/filter-expenses",
-                            bodyText: "Filters are applied to narrow the visible expense set. Use this when troubleshooting one category, one card, or one timeframe instead of scanning the full ledger. A focused result set makes it easier to identify the entries driving pressure. Confirm conclusions, then reset filters before moving on.",
-                            fullscreenCaptionText: "Apply filters to isolate the exact expense slice you want to diagnose."
+                            bodyText: "Use Categories or the expense type picker to narrow the budget list. Search can match the name, category, card, date, or amount.",
+                            fullscreenCaptionText: "Filter or search within the budget’s existing scope."
                         )
                     ]
                 ),
                 mediaSection(
                     id: "budgets-details-spending-limits",
                     header: "Category Goals",
-                    body: "Set optional minimum and maximum spending goals for each category. Open Category Goals from the Budget Detail ellipsis menu to edit them. A minimum is a target you want to reach; a maximum is a ceiling. Goals guide your review without blocking expense entry.\n\nCategory Goals belong to this budget. You can set them while creating a budget or edit them later. The Goals list includes categories with no spending yet, so you can plan ahead. Leave either amount blank when you do not need that goal.",
+                    body: "Set optional minimum and maximum spending goals for each category. In Budget Details, open Budget Actions (…) › Category Goals to edit them. A minimum is a target you want to reach; a maximum is a ceiling. Goals guide your review without blocking expense entry.\n\nCategory Goals belong to this budget. You can set them while creating a budget or edit them later. The Goals list includes categories with no spending yet, so you can plan ahead. Leave either amount blank when you do not need that goal.",
                     media: [
                         mediaItem(
                             id: "budgets-details-spending-limits-1",
                             assetName: "Help/CoreScreens/Budgets/Budget Details/spending-limits",
-                            bodyText: "Open Category Goals from the Budget Detail ellipsis menu to set its minimum and maximum spending goals for this budget. Review recent spending before changing a goal. Minimums are targets; maximums are ceilings; either can be left blank.",
+                            bodyText: "In Budget Details, open Budget Actions (…) › Category Goals to set its minimum and maximum spending goals for this budget. Review recent spending before changing a goal. Minimums are targets; maximums are ceilings; either can be left blank.",
                             fullscreenCaptionText: "Set category goals to surface budget pressure before it compounds."
                         )
                     ]
+                ),
+                textSection(
+                    id: "budgets-details-delete-budget",
+                    header: "Delete a Budget or Change Its Links",
+                    body: "Open Budget Actions › Delete Budget. If the budget generated planned expenses, Keep All Expenses removes the budget and keeps its expenses on their cards. Delete Budget-Planned Expenses removes unrecorded generated rows first. If there are recorded rows, Offshore opens Review Recorded Expenses so you can choose which of those rows to delete.\n\nSaving Edit Budget with a narrower date range, different linked cards, or a deselected preset can remove generated expenses, including rows with an actual amount. Removing a preset in Manage Presets deletes its generated rows for this budget, including recorded ones. When removing a card through Manage Cards, review the choices shown. Use Keep All Expenses when offered to preserve its existing expense history."
                 )
             ]
         ),
@@ -831,7 +887,7 @@ enum GeneratedHelpContent {
                 textSection(
                     id: "budgets-category-goals-editing",
                     header: "Set Minimum and Maximum Goals",
-                    body: "Set optional minimum and maximum spending goals for each category. Open Category Goals from the Budget Detail ellipsis menu to edit them. A minimum is a spending target you want to reach; a maximum is a ceiling you want to stay within. Either can be left blank.\n\nGoals belong to one budget, so Groceries can have a different maximum in a weekly budget and a monthly budget. They guide your review without preventing you from recording expenses. All categories in the workspace are available, including ones with no spending yet."
+                    body: "Set optional minimum and maximum spending goals for each category. In Budget Details, open Budget Actions (…) › Category Goals to edit them. A minimum is a spending target you want to reach; a maximum is a ceiling you want to stay within. Either can be left blank.\n\nGoals belong to one budget, so Groceries can have a different maximum in a weekly budget and a monthly budget. They guide your review without preventing you from recording expenses. All categories in the workspace are available, including ones with no spending yet."
                 ),
                 textSection(
                     id: "budgets-category-goals-creation",
@@ -841,7 +897,7 @@ enum GeneratedHelpContent {
                 textSection(
                     id: "budgets-category-goals-auto-configure",
                     header: "Auto-Configure Goals",
-                    body: "While creating a budget, enable Auto-Configure to fill minimums from attached presets assigned to selected cards. Blank maximums can be suggested from average category spending in previous comparable budgets. Open a category to see the budgets behind its suggestion. You can edit every amount; turning Auto-Configure off restores generated values unless you edited them.\n\nSet workspace defaults in Settings > Manage Categories > Auto-Configure Goals. Start with 3 past budgets and no extra cushion, or choose 1–12 budgets and a cushion from zero to 100 percent. Only budgets ending before today and before the new budget are used. Overlapping history windows are skipped. Durations match exactly, except 28–31 days, 90–92 days, and 365–366 days are treated as comparable groups.\n\nHistory follows Budget Detail totals: recorded actual amounts where available, planned amounts otherwise, with splits, refunds, and savings offsets included. Empty periods count as zero after the category first appears in expenses or goals. Limited history uses fewer samples; no history leaves the maximum blank. Suggestions are at least the planned or entered minimum. They are a starting point, not an assessment of affordability. Defaults sync with the workspace when using iCloud and are included in workspace backups. Changing defaults does not change saved goals."
+                    body: "While creating a budget, enable Auto-Configure to fill minimums from attached presets assigned to selected cards. If no positive preset minimum applies, an eligible blank minimum can use the lowest comparable spending amount, with a floor of zero. Blank maximums can be suggested from average category spending in previous comparable budgets. Open a category to see the budgets behind its suggestion. You can edit every amount. Turning Auto-Configure off restores the previous values where suggestions are unchanged and keeps your manual edits.\n\nSet workspace defaults in Settings > Manage Categories > Auto-Configure Goals. Start with 3 past budgets and no extra cushion, or choose 1–12 budgets and a cushion from zero to 100 percent. Only budgets ending before today and before the new budget are used. Overlapping history windows are skipped. Durations match exactly, except 28–31 days, 90–92 days, and 365–366 days are treated as comparable groups.\n\nHistory follows Budget Detail totals: recorded actual amounts where available, planned amounts otherwise, with splits, refunds, and savings offsets included. Empty periods count as zero after the category first appears in expenses or goals. Limited history uses fewer samples; no history leaves the maximum blank. Suggestions are at least the planned or entered minimum. They are a starting point, not an assessment of affordability. Defaults sync with the workspace when using iCloud and are included in workspace backups. Changing defaults does not change saved goals."
                 )
             ]
         ),
@@ -853,26 +909,26 @@ enum GeneratedHelpContent {
                 mediaSection(
                     id: "budgets-calculations-overview",
                     header: "Calculations Overview",
-                    body: "Calculations summarize how income and expenses combine into period outcomes. When a number looks off, first check whether values are hidden or excluded before assuming the math is wrong.\n\nThe eye control changes visibility and can make totals look different from what you expected if some values are currently hidden. Always confirm visibility state before comparing screens.\n\nYou can set default visibility behavior in Settings > General > Expense Display, then use the eye control for quick per-view adjustments.",
+                    body: "If a future expense is missing from the list or a total, open Expense Display from the eye button. Hide Future Planned Expenses and Hide Future Variable Expenses remove rows from the list. Exclude Future Planned Expenses from Totals and Exclude Future Variable Expenses from Totals change the calculations. Check each setting separately.\n\nSet your defaults in Settings › General › Expense Display.",
                     media: [
                         mediaItem(
                             id: "budgets-calculations-overview-image-1",
                             assetName: "Help/CoreScreens/Budgets/Calculations/overview",
-                            bodyText: "The overview shows top-level budget math in one place, including controls that affect what is visible. If totals look unusual, check the eye state first to confirm no values are hidden or excluded. This quick check prevents unnecessary troubleshooting.",
-                            fullscreenCaptionText: "Check eye visibility first when totals look off."
+                            bodyText: "Open Expense Display to check the list and calculation controls for each expense type.",
+                            fullscreenCaptionText: "Check both the Hide and Exclude from Totals settings."
                         )
                     ]
                 ),
                 mediaSection(
                     id: "budgets-calculations-details",
-                    header: "Calculation Details",
-                    body: "Calculation Details is where you confirm why a total changed. Use it after checking visibility controls so you know whether the value changed because of data or because items are hidden.\n\nIf numbers still look wrong, trace by entry type and recent edits. This is usually enough to find the exact source quickly.\n\nFor consistent behavior across sessions, review Settings > General > Expense Display and choose defaults that match how you like to review expense math.",
+                    header: "How Is This Calculated?",
+                    body: "In the budget Overview, choose How is this calculated? to see the inputs behind the totals. If an amount is unexpected, check the budget dates, linked cards, expense type, and Exclude from Totals settings. Then check the underlying transactions for changes such as refunds, splits, payments from savings, or newly recorded actual amounts.",
                     media: [
                         mediaItem(
                             id: "budgets-calculations-details-image-1",
                             assetName: "Help/CoreScreens/Budgets/Calculations/calculations",
-                            bodyText: "The detail view breaks down the numbers behind budget outcomes. If something seems inconsistent, verify hidden or excluded values first, then trace the remaining difference to entry type, timing, and recent edits. This keeps debugging focused and fast.",
-                            fullscreenCaptionText: "Use details after visibility checks to trace the exact source of a mismatch."
+                            bodyText: "Use the breakdown to trace a budget total to the income and expense amounts included in it.",
+                            fullscreenCaptionText: "Open How is this calculated? to see the inputs for the current budget."
                         )
                     ]
                 )
@@ -918,6 +974,16 @@ enum GeneratedHelpContent {
                             fullscreenCaptionText: "Adding an Actual income recurring series, repeats every 2 weeks on Fridays, ending 1 year from now."
                         )
                     ]
+                ),
+                textSection(
+                    id: "income-add-planned-or-actual",
+                    header: "Add Planned or Actual Income",
+                    body: "1. Open Income, select a day, then choose + › Add Income. The form starts with Actual selected.\n2. Under Type, select Planned for money you expect or Actual for money you have received.\n3. Enter Source, Amount, and Date. Choose a card if you want to associate the entry with one.\n4. Choose Save. Check the entry and its type in Income."
+                ),
+                textSection(
+                    id: "income-repeat",
+                    header: "Set Up or Edit Recurring Income",
+                    body: "To repeat an income entry, choose a schedule under Repeat, set an End Date, and save.\n\nWhen editing a repeating entry, Just This Income changes a single occurrence. Use it when one paycheck differs. This and Future applies the change from the selected occurrence forward. All in Series applies the change across the series while keeping individual exceptions. Review the scope before saving."
                 )
             ]
         ),
@@ -1003,15 +1069,20 @@ enum GeneratedHelpContent {
                 mediaSection(
                     id: "accounts-card-details-import-expenses",
                     header: "Import Expenses",
-                    body: "Card import helps you add multiple transactions quickly when manual entry would be slow. Offshore supports CSV, PDF, and image imports from this flow.\n\nIf you use the mapping memory toggle, Offshore can reuse similar import structure later so repeat imports are faster. It is a good option when your source format is consistent.\n\nFriendly warning: avoid importing card payment transfers as expenses. Offshore is built to help you understand spending and savings direction, and importing payments as expenses can create confusing or inflated math. Keep imports focused on true spending or income activity.",
+                    body: "Open a card, choose + › Import Expenses, then Choose Source to import a CSV, PDF, or image. Check that the file belongs to this card. Review the row dates and transaction types, resolve possible duplicates, and confirm the selected rows before choosing Import.\n\nUse Save for Future Imports on individual rows to remember a recognized merchant’s name or category in this workspace. See Help › Introduction › Import for the full walkthrough and the separate income path.",
                     media: [
                         mediaItem(
                             id: "accounts-card-details-import-expenses-image-1",
                             assetName: "Help/CoreScreens/Accounts/Card Details/import-expenses",
-                            bodyText: "This step starts a card-scoped import flow for bulk transaction capture from CSV, PDF, or images. Review parsed rows for duplicates and category accuracy, and use the mapping memory toggle when you want faster repeat imports from similar files. Skip payment-transfer rows that are not true expenses so totals stay clean.",
-                            fullscreenCaptionText: "Import CSV/PDF/image records, use mapping memory for repeats, and avoid payment-transfer expense rows."
+                            bodyText: "Review the parsed transactions for the selected card. Check row details and selection before using Import.",
+                            fullscreenCaptionText: "Check the card, dates, and included rows before importing."
                         )
                     ]
+                ),
+                textSection(
+                    id: "accounts-card-details-delete",
+                    header: "Delete a Card",
+                    body: "Open the card, then choose Card Actions › Delete Card. Deleting a card also deletes its planned expenses, variable expenses, and linked income, and removes the card from budgets. Review the card’s history before confirming. To remove the card from just one budget, use Manage Cards in that budget and review the choices for its existing expenses."
                 )
             ]
         ),
@@ -1027,8 +1098,8 @@ enum GeneratedHelpContent {
                 ),
                 textSection(
                     id: "accounts-transaction-types-credit",
-                    header: "Credit: Refunds and Credits",
-                    body: "Choose Credit for a refund or credit. Enter a positive amount; Offshore applies its negative ledger sign.\n\nA $10 credit subtracts $10 from the signed card ledger and budget impact. If your earlier purchase was $40, the net ledger amount is $30. Gross spending totals, including the card’s Total Spent, still show the $40 debit purchase before refunds."
+                    header: "Record a Refund or Credit",
+                    body: "1. Open Accounts › Cards and select the card that received the refund.\n2. Choose + › Add Expense. Set Transaction Type to Credit.\n3. Enter a description, the refund as a positive amount, and the date the refund was posted. Choose Save and check card history.\n\nA $10 credit subtracts $10 from the signed card ledger and budget impact. After a $40 purchase, the net ledger amount is $30. The purchase still contributes $40 to gross spending. If the refund arrives in a later budget period, it can affect that period when the budget includes its date and card."
                 ),
                 textSection(
                     id: "accounts-transaction-types-adjustment",
@@ -1038,7 +1109,7 @@ enum GeneratedHelpContent {
                 textSection(
                     id: "accounts-transaction-types-totals",
                     header: "Why Totals Can Differ",
-                    body: "Card history keeps every recorded transaction. The signed ledger treats debits and adjustments as positive and credits as negative. Gross spending counts debit purchases, before refunds, splits, or payments from savings. Budget impact accounts for credits, your share after splits, and Pay From Savings; adjustments have no budget impact.\n\nPlanned expenses are separate expected bills. Their effective amount is the actual amount when greater than zero, otherwise the planned amount. Record a paid planned bill on its existing planned expense instead of adding a second variable expense.\n\nDate ranges, category and search filters, and future-expense calculation settings also affect totals. Hiding a future row is separate from excluding it from calculations."
+                    body: "The signed card ledger counts debits and adjustments as positive and credits as negative. In the Variable view, Total Spent counts debit purchases before refunds. The Planned view uses each expense’s actual amount when greater than zero and its planned amount otherwise. The combined view includes both.\n\nBudget impact accounts for credits, your share after reconciliation splits, and Pay From Savings. Adjustments have zero budget impact. Date ranges, filters, and future-expense calculation settings determine which amounts are included."
                 )
             ]
         ),
@@ -1101,21 +1172,26 @@ enum GeneratedHelpContent {
                 mediaSection(
                     id: "accounts-reconciliations-add-settlement",
                     header: "Add a Settlement",
-                    body: "Settlements are the entries that reduce or clear shared balances over time. Use this flow any time money is paid back, collected, or otherwise resolves a reconciliation amount. Recording settlements promptly keeps the ledger honest and current.\n\nDirection and amount accuracy matter because they determine whether balances move toward zero correctly. Include brief notes so future you can understand why each movement occurred. Clear settlement records prevent timeline confusion later.\n\nAfter saving, verify updated balance direction in detail view. This quick check catches sign mistakes immediately. Reliable settlement entry is key to trustworthy shared-balance tracking.",
+                    body: "Open the reconciliation account and choose Add Settlement. Enter a positive Amount. Under Direction, They Owe Me adds it to the balance and I Owe Them subtracts it. For example, if someone owes you $60 and repays $20, choose I Owe Them to subtract $20 and leave $40 owed. Check the resulting balance in the account timeline.",
                     media: [
                         mediaItem(
                             id: "accounts-reconciliations-add-settlement-1",
                             assetName: "Help/CoreScreens/Accounts/Reconciliations/add-settlement-1",
-                            bodyText: "This first step opens reconciliation detail and starts a settlement entry. Choose settlement direction carefully so the balance moves as intended. Direction mistakes can invert progress and create confusion in later review. Confirm the sign before continuing.",
-                            fullscreenCaptionText: "Start a settlement from reconciliation detail and confirm the balance direction."
+                            bodyText: "Choose a direction based on the change you want to make to the current balance.",
+                            fullscreenCaptionText: "They Owe Me adds to the balance. I Owe Them subtracts from it."
                         ),
                         mediaItem(
                             id: "accounts-reconciliations-add-settlement-2",
                             assetName: "Help/CoreScreens/Accounts/Reconciliations/add-settlement-2",
-                            bodyText: "This step confirms settlement amount and notes before committing the entry. Add a concise reason so future reviews clearly explain the balance change. Good notes are especially valuable when multiple people or events affect one ledger. Save only after amount, direction, and context are all clear.",
-                            fullscreenCaptionText: "Confirm amount and add a short note so settlement history stays clear."
+                            bodyText: "Enter the amount and review the direction before saving. Check the settlement and resulting balance in the account timeline.",
+                            fullscreenCaptionText: "Verify the signed settlement in the reconciliation timeline."
                         )
                     ]
+                ),
+                textSection(
+                    id: "accounts-reconciliations-archive",
+                    header: "Archive a Reconciliation",
+                    body: "Open Accounts › Reconciliations and choose Archive from the account’s actions when it has history. Existing allocations and settlements stay in history, and the account is hidden from new allocation choices. Accounts without allocations or settlements can be deleted."
                 )
             ]
         ),
@@ -1145,7 +1221,7 @@ enum GeneratedHelpContent {
                 textSection(
                     id: "accounts-savings-account-period-review",
                     header: "Review Before Posting",
-                    body: "Open Period Review in Offshore Savings to check completed periods. Review Today also links to this dedicated screen and shows how many periods are waiting. Each review shows overlapping budgets, income, expenses, the calculated closing amount, and the change it would make to your available Savings balance.\n\nTap an income or expense to edit it. Press and hold for all row actions, or swipe to reveal them. Planned expenses still use their planned amounts until you record an actual amount. If the records don’t tell the whole story, turn on Use a Different Amount. Zero and negative amounts are fine. Add a note if you like; leaving it blank uses the usual period-close text. When you’re ready, turn on Update Savings, then tap Save at the top for a new close or Update for an existing one. Your transactions and existing manual adjustments stay as they are.\n\nChanges after confirmation appear under Needs Review. The posted amount stays in Savings until you confirm again. Posted History also lets you deliberately review older closes; existing closes are not automatically queued when you first use this feature.\n\nReview Before Posting Savings is enabled by default and saved with your workspace in Settings > General. Turning it off enables automatic posting only for periods ending afterward. Older pending periods still need review, and corrected closes remain protected from automatic recalculation."
+                    body: "Open Period Review in Offshore Savings to check completed periods. Review Today also links to this dedicated screen and shows how many periods are waiting. Each review shows overlapping budgets, income, expenses, the calculated closing amount, and the change it would make to your available Savings balance.\n\nTap an income or expense to edit it. Press and hold for all row actions, or swipe to reveal them. Planned expenses still use their planned amounts until you record an actual amount. If the records don’t tell the whole story, turn on Use a Different Amount. Zero and negative amounts are fine. Add a note if you like; leaving it blank uses the usual period-close text. When you’re ready, turn on Update Savings, then tap Save at the top to confirm. Your transactions and existing manual adjustments stay as they are.\n\nChanges after confirmation appear under Needs Review. The posted amount stays in Savings until you confirm again. Posted History also lets you deliberately review older closes; existing closes are not automatically queued when you first use this feature.\n\nReview Before Posting Savings is enabled by default and saved with your workspace in Settings > General. Turning it off enables automatic posting only for periods ending afterward. Older pending periods still need review, and corrected closes remain protected from automatic recalculation."
                 ),
                 textSection(
                     id: "accounts-savings-account-set-aside",
@@ -1194,6 +1270,21 @@ enum GeneratedHelpContent {
                             fullscreenCaptionText: "Adjust General preferences to control global display and calculation behavior."
                         )
                     ]
+                ),
+                textSection(
+                    id: "settings-general-expense-display",
+                    header: "Expense Display and Future Expense Totals",
+                    body: "In Settings › General › Expense Display, use the Hide Future switches to control whether expenses dated after today appear in lists. The separate Exclude from Totals switches affect totals and savings calculations. Planned and variable expenses each have their own pair of switches."
+                ),
+                textSection(
+                    id: "settings-general-maintenance",
+                    header: "Reset Tips, Repeat Onboarding, or Erase Content",
+                    body: "Open Settings › General › Maintenance. Reset Tips & Hints makes tips eligible to appear again. Repeat Onboarding repeats setup while keeping your data and data source. Reset & Erase Content erases on-device app data. In iCloud mode, switch to On Device and relaunch to access the erase action. To keep a copy first, see Back Up or Import a Workspace in Help › Settings › Workspaces."
+                ),
+                textSection(
+                    id: "settings-general-uncategorized-review",
+                    header: "Review Uncategorized Expenses on App Open",
+                    body: "In Settings › General › Behavior, enable Review Uncategorized Expenses on App Open. Offshore offers to review uncategorized expenses in the selected workspace when you open or return to the app. Assign categories as needed, or choose Skip to defer the review."
                 )
             ]
         ),
@@ -1205,15 +1296,20 @@ enum GeneratedHelpContent {
                 mediaSection(
                     id: "settings-privacy-1",
                     header: "Privacy",
-                    body: "Privacy in Offshore is primarily a visibility and status view for permissions the system controls. Use it to review what Offshore currently has access to, then open iOS App Settings if you want to change those permissions.\n\nA good workflow is: review status here, open App Settings for permission changes, then return and verify expected behavior. This keeps permission changes intentional and easy to confirm.\n\nCore Offshore budgeting functions work fully offline. Network-dependent features are optional, so your core workflow remains available even without connectivity.",
+                    body: "Use Settings › Privacy to see which permissions Offshore has. On iPhone and iPad, use Open App Settings to manage system permissions. On Mac, the system photo picker can select an image without full library access. Use Open Photos Settings when it appears for denied or restricted access. The core budgeting features work offline.",
                     media: [
                         mediaItem(
                             id: "settings-privacy-1-image-1",
                             assetName: "Help/CoreScreens/Settings/Privacy/overview",
-                            bodyText: "This screen shows Offshore permission status and privacy-related controls. Use it as your checkpoint, then open App Settings to modify permissions when needed. After changes, run a quick verification pass to confirm expected behavior. Core budgeting features continue to work offline.",
-                            fullscreenCaptionText: "Review permission status here, manage changes in App Settings, and keep in mind core features work offline."
+                            bodyText: "Review Offshore’s permission status and use the available settings action for your device.",
+                            fullscreenCaptionText: "Review privacy permissions and app lock in Settings."
                         )
                     ]
+                ),
+                textSection(
+                    id: "settings-privacy-app-lock",
+                    header: "Lock Offshore with Face ID or Touch ID",
+                    body: "Open Settings › Privacy. Under Security, turn on Use Face ID or Use Touch ID when it is available on your device. Use your device settings to set up biometrics first if needed."
                 )
             ]
         ),
@@ -1224,14 +1320,14 @@ enum GeneratedHelpContent {
             sections: [
                 mediaSection(
                     id: "settings-notifications-1",
-                    header: "Notifications",
-                    body: "Notifications help you build consistency by prompting review and capture habits at the right times. Use this section to configure reminders that support your budgeting cadence without creating alert fatigue. Fewer focused reminders usually perform better than broad noisy setups.\n\nMatch reminder timing to moments when you can actually act, not just when it is convenient to schedule. Actionable timing increases follow-through. This makes notifications supportive instead of distracting.\n\nReview notification performance after a week and adjust quickly. If you ignore a reminder repeatedly, change or disable it. Useful reminders should earn their place.",
+                    header: "Set Up Scheduled Reminders",
+                    body: "Open Settings › Notifications and turn on Send Scheduled Reminders. Set the shared Time, then choose Daily Expense Reminder, Planned Income Reminder, or Preset Expense Due Reminder. You may see Set Up Reminders when none are selected. If the system has denied notifications, use Open Settings and allow notifications for Offshore. Excursion Mode reminders are controlled separately.",
                     media: [
                         mediaItem(
                             id: "settings-notifications-1-image-1",
                             assetName: "Help/CoreScreens/Settings/Notifications/overview",
-                            bodyText: "Notification settings control reminder types and schedule timing. Enable only the reminders that directly improve your daily workflow. Then validate delivery timing against when you can actually review or log data. Focused reminder design increases consistency and lowers noise.",
-                            fullscreenCaptionText: "Enable only high-value reminders and schedule them when you can act."
+                            bodyText: "Choose a time and turn on the scheduled reminders you want. Excursion Mode has its own reminder settings.",
+                            fullscreenCaptionText: "Set the shared reminder time and choose individual reminders."
                         )
                     ]
                 )
@@ -1244,14 +1340,14 @@ enum GeneratedHelpContent {
             sections: [
                 mediaSection(
                     id: "settings-icloud-1",
-                    header: "iCloud",
-                    body: "iCloud settings provide sync visibility and cross-device status for your workspace data. Use this section when validating setup on a new device or troubleshooting stale records. It is the authoritative place to check sync health first.\n\nWhen data appears inconsistent, confirm status here before editing entries. Many issues are temporary sync delays rather than true data problems. Early verification avoids unnecessary manual corrections.\n\nAfter major setup changes or device migrations, perform a quick sync check. Confirm recent edits appear where expected. Reliable sync confidence helps you trust multi-device workflows.",
+                    header: "Switch Between iCloud and On Device",
+                    body: "In Settings › iCloud, use Use iCloud to Sync Data, then quit and relaunch Offshore. iCloud and On Device use separate data stores. Switching to iCloud opens your iCloud data and leaves the on-device data available when you switch back. To move a workspace between the two stores, export it first, switch and relaunch, then import the archive.\n\nThe status shows whether syncing is enabled and whether iCloud is available. To confirm a particular change has arrived, check the record on the other device. Once iCloud is active, Sync Options separately controls Home Layout and What-if Scenarios.",
                     media: [
                         mediaItem(
                             id: "settings-icloud-1-image-1",
                             assetName: "Help/CoreScreens/Settings/iCloud/overview",
-                            bodyText: "iCloud sync status and related controls are shown here for cross-device behavior. Use this to confirm that recent edits are propagating correctly across your devices. If something appears stale, verify sync health here before changing records elsewhere. Sync-first troubleshooting prevents avoidable data confusion.",
-                            fullscreenCaptionText: "Check iCloud status first when data looks stale across devices."
+                            bodyText: "Use this screen to check the active storage mode and change the optional Home Layout and What-if Scenarios sync settings.",
+                            fullscreenCaptionText: "Relaunch Offshore after changing the data source."
                         )
                     ]
                 )
@@ -1293,6 +1389,11 @@ enum GeneratedHelpContent {
                             fullscreenCaptionText: "Create a category when existing labels are too broad for useful decisions."
                         )
                     ]
+                ),
+                textSection(
+                    id: "settings-categories-archive",
+                    header: "Archive or Unarchive a Category",
+                    body: "In Settings › Manage Categories, use a category’s actions and choose Archive. Existing expenses keep their category. To use the category again, open the Archived section and choose Unarchive."
                 )
             ]
         ),
@@ -1317,21 +1418,26 @@ enum GeneratedHelpContent {
                 mediaSection(
                     id: "settings-presets-add-preset",
                     header: "Add Preset",
-                    body: "Adding a preset converts a recurring planned expense into a reusable template for future cycles. This improves setup speed while preserving consistency in naming and category assignment. Create presets for items that repeat with similar structure.\n\nDuring creation, prioritize accurate default values and practical names. Better defaults mean fewer edits each cycle. Template quality directly determines reuse quality.\n\nBefore final save, run a quick review of amount, category, and label clarity. A clean preset now avoids repeated correction later. Strong preset creation compounds over time.",
+                    body: "Open Settings › Manage Presets and choose + (Add Preset). Pick a Card, enter the name and planned amount, and set the Schedule. Category is optional. After saving, select eligible budgets in Preset Saved and choose Add to Budget or Add to Budgets. Choose Not Now to apply the preset later. If no budget is eligible, choose Done. An eligible budget links the default card and includes a scheduled occurrence.",
                     media: [
                         mediaItem(
                             id: "settings-presets-add-preset-1",
                             assetName: "Help/CoreScreens/Settings/Presets/add-preset-1",
-                            bodyText: "This first step fills in core preset fields such as name, amount, and category. Choose defaults that match normal recurring behavior so reuse requires minimal edits. Clear naming helps you select the right preset quickly during budget setup. Strong defaults create repeatable efficiency.",
-                            fullscreenCaptionText: "Define clear preset defaults so recurring setup needs minimal editing later."
+                            bodyText: "Choose the default card, add a name and amount, and optionally pick a category.",
+                            fullscreenCaptionText: "Choose the card and enter the preset details."
                         ),
                         mediaItem(
                             id: "settings-presets-add-preset-2",
                             assetName: "Help/CoreScreens/Settings/Presets/add-preset-2",
-                            bodyText: "This step reviews preset details before saving the template. Confirm amount and category mapping now so future budgets inherit reliable defaults. A careful review here prevents repeated cycle-by-cycle fixes. Save only after template intent is clear.",
-                            fullscreenCaptionText: "Review and confirm preset details before save to prevent recurring setup errors."
+                            bodyText: "Review Schedule and save. Apply the preset to eligible budgets now or attach it to a budget later.",
+                            fullscreenCaptionText: "Set the schedule before saving the preset."
                         )
                     ]
+                ),
+                textSection(
+                    id: "settings-presets-apply-or-archive",
+                    header: "Apply or Archive a Preset",
+                    body: "Apply a preset when you save it or from a budget’s Manage Presets screen. Offshore generates planned expenses for occurrences inside that budget’s dates when its default card is linked. Archive a preset in Manage Presets to keep it out of new selections while retaining generated history. Unlinking it from a budget has a separate effect: it removes that budget’s generated rows for the preset, including any with recorded actual amounts."
                 )
             ]
         ),
@@ -1352,6 +1458,21 @@ enum GeneratedHelpContent {
                             fullscreenCaptionText: "Use Workspaces to keep contexts separate and prevent cross-domain data mixing."
                         )
                     ]
+                ),
+                textSection(
+                    id: "settings-workspaces-transfer",
+                    header: "Back Up or Import a Workspace",
+                    body: "1. Open the workspace menu and choose Manage Workspaces. Select the workspace you want to back up.\n2. Choose Export Workspace, select the sections to include, and save the archive file.\n3. To restore or move it, open Manage Workspaces and choose + › Import Workspace. Pick the file, review Included Data and the record counts, then choose Import.\n\nThe archive opens as a new workspace with its own name. Your existing workspace stays available. For a transfer between On Device and iCloud, switch the data source and relaunch between exporting and importing."
+                ),
+                textSection(
+                    id: "settings-workspaces-progress",
+                    header: "Check or Hide Workspace Progress",
+                    body: "Open Workspace Progress from Settings to see setup milestones for the current workspace, including cards, categories, presets, income, and budgets. After setup is complete, go to Settings › General › Maintenance and turn on Hide Workspace Progress to hide that row for the workspace."
+                ),
+                textSection(
+                    id: "settings-workspaces-delete",
+                    header: "Delete a Workspace",
+                    body: "Open the workspace menu and choose Manage Workspaces. Deleting a workspace removes its budgets, cards, transactions, income, savings, and other workspace records. Export the workspace first if you want a copy. Offshore requires at least one workspace."
                 )
             ]
         )
@@ -1490,7 +1611,7 @@ private func quickActionsGuideSections(prefix: String, isSettingsVariant: Bool) 
 
     let tapToPayHeader: LocalizedStringResource = "Add Expense via Tap to Pay"
     let tapToPayGuideHeader: LocalizedStringResource = "Add Expense via Tap to Pay Setup Guide"
-    let tapToPayBody: LocalizedStringResource = "Use this workflow for Apple Wallet transaction automations. Setup is per device and works best with one automation per card. Leave categories selected, keep merchant filters broad unless you need them, and let Offshore resolve merchant-based category matching later when possible.\n\nTap to Pay is configured manually in Shortcuts using Offshore’s built-in Add Expense action, so no shortcut download is required."
+    let tapToPayBody: LocalizedStringResource = "Use this workflow for Apple Wallet transaction automations. Setup is per device and works best with one automation per card. In Offshore’s Add Expense action, choose a category to apply it to each transaction. If you leave Category unset, Offshore checks the selected workspace for a learned merchant category and uses Uncategorized when there is no match.\n\nTap to Pay is configured manually in Shortcuts using Offshore’s built-in Add Expense action, so no shortcut download is required."
     let reliabilityBody: LocalizedStringResource = "Test after each automation is created. If parsing fails, recheck that the intended variables are mapped to the correct Shortcut Input details and that the installed shortcut version matches the instructions you are following.\n\nAvoid creating many near-duplicate automations up front. Start with one, verify it runs from a real message or transaction, then expand only if needed."
     let shortcutDownloadsBody: LocalizedStringResource = "Choose the version you want to install before following the setup guide."
     let incomeSetup: LocalizedStringResource = """
@@ -1518,7 +1639,7 @@ private func quickActionsGuideSections(prefix: String, isSettingsVariant: Bool) 
         "Repeat the same setup for the Wallet Card field. Tap the field, choose Select Variable, then choose Shortcut Input. Once Shortcut Input appears in the field, tap it and change the Type from Transaction to Card or Pass. Then tap Return.",
         "Repeat the same setup for Merchant. Tap the field, choose Select Variable, then choose Shortcut Input. Once Shortcut Input appears in the field, tap it and change the Type from Transaction to Merchant. Then tap Return.",
         "To use the current date, tap the Date field and scroll until you find Current Date. For best results, set Date Format to Medium and Time Format to None. Once Current Date looks correct, tap Return.",
-        "Leave Category unchanged if you want these expenses added as Uncategorized. Turn off Show When Run, then tap Save."
+        "Choose a category to apply every time, or leave Category unset to use a learned merchant category when available. Turn off Show When Run, then tap Save."
     ]
 
     return [
@@ -1582,6 +1703,11 @@ private func quickActionsGuideSections(prefix: String, isSettingsVariant: Bool) 
             header: tapToPayGuideHeader,
             assetPrefix: "tap-to-pay",
             steps: tapToPaySteps
+        ),
+        textSection(
+            id: "\(prefix)-built-in-actions",
+            header: "Built-in Offshore Shortcut Actions",
+            body: "In Apple Shortcuts, search for Offshore to find Add Expense, Add Income, Review Today, Safe Spend Today, Forecast Savings, and, on supported devices, Excursion Mode. Add Expense and Add Income use Offshore’s selected workspace. Offshore also offers Import Screenshot and Import From Clipboard to review what was recognized before saving."
         ),
         textSection(
             id: "\(prefix)-14",

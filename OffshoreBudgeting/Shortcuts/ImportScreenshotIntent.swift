@@ -41,7 +41,8 @@ struct ImportScreenshotIntent: AppIntent {
                 "No image was provided. Pass an image into Screenshot (for example from Select Photos or Get Latest Screenshot)."
             )
         } catch {
-            let message = (error as? LocalizedError)?.errorDescription ?? "Could not read the image."
+            let message = (error as? LocalizedError)?.errorDescription
+                ?? String(localized: "Could not read the image.")
             return .result(
                 value: message,
                 dialog: IntentDialog(stringLiteral: message)
@@ -60,7 +61,8 @@ struct ImportScreenshotIntent: AppIntent {
                 try ShortcutImportPreviewService.shared.previewFromImage(url: sourceURL)
             }
         } catch {
-            let message = (error as? LocalizedError)?.errorDescription ?? "Could not parse the image into entries."
+            let message = (error as? LocalizedError)?.errorDescription
+                ?? String(localized: "Could not parse the image into entries.")
             return .result(
                 value: message,
                 dialog: IntentDialog(stringLiteral: message)

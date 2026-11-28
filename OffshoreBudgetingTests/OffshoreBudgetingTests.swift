@@ -371,7 +371,7 @@ struct OffshoreBudgetingTests {
 
         #expect(expenseRow?.isBlocked == true)
         #expect(expenseRow?.includeInImport == false)
-        #expect(expenseRow?.blockedReason?.contains("skipped") == true)
+        #expect(expenseRow?.blockedReason == String(localized: "Expense, credit, and adjustment rows are skipped when importing from Income."))
 
         #expect(incomeRow?.isBlocked == false)
         #expect(incomeRow?.includeInImport == true)

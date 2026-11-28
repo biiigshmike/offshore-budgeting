@@ -22,11 +22,11 @@ enum StatementPDFImportParserError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .unreadableFile:
-            return "The selected PDF could not be opened."
+            return String(localized: "The selected PDF could not be opened.")
         case .emptyDocument:
-            return "The selected PDF did not contain readable text."
+            return String(localized: "The selected PDF did not contain readable text.")
         case .noTransactionsFound:
-            return "No entry rows were found in this PDF."
+            return String(localized: "No entry rows were found in this PDF.")
         }
     }
 }

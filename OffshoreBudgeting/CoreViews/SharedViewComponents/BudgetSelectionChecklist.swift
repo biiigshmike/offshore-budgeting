@@ -46,7 +46,7 @@ struct BudgetSelectionChecklist<Item: Identifiable, ItemLabel: View>: View {
         .accessibilityValue(isExpanded ? Text("Expanded") : Text("Collapsed"))
 
         if isExpanded {
-            Button(selectedCount == items.count ? "Clear All" : "Select All", action: onToggleAll)
+            Button(selectedCount == items.count ? "Deselect All" : "Select All", action: onToggleAll)
                 .buttonStyle(.borderless)
                 .font(.subheadline)
                 .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)

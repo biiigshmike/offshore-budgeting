@@ -141,7 +141,7 @@ struct BudgetRecordedPlannedExpensesReviewView: View {
         if let card {
             return "Review \(card.name)"
         }
-        return "Review Recorded Expenses"
+        return String(localized: "Review Recorded Expenses")
     }
 
     private var introText: String {

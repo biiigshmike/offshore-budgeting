@@ -23,7 +23,7 @@ extension ForecastSavingsWidgetSnapshot {
         let end = Calendar.current.date(byAdding: DateComponents(month: 1, day: -1), to: start) ?? .now
 
         return ForecastSavingsWidgetSnapshot(
-            title: widgetLocalized("Forecast Savings"),
+            title: "Forecast Savings",
             rangeStart: start,
             rangeEnd: end,
             projectedSavings: 640,
@@ -193,7 +193,7 @@ private struct ForecastSavingsWidgetEntryView: View {
 
     private var smallHeader: some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text(snapshot.title)
+            Text(widgetLocalized(snapshot.title))
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(.primary)
                 .lineLimit(2)
@@ -213,7 +213,7 @@ private struct ForecastSavingsWidgetEntryView: View {
     private var mediumBody: some View {
         VStack(alignment: .leading, spacing: 10) {
             WidgetHeaderView(
-                title: snapshot.title,
+                title: widgetLocalized(snapshot.title),
                 periodToken: "",
                 rangeText: rangeText,
                 style: .singleLine
@@ -240,7 +240,7 @@ private struct ForecastSavingsWidgetEntryView: View {
                     summaryPill(title: "Gap", value: gapText)
                 }
 
-                Text(snapshot.statusLine)
+                Text(widgetLocalized(snapshot.statusLine))
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .lineLimit(2)
@@ -252,14 +252,14 @@ private struct ForecastSavingsWidgetEntryView: View {
     private var rectangularBody: some View {
         VStack(alignment: .leading, spacing: 3) {
             if let message = snapshot.message {
-                rectangularHeading(Text(snapshot.title))
+                rectangularHeading(Text(widgetLocalized(snapshot.title)))
                 Text(message)
                     .font(.caption.weight(.semibold))
                     .lineLimit(2)
             } else {
                 ViewThatFits(in: .horizontal) {
                     VStack(alignment: .leading, spacing: 3) {
-                        rectangularHeading(Text(snapshot.title))
+                        rectangularHeading(Text(widgetLocalized(snapshot.title)))
                         Text("\(projectedText) projected")
                             .font(.headline.weight(.bold))
                             .fixedSize(horizontal: true, vertical: false)

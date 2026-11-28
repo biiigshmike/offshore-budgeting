@@ -16,11 +16,11 @@ final class TransactionEntryService {
         var errorDescription: String? {
             switch self {
             case .missingDescription:
-                return "Please provide notes or a description for the expense."
+                return String(localized: "Please provide notes or a description for the expense.")
             case .invalidAmount:
-                return "Amount must be greater than 0."
+                return String(localized: "Amount must be greater than 0.")
             case .missingIncomeSource:
-                return "Please provide an income source."
+                return String(localized: "Please provide an income source.")
             }
         }
     }

@@ -31,26 +31,32 @@ struct ReviewTodaySummary {
 
         var variableTotal = 0.0
         var plannedTotal = 0.0
-        var totalsByCardName: [String: Double] = [:]
+        var totalsByCardName: [String?: Double] = [:]
 
         for expense in variableExpenses {
             let amount = expense.ledgerSignedAmount()
             variableTotal += amount
-            totalsByCardName[expense.card?.name ?? "Unknown Card", default: 0] += amount
+            totalsByCardName[expense.card?.name, default: 0] += amount
         }
         for expense in plannedExpenses {
             let amount = expense.effectiveAmount()
             plannedTotal += amount
-            totalsByCardName[expense.card?.name ?? "Unknown Card", default: 0] += amount
+            totalsByCardName[expense.card?.name, default: 0] += amount
         }
 
         let topCards = totalsByCardName
             .sorted { lhs, rhs in
-                if lhs.value == rhs.value { return lhs.key < rhs.key }
+                if lhs.value == rhs.value {
+                    // Preserve the missing-card bucket's sort position across app languages.
+                    let lhsName = lhs.key ?? "Unknown Card"
+                    let rhsName = rhs.key ?? "Unknown Card"
+                    if lhsName == rhsName { return lhs.key != nil && rhs.key == nil }
+                    return lhsName < rhsName
+                }
                 return lhs.value > rhs.value
             }
             .prefix(2)
-            .map { CardTotal(name: $0.key, amount: $0.value) }
+            .map { CardTotal(name: $0.key ?? String(localized: "No Card"), amount: $0.value) }
 
         return Self(
             total: variableTotal + plannedTotal,

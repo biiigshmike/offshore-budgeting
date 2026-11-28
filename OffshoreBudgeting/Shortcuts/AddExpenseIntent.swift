@@ -70,36 +70,23 @@ struct AddExpenseIntent: AppIntent {
 
             return .result(dialog: IntentDialog(stringLiteral: addedSummary))
         } catch let requestError as AddExpenseShortcutExecutor.RequestValidationError {
+            let dialog = IntentDialog(stringLiteral: requestError.localizedDescription)
             switch requestError {
             case .invalidAmount:
-                throw $amountText.needsValueError(
-                    IntentDialog(stringLiteral: requestError.errorDescription ?? "Please provide a valid amount.")
-                )
+                throw $amountText.needsValueError(dialog)
             case .missingCard:
-                throw $walletCardName.needsValueError(
-                    IntentDialog(
-                        stringLiteral: requestError.errorDescription
-                            ?? "Please choose an Offshore card or provide the Wallet card name."
-                    )
-                )
+                throw $walletCardName.needsValueError(dialog)
             case .missingMerchant:
-                throw $merchant.needsValueError(
-                    IntentDialog(
-                        stringLiteral: requestError.errorDescription
-                            ?? "Please provide a merchant or description for the expense."
-                    )
-                )
+                throw $merchant.needsValueError(dialog)
             case .missingDate:
-                throw $date.needsValueError(
-                    IntentDialog(stringLiteral: requestError.errorDescription ?? "Please provide a date.")
-                )
+                throw $date.needsValueError(dialog)
             }
         } catch let validation as TransactionEntryService.ValidationError {
-            return .result(dialog: IntentDialog(stringLiteral: validation.errorDescription ?? "Couldn't add expense."))
+            return .result(dialog: IntentDialog(stringLiteral: validation.errorDescription ?? String(localized: "Couldn't add expense.")))
         } catch let intentError as OffshoreIntentDataStore.IntentDataError {
-            return .result(dialog: IntentDialog(stringLiteral: intentError.errorDescription ?? "Couldn't add expense."))
+            return .result(dialog: IntentDialog(stringLiteral: intentError.errorDescription ?? String(localized: "Couldn't add expense.")))
         } catch {
-            return .result(dialog: IntentDialog(stringLiteral: "Couldn't add expense. \(error.localizedDescription)"))
+            return .result(dialog: IntentDialog("Couldn't add expense. \(error.localizedDescription)"))
         }
     }
 }

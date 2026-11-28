@@ -19,9 +19,9 @@ enum CSVParserError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .unreadableFile:
-            return "The selected CSV could not be read."
+            return String(localized: "The selected CSV could not be read.")
         case .empty:
-            return "The selected CSV is empty."
+            return String(localized: "The selected CSV is empty.")
         }
     }
 }

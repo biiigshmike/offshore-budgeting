@@ -214,7 +214,7 @@ struct ExpenseCSVImportRowView: View {
         }
     }
 
-    private func kindTitle(_ kind: ExpenseCSVImportKind) -> String {
+    private func kindTitle(_ kind: ExpenseCSVImportKind) -> LocalizedStringKey {
         switch kind {
         case .expense:
             return "Expense"
@@ -377,18 +377,18 @@ struct ExpenseCSVImportRowView: View {
         guard row.isMissingRequiredData else { return nil }
         if row.finalMerchant.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             return row.kind == .income
-                ? "Add a name to import."
-                : "Add a merchant name to import."
+                ? String(localized: "Add a name to import.")
+                : String(localized: "Add a merchant name to import.")
         }
 
         if row.kind == .expense {
-            return "Choose a category to import."
+            return String(localized: "Choose a category to import.")
         }
 
         return nil
     }
 
-    private var reconciliationValidationMessage: String? {
+    private var reconciliationValidationMessage: LocalizedStringKey? {
         switch row.reconciliationAction {
         case .none:
             return nil
@@ -433,11 +433,11 @@ struct ExpenseCSVImportRowView: View {
         }
     }
 
-    private var importSummary: String {
+    private var importSummary: LocalizedStringKey {
         if let csvCategory = row.originalCategoryText, !csvCategory.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            return "Imported: \(row.originalDescriptionText) • \(row.originalAmountText) • \(csvCategory)"
+            return "Source data: \(row.originalDescriptionText) • \(row.originalAmountText) • \(csvCategory)"
         }
-        return "Imported: \(row.originalDescriptionText) • \(row.originalAmountText)"
+        return "Source data: \(row.originalDescriptionText) • \(row.originalAmountText)"
     }
 
     private var splitPercentageControl: some View {

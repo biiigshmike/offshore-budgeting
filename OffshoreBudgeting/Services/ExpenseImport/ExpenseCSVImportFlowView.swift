@@ -58,7 +58,7 @@ struct ExpenseCSVImportFlowView: View {
                 HStack {
                     Text("File")
                     Spacer()
-                    Text(selectedFileName ?? "None")
+                    Text(selectedFileName ?? String(localized: "None"))
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                 }
@@ -190,7 +190,7 @@ struct ExpenseCSVImportFlowView: View {
 
             let clipboard = (initialClipboardText ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
             if !clipboard.isEmpty, vm.state == .idle {
-                selectedFileName = "Clipboard"
+                selectedFileName = String(localized: "Clipboard")
                 vm.loadClipboard(
                     text: clipboard,
                     workspace: workspace,
@@ -230,7 +230,7 @@ struct ExpenseCSVImportFlowView: View {
             vm.state = .loading
 
             guard let data = try await item.loadTransferable(type: Data.self), !data.isEmpty else {
-                vm.state = .failed("No image data was returned from Photos.")
+                vm.state = .failed(String(localized: "No image data was returned from Photos."))
                 return
             }
 
@@ -239,12 +239,12 @@ struct ExpenseCSVImportFlowView: View {
                 .appendingPathComponent("offshore-photo-import-\(UUID().uuidString).\(fileExtension)")
 
             try data.write(to: tempURL, options: .atomic)
-            selectedFileName = "Photo (\(tempURL.lastPathComponent))"
+            selectedFileName = String(localized: "Photo (\(tempURL.lastPathComponent))")
             let referenceDate = photoReferenceDate(for: item)
             vm.load(url: tempURL, workspace: workspace, card: card, modelContext: modelContext, referenceDate: referenceDate)
             try? FileManager.default.removeItem(at: tempURL)
         } catch {
-            vm.state = .failed("Could not load the selected photo.")
+            vm.state = .failed(String(localized: "Could not load the selected photo."))
         }
     }
 
@@ -265,7 +265,7 @@ struct ExpenseCSVImportFlowView: View {
     }
 
     @ViewBuilder
-    private func sectionView(title: String, rows: [ExpenseCSVImportRow]) -> some View {
+    private func sectionView(title: LocalizedStringKey, rows: [ExpenseCSVImportRow]) -> some View {
         if let firstRow = rows.first {
             Section {
                 rowView(firstRow)
@@ -302,21 +302,21 @@ struct ExpenseCSVImportFlowView: View {
         )
     }
 
-    private var navigationTitle: String {
+    private var navigationTitle: LocalizedStringKey {
         mode == .cardTransactions ? "Import Expenses" : "Import Income"
     }
 
-    private var paymentSectionTitle: String {
+    private var paymentSectionTitle: LocalizedStringKey {
         mode == .cardTransactions ? "Credits / Adjustments / Income" : "Income"
     }
 
-    private var idlePromptText: String {
+    private var idlePromptText: LocalizedStringKey {
         mode == .cardTransactions
             ? "Choose a CSV, PDF, or image from Files or Photos to begin."
             : "Choose a CSV, PDF, or image from Files or Photos to begin. Expense rows will be skipped."
     }
 
-    private var importHintText: String {
+    private var importHintText: LocalizedStringKey {
         mode == .cardTransactions
             ? "You can import one file at a time (CSV, PDF, or image) from Files or Photos. You will review everything before saving."
             : "You can import one file at a time (CSV, PDF, or image) from Files or Photos. Expense rows are skipped in Income import."

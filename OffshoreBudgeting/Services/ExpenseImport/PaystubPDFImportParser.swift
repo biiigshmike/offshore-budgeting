@@ -16,11 +16,11 @@ enum PaystubPDFImportParserError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .unreadableFile:
-            return "The selected paystub PDF could not be opened."
+            return String(localized: "The selected paystub PDF could not be opened.")
         case .noTextFound:
-            return "No readable text was found in this paystub."
+            return String(localized: "No readable text was found in this paystub.")
         case .netPayNotFound:
-            return "No net pay amount was found in this paystub."
+            return String(localized: "No net pay amount was found in this paystub.")
         }
     }
 }

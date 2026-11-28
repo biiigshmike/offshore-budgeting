@@ -101,16 +101,18 @@ struct AddIncomeIntent: AppIntent {
                     )
 
                     let amountString = CurrencyFormatter.string(from: parsedAmount)
-                    let label = kind.isPlanned ? "planned" : "actual"
-                    return "Logged \(amountString) income from \(trimmedSource) as \(label)."
+                    if kind.isPlanned {
+                        return String(localized: "Logged \(amountString) in planned income from \(trimmedSource).")
+                    }
+                    return String(localized: "Logged \(amountString) in actual income from \(trimmedSource).")
                 }
             }
 
             return .result(dialog: IntentDialog(stringLiteral: summary))
         } catch let validation as TransactionEntryService.ValidationError {
-            return .result(dialog: IntentDialog(stringLiteral: validation.errorDescription ?? "Couldn't add income."))
+            return .result(dialog: IntentDialog(stringLiteral: validation.errorDescription ?? String(localized: "Couldn't add income.")))
         } catch {
-            return .result(dialog: IntentDialog(stringLiteral: "Couldn't add income. \(error.localizedDescription)"))
+            return .result(dialog: IntentDialog("Couldn't add income. \(error.localizedDescription)"))
         }
     }
 }
