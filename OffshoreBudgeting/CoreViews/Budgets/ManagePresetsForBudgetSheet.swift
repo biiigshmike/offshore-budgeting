@@ -227,6 +227,8 @@ struct ManagePresetsForBudgetSheet: View {
     
     private var presetRowFootnoteText: String {
         let hasAnyCardsInSystem = (workspace.cards ?? []).isEmpty == false
-        return hasAnyCardsInSystem ? "Card Unassigned" : "No Cards Available"
+        return hasAnyCardsInSystem
+            ? String(localized: "Card Unassigned")
+            : String(localized: "No Cards Available")
     }
 }

@@ -342,8 +342,8 @@ equals_key_allowlist = {
 equals_key_allowlist |= {"Offshore Savings"}
 equals_key_allowlist |= {
     "es": {"Hospital", "Hotel", "Personal", "Spa"},
-    "de": {"In %@", "Museum", "Optional", "Q", "Start"},
-    "fr": {"Message"},
+    "de": {"In %@", "Museum", "Name A–Z", "Name Z–A", "Optional", "Q", "Start"},
+    "fr": {"%lld budgets", "Message", "Mode", "Photo (%@)"},
     "pt-BR": {"30 min", "Email", "Hospital", "Hotel", "Marina", "Spa"},
 }.get(target_locale, set())
 
@@ -437,6 +437,21 @@ def source_for_variant(source_units, path, fallback):
     other_path = tuple("other" if i >= 2 and path[i - 2:i] == ("variations", "plural") else part
                        for i, part in enumerate(path))
     return source_units.get(other_path, source_units.get((), {})).get("value", fallback)
+
+
+def placeholders_match(source_text, target_text, path):
+    source_arguments = extract_placeholders(source_text)
+    target_arguments = extract_placeholders(target_text)
+    if source_arguments == target_arguments:
+        return True
+    # Arabic can spell out the fixed count or express it with the dual noun form.
+    # This applies only to the single count in a direct plural, not other arguments.
+    return (
+        target_locale == "ar"
+        and path in {("variations", "plural", category) for category in ("zero", "one", "two")}
+        and source_arguments == [(1, "lld")]
+        and not target_arguments
+    )
 
 
 def unchanged_is_allowed(key, source_text):
@@ -631,7 +646,7 @@ for key, entry in strings.items():
         if target_value == source_text and source_text != key and not allowed:
             equals_en_count += 1
             equals_en_items.append(label)
-        if extract_placeholders(source_text) != extract_placeholders(target_value):
+        if not placeholders_match(source_text, target_value, path):
             placeholder_mismatches += 1
             placeholder_mismatch_items.append(label)
         if target_locale == "es":

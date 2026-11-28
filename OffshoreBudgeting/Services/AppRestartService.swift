@@ -11,26 +11,24 @@ enum AppRestartService {
     }
 
     static var closeAppButtonTitle: String {
-        canCloseAppProgrammatically ? "Close App" : "Got It"
+        canCloseAppProgrammatically ? String(localized: "Close App") : String(localized: "Got It")
     }
 
     static var nextButtonTitle: String {
-        canCloseAppProgrammatically ? "Close App" : "Next"
+        canCloseAppProgrammatically ? String(localized: "Close App") : String(localized: "Next")
     }
 
     static func restartRequiredMessage(
-        debugMessage: String,
+        debugMessage: LocalizedStringResource,
         appName: String = "Offshore",
-        releaseExtraMessage: String? = nil
+        releaseExtraMessage: LocalizedStringResource? = nil
     ) -> String {
         #if DEBUG
-        return debugMessage
+        return String(localized: debugMessage)
         #else
-        if let releaseExtraMessage {
-            return "This will take effect the next time you quit and relaunch \(appName).\n\n\(releaseExtraMessage)"
-        } else {
-            return "This will take effect the next time you quit and relaunch \(appName)."
-        }
+        let message = String(localized: "This will take effect the next time you quit and relaunch \(appName).")
+        guard let releaseExtraMessage else { return message }
+        return message + "\n\n" + String(localized: releaseExtraMessage)
         #endif
     }
 

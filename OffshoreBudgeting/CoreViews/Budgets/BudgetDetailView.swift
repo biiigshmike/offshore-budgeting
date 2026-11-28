@@ -193,7 +193,9 @@ struct BudgetDetailView: View {
         guard linkedCards.isEmpty else { return nil }
 
         let hasAnyCardsInSystem = !workspaceCards.isEmpty
-        return hasAnyCardsInSystem ? "Card Unassigned" : "No Cards Available"
+        return hasAnyCardsInSystem
+            ? String(localized: "Card Unassigned")
+            : String(localized: "No Cards Available")
     }
 
     // MARK: - Income (within budget window)
@@ -1243,25 +1245,25 @@ struct BudgetDetailView: View {
     private func plannedEmptyMessage(_ derived: BudgetDetailDerivedState) -> String {
         if selectedCategoryIDs?.isEmpty == true { return String(localized: "No categories selected") }
         if derived.hiddenFuturePlannedExpenseCount > 0 {
-            return "No visible planned expenses"
+            return String(localized: "No visible planned expenses")
         }
-        return "No planned expenses"
+        return String(localized: "No planned expenses")
     }
 
     private func variableEmptyMessage(_ derived: BudgetDetailDerivedState) -> String {
         if selectedCategoryIDs?.isEmpty == true { return String(localized: "No categories selected") }
         if derived.hiddenFutureVariableExpenseCount > 0 {
-            return "No visible variable expenses"
+            return String(localized: "No visible variable expenses")
         }
-        return "No variable expenses"
+        return String(localized: "No variable expenses")
     }
 
     private func unifiedEmptyMessage(_ derived: BudgetDetailDerivedState) -> String {
         if selectedCategoryIDs?.isEmpty == true { return String(localized: "No categories selected") }
         if derived.hiddenFuturePlannedExpenseCount > 0 || derived.hiddenFutureVariableExpenseCount > 0 {
-            return "No visible expenses"
+            return String(localized: "No visible expenses")
         }
-        return "No expenses"
+        return String(localized: "No expenses")
     }
 
     // MARK: - Budget Deletion (Policy A)

@@ -73,7 +73,7 @@ struct PillDatePickerField: View {
 
     @Environment(\.verticalSizeClass) private var verticalSizeClass
 
-    let title: String
+    let title: LocalizedStringResource
     @Binding var date: Date
 
     var minimumDate: Date?
@@ -83,7 +83,7 @@ struct PillDatePickerField: View {
     @State private var isPresented = false
 
     init(
-        title: String,
+        title: LocalizedStringResource,
         date: Binding<Date>,
         minimumDate: Date? = nil,
         maximumDate: Date? = nil,
@@ -110,16 +110,17 @@ struct PillDatePickerField: View {
 
     var body: some View {
         let dateText = formattedDate(date)
+        let accessibilityText = "\(String(localized: title)) \(dateText)"
 
         if PillPickerPlatform.isMacCatalyst {
-            triggerButton(text: dateText, accessibilityText: "\(title) \(dateText)")
+            triggerButton(text: dateText, accessibilityText: accessibilityText)
                 .blocksAutomaticExpenseReview(while: isPresented)
                 .popover(isPresented: $isPresented, attachmentAnchor: .rect(.bounds), arrowEdge: .top) {
                     macPopoverContent
                         .presentationCompactAdaptation(.popover)
                 }
         } else {
-            triggerButton(text: dateText, accessibilityText: "\(title) \(dateText)")
+            triggerButton(text: dateText, accessibilityText: accessibilityText)
                 .appSheet(isPresented: $isPresented, usesPageSizing: false) {
                     mobileSheetContent
                         .presentationSizing(.form)
@@ -152,7 +153,7 @@ struct PillDatePickerField: View {
                 pickerContainer
             }
             .padding()
-            .navigationTitle(title)
+            .navigationTitle(Text(title))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 if #available(iOS 26.0, *) {
@@ -278,28 +279,29 @@ struct PillDatePickerField: View {
 
 struct PillTimePickerField: View {
 
-    let title: String
+    let title: LocalizedStringResource
     @Binding var time: Date
 
     @State private var isPresented = false
 
-    init(title: String, time: Binding<Date>) {
+    init(title: LocalizedStringResource, time: Binding<Date>) {
         self.title = title
         self._time = time
     }
 
     var body: some View {
         let timeText = formattedTime(time)
+        let accessibilityText = "\(String(localized: title)) \(timeText)"
 
         if PillPickerPlatform.isMacCatalyst {
-            triggerButton(text: timeText, accessibilityText: "\(title) \(timeText)")
+            triggerButton(text: timeText, accessibilityText: accessibilityText)
                 .blocksAutomaticExpenseReview(while: isPresented)
                 .popover(isPresented: $isPresented, attachmentAnchor: .rect(.bounds), arrowEdge: .top) {
                     macPopoverContent
                         .presentationCompactAdaptation(.popover)
                 }
         } else {
-            triggerButton(text: timeText, accessibilityText: "\(title) \(timeText)")
+            triggerButton(text: timeText, accessibilityText: accessibilityText)
                 .appSheet(isPresented: $isPresented) {
                     mobileSheetContent
                 }
@@ -340,7 +342,7 @@ struct PillTimePickerField: View {
                 }
             }
             .padding()
-            .navigationTitle(title)
+            .navigationTitle(Text(title))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 if #available(iOS 26.0, *) {

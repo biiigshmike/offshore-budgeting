@@ -7,14 +7,14 @@ struct DebugStartupDiagnosticsView: View {
     @State private var logURLs: [URL] = []
     @State private var selectedLogURL: URL?
     @State private var logText = ""
-    @State private var validationResult = "Not checked"
+    @State private var validationResult = String(localized: "Not checked")
     @State private var persistenceError: String?
 
     private var modeDescription: String {
         if DebugScreenshotMode.isCompiledBuild {
-            "Screenshots (compiled)"
+            String(localized: "Screenshots (compiled)")
         } else {
-            "Normal Debug"
+            String(localized: "Normal Debug")
         }
     }
 
@@ -31,7 +31,7 @@ struct DebugStartupDiagnosticsView: View {
                 LabeledContent("Mode", value: modeDescription)
                     .accessibilityElement(children: .combine)
                     .accessibilityIdentifier("screenshotDiagnosticsMode")
-                LabeledContent("Bundle", value: Bundle.main.bundleIdentifier ?? "Unknown")
+                LabeledContent("Bundle", value: Bundle.main.bundleIdentifier ?? String(localized: "Unknown"))
                 LabeledContent("Process", value: String(ProcessInfo.processInfo.processIdentifier))
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Displayed Store")
@@ -101,12 +101,12 @@ struct DebugStartupDiagnosticsView: View {
         if DebugScreenshotMode.isEnabled {
             do {
                 let workspaceID = try ScreenshotStartupCoordinator.validate(container: modelContext.container)
-                validationResult = "Valid (\(workspaceID))"
+                validationResult = String(localized: "Valid (\(workspaceID.uuidString))")
             } catch {
-                validationResult = "Failed: \(error.localizedDescription)"
+                validationResult = String(localized: "Failed: \(error.localizedDescription)")
             }
         } else {
-            validationResult = "Not applicable"
+            validationResult = String(localized: "Not applicable")
         }
 
         StartupDiagnostics.log("debug inspector mode=\(modeDescription) screenshotValidation=\(validationResult)")

@@ -334,7 +334,7 @@ struct SettingsPrivacyView: View {
         }
 
         do {
-            let reason = "Enable \(availability.kind.displayName) to unlock the app."
+            let reason = String(localized: "Enable \(availability.kind.displayName) to unlock the app.")
             let success = try await LocalAuthenticationService.authenticateForUnlock(localizedReason: reason)
 
             if success {
@@ -399,9 +399,9 @@ struct SettingsPrivacyView: View {
 
         switch permission {
         case .location:
-            return "System Settings > Privacy & Security > Location Services"
+            return String(localized: "System Settings > Privacy & Security > Location Services")
         case .photos:
-            return "System Settings > Privacy & Security > Photos"
+            return String(localized: "System Settings > Privacy & Security > Photos")
         }
     }
 

@@ -313,11 +313,7 @@ struct BudgetsView: View {
                 if !activeBudgets.isEmpty {
                     Section {
                         BucketDisclosureRow(
-                            title: bucketTitle(
-                                key: "budgets.bucket.active",
-                                defaultValue: "Active Budgets (%@)",
-                                count: activeBudgets.count
-                            ),
+                            title: activeBudgetTitle,
                             isExpanded: $activeExpanded
                         )
 
@@ -332,11 +328,7 @@ struct BudgetsView: View {
                 if !upcomingBudgets.isEmpty {
                     Section {
                         BucketDisclosureRow(
-                            title: bucketTitle(
-                                key: "budgets.bucket.upcoming",
-                                defaultValue: "Upcoming Budgets (%@)",
-                                count: upcomingBudgets.count
-                            ),
+                            title: upcomingBudgetTitle,
                             isExpanded: $upcomingExpanded
                         )
 
@@ -351,11 +343,7 @@ struct BudgetsView: View {
                 if !pastBudgets.isEmpty {
                     Section {
                         BucketDisclosureRow(
-                            title: bucketTitle(
-                                key: "budgets.bucket.past",
-                                defaultValue: "Past Budgets (%@)",
-                                count: pastBudgets.count
-                            ),
+                            title: pastBudgetTitle,
                             isExpanded: $pastExpanded
                         )
 
@@ -385,19 +373,19 @@ struct BudgetsView: View {
                     description: Text(String(localized: "common.tryDifferentSearch", defaultValue: "Try a different search.", comment: "Prompt to try a different search query."))
                 )
             } else {
-                budgetGalleryBucket(activeBudgets, key: "budgets.bucket.active", title: "Active Budgets (%@)", isExpanded: $activeExpanded)
-                budgetGalleryBucket(upcomingBudgets, key: "budgets.bucket.upcoming", title: "Upcoming Budgets (%@)", isExpanded: $upcomingExpanded)
-                budgetGalleryBucket(pastBudgets, key: "budgets.bucket.past", title: "Past Budgets (%@)", isExpanded: $pastExpanded)
+                budgetGalleryBucket(activeBudgets, title: activeBudgetTitle, isExpanded: $activeExpanded)
+                budgetGalleryBucket(upcomingBudgets, title: upcomingBudgetTitle, isExpanded: $upcomingExpanded)
+                budgetGalleryBucket(pastBudgets, title: pastBudgetTitle, isExpanded: $pastExpanded)
             }
         }
     }
 
     @ViewBuilder
-    private func budgetGalleryBucket(_ budgets: [Budget], key: String, title: String, isExpanded: Binding<Bool>) -> some View {
+    private func budgetGalleryBucket(_ budgets: [Budget], title: String, isExpanded: Binding<Bool>) -> some View {
         if !budgets.isEmpty {
             VStack(alignment: .leading) {
                 BucketDisclosureRow(
-                    title: bucketTitle(key: key, defaultValue: title, count: budgets.count),
+                    title: title,
                     isExpanded: isExpanded
                 )
                 .padding(.vertical, 8)
@@ -495,13 +483,28 @@ struct BudgetsView: View {
         }
     }
 
-    private func localizedInt(_ value: Int) -> String {
-        AppNumberFormat.integer(value)
+    private var activeBudgetTitle: String {
+        String(
+            localized: "budgets.bucket.active",
+            defaultValue: "Active Budgets (\(AppNumberFormat.integer(activeBudgets.count)))",
+            comment: "Heading for active budgets, followed by the number of budgets in parentheses."
+        )
     }
 
-    private func bucketTitle(key: String, defaultValue: String, count: Int) -> String {
-        let format = Bundle.main.localizedString(forKey: key, value: defaultValue, table: nil)
-        return String(format: format, locale: Locale.current, localizedInt(count))
+    private var upcomingBudgetTitle: String {
+        String(
+            localized: "budgets.bucket.upcoming",
+            defaultValue: "Upcoming Budgets (\(AppNumberFormat.integer(upcomingBudgets.count)))",
+            comment: "Heading for upcoming budgets, followed by the number of budgets in parentheses."
+        )
+    }
+
+    private var pastBudgetTitle: String {
+        String(
+            localized: "budgets.bucket.past",
+            defaultValue: "Past Budgets (\(AppNumberFormat.integer(pastBudgets.count)))",
+            comment: "Heading for past budgets, followed by the number of budgets in parentheses."
+        )
     }
 
     private func openNewBudget() {
@@ -741,10 +744,9 @@ private struct BucketDisclosureRow: View {
 
                 Spacer(minLength: 0)
 
-                Image(systemName: "chevron.down")
+                Image(systemName: isExpanded ? "chevron.down" : "chevron.forward")
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(.secondary)
-                    .rotationEffect(.degrees(isExpanded ? 0 : -90))
                     .animation(.easeInOut(duration: 0.18), value: isExpanded)
             }
             .frame(minHeight: 44)
@@ -754,6 +756,7 @@ private struct BucketDisclosureRow: View {
         .accessibilityLabel(title)
         .accessibilityValue(isExpanded ? "Expanded" : "Collapsed")
     }
+
 }
 
 #Preview("Budgets") {

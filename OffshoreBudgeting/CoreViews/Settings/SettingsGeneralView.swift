@@ -242,12 +242,12 @@ struct SettingsGeneralView: View {
                 rootResetToken = newToken
             }
 
-            eraseResultMessage = "All content has been erased. You’ll be returned to onboarding."
+            eraseResultMessage = String(localized: "All content has been erased. You’ll be returned to onboarding.")
             DispatchQueue.main.async {
                 activeAlert = .eraseResult
             }
         } catch {
-            eraseResultMessage = "Something went wrong while erasing data: \(error.localizedDescription)"
+            eraseResultMessage = String(localized: "Something went wrong while erasing data: \(error.localizedDescription)")
             DispatchQueue.main.async {
                 activeAlert = .eraseResult
             }

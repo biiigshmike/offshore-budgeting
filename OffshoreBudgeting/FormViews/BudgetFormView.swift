@@ -17,7 +17,7 @@ struct BudgetFormView: View {
     
     // MARK: - Inputs
     
-    let modeTitle: String
+    let modeTitle: LocalizedStringResource
     let workspace: Workspace
     
     let cards: [Card]
@@ -307,7 +307,7 @@ struct BudgetFormView: View {
                 }
             }
         }
-        .navigationTitle(modeTitle)
+        .navigationTitle(Text(modeTitle))
         .appSheet(item: $sheetRoute) { route in
             switch route {
             case .categoryGoals:

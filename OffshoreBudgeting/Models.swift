@@ -181,16 +181,10 @@ enum BudgetNameSuggestion {
 
         guard start == quarterStart && end == calendar.startOfDay(for: quarterEnd) else { return nil }
 
-        let year = calendar.component(.year, from: start)
-        let month = calendar.component(.month, from: start)
-        let quarter: Int
-        switch month {
-        case 1...3: quarter = 1
-        case 4...6: quarter = 2
-        case 7...9: quarter = 3
-        default: quarter = 4
-        }
-        return "Q\(localizedInt(quarter)) \(localizedInt(year))"
+        let format = Date.FormatStyle(calendar: calendar, timeZone: calendar.timeZone)
+            .quarter(.abbreviated)
+            .year()
+        return start.formatted(format)
     }
 
     private static func monthStringIfFullMonth(start: Date, end: Date, calendar: Calendar) -> String? {

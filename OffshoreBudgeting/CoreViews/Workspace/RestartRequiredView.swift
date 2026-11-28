@@ -1,20 +1,20 @@
 import SwiftUI
 
 struct RestartRequiredView: View {
-    let title: String
+    let title: LocalizedStringResource
     let message: String
     let primaryButtonTitle: String
     let onPrimary: () -> Void
 
-    let secondaryButtonTitle: String?
+    let secondaryButtonTitle: LocalizedStringResource?
     let onSecondary: (() -> Void)?
 
     init(
-        title: String,
+        title: LocalizedStringResource,
         message: String,
         primaryButtonTitle: String,
         onPrimary: @escaping () -> Void,
-        secondaryButtonTitle: String? = nil,
+        secondaryButtonTitle: LocalizedStringResource? = nil,
         onSecondary: (() -> Void)? = nil
     ) {
         self.title = title
@@ -30,7 +30,7 @@ struct RestartRequiredView: View {
             Spacer(minLength: 0)
 
             ContentUnavailableView(
-                title,
+                String(localized: title),
                 systemImage: "arrow.clockwise.circle",
                 description: Text(message)
             )

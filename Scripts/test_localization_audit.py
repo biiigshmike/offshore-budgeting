@@ -200,5 +200,26 @@ class LocalizationAuditTests(unittest.TestCase):
             self.assertIn("placeholder mismatches: 1", result.stdout)
 
 
+    def test_arabic_fixed_plural_can_express_count_without_a_placeholder(self):
+        for category, value in (("zero", "لا توجد ميزانيات"), ("one", "ميزانية واحدة"), ("two", "ميزانيتان")):
+            with self.subTest(category=category):
+                plural = {category: unit(value), "other": unit("%lld ميزانية")}
+                target = {"variations": {"plural": plural}}
+                result = self.audit({"%lld budgets": {"localizations": {"ar": target}}}, locale="ar")
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_arabic_plural_checks_variable_counts_and_other_arguments(self):
+        for key, category, value, other in (
+            ("%lld budgets", "few", "ميزانيات", "%lld ميزانية"),
+            ("%lld budgets in %@", "two", "ميزانيتان في %@", "%lld ميزانية في %@"),
+        ):
+            with self.subTest(category=category):
+                plural = {category: unit(value), "other": unit(other)}
+                target = {"variations": {"plural": plural}}
+                result = self.audit({key: {"localizations": {"ar": target}}}, locale="ar")
+                self.assertEqual(result.returncode, 1)
+                self.assertIn("placeholder mismatches: 1", result.stdout)
+
+
 if __name__ == "__main__":
     unittest.main()

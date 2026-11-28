@@ -1503,7 +1503,9 @@ private struct OnboardingPresetsStep: View {
 
     private var presetRequiresCardFootnoteText: String {
         let hasAnyCardsInSystem = (workspace.cards ?? []).isEmpty == false
-        return hasAnyCardsInSystem ? "Card Unassigned" : "No Cards Available"
+        return hasAnyCardsInSystem
+            ? String(localized: "Card Unassigned")
+            : String(localized: "No Cards Available")
     }
 
     private func deletePresetWithOptionalConfirm(_ preset: Preset) {

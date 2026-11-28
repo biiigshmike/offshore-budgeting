@@ -139,16 +139,16 @@ struct BudgetRecordedPlannedExpensesReviewView: View {
 
     private var navigationTitleText: String {
         if let card {
-            return "Review \(card.name)"
+            return String(localized: "Review \(card.name)")
         }
         return String(localized: "Review Recorded Expenses")
     }
 
     private var introText: String {
         if let card {
-            return "Some planned expenses created by this budget on \(card.name) have recorded spending. Review them below if you want to delete any."
+            return String(localized: "Some planned expenses created by this budget on \(card.name) have recorded spending. Review them below if you want to delete any.")
         }
-        return "Some planned expenses created by this budget have recorded spending. Review them below if you want to delete any."
+        return String(localized: "Some planned expenses created by this budget have recorded spending. Review them below if you want to delete any.")
     }
 
     // MARK: - Row

@@ -189,27 +189,29 @@ struct SettingsiCloudView: View {
 
     private var statusTitle: String {
         if desiredUseICloud != activeUseICloud {
-            return "Restart Required"
+            return String(localized: "Restart Required")
         }
 
         if activeUseICloud {
-            return isICloudAvailable ? "Syncing Enabled" : "Enabled, But Not Available"
+            return isICloudAvailable
+                ? String(localized: "Syncing Enabled")
+                : String(localized: "Enabled, But Not Available")
         } else {
-            return "Syncing Disabled"
+            return String(localized: "Syncing Disabled")
         }
     }
 
     private var statusSubtitle: String {
         if desiredUseICloud != activeUseICloud {
-            return "Will take effect the next time you quit and relaunch the app."
+            return String(localized: "Will take effect the next time you quit and relaunch the app.")
         }
 
         if activeUseICloud {
             return isICloudAvailable
-            ? "Your data will sync via iCloud."
-            : "Sign in to iCloud in Settings to enable syncing."
+                ? String(localized: "Your data will sync via iCloud.")
+                : String(localized: "Sign in to iCloud in Settings to enable syncing.")
         } else {
-            return "Data is stored only on this device."
+            return String(localized: "Data is stored only on this device.")
         }
     }
 

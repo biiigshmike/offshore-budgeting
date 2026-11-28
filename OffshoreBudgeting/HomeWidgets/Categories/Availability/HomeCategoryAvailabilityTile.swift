@@ -295,13 +295,11 @@ struct HomeCategoryAvailabilityTile: View {
     private func headerSummary(overCount: Int, nearCount: Int) -> some View {
         HStack(spacing: 10) {
             AvailabilityCountPill(
-                title: "Over",
                 count: overCount,
                 style: .over
             )
 
             AvailabilityCountPill(
-                title: "Near",
                 count: nearCount,
                 style: .near
             )
@@ -356,7 +354,6 @@ private struct AvailabilityCountPill: View {
         case near
     }
 
-    let title: String
     let count: Int
     let style: PillStyle
 
@@ -370,8 +367,22 @@ private struct AvailabilityCountPill: View {
         .font(.footnote.weight(.medium))
         .foregroundStyle(.secondary)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(title) categories")
+        .accessibilityLabel(accessibilityTitle)
         .accessibilityValue(localizedInt(count))
+    }
+
+    private var title: LocalizedStringResource {
+        switch style {
+        case .over: LocalizedStringResource("homeWidget.categoryAvailability.over", defaultValue: "Over")
+        case .near: LocalizedStringResource("homeWidget.categoryAvailability.near", defaultValue: "Near")
+        }
+    }
+
+    private var accessibilityTitle: Text {
+        switch style {
+        case .over: Text("Categories over the limit")
+        case .near: Text("Categories near the limit")
+        }
     }
 
     private var foregroundColor: Color {
